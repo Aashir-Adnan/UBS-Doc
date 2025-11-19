@@ -24,12 +24,12 @@ const sidebars = {
     {
       type: 'category',
       label: 'Framework Backend',
-      items: ['UBS-intro', 'FAQs'],
+      items: ['backend/UBS-intro', 'backend/FAQs'],
     },
     {
       type: 'category',
       label: 'Framework Frontend',
-      items: [],
+      items: ['frontend/UBS-intro'],
     },
     {
       type: 'category',
