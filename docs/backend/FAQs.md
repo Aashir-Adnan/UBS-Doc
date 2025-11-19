@@ -74,7 +74,7 @@ This starts the UBS server with all defined APIs and global objects loaded.
 To add an API:
 
 1. Create a **global object** in the naming format described in
-   [`UBS Intro`](/docs/UBS-intro)
+   [`UBS Intro`](/docs/backend/UBS-intro)
 
 Example:
 
