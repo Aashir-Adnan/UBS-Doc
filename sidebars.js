@@ -21,8 +21,16 @@ const sidebars = {
   // But you can create a sidebar manually
 
   tutorialSidebar: [
-    'UBS-intro',
-    'FAQs',
+    {
+      type: 'category',
+      label: 'Framework Backend',
+      items: ['UBS-intro', 'FAQs'],
+    },
+    {
+      type: 'category',
+      label: 'Framework Frontend',
+      items: [],
+    },
     {
       type: 'category',
       label: 'Tutorial',
