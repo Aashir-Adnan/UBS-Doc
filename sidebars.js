@@ -24,7 +24,7 @@ const sidebars = {
     {
       type: 'category',
       label: 'Framework Backend',
-      items: ['backend/UBS-intro', 'backend/FAQs', 'backend/Socket'],
+      items: ['backend/UBS-intro', 'backend/FAQs', 'backend/Socket', 'backend/Payments'],
     },
     {
       type: 'category',
