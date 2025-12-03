@@ -23,6 +23,11 @@ const sidebars = {
   tutorialSidebar: [
     {
       type: 'category',
+      label: 'Framework Database',
+      items: ['database/Lucidchart'],
+    },
+    {
+      type: 'category',
       label: 'Framework Backend',
       items: ['backend/UBS-intro', 'backend/FAQs', 'backend/Socket', 'backend/Payments'],
     },
