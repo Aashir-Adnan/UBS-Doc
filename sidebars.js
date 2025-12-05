@@ -29,11 +29,21 @@ const sidebars = {
     {
       type: 'category',
       label: 'Framework Backend',
-      items: ['backend/UBS-intro', 'backend/FAQs', 'backend/Socket', 'backend/Payments', {
-        type: 'category',
-        label: 'Github Workflows',
-        items: ['backend/githubWorkflows/ai-reviewer', 'backend/githubWorkflows/ai-agent'],
-      }],
+      items: [
+        'backend/UBS-intro',
+        {
+          type: 'category',
+          label: 'Github Workflows',
+          items: ['backend/githubWorkflows/ai-reviewer', 'backend/githubWorkflows/ai-agent'],
+        },
+        {
+          type: 'category',
+          label: 'Integrations',
+          items: ['backend/Socket',  'backend/Payments'],
+        },
+        'backend/FAQs'
+    
+      ],
     },
     {
       type: 'category',
