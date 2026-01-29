@@ -4,7 +4,15 @@
 // There are various equivalent ways to declare your Docusaurus config.
 // See: https://docusaurus.io/docs/api/docusaurus-config
 
-import {themes as prismThemes} from 'prism-react-renderer';
+import { themes as prismThemes } from 'prism-react-renderer';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+try {
+  require('dotenv').config();
+} catch {
+  // dotenv optional; set VITE_FIREBASE_* and VITE_API_BASE_URL in env when using portal
+}
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
@@ -31,6 +39,8 @@ const config = {
   projectName: 'docusaurus', // Usually your repo name.
 
   onBrokenLinks: 'throw',
+
+  plugins: ['./plugins/portalPlugin.js'],
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
@@ -95,6 +105,8 @@ const config = {
             position: 'left',
             label: 'Documentation',
           },
+          { to: '/tools', label: 'Dev Tools', position: 'left' },
+          { to: '/about', label: 'About', position: 'left' },
           {
             href: 'https://granjur.com/',
             label: 'Granjur Tech',
