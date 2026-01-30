@@ -37,6 +37,14 @@ function FieldHelp({ text }) {
   );
 }
 
+const FIELDS_JSON_EXAMPLE = `[
+  {
+    "name": "actionPerformerURDD",
+    "required": false,
+    "source": "req.body"
+  }
+]`;
+
 const DEFAULT_STATE = {
   url: '/test/api',
   // config.features
@@ -45,6 +53,8 @@ const DEFAULT_STATE = {
   pagination: false,
   // config.communication
   encryption: false,
+  encryptionAccessToken: false,
+  encryptionPlatformEncryption: true, // at least one must be true when encryption is on
   // config.verification
   otp: false,
   accessToken: false,
@@ -55,26 +65,28 @@ const DEFAULT_STATE = {
   // response
   successMessage: 'Configuration generated successfully!',
   errorMessage: 'There was an error generating the configuration.',
-  // apiInfo
-  preProcessFunctions: '', // comma or newline separated, or JSON array
-  postProcessFunction: 'ubs_init_wrapper',
+  // apiInfo — write full function definitions; names are extracted and referenced in config
+  preProcessDefinitions: '',
+  postProcessDefinition: '',
   query: '',
   // optional: fields JSON
   fieldsJson: '[]',
 };
 
-function parsePreProcessFunctions(raw) {
-  if (!raw || !String(raw).trim()) return [];
-  const s = String(raw).trim();
-  if (s.startsWith('[')) {
-    try {
-      const arr = JSON.parse(s);
-      return Array.isArray(arr) ? arr : [s];
-    } catch {
-      return s.split(/[\n,]+/).map((x) => x.trim()).filter(Boolean);
-    }
-  }
-  return s.split(/[\n,]+/).map((x) => x.trim()).filter(Boolean);
+/** Extract function names from definition code (async function name( or function name() in order. */
+function extractFunctionNames(code) {
+  if (!code || !String(code).trim()) return [];
+  const regex = /(?:async\s+)?function\s+(\w+)\s*\(/g;
+  const names = [];
+  let m;
+  while ((m = regex.exec(code)) !== null) names.push(m[1]);
+  return names;
+}
+
+/** Extract single function name from definition code. */
+function extractSingleFunctionName(code) {
+  const names = extractFunctionNames(code);
+  return names.length > 0 ? names[0] : null;
 }
 
 function parseFieldsJson(raw) {
@@ -89,10 +101,12 @@ function parseFieldsJson(raw) {
 
 function buildOutput(state) {
   const objectName = urlToObjectName(state.url) || 'Api_object';
-  const preProcess = parsePreProcessFunctions(state.preProcessFunctions);
+  const preDefs = (state.preProcessDefinitions || '').trim();
+  const postDef = (state.postProcessDefinition || '').trim();
+  const preNames = extractFunctionNames(preDefs);
+  const postName = extractSingleFunctionName(postDef);
   const fields = parseFieldsJson(state.fieldsJson);
   const queryVal = state.query.trim() || null;
-  const postProcess = state.postProcessFunction.trim() || null;
 
   const obj = {
     versions: {
@@ -108,7 +122,12 @@ function buildOutput(state) {
                     pagination: state.pagination,
                   },
                   communication: {
-                    encryption: state.encryption,
+                    encryption: state.encryption
+                      ? {
+                          accessToken: state.encryptionAccessToken,
+                          platformEncryption: state.encryptionPlatformEncryption,
+                        }
+                      : false,
                   },
                   verification: {
                     otp: state.otp,
@@ -120,9 +139,9 @@ function buildOutput(state) {
                     fields,
                   },
                   apiInfo: {
-                    preProcessFunctions: preProcess,
+                    preProcessFunctions: preNames.length > 0 ? preNames : [],
                     query: queryVal,
-                    postProcessFunction: postProcess,
+                    postProcessFunction: postName,
                   },
                   requestMetaData: {
                     requestMethod: state.requestMethod || 'POST',
@@ -146,12 +165,27 @@ function buildOutput(state) {
 
   let js = JSON.stringify(obj, null, 4);
   js = js.replace(/"([^"]+)":/g, '$1:');
-  // Output postProcessFunction as identifier when it looks like one (e.g. ubs_init_wrapper)
-  const postVal = state.postProcessFunction.trim();
-  if (postVal && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(postVal)) {
-    js = js.replace(new RegExp(`"postProcessFunction":\\s*"${postVal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`), `postProcessFunction: ${postVal}`);
+  // Output preProcessFunctions as array of identifiers when we have definitions
+  if (preNames.length > 0) {
+    const arrLiteral = '[' + preNames.join(', ') + ']';
+    js = js.replace(
+      /preProcessFunctions:\s*\[[^\]]*\]/,
+      `preProcessFunctions: ${arrLiteral}`
+    );
   }
-  return `global.${objectName} = ${js}\nmodule.exports = { ${objectName} }`;
+  // Output postProcessFunction as identifier when we have a definition
+  if (postName) {
+    js = js.replace(
+      new RegExp(`postProcessFunction:\\s*"${postName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`),
+      `postProcessFunction: ${postName}`
+    );
+  }
+
+  const definitionsBlock = [preDefs, postDef].filter(Boolean).join('\n\n');
+  const configPart = `global.${objectName} = ${js}\nmodule.exports = { ${objectName} }`;
+  return definitionsBlock
+    ? `${definitionsBlock}\n\n${configPart}`
+    : configPart;
 }
 
 function ApiObjectBuilderContent() {
@@ -311,8 +345,31 @@ function ApiObjectBuilderContent() {
                     onChange={() => toggle('encryption')}
                   />
                   <span>encryption</span>
-                  <FieldHelp text="Use encryption for request/response communication." />
+                  <FieldHelp text="When true, sets an encryption object with accessToken and platformEncryption (at least one must be true)." />
                 </label>
+                {state.encryption && (
+                  <>
+                    <label className="api-object-check api-object-check-indent">
+                      <input
+                        type="checkbox"
+                        checked={state.encryptionAccessToken}
+                        onChange={() => toggle('encryptionAccessToken')}
+                      />
+                      <span>accessToken</span>
+                    </label>
+                    <label className="api-object-check api-object-check-indent">
+                      <input
+                        type="checkbox"
+                        checked={state.encryptionPlatformEncryption}
+                        onChange={() => toggle('encryptionPlatformEncryption')}
+                      />
+                      <span>platformEncryption</span>
+                    </label>
+                    {!state.encryptionAccessToken && !state.encryptionPlatformEncryption && (
+                      <span className="api-object-warn">At least one of accessToken or platformEncryption should be true.</span>
+                    )}
+                  </>
+                )}
               </div>
 
               <h4 className="api-object-group-title">Verification</h4>
@@ -406,27 +463,41 @@ function ApiObjectBuilderContent() {
               <h4 className="api-object-group-title">Pre / Post process</h4>
               <div className="api-object-field">
                 <label>
-                  preProcessFunctions{' '}
-                  <FieldHelp text="Comma- or newline-separated function names, or a JSON array. Run before the main handler." />
+                  Pre-process function definitions{' '}
+                  <FieldHelp text="Write one or more full function definitions (e.g. async function func1(req, decryptedPayload) { }). The return of this function is added to decryptedPayload under the key of the function name." />
                 </label>
                 <textarea
-                  value={state.preProcessFunctions}
-                  onChange={(e) => update('preProcessFunctions', e.target.value)}
-                  placeholder="fn1, fn2"
-                  rows={3}
+                  value={state.preProcessDefinitions}
+                  onChange={(e) => update('preProcessDefinitions', e.target.value)}
+                  placeholder={'async function func1(req, decryptedPayload) {\n  // ...\n}\nasync function func2(req, decryptedPayload) {\n  // ...\n}'}
+                  rows={6}
+                  className="api-object-code"
+                  spellCheck={false}
                 />
+                {state.preProcessDefinitions.trim() && (
+                  <span className="api-object-name-hint">
+                    → Referenced as: [{extractFunctionNames(state.preProcessDefinitions).join(', ')}]
+                  </span>
+                )}
               </div>
               <div className="api-object-field">
                 <label>
-                  postProcessFunction{' '}
-                  <FieldHelp text="Function name to run after the main handler (e.g. ubs_init_wrapper)." />
+                  Post-process function definition{' '}
+                  <FieldHelp text="Write a single full function definition. The return of this function is assigned to response." />
                 </label>
-                <input
-                  type="text"
-                  value={state.postProcessFunction}
-                  onChange={(e) => update('postProcessFunction', e.target.value)}
-                  placeholder="ubs_init_wrapper"
+                <textarea
+                  value={state.postProcessDefinition}
+                  onChange={(e) => update('postProcessDefinition', e.target.value)}
+                  placeholder={'async function ubs_init_wrapper(req, decryptedPayload) {\n  // ...\n}'}
+                  rows={4}
+                  className="api-object-code"
+                  spellCheck={false}
                 />
+                {state.postProcessDefinition.trim() && extractSingleFunctionName(state.postProcessDefinition) && (
+                  <span className="api-object-name-hint">
+                    → Referenced as: {extractSingleFunctionName(state.postProcessDefinition)}
+                  </span>
+                )}
               </div>
               <div className="api-object-field">
                 <label>
@@ -445,13 +516,13 @@ function ApiObjectBuilderContent() {
               <div className="api-object-field">
                 <label>
                   fields (JSON array){' '}
-                  <FieldHelp text="JSON array of field definitions for the request parameters." />
+                  <FieldHelp text="JSON array of field definitions. Each field: name, validations (array), required (bool), source (e.g. req.body)." />
                 </label>
                 <textarea
                   value={state.fieldsJson}
                   onChange={(e) => update('fieldsJson', e.target.value)}
-                  placeholder="[]"
-                  rows={4}
+                  placeholder={FIELDS_JSON_EXAMPLE}
+                  rows={6}
                   className="api-object-code"
                 />
               </div>

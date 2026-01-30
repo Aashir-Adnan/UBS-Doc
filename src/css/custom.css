@@ -572,6 +572,18 @@
   margin: 0;
 }
 
+.api-object-check-indent {
+  margin-left: 1.25rem;
+}
+
+.api-object-warn {
+  display: block;
+  width: 100%;
+  font-size: 0.85rem;
+  color: var(--ifm-color-warning);
+  margin-top: 0.25rem;
+}
+
 .api-object-help {
   display: inline-flex;
   align-items: center;
