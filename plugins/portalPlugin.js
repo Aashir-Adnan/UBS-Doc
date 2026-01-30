@@ -1,11 +1,7 @@
 'use strict';
 
-const path = require('path');
 const React = require('react');
 
-// Load .env from project root (plugin lives in /plugins, .env at root)
-const envPath = path.resolve(__dirname, '..', '.env');
-require('dotenv').config({ path: envPath });
 
 module.exports = function () {
   console.log('portalPlugin', process.env)
