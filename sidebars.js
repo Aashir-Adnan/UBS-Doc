@@ -63,8 +63,35 @@ const sidebars = {
           type: 'category',
           label: 'Badar HMS',
           items: [
-            'projects/badar-hms/Opera_Integration',
-            'projects/badar-hms/Opera_Integration_ar',
+            {
+              type: 'category',
+              label: 'V1',
+              items: [
+                'projects/badar-hms/v1/OPERA_PMS_Integration_Solutions'              
+              ]
+            },
+            {
+              type: 'category',
+              label: 'V2',
+              items: [
+                'projects/badar-hms/v2/OPERA_PMS_Integration_Solutions_v2'              
+              ]
+            },
+            {
+              type: 'category',
+              label: 'V3',
+              items: [
+                'projects/badar-hms/v3/OPERA_PMS_Integration_Solutions_v3'              
+              ]
+            },
+            {
+              type: 'category',
+              label: 'V4',
+              items: [
+                'projects/badar-hms/v4/OPERA_PMS_Integration_Solutions_v4'              
+              ]
+            },
+            'projects/badar-hms/Opera_Config',
           ]
         }
       ],
