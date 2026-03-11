@@ -1,473 +1,382 @@
-# [English] Secure Hybrid SaaS Integration for OPERA PMS
-## Solution Architecture Options
+# Secure Hybrid SaaS Integration for OPERA PMS
+## Solution Architecture Options — Revised
 
-**Document Version:** 1.0  
+**Document Version:** 2.0  
 **Status:** Draft  
-**Reference PRD Version:** 1.0
+**Reference PRD Version:** 1.0 (Amended)  
+**Supersedes:** Version 1.0
+
+---
+
+## Changelog v1.0 → v2.0
+
+| Constraint | v1.0 | v2.0 |
+|---|---|---|
+| **TR-1** | Pull-based sync only; no cloud-initiated push | ~~Removed~~ — bidirectional sync now permitted |
+| **TR-2** | Sync interval ≥ 1 hour or async OXI/OHIP events | **Replaced** — OPERA must remain in continuous real-time sync with the MERN cloud service |
+| **TR-3** | No static IP or port forwarding at hotel site | **Relaxed** — static IP is now permitted where operationally justified |
+| **SC-3** | Integration DB user restricted to `SELECT` only | **Expanded** — `INSERT` and `UPDATE` are now required for bookings and reservations at minimum |
+| **Write scope** | SaaS sidecar/OHIP only | **Expanded** — writes to OPERA reservation and booking tables are a core requirement |
 
 ---
 
 ## Table of Contents
-1. [Overview & Constraints Summary](#overview)
-2. [Read-Only Solutions (5 Options)](#read-only-solutions)
-3. [Read & Write Solutions (3 Options)](#read-write-solutions)
-4. [Comparison Matrix](#comparison-matrix)
+1. [Updated Constraints Summary](#overview)
+2. [Hybrid Read/Write Solutions (5 Options)](#solutions)
+3. [Comparison Matrix](#comparison-matrix)
+4. [Recommended Architecture](#recommendation)
 
 ---
 
-## 1. Overview & Constraints Summary <a name="overview"></a>
-
-All solutions must satisfy the following non-negotiable constraints derived from the PRD:
+## 1. Updated Constraints Summary <a name="overview"></a>
 
 | Constraint | Requirement |
 |---|---|
-| **TR-1** | Pull-based sync only; no cloud-initiated push to local network |
-| **TR-2** | Sync interval ≥ 1 hour, or async via OXI/OHIP Business Events |
-| **TR-3** | No Static IP or Port Forwarding at hotel site |
-| **SC-1** | TLS 1.3 for all data in transit |
-| **SC-2** | PII masked/hashed before leaving on-premises |
-| **SC-3** | Integration DB user restricted to `SELECT` only |
+| **TR-1** | Bidirectional sync permitted; both push and pull patterns are acceptable |
+| **TR-2** | OPERA must remain in **continuous, real-time sync** with the MERN cloud service — eventual consistency is not acceptable for bookings and reservations |
+| **TR-3** | Static IP and port forwarding are permitted at the hotel site where operationally justified |
+| **SC-1** | TLS 1.3 for all data in transit — non-negotiable |
+| **SC-2** | PII masked/hashed before leaving on-premises unless required for core booking function |
+| **SC-3** | Integration DB user must support `SELECT`, `INSERT`, and `UPDATE` on reservation and booking tables at minimum; `DELETE` remains prohibited |
 | **SA-1** | MFA required for all external users |
-| **SA-2** | Stakeholder reads target Cloud Read-Replica only |
+| **SA-2** | General stakeholder reads target Cloud Read-Replica; booking write operations use a dedicated write path |
+
+> **Important note on SC-2 and bookings:** Guest name, contact details, and identification data are required for reservation operations. These fields are exempt from PII masking on the write path but must still be encrypted in transit (SC-1) and at rest in the cloud database.
+
+> **Important note on SC-3:** A dedicated DB user with scoped `INSERT`/`UPDATE` permissions on `RESERVATION`, `RESERVATION_NAME`, `ALLOTMENT`, and related tables must be provisioned separately from the read-only reporting user. `DELETE`, `DROP`, `TRUNCATE`, and DDL operations remain strictly prohibited.
 
 ---
 
-## 2. Read-Only Solutions <a name="read-only-solutions"></a>
+## 2. Hybrid Read/Write Solutions <a name="solutions"></a>
 
 ---
 
-### Solution 1: On-Premises Agent + Cloudflare Tunnel + Managed Cloud Replica
+### Solution 1: OHIP REST API (Bidirectional) + MERN Backend + MongoDB Atlas Sync
 
 **Architecture Summary:**  
-A lightweight Windows/Linux service installed on-premises polls the OPERA Oracle DB on a scheduled interval, masks PII locally, and streams the payload outbound through a **Cloudflare Tunnel** (formerly Argo Tunnel). The tunnel establishes a persistent outbound-only HTTPS connection to Cloudflare's edge — eliminating any need for static IPs or inbound firewall rules. Data lands in a managed cloud database (e.g., AWS RDS PostgreSQL or Supabase) serving as the read-replica.
+The most Oracle-aligned option. The MERN cloud service communicates with OPERA exclusively through **Oracle's OHIP REST API** — the officially certified integration layer for OPERA Cloud. The MERN Node.js backend calls OHIP endpoints to read availability and reservation data, and to write new bookings directly into OPERA. A **MongoDB Change Stream** on Atlas detects reservation mutations and triggers outbound OHIP write calls in near real-time, keeping both systems continuously in sync per TR-2. A static IP on the hotel's network is used to whitelist OHIP inbound traffic, satisfying the relaxed TR-3.
 
 ```
-[OPERA Oracle DB] ──SELECT──► [On-Prem Agent]
-                                    │  PII Masking
-                                    │  TLS 1.3
-                                    ▼
-                           [Cloudflare Tunnel]
-                                    │ Outbound only
-                                    ▼
-                        [Cloudflare Edge / Zero Trust]
-                                    │
-                                    ▼
-                         [Cloud Read-Replica DB]
-                                    │
-                                    ▼
-                    [SaaS Application + MFA Auth Layer]
+[MERN React Frontend]
+        │ REST
+        ▼
+[Node.js Express Backend]
+        │ OHIP OAuth 2.0 token
+        ├──────────────────────────────────────────────┐
+        │ Read: GET /reservations, /availability        │ Write: POST /reservations
+        ▼                                              ▼
+[OHIP REST API — Oracle Managed]──────────────────────►[OHIP REST API]
+        │                                              │
+        ▼                                              ▼
+[OPERA Oracle DB — Read via OHIP]          [OPERA Oracle DB — Write via OHIP]
+        │
+        ▼
+[MongoDB Atlas — Read Replica / Cache]
+        │ Change Streams
+        ▼
+[Stakeholder Dashboard (SA-2)]
 ```
+
+**Sync Mechanism:** MongoDB Atlas acts as a read cache populated by OHIP polling or webhooks. Write operations bypass MongoDB entirely and go direct OHIP → OPERA to ensure transactional consistency. OHIP webhooks notify the MERN backend of OPERA-side changes (e.g., walk-ins, PMS-originated modifications) to keep Atlas in sync.
 
 **Compliance Mapping:**
-- ✅ TR-1: Agent pulls from Oracle; cloud never pushes inbound
-- ✅ TR-2: Scheduled via Windows Task Scheduler / cron (1hr+) or event-triggered
-- ✅ TR-3: Cloudflare Tunnel requires no port forwarding or static IP
-- ✅ SC-1: Cloudflare Tunnel enforces TLS 1.3
-- ✅ SC-2: PII masked within agent before any data leaves the LAN
-- ✅ SC-3: Oracle user created with `GRANT SELECT` only
-- ✅ SA-1/SA-2: MFA enforced at SaaS layer; replica is read-only
+- ✅ TR-1: Bidirectional via OHIP API; both read and write supported natively
+- ✅ TR-2: OHIP webhooks deliver OPERA state changes to MERN in near real-time; write confirmations are synchronous
+- ✅ TR-3: Static IP whitelisted in OHIP configuration; no raw port forwarding to Oracle DB
+- ✅ SC-1: OHIP enforces TLS 1.3; Atlas TLS 1.3 in transit
+- ✅ SC-2: PII transmitted only for reservation operations where required
+- ✅ SC-3: No direct Oracle DB user — all access mediated by OHIP, which enforces its own permission model
+- ✅ SA-1/SA-2: MFA at MERN auth layer; stakeholder views use Atlas replica
 
-**Tech Stack Candidates:** Cloudflare Tunnel, AWS RDS / Supabase, Python or Node.js agent, Oracle JDBC/cx_Oracle  
-**Complexity:** ⭐⭐ Low-Medium  
-**Cost Profile:** Low (Cloudflare Tunnel free tier available)
-
-**Pros:**
-- Lowest barrier to entry — Cloudflare Tunnel has a generous free tier and a well-documented `cloudflared` daemon for Windows and Linux
-- No networking changes required at the hotel site; IT staff do not need to open firewall ports or request a static IP from the ISP
-- Cloudflare's Zero Trust dashboard provides access policies, identity-aware routing, and connection logs out of the box
-- The polling agent is a simple, stateless process that is easy to maintain, redeploy, or version-control
-- Broad cloud database compatibility — the replica can be hosted on any provider (AWS, GCP, Azure, Supabase)
-
-**Cons:**
-- Polling introduces inherent data latency; the replica will lag behind OPERA by up to the configured interval (minimum 1 hour per TR-2), making it unsuitable for near-real-time use cases
-- The sync agent is a custom-built component requiring ongoing maintenance, error handling, and schema-change management as OPERA is upgraded
-- A single-process agent represents a potential single point of failure unless a watchdog or redundancy mechanism is implemented
-- Cloudflare's free tier imposes connection and bandwidth limits that may be insufficient for large multi-property deployments; paid tiers add recurring cost
-- PII masking logic lives in the agent code, requiring careful testing and auditing to ensure no leakage edge cases
-
----
-
-### Solution 2: OXI/OHIP Business Event Listener + AWS EventBridge + Serverless Pipeline
-
-**Architecture Summary:**  
-Rather than scheduled polling, this solution leverages **OPERA's native OXI/OHIP Business Event** system. When a booking, check-in, or rate change occurs, OPERA fires an event. An on-premises listener service captures these events, applies PII masking, and forwards them outbound via **AWS PrivateLink** or a secure webhook relay to **AWS EventBridge**. EventBridge routes events to Lambda functions that hydrate the cloud read-replica in near real-time.
-
-```
-[OPERA PMS] ──Business Event──► [On-Prem OXI Listener]
-                                         │ PII Mask + TLS 1.3
-                                         ▼
-                               [Outbound Webhook Relay]
-                                         │
-                                         ▼
-                              [AWS EventBridge / SNS]
-                                         │
-                                    ┌────┴─────┐
-                                    ▼          ▼
-                              [Lambda]    [Lambda]
-                             (Upsert)    (Audit Log)
-                                    │
-                                    ▼
-                         [Cloud Read-Replica (RDS)]
-```
-
-**Compliance Mapping:**
-- ✅ TR-1: Listener is on-prem and event-driven; no inbound cloud connections
-- ✅ TR-2: Async Business Event triggers satisfy the OXI/OHIP requirement explicitly
-- ✅ TR-3: Outbound HTTPS webhook; no firewall inbound rules required
-- ✅ SC-1: AWS SDK enforces TLS 1.3
-- ✅ SC-2: PII scrubbed in OXI Listener before EventBridge payload
-- ✅ SC-3: Oracle integration user is SELECT-only; OXI reads published events only
-
-**Tech Stack Candidates:** Oracle OXI/OHIP, AWS EventBridge, AWS Lambda, RDS Aurora  
+**Tech Stack:** OHIP REST API, Node.js/Express, MongoDB Atlas, React, Atlas Change Streams  
 **Complexity:** ⭐⭐⭐ Medium  
-**Cost Profile:** Medium (AWS serverless pricing, scales with event volume)
+**Cost Profile:** Medium-High (OHIP subscription + Atlas M10+ cluster)
 
 **Pros:**
-- Natively satisfies the TR-2 async Business Event requirement — data reaches the cloud replica within seconds of an OPERA state change, not hours
-- Event-driven architecture is inherently decoupled; the cloud pipeline can be scaled, modified, or replaced independently of the on-prem listener
-- AWS Lambda's serverless model means infrastructure scales automatically with event volume and incurs no cost when idle
-- Built-in dead-letter queue support in EventBridge / SQS provides resilience against transient failures without data loss
-- Separating upsert and audit Lambda functions enforces a clean separation of concerns and makes compliance reporting straightforward
+- Writes to OPERA are validated by Oracle's own business logic layer — OHIP will reject invalid reservation states, double-bookings, or rate plan violations before they reach the DB
+- No direct Oracle DB credentials required in the MERN codebase; the attack surface is dramatically reduced
+- OHIP webhooks provide genuine push notification from OPERA to the MERN backend, satisfying TR-2's continuous sync requirement without polling overhead
+- The cleanest long-term maintainability story — as Oracle evolves OPERA Cloud, OHIP absorbs the schema changes and the MERN backend is insulated
+- MongoDB Atlas Change Streams give the React frontend a real-time data layer via websockets with minimal backend code
 
 **Cons:**
-- OXI/OHIP configuration requires Oracle-certified expertise; incorrect Business Event mappings can cause missed or duplicate events and may require Oracle support engagement
-- Not all OPERA versions or deployment configurations expose the full set of Business Events needed — compatibility must be verified per property
-- AWS vendor lock-in: the EventBridge + Lambda + RDS stack is not portable; migrating to another cloud provider would require significant rework
-- Serverless cold-start latency can delay the first event processing after periods of inactivity, though this is typically sub-second
-- Running cost scales directly with event volume; a high-churn property (large conference hotel) could generate unexpectedly high Lambda invocation and EventBridge costs
+- Hard dependency on OHIP subscription and Oracle licensing — the most expensive solution in this set, and Oracle's enterprise licensing process can take weeks
+- OHIP is only available for OPERA Cloud deployments; on-premises OPERA 5.x installations require a separate OPERA Web Services (OWS) approach
+- OHIP's published write endpoints may not cover every booking edge case — complex group allotments, packages, and multi-room reservations may require workarounds
+- The MERN backend must implement OHIP token refresh, retry logic, and webhook signature verification, adding non-trivial integration boilerplate
+- Real-time sync depends on OHIP webhook reliability; a webhook outage means the Atlas replica drifts until the next poll cycle
 
 ---
 
-### Solution 3: ngrok / Pinggy Relay Agent with Encrypted Sync Queue
+### Solution 2: Direct Oracle DB Connection via Encrypted Tunnel + MERN ORM Layer
 
 **Architecture Summary:**  
-An on-premises sync agent establishes a persistent reverse-proxy tunnel via **ngrok** (or self-hosted alternative like **frp** or **Pinggy**) to expose a local gRPC/HTTPS endpoint exclusively to the SaaS backend. The SaaS cloud service sends a pull-request signal through the tunnel, prompting the agent to query Oracle, mask PII, and return the data payload — all within a single outbound-initiated session. A message queue (e.g., Redis Streams or SQS) buffers payloads for reliable delivery.
+The MERN Node.js backend connects **directly to the OPERA Oracle database** via a hardened, encrypted tunnel — either an **IPSec site-to-site VPN** between the hotel network and the cloud provider, or an **SSL-wrapped TCP connection** over the hotel's static IP. A dedicated Oracle DB user is provisioned with tightly scoped `SELECT`, `INSERT`, and `UPDATE` permissions on reservation and booking tables only. The Node.js backend uses an Oracle client library (e.g., `node-oracledb`) to execute parameterised queries, with a thin ORM layer enforcing the permitted operation set. MongoDB Atlas serves as the read replica, populated by a Change Data Capture (CDC) process on the Oracle side.
 
 ```
-[SaaS Cloud Backend] ──pull signal──► [ngrok Cloud Edge]
-                                               │ (outbound tunnel, no port forward)
-                                               ▼
-                                    [On-Prem ngrok Agent]
-                                               │ SELECT query
-                                               ▼
-                                       [OPERA Oracle DB]
-                                               │
-                                    [PII Mask → Payload]
-                                               │ TLS 1.3 response
-                                               ▼
-                                    [ngrok Cloud Edge]
-                                               │
-                                               ▼
-                                  [Cloud Queue → Read-Replica]
+[MERN React Frontend]
+        │
+        ▼
+[Node.js Express Backend]
+        │ node-oracledb — TLS 1.3 over IPSec VPN / Static IP
+        ▼
+[Hotel Network — Static IP Endpoint]
+        │
+        ▼
+[OPERA Oracle DB]
+   ├── READ: SELECT on reservations, availability, rates
+   └── WRITE: INSERT/UPDATE on RESERVATION, RESERVATION_NAME tables
+        │
+        ▼ (CDC / LogMiner / GoldenGate)
+[MongoDB Atlas Read Replica]
+        │
+        ▼
+[Stakeholder Dashboard]
 ```
 
-> **Note:** The pull signal travels from cloud → tunnel edge, but the **data connection is initiated and maintained by the on-prem agent** (outbound), preserving TR-1 compliance. The cloud cannot initiate a new TCP session into the LAN.
+**Sync Mechanism:** Oracle LogMiner or GoldenGate CDC streams change events from the OPERA Oracle DB to MongoDB Atlas in near real-time. Writes from the MERN backend go direct to Oracle and are immediately reflected in subsequent reads. This achieves the continuous sync required by TR-2 without polling latency.
 
 **Compliance Mapping:**
-- ✅ TR-1: TCP session is always established outbound by on-prem agent
-- ✅ TR-2: Pull cadence configurable; compatible with event triggers
-- ✅ TR-3: ngrok tunnel eliminates static IP / port forwarding requirement
-- ✅ SC-1: ngrok enforces TLS 1.3 on all tunnel traffic
-- ✅ SC-2: PII masked before payload leaves the agent
-- ✅ SC-3: Read-only Oracle credentials
+- ✅ TR-1: Bidirectional direct DB connection; cloud initiates both reads and writes
+- ✅ TR-2: CDC provides sub-second propagation of OPERA changes to Atlas; direct writes are immediately consistent
+- ✅ TR-3: Static IP used for VPN endpoint or Oracle listener whitelisting
+- ✅ SC-1: IPSec VPN + Oracle native encryption (TLS 1.3 / AES-256) on all DB connections
+- ✅ SC-2: PII controlled at application layer; booking fields transmitted as required
+- ✅ SC-3: Dedicated Oracle user with `SELECT`, `INSERT`, `UPDATE` on scoped tables; no `DELETE` or DDL
+- ✅ SA-1/SA-2: MFA at MERN layer; stakeholder reads served from Atlas replica
 
-**Tech Stack Candidates:** ngrok / frp / Pinggy, Redis Streams or AWS SQS, PostgreSQL replica  
-**Complexity:** ⭐⭐ Low-Medium  
-**Cost Profile:** Low-Medium (ngrok paid tier for production use)
+**Tech Stack:** node-oracledb, Oracle LogMiner / GoldenGate, MongoDB Atlas, IPSec VPN, React  
+**Complexity:** ⭐⭐⭐⭐ Medium-High  
+**Cost Profile:** Medium (VPN infrastructure + GoldenGate licensing if used)
 
 **Pros:**
-- Extremely fast to prototype and deploy — the ngrok agent is a single binary with no complex configuration, making it ideal for proofs of concept or phased rollouts
-- Self-hosted alternatives (frp, Pinggy) eliminate third-party dependency and can be operated entirely within the organization's own infrastructure
-- The message queue buffer adds resilience: if the cloud replica is temporarily unavailable, payloads are retained and replayed without data loss
-- Flexible trigger model — the pull signal can be sent on a schedule, on demand, or in response to application events, satisfying both TR-2 paths
-- Straightforward to audit: each pull request and response can be logged at the queue layer with full payload metadata
+- Direct DB access gives the MERN backend full control over query design, transaction management, and write operations — no API layer constraints limiting what can be expressed
+- LogMiner-based CDC is the most reliable continuous sync mechanism available for Oracle — changes are captured at the redo log level, meaning nothing is missed even if the application layer is temporarily down
+- The lowest latency read path of any solution in this document — the MERN backend can query Oracle directly with sub-millisecond round-trip on the VPN
+- Static IP + IPSec VPN is a well-understood, auditable network security control that hotel IT teams and Oracle DBAs are familiar with
+- No third-party SaaS dependency in the data path — the integration is entirely within your infrastructure control
 
 **Cons:**
-- ngrok's production-grade plans (custom domains, reserved tunnels, SSO) carry meaningful per-seat/per-tunnel monthly costs that can grow with scale
-- The TR-1 compliance argument is nuanced — while the TCP session is outbound, the pull signal originates from the cloud, which may require additional justification during security review
-- Self-hosted tunnel alternatives (frp) require the team to operate and secure their own relay infrastructure, adding operational overhead
-- The relay introduces an additional network hop and potential latency compared to a direct outbound tunnel (Solution 1)
-- ngrok free-tier tunnels use randomised public URLs that change on restart, making them unsuitable for production without a paid reserved-domain plan
+- Direct Oracle DB credentials in the cloud environment represent the highest security risk in this set; a compromised MERN backend has a direct write path to the OPERA production database
+- Requires an Oracle DBA to provision and maintain the scoped DB user, manage connection pool sizing, and monitor for OPERA schema changes that could break queries
+- Oracle GoldenGate (the production-grade CDC option) is a licensed Oracle product with significant cost; LogMiner is free but more operationally complex to maintain at scale
+- IPSec VPN configuration between the hotel network and cloud provider requires coordination between hotel IT, the cloud provider, and potentially the property management company
+- Any OPERA upgrade that alters the reservation table schema can silently break MERN queries or writes — requires a schema-change monitoring process
 
 ---
 
-### Solution 4: Azure Arc-Enabled Data Services + Azure Relay
+### Solution 3: Node.js Sync Agent (On-Prem) + WebSocket Push + MongoDB Atlas
 
 **Architecture Summary:**  
-For organizations already invested in Microsoft/Oracle ecosystems, **Azure Arc** can project on-premises data services into Azure's management plane without requiring inbound connectivity. An **Azure Relay Hybrid Connection** allows the on-prem OPERA sync agent to register as a listener. The cloud SaaS sends relay messages, the agent processes them locally (SELECT + PII mask), and publishes results to an **Azure SQL Read-Replica** or **Azure Cosmos DB** instance. Governance is managed centrally via Azure Policy and Defender for Cloud.
+A **Node.js sync agent** runs on-premises within the hotel network, connecting to both the OPERA Oracle DB locally and the MERN cloud service via a **persistent WebSocket or Server-Sent Events (SSE) connection**. Because the agent initiates the WebSocket connection outbound, no port forwarding is required — though a static IP is available if needed for connection stability. The agent listens to Oracle change events (via polling or OXI triggers), serialises the payload, and **pushes updates to the MERN backend in real-time**. For write operations, the MERN backend sends reservation creation/update commands back through the same WebSocket channel, and the agent applies them directly to the Oracle DB using scoped credentials.
+
+```
+[OPERA Oracle DB]◄──INSERT/UPDATE──[On-Prem Node.js Agent]
+        │                                    ▲│
+        │ Poll / OXI trigger                  ││ WebSocket (persistent, outbound)
+        ▼                                    │▼
+[Change Detected]                   [MERN Node.js Backend]
+        │                                    │
+        └──── serialise + push ─────────────►│
+                                             │
+                                    [MongoDB Atlas]
+                                             │
+                                    [React Frontend]
+                                             │
+                                    [Stakeholder Dashboard]
+```
+
+**Sync Mechanism:** The WebSocket connection is full-duplex — OPERA changes flow up to the MERN backend continuously (satisfying TR-2), and reservation write commands flow down to the agent for immediate local execution. The agent acknowledges writes with a confirmation message, giving the MERN backend transactional feedback.
+
+**Compliance Mapping:**
+- ✅ TR-1: Agent initiates outbound WebSocket; MERN backend can push commands over the established channel
+- ✅ TR-2: Real-time bidirectional push via persistent WebSocket; no polling lag for state changes
+- ✅ TR-3: Static IP available but not required; WebSocket is outbound from the agent
+- ✅ SC-1: WSS (WebSocket Secure) enforces TLS 1.3; Oracle connection uses native encryption
+- ✅ SC-2: PII included only in reservation payloads where required
+- ✅ SC-3: Agent uses scoped Oracle credentials: `SELECT` for reads, `INSERT`/`UPDATE` on reservation tables for writes
+- ✅ SA-1/SA-2: MFA at MERN auth layer; Atlas serves stakeholder reads
+
+**Tech Stack:** Node.js (on-prem agent + MERN backend), WebSocket/ws library, Oracle node-oracledb, MongoDB Atlas, React  
+**Complexity:** ⭐⭐⭐ Medium  
+**Cost Profile:** Low-Medium (no additional licensing; compute cost for agent process)
+
+**Pros:**
+- The on-prem agent is written in Node.js — the same language as the MERN backend — meaning the same development team can own, maintain, and deploy both ends of the integration without context switching
+- Full-duplex WebSocket provides genuine real-time bidirectional sync, satisfying TR-2 without the complexity of separate read and write pipelines
+- No Oracle credentials leave the hotel network — the agent holds DB credentials locally; the MERN backend only sends command payloads, never touches the DB directly
+- Static IP is available but the architecture does not depend on it — if the hotel's IP changes, the agent reconnects outbound automatically
+- Lightweight and low-cost — the agent is a Node.js process with no additional licensing requirements beyond the existing Oracle client library
+
+**Cons:**
+- A persistent WebSocket connection between the hotel and cloud must be kept alive across network interruptions, hotel Wi-Fi instability, and server restarts — requires robust reconnection logic, heartbeat monitoring, and a message replay buffer for missed events
+- The on-prem Node.js agent is a custom-built component that must be versioned, deployed, and monitored at each hotel property — multi-property rollouts require a remote management strategy
+- Write commands flowing from the MERN backend through the WebSocket to the local Oracle DB introduce a two-hop write latency (MERN → WebSocket → Agent → Oracle) compared to a direct DB connection
+- If the WebSocket connection drops during a write operation, the MERN backend may not receive the acknowledgement — idempotency keys and retry logic are essential to prevent duplicate bookings
+- The agent process represents a local dependency; a hotel IT team rebooting the server without restarting the agent would silently break sync until noticed
+
+---
+
+### Solution 4: GraphQL Subscriptions + OPERA Web Services (OWS) + MongoDB Atlas
+
+**Architecture Summary:**  
+Targeting on-premises OPERA installations that do not have OHIP available, this solution uses **OPERA Web Services (OWS)** — Oracle's SOAP/XML API for on-prem OPERA — as the write channel, fronted by a **GraphQL API layer** in the MERN backend. The MERN Node.js server exposes a GraphQL schema that maps directly to OPERA reservation operations. For reads, a **scheduled OWS polling service** hydrates MongoDB Atlas at high frequency (every 30–60 seconds). For writes, GraphQL mutations trigger synchronous OWS SOAP calls to OPERA, with the response used to confirm the booking before updating Atlas. The hotel's static IP is used to restrict OWS access to the cloud service exclusively.
+
+```
+[React Frontend]
+        │ GraphQL query / mutation / subscription
+        ▼
+[Node.js GraphQL Server (Apollo)]
+        ├── Query ──────────────────────────────► [MongoDB Atlas]
+        │                                               ▲
+        │                                               │ OWS Sync (30s poll)
+        └── Mutation ──► [OWS SOAP Client]──────────────┤
+                                │                       │
+                                ▼                       │
+                    [OPERA Web Services]                │
+                         (Static IP)                   │
+                                │                       │
+                                ▼                       │
+                    [OPERA Oracle DB]───────────────────┘
+                     INSERT/UPDATE on
+                     reservation tables
+```
+
+**Sync Mechanism:** Reads are served from Atlas (low latency, no OPERA load). Writes go synchronously through OWS, ensuring OPERA is the system of record. OWS polling every 30–60 seconds keeps Atlas consistent with walk-ins and PMS-originated changes. GraphQL subscriptions (via Atlas Change Streams) push real-time updates to connected React clients.
+
+**Compliance Mapping:**
+- ✅ TR-1: Bidirectional — cloud calls OWS for writes; high-frequency polling for reads
+- ✅ TR-2: 30–60 second OWS sync cycle approaches near-real-time; writes are immediately consistent
+- ✅ TR-3: Static IP used to whitelist cloud service IP on the hotel firewall for OWS port
+- ✅ SC-1: OWS over HTTPS (TLS 1.3); Atlas TLS 1.3 in transit
+- ✅ SC-2: PII handled per booking requirements
+- ✅ SC-3: OWS credentials scoped to reservation operations; no direct Oracle access from cloud
+- ✅ SA-1/SA-2: MFA at GraphQL auth layer; Atlas for stakeholder reads
+
+**Tech Stack:** Apollo GraphQL Server, OPERA Web Services (SOAP), node-soap, MongoDB Atlas, React, Atlas Change Streams  
+**Complexity:** ⭐⭐⭐ Medium  
+**Cost Profile:** Low-Medium (OWS is included with OPERA on-prem license; Atlas M10+)
+
+**Pros:**
+- OWS is available on on-premises OPERA installations without an OHIP subscription, making this the most accessible write channel for hotels not yet on OPERA Cloud
+- GraphQL's typed schema provides a clean, self-documenting contract between the React frontend and the backend — mutations for `createReservation`, `updateReservation` are explicit and versioned
+- GraphQL subscriptions combined with Atlas Change Streams give the React frontend a real-time push notification layer with no additional infrastructure
+- OWS has been the standard OPERA integration mechanism for on-prem deployments for many years — it is well-documented and Oracle-support-approved, reducing implementation risk
+- Atlas absorbing all read traffic means the OPERA server is only hit for writes and sync polling, significantly reducing load on the production PMS
+
+**Cons:**
+- OWS uses SOAP/XML, which is verbose, slower to parse, and significantly less developer-friendly than REST or GraphQL — the Node.js `node-soap` library adds complexity and the XML response mapping requires careful maintenance
+- The 30–60 second polling cycle means Atlas can be up to a minute behind OPERA for PMS-originated changes — this may be acceptable for most reads but could cause brief availability discrepancies visible to booking users
+- Static IP requirement on the hotel firewall means coordinating a port-open rule with hotel IT for the OWS HTTP port — this is manageable but requires change-control processes at each property
+- OWS authentication uses a WSSE username/token pattern that requires careful credential rotation management in the MERN backend
+- OWS feature coverage varies by OPERA version; advanced reservation features (packages, linked profiles, allotments) may require multiple SOAP call chains to execute a single logical operation
+
+---
+
+### Solution 5: Event-Driven Sync via Oracle GoldenGate / Debezium CDC + MERN Event Bus + OHIP Writes
+
+**Architecture Summary:**  
+The most robust and enterprise-grade option. **Change Data Capture (CDC)** via Oracle GoldenGate (or open-source Debezium with Oracle LogMiner) continuously streams every committed change in the OPERA Oracle DB — at the redo log level — to a **Kafka or AWS MSK event bus** in the cloud. The MERN Node.js backend consumes these events and applies them to MongoDB Atlas in milliseconds, achieving true continuous sync per TR-2 with no polling whatsoever. Write operations from the MERN backend flow through **OHIP REST API** (for OPERA Cloud) or **OWS** (for on-prem OPERA), providing a clean, Oracle-validated write channel. The hotel's static IP is used to secure the GoldenGate replication endpoint.
 
 ```
 [OPERA Oracle DB]
-        │ SELECT (read-only)
+        │ Redo log capture
         ▼
-[On-Prem Arc Agent + Relay Listener]
-        │ Outbound registration to Azure Relay
+[GoldenGate / Debezium CDC Agent]
+        │ TLS 1.3 — Static IP outbound
         ▼
-[Azure Relay Hybrid Connection Namespace]
+[Kafka / AWS MSK Event Bus]
         │
-        ▼
-[Azure Service Bus → Azure SQL / Cosmos DB]
+        ├──► [MERN Node.js Consumer] ──► [MongoDB Atlas]
+        │                                      │
+        │                              [React Frontend]
+        │                              [Stakeholder Dashboard]
         │
-        ▼
-[SaaS App Layer + Azure AD MFA (Entra ID)]
+        └──► [Audit / Analytics Pipeline]
+
+[MERN Write Path]
+[React Frontend] ──► [Node.js Backend] ──► [OHIP / OWS] ──► [OPERA Oracle DB]
+                                                │
+                                        (Confirmation event
+                                         re-enters Kafka via CDC)
 ```
+
+**Sync Mechanism:** CDC is the gold standard for continuous sync — every INSERT, UPDATE, and committed transaction in OPERA is captured at the database engine level and propagated to Kafka within milliseconds. Atlas is kept perpetually current. Writes from the MERN backend go through OHIP/OWS and, once committed to Oracle, are automatically re-captured by CDC and reflected in Atlas — creating a closed, self-consistent loop.
 
 **Compliance Mapping:**
-- ✅ TR-1: Relay Listener is outbound-registered; no inbound connections to LAN
-- ✅ TR-2: Scheduled or event-triggered via Service Bus messages
-- ✅ TR-3: Azure Relay requires no static IP or inbound port rules
-- ✅ SC-1: Azure Relay enforces TLS 1.3 natively
-- ✅ SC-2: PII masked within Arc agent prior to relay
-- ✅ SC-3: Oracle user restricted to SELECT
-- ✅ SA-1: Azure Entra ID enforces MFA; Conditional Access policies available
+- ✅ TR-1: Bidirectional — CDC pushes OPERA changes outbound; OHIP/OWS handles cloud-to-OPERA writes
+- ✅ TR-2: CDC provides millisecond-level continuous sync — the strongest compliance with TR-2 of any solution
+- ✅ TR-3: Static IP used to secure GoldenGate replication target endpoint; no raw DB port exposed
+- ✅ SC-1: GoldenGate TLS 1.3; Kafka TLS 1.3; OHIP TLS 1.3; Atlas TLS 1.3 — full chain enforced
+- ✅ SC-2: PII fields can be masked in the CDC transformation layer before events reach Kafka
+- ✅ SC-3: CDC agent uses a dedicated Oracle log-mining user; OHIP/OWS handles writes without direct DDL access
+- ✅ SA-1/SA-2: MFA at MERN auth layer; Atlas and Kafka ACLs restrict consumer access
 
-**Tech Stack Candidates:** Azure Arc, Azure Relay, Azure Service Bus, Azure SQL, Entra ID  
-**Complexity:** ⭐⭐⭐⭐ Medium-High  
-**Cost Profile:** Medium-High (Azure Arc + Relay licensing)
-
-**Pros:**
-- Best-in-class enterprise governance: Azure Policy, Defender for Cloud, and Entra ID Conditional Access provide centralised security controls across all connected hotel properties
-- Entra ID MFA (SA-1) is deeply integrated, enabling passwordless authentication, Conditional Access policies, and Privileged Identity Management for admin accounts
-- Azure Arc allows the on-premises agent to be monitored, patched, and managed from the Azure portal, reducing operational burden on hotel IT staff
-- Azure Service Bus provides enterprise-grade message durability, ordering guarantees, and built-in dead-lettering — significantly more robust than a simple queue
-- Strong fit for hotel groups already standardised on Microsoft 365 / Azure, avoiding new vendor relationships
-
-**Cons:**
-- Highest setup complexity among the five read-only solutions; Azure Arc configuration and Relay namespace provisioning require Azure-certified personnel
-- Strong Azure vendor lock-in — the architecture cannot be replicated on AWS or GCP without a full rebuild
-- Azure Arc licensing and Relay Hybrid Connection costs add a fixed monthly overhead regardless of data volume, making this less cost-efficient for single-property deployments
-- Oracle-to-Azure SQL schema mapping may require non-trivial data type translation work, particularly for OPERA-specific data structures
-- Azure Relay has less community documentation and tooling compared to Cloudflare Tunnel or ngrok, making troubleshooting slower for teams without Azure expertise
-
----
-
-### Solution 5: Self-Hosted Temporal.io Workflow Engine + WireGuard Mesh VPN
-
-**Architecture Summary:**  
-A **Temporal.io** workflow engine deployed in the cloud orchestrates durable, retryable data sync workflows. A Temporal **Worker** process runs on-premises, polling the Temporal cloud server (outbound only) for workflow tasks. When assigned a task, the worker queries the OPERA Oracle DB, applies PII masking, and returns the result to the Temporal server, which persists it to the cloud read-replica. Network transport is hardened with **WireGuard** — a modern, cryptographically superior VPN — creating a zero-trust mesh without exposing hotel LAN ports.
-
-```
-[Temporal Cloud Server] ◄──── long-poll ────[On-Prem Temporal Worker]
-                                                       │ (outbound only)
-                                                       │ SELECT
-                                                       ▼
-                                              [OPERA Oracle DB]
-                                                       │
-                                            [PII Mask → Task Result]
-                                                       │ WireGuard + TLS 1.3
-                                                       ▼
-                                           [Temporal Cloud Server]
-                                                       │
-                                                       ▼
-                                         [Cloud Read-Replica + SaaS App]
-```
-
-**Compliance Mapping:**
-- ✅ TR-1: Worker long-polls Temporal server (outbound); no cloud-initiated inbound connections
-- ✅ TR-2: Workflow schedules configurable; supports event-driven triggers via Temporal Signals
-- ✅ TR-3: WireGuard + Temporal worker polling eliminates all inbound firewall requirements
-- ✅ SC-1: WireGuard (ChaCha20) + TLS 1.3 on Temporal gRPC transport
-- ✅ SC-2: PII masked within the worker activity before task result is returned
-- ✅ SC-3: Oracle read-only credentials enforced at DB level
-
-**Tech Stack Candidates:** Temporal Cloud, WireGuard, Python/Go Temporal SDK, Oracle cx_Oracle  
-**Complexity:** ⭐⭐⭐⭐ Medium-High  
-**Cost Profile:** Medium (Temporal Cloud pricing per action)
+**Tech Stack:** Oracle GoldenGate or Debezium, Apache Kafka / AWS MSK, OHIP or OWS, Node.js, MongoDB Atlas, React  
+**Complexity:** ⭐⭐⭐⭐⭐ High  
+**Cost Profile:** High (GoldenGate licensing + Kafka cluster + OHIP if applicable)
 
 **Pros:**
-- Temporal's durable execution model guarantees that every sync workflow completes eventually — failed steps are automatically retried with configurable backoff, eliminating data gaps from transient network issues
-- WireGuard provides modern, cryptographically superior transport (ChaCha20-Poly1305) with a minimal attack surface, significantly hardening the network layer beyond TLS 1.3 alone
-- Temporal Signals enable true event-driven triggers from OPERA Business Events without requiring OXI configuration, satisfying TR-2's async path via a different mechanism
-- Full workflow history and replay capability in Temporal provides a built-in audit trail of every sync operation, which is valuable for compliance reporting
-- Workflow code can be version-controlled and tested like application code, making it more maintainable than cron-based or queue-based approaches over time
+- The only solution that achieves genuinely continuous, sub-second sync from OPERA to Atlas without any polling — CDC at the redo log level captures every committed transaction, including PMS-originated changes, walk-ins, and back-office edits that no API would surface
+- Kafka as an event bus decouples OPERA from the MERN backend entirely — the PMS does not need to know the SaaS exists; all integration logic lives in consumers
+- Event replay: if the MERN backend or Atlas has an outage, Kafka retains the event log and consumers can replay from the last committed offset — zero data loss
+- The write path (OHIP/OWS) and read path (CDC) are completely independent — a write API outage does not affect read sync, and vice versa
+- Highly extensible: additional consumers can be added to the Kafka bus for analytics, reporting, revenue management, or third-party integrations without modifying OPERA or the MERN backend
 
 **Cons:**
-- Temporal is a relatively niche technology in the hospitality sector; hiring or contracting developers with Temporal expertise is more difficult than for mainstream tools
-- WireGuard mesh configuration adds operational complexity — key management, peer rotation, and network topology changes must be managed carefully across multiple hotel sites
-- Temporal Cloud pricing is consumption-based (per workflow action), which can be difficult to forecast for high-volume OPERA environments and may require spend caps
-- The combination of Temporal + WireGuard + Oracle SDK represents the largest number of distinct technologies to integrate and support in this solution set
-- Self-hosted Temporal (as an alternative to Temporal Cloud) requires running and maintaining a Cassandra or PostgreSQL backend cluster, substantially increasing infrastructure overhead
+- The most expensive and operationally complex solution in this document; Oracle GoldenGate licensing is enterprise-priced and the operational expertise to run it is scarce
+- Debezium with Oracle LogMiner is the open-source alternative but requires careful tuning — LogMiner has known performance implications on high-transaction Oracle databases and can impact OPERA server load if not configured correctly
+- Kafka requires its own deployment, monitoring, topic management, consumer group administration, and retention policy — a non-trivial operational commitment on top of the existing MERN stack
+- The combination of CDC + Kafka + OHIP + Atlas is the largest surface area in this document; debugging a sync discrepancy requires tracing an event across four distinct systems
+- Initial setup involves significant Oracle DBA involvement to configure supplemental logging, GoldenGate extract processes, and trail files — this is not a self-service deployment
 
 ---
 
-## 3. Read & Write Solutions <a name="read-write-solutions"></a>
+## 3. Comparison Matrix <a name="comparison-matrix"></a>
 
-> ⚠️ **Critical Compliance Note:** The PRD (SC-3) mandates that the OPERA Oracle integration user be restricted to `SELECT` permissions. **Write-back to the OPERA production Oracle DB is explicitly out of scope.** The following solutions address write access to the **SaaS-managed cloud data layer** (e.g., replica, enrichment tables, workflow state), not to the OPERA database itself. Where OPERA write-back is a genuine business requirement, a separate privileged service account with audited, scoped `INSERT/UPDATE` permissions and change-approval workflows must be provisioned — this is a **PRD amendment** that requires sign-off.
+| Solution | Write Channel | Read Channel | Sync Model | Real-Time? | Static IP Required | Complexity | Cost |
+|---|---|---|---|---|---|---|---|
+| **1. OHIP Bidirectional** | OHIP REST API | Atlas + OHIP | Push (webhooks) + Pull | ✅ Near real-time | Optional | ⭐⭐⭐ | Med-High |
+| **2. Direct Oracle + VPN** | node-oracledb direct | Atlas CDC | CDC (LogMiner) | ✅ Sub-second | ✅ Required | ⭐⭐⭐⭐ | Medium |
+| **3. On-Prem Node.js Agent + WebSocket** | Agent → Oracle (local) | Atlas | Full-duplex WebSocket | ✅ Real-time | Optional | ⭐⭐⭐ | Low-Med |
+| **4. GraphQL + OWS** | OWS SOAP | Atlas | Poll (30–60s) + OWS | ⚠️ Near (30–60s lag) | ✅ Recommended | ⭐⭐⭐ | Low-Med |
+| **5. CDC + Kafka + OHIP/OWS** | OHIP or OWS | Atlas via Kafka | CDC (redo log) | ✅ Milliseconds | ✅ Recommended | ⭐⭐⭐⭐⭐ | High |
 
----
+### Write Capability by Table
 
-### Read/Write Solution A: Bi-Directional Cloudflare Tunnel + Command Queue Pattern
-*(Extends Solution 1)*
-
-**Architecture Summary:**  
-This solution extends the Cloudflare Tunnel architecture with an **async command queue** pattern. External stakeholders or the SaaS application write commands (e.g., rate overrides, notes, flags) to a cloud-side **command queue** (AWS SQS or Azure Service Bus). The on-premises agent — which already maintains the outbound tunnel — periodically polls this queue for pending commands, validates them against an allowlist schema, and applies writes to **approved, non-production OPERA tables** (e.g., a staging schema or a SaaS-managed sidecar database co-located on-prem).
-
-```
-[SaaS User / Stakeholder]
-        │ Write intent (MFA-authenticated)
-        ▼
-[Cloud Command Queue (SQS)]
-        │
-        ▼                         ◄── Outbound poll (same Cloudflare Tunnel)
-[On-Prem Agent]
-        │ Schema validation + allowlist check
-        │
-        ├─► [OPERA Oracle DB — SELECT only, no change]
-        │
-        └─► [SaaS Sidecar DB / Approved Staging Schema — INSERT/UPDATE permitted]
-```
-
-**Write Scope:** SaaS-managed sidecar tables only. OPERA core schema remains read-only.  
-**Additional Controls Required:**
-- Command schema validation (reject malformed/unexpected payloads)
-- Audit log of all write operations with user attribution
-- Rate limiting on the command queue to prevent abuse
-- Separate privileged service account for any write path (distinct from read account)
-
-**Compliance Mapping:**
-- ✅ TR-1: Agent polls queue outbound; no inbound cloud connection to LAN
-- ✅ SC-3: OPERA Oracle user remains SELECT-only; writes go to sidecar schema
-- ✅ SA-1: Write intent authenticated with MFA at SaaS layer
-
-**Pros:**
-- Reuses the existing Cloudflare Tunnel infrastructure from Solution 1, minimising additional components and operational surface area
-- The async command queue decouples write intent from execution — stakeholders can submit commands even if the on-prem agent is temporarily offline, with guaranteed delivery on reconnection
-- Schema validation and allowlist enforcement at the agent layer provides a strong defence-in-depth layer before any data reaches on-premises systems
-- Separate service accounts for read and write paths (as required) limit the blast radius of a compromised credential
-- Well-understood pattern (queue-based command processing) with extensive tooling support across AWS SQS, Azure Service Bus, and open-source alternatives
-
-**Cons:**
-- Write scope is intentionally limited to a sidecar schema — if stakeholders require writes back to native OPERA tables, this solution is insufficient without a PRD amendment and additional Oracle credentials
-- Introduces a second on-prem process (command processor) that must be monitored, maintained, and kept in sync with the read agent
-- Allowlist schema management becomes an ongoing responsibility; as the SaaS application evolves, the allowlist must be updated and re-deployed to the on-prem agent
-- Asynchronous write execution means stakeholders will not receive immediate confirmation that their command was applied — UI design must account for eventual-consistency feedback patterns
-- Rate limiting and abuse prevention on the command queue must be carefully tuned; too restrictive and legitimate writes are delayed, too permissive and the queue becomes a potential denial-of-service vector
+| Solution | `RESERVATION` | `RESERVATION_NAME` | `ALLOTMENT` | `RATE_HEADER` | Direct DDL |
+|---|---|---|---|---|---|
+| **1. OHIP** | ✅ OHIP-validated | ✅ OHIP-validated | ⚠️ Limited by OHIP endpoints | ❌ | ❌ |
+| **2. Direct Oracle** | ✅ Full control | ✅ Full control | ✅ Full control | ⚠️ Requires explicit grant | ❌ |
+| **3. WebSocket Agent** | ✅ Agent-mediated | ✅ Agent-mediated | ✅ Agent-mediated | ⚠️ Configurable | ❌ |
+| **4. OWS** | ✅ OWS-validated | ✅ OWS-validated | ⚠️ Limited by OWS methods | ❌ | ❌ |
+| **5. CDC + OHIP/OWS** | ✅ OHIP or OWS | ✅ OHIP or OWS | ⚠️ Depends on write channel | ❌ | ❌ |
 
 ---
 
-### Read/Write Solution B: OHIP REST API Gateway with Scoped Write-Back
-*(Extends Solution 2)*
+## 4. Recommended Architecture <a name="recommendation"></a>
 
-**Architecture Summary:**  
-Oracle's **OHIP (Oracle Hospitality Integration Platform)** provides a certified REST API layer on top of OPERA Cloud. Where the hotel has migrated to or partially integrated with OPERA Cloud, OHIP can serve as the **official, sanctioned write channel** back into OPERA — replacing direct Oracle DB writes with API-level mutations that OPERA itself validates. An **API Gateway** (Kong or AWS API Gateway) fronts OHIP, enforcing OAuth 2.0 scopes, rate limits, and audit logging. The SaaS application holds scoped tokens permitting only approved OHIP endpoints (e.g., `PUT /reservations/{id}/notes`).
+### Primary Recommendation: Solution 3 (On-Prem Node.js Agent + WebSocket)
 
-```
-[SaaS App — MFA Authenticated User]
-        │ Scoped OAuth 2.0 token
-        ▼
-[Cloud API Gateway (Kong / AWS APIGW)]
-        │ Scope enforcement + rate limit + audit
-        ▼
-[OHIP REST API (Oracle-managed)]
-        │ Validated write to OPERA
-        ▼
-[OPERA PMS / Oracle DB]
-```
+For a MERN-based team building a new SaaS product, **Solution 3** offers the best balance of real-time sync performance, write capability, and operational simplicity:
 
-**Write Scope:** OHIP-permitted operations only (OPERA validates all mutations).  
-**Additional Controls Required:**
-- OAuth scope taxonomy mapped to OHIP endpoint permissions
-- Full audit trail at API Gateway layer
-- OHIP subscription/licensing from Oracle required
-- Confirm hotel's OPERA version supports OHIP integration
+- The agent is written in the same language as the rest of the stack — no Oracle DBA required, no SOAP libraries, no separate licensing
+- Real-time bidirectional WebSocket satisfies TR-2 continuously without polling lag
+- Oracle credentials never leave the hotel network — the cloud service is insulated from direct DB access
+- Static IP is available if needed but the architecture does not depend on it, making multi-property rollout straightforward
 
-**Compliance Mapping:**
-- ✅ TR-1: Reads remain pull-based; OHIP writes are a separate, approved channel
-- ✅ SC-3: No direct Oracle SQL writes; all mutations go through OHIP validation layer
-- ✅ SA-1: OAuth 2.0 + MFA at SaaS layer; OHIP provides additional auth
+### Secondary Recommendation: Solution 1 (OHIP Bidirectional)
 
-**Pros:**
-- The only solution that writes to native OPERA data structures through an officially sanctioned, Oracle-certified channel — eliminating the risk of corrupting the production database with malformed SQL
-- OHIP's own validation layer acts as a second line of defence, rejecting writes that violate OPERA's business rules (e.g., invalid reservation states, duplicate rate codes)
-- OAuth 2.0 scopes provide fine-grained, auditable access control — each stakeholder role can be restricted to exactly the OHIP endpoints their function requires
-- API Gateway-level rate limiting and audit logging centralise security controls without requiring on-prem changes
-- Best long-term alignment with Oracle's product roadmap, as OHIP is Oracle's stated integration standard for OPERA Cloud going forward
+If the hotel group is on **OPERA Cloud** and the budget supports OHIP licensing, Solution 1 is the most architecturally clean option. OHIP handles all Oracle complexity, write validation is Oracle-enforced, and the MERN backend never needs an Oracle client library.
 
-**Cons:**
-- Requires an active OHIP subscription and Oracle licensing, which adds significant and ongoing vendor cost — and Oracle's enterprise licensing negotiations can be lengthy
-- Strictly dependent on the hotel having deployed OPERA Cloud or a hybrid OHIP-compatible configuration; on-premises-only OPERA installations may not support OHIP without an upgrade
-- OHIP's available write endpoints are limited to what Oracle has published — custom or bespoke OPERA data operations may not be achievable through this channel
-- API Gateway management (Kong or AWS APIGW) is an additional infrastructure component requiring its own deployment, scaling, and maintenance discipline
-- OHIP API versioning changes can break integrations if the SaaS application does not track Oracle's release cadence, creating a dependency on Oracle's update schedule
+### For Maximum Sync Fidelity: Solution 5 (CDC + Kafka)
+
+If the non-negotiable requirement is **zero tolerance for sync lag** across many properties at scale, Solution 5 is the only architecture that delivers millisecond-level continuous sync. The cost and complexity are justified only at enterprise scale (10+ properties) or where financial transactions depend on real-time availability data.
+
+### What to Avoid
+
+**Solution 2 (Direct Oracle + VPN)** should be treated as a last resort. While it offers maximum query flexibility, placing direct Oracle write credentials in the cloud environment creates unacceptable risk to the OPERA production database. If chosen, it must be paired with a Web Application Firewall, connection proxying, and a rigorous credential rotation policy.
 
 ---
 
-### Read/Write Solution C: Event-Sourced CQRS Architecture with Dual-Path Agent
-*(Extends Solutions 1 & 5)*
-
-**Architecture Summary:**  
-This is the most architecturally mature option. A **CQRS (Command Query Responsibility Segregation)** pattern separates read and write concerns entirely. The **Query path** is identical to Solution 1 or 5 — the on-prem agent pulls OPERA data and populates the cloud read-replica. The **Command path** maintains a cloud-side **event store** (e.g., EventStoreDB or Kafka) where write intents are recorded as immutable events. A separate **Command Processor** on-premises subscribes to this event stream (outbound connection), applies business rule validation, and executes approved writes against a **SaaS-controlled schema** within the hotel's environment or via OHIP.
-
-```
-              ┌─────── QUERY PATH (Read) ──────────────────────────┐
-              │                                                     │
-[OPERA Oracle DB] ──SELECT──► [On-Prem Read Agent] ──► [Cloud Replica]
-                                                                    │
-                                                         [SaaS Read UI]
-
-              ┌─────── COMMAND PATH (Write) ────────────────────────┐
-              │                                                     │
-[SaaS Write UI] ──► [Cloud Event Store / Kafka] ◄── poll (outbound)
-                                                         │
-                                              [On-Prem Command Processor]
-                                                         │ Validates + routes
-                                                         ├─► [Sidecar Schema / OHIP]
-                                                         └─► [Audit Log]
-```
-
-**Write Scope:** SaaS sidecar schema and/or OHIP API endpoints. Event store provides full auditability and replay capability.  
-**Additional Controls Required:**
-- Immutable event log (append-only) for complete audit trail
-- Dead-letter queue for failed/rejected commands
-- Separate on-prem process identity for command processor vs read agent
-- Schema versioning strategy for event payloads
-
-**Compliance Mapping:**
-- ✅ TR-1: Both read and command processors use outbound polling; no inbound LAN connections
-- ✅ TR-3: Both agents connect outbound through tunnel/relay — no static IP required
-- ✅ SC-1: Kafka/EventStore + TLS 1.3 on all transit paths
-- ✅ SC-3: OPERA Oracle DB user remains SELECT-only; no direct SQL writes from cloud
-- ✅ SA-1/SA-2: Read replica and event store are separate; write events authenticated with MFA + scoped tokens
-
-**Pros:**
-- The most auditable architecture in this document: every write intent is recorded as an immutable event before execution, enabling complete replay, forensic investigation, and regulatory reporting
-- CQRS's strict separation of read and write paths eliminates the risk of a write operation inadvertently degrading read performance on the OPERA server or the cloud replica
-- The event store enables temporal querying — stakeholders can reconstruct the state of any OPERA entity at any point in time, which is valuable for dispute resolution and shareholder reporting
-- Dead-letter queue handling and event replay make the system highly resilient; failed commands can be inspected, corrected, and reprocessed without data loss
-- Scales naturally to multi-property deployments — additional hotel sites can be onboarded as new consumer groups on the same Kafka topic without architectural changes
-
-**Cons:**
-- Highest engineering complexity in this document; CQRS and event sourcing are advanced patterns that require developers with specific distributed systems experience to implement correctly
-- Operational overhead is substantial: Kafka (or EventStoreDB) requires its own deployment, monitoring, retention policy management, and capacity planning
-- Schema versioning for event payloads is a long-term maintenance commitment — as the OPERA data model or SaaS application evolves, event schemas must be versioned and old consumers must remain compatible
-- Two separate on-prem agent processes (read agent + command processor) double the on-premises deployment and monitoring footprint
-- Eventual consistency between the read replica and the command outcomes can be confusing for end users if the UI does not clearly communicate pending vs. applied states — requires careful UX design
-
----
-
-## 4. Comparison Matrix <a name="comparison-matrix"></a>
-
-| Solution | Type | Connectivity Method | Complexity | Cost | OXI/OHIP Native | Write Capable |
-|---|---|---|---|---|---|---|
-| **1. Cloudflare Tunnel + Replica** | Read | Cloudflare Tunnel | ⭐⭐ | Low | Optional | ❌ (base) |
-| **2. OXI/OHIP Business Events** | Read | Outbound Webhook | ⭐⭐⭐ | Medium | ✅ Native | ❌ |
-| **3. ngrok Relay + Queue** | Read | ngrok / Pinggy | ⭐⭐ | Low-Med | Optional | ❌ |
-| **4. Azure Arc + Relay** | Read | Azure Relay | ⭐⭐⭐⭐ | Med-High | Optional | ❌ |
-| **5. Temporal + WireGuard** | Read | WireGuard + Long-poll | ⭐⭐⭐⭐ | Medium | Optional | ❌ |
-| **A. Cloudflare + Command Queue** | R/W | Cloudflare Tunnel | ⭐⭐⭐ | Low-Med | Optional | ✅ Sidecar |
-| **B. OHIP REST API Gateway** | R/W | Direct HTTPS (OHIP) | ⭐⭐⭐ | Med-High | ✅ Native | ✅ OHIP-scoped |
-| **C. CQRS Event-Sourced Dual-Path** | R/W | Tunnel + Event Stream | ⭐⭐⭐⭐⭐ | High | Optional | ✅ Full |
-
----
-
-## 5. Recommended Starting Point
-
-For most hotel deployments, **Solution 1 (Cloudflare Tunnel + Replica)** offers the best balance of simplicity, cost, and compliance coverage. If Business Events are already configured in OXI/OHIP, **Solution 2** provides superior data freshness with no polling overhead.
-
-For organizations requiring write-back, **Solution A** (extending Solution 1 with a command queue) provides the lowest-risk path, as it preserves the SELECT-only constraint on the OPERA Oracle DB while enabling controlled writes to a SaaS-managed sidecar.
-
-**Solution C (CQRS)** is recommended only where long-term auditability, multi-property scale, or complex write workflows justify the additional engineering investment.
-
----
-
-*Document prepared for review. All solutions subject to Oracle OPERA PMS version compatibility assessment and hotel IT infrastructure audit prior to implementation.*
+*Document Version 2.0 — prepared for review. All solutions subject to Oracle OPERA PMS version compatibility assessment and hotel IT infrastructure audit prior to implementation. SC-3 write permissions require sign-off from the property's Oracle DBA and IT Security team before provisioning.*
