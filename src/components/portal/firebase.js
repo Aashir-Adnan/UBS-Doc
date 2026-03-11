@@ -4,6 +4,7 @@ let firebaseApp = null;
 
 /** Initialize Firebase on the client when config is available. Call from AuthRoot useEffect. */
 export function initFirebase() {
+  console.log("initFirebase", window.__FIREBASE_CONFIG__);
   if (typeof window === 'undefined') return null;
   if (firebaseApp) return firebaseApp;
   const config = window.__FIREBASE_CONFIG__;

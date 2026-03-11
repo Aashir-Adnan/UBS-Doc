@@ -55,6 +55,20 @@ const sidebars = {
       label: 'Tutorial',
       items: ['tutorial-basics/create-a-document', 'tutorial-basics/create-a-page', 'tutorial-basics/deploy-your-site', 'tutorial-basics/markdown-features'],
     },
+    {
+      type: 'category',
+      label: 'Projects',
+      items: [
+        {
+          type: 'category',
+          label: 'Badar HMS',
+          items: [
+            'projects/badar-hms/Opera_Integration',
+            'projects/badar-hms/Opera_Integration_ar',
+          ]
+        }
+      ],
+    }
   ],
 };
 

@@ -3,6 +3,7 @@ import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 import { useAuth } from '@site/src/components/portal/authStore';
 import GoogleSignIn from '@site/src/components/portal/GoogleSignIn';
+import { projects } from '@site/src/data/projectsConfig';
 
 function isGranjurEmail(email) {
   const e = (email || '').toLowerCase();
@@ -13,9 +14,8 @@ function isGranjurEmail(email) {
   );
 }
 
-function ToolsHub() {
+function ProjectsContent() {
   const { user, signOut } = useAuth();
-  console.log('user', user);
   const canAccessPortal = !!user && isGranjurEmail(user?.email);
 
   if (!user) {
@@ -54,14 +54,16 @@ function ToolsHub() {
 
   return (
     <>
+      <div className="portal-breadcrumb">
+        <Link to="/tools">← Back to Dev Tools</Link>
+      </div>
+
       <section className="portal-hero">
         <div className="portal-hero-text">
-          <h2>Welcome, {user.name || user.email}.</h2>
+          <h2>Projects</h2>
           <p>
-            You are signed in with a Granjur account. Choose a tool below to get
-            started.
-          </p>
-          <p>
+            View documentation and custom dashboards for each project. Signed in
+            as <strong>{user.name || user.email}</strong>.{' '}
             <button
               type="button"
               className="portal-signout-link"
@@ -74,64 +76,47 @@ function ToolsHub() {
       </section>
 
       <section className="portal-section">
-        <div className="tools-hub-grid">
-          <Link to="/tools/database" className="tool-card">
-            <div className="tool-card-icon">🗄️</div>
-            <h3>Database Tools</h3>
-            <p>
-              Upload SQL schemas to generate internal resources and automation
-              utilities.
-            </p>
-          </Link>
-
-          <Link to="/tools/lucid" className="tool-card">
-            <div className="tool-card-icon">🎨</div>
-            <h3>Lucid Sanitize</h3>
-            <p>
-              Upload and sanitize Lucid chart exports for cleaner diagrams.
-            </p>
-          </Link>
-
-          <Link to="/tools/notify" className="tool-card">
-            <div className="tool-card-icon">✉️</div>
-            <h3>Notify Maintainer</h3>
-            <p>
-              Send quick bug reports or feature requests directly to the
-              maintainer.
-            </p>
-          </Link>
-
-          <Link to="/tools/apiObject" className="tool-card">
-            <div className="tool-card-icon">⚙️</div>
-            <h3>API Object Builder</h3>
-            <p>
-              Create custom API objects with flags and pre/post process
-              functions. Copy the generated JS file.
-            </p>
-          </Link>
-
-          <Link to="/tools/projects" className="tool-card">
-            <div className="tool-card-icon">📁</div>
-            <h3>Projects</h3>
-            <p>
-              Browse project documentation and open custom project views and
-              dashboards.
-            </p>
-          </Link>
+        <div className="projects-grid">
+          {projects.map((project) => (
+            <div key={project.slug} className="project-card">
+              <div className="project-card-header">
+                <h3>{project.name}</h3>
+                {project.description && (
+                  <p className="project-card-desc">{project.description}</p>
+                )}
+              </div>
+              <div className="project-card-actions">
+                <Link
+                  to={project.docPath}
+                  className="button button--secondary button--sm"
+                >
+                  {project.docLabel || 'Documentation'}
+                </Link>
+                {project.hasCustomView && (
+                  <Link
+                    to={`/tools/projects/view?project=${encodeURIComponent(project.slug)}`}
+                    className="button button--primary button--sm"
+                  >
+                    Open project view
+                  </Link>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </section>
     </>
   );
 }
 
-export default function ToolsPage() {
+export default function ProjectsPage() {
   return (
     <Layout
-      title="Dev Tools"
-      description="Granjur Dev Tools - database and automation utilities"
+      title="Projects"
+      description="Project documentation and custom views"
     >
       <main className="portal-main-wrapper">
-        <ToolsHub />
+        <ProjectsContent />
       </main>
     </Layout>
   );
