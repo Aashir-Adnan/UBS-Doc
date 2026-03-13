@@ -84,6 +84,25 @@ function DatabaseToolsContent() {
         <div className="portal-card portal-card-hover">
           <FileUpload />
         </div>
+
+        <div className="portal-section-header" style={{ marginTop: '2rem' }}>
+          <h3>Project DB → Base DB Mapper</h3>
+          <p>
+            Map a project database (uploaded SQL) onto the base database
+            (server). Generate a single merged SQL with table mappings and
+            user→URDD FK rewrites.
+          </p>
+        </div>
+        <div className="portal-card portal-card-hover">
+          <Link to="/tools/database/mapper" className="tool-card">
+            <div className="tool-card-icon">🗺️</div>
+            <h4>Project DB Mapper</h4>
+            <p>
+              ERD-style doc, API outline, and usage. Base DB on server; project
+              DB SQL uploaded.
+            </p>
+          </Link>
+        </div>
       </section>
     </>
   );

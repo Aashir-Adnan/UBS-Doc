@@ -23,8 +23,13 @@ const sidebars = {
   tutorialSidebar: [
     {
       type: 'category',
+      label: 'Framework Introduction',
+      items: ['intro/Node-Advantages'],
+    },
+    {
+      type: 'category',
       label: 'Framework Database',
-      items: ['database/Lucidchart'],
+      items: ['database/Lucidchart', 'database/Project_DB_Base_DB_Mapper'],
     },
     {
       type: 'category',

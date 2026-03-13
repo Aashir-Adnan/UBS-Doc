@@ -290,6 +290,458 @@
   white-space: pre-wrap;
 }
 
+/* ========== Project DB Mapper ========== */
+.mapper-visualizer-main {
+  max-width: none;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.mapper-visualizer-shell {
+  width: 100%;
+  height: calc(100vh - 120px);
+}
+
+.sql-erd-visualizer {
+  width: 100%;
+  height: 100%;
+  background: #0f1117;
+  border: 1px solid #303a61;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  position: relative;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.sql-erd-uploader {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  border: 2px dashed #3d4a7a;
+  margin: 2rem;
+  border-radius: 1rem;
+}
+
+.sql-erd-uploader-title {
+  color: #e6ebff;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.sql-erd-uploader-sub {
+  color: #98a4cf;
+  font-size: 0.8rem;
+}
+
+.sql-erd-error {
+  margin-top: 0.5rem;
+  color: #f07167;
+  font-size: 0.8rem;
+}
+
+.sql-erd-canvas-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.sql-erd-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sql-erd-controls {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(23, 27, 42, 0.85);
+  border: 1px solid #303a61;
+  border-radius: 0.5rem;
+  padding: 0.35rem;
+  backdrop-filter: blur(4px);
+}
+
+.sql-erd-controls button {
+  border: 1px solid #3a4470;
+  background: #1f2540;
+  color: #d8def4;
+  border-radius: 0.4rem;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.sql-erd-controls button:hover {
+  border-color: #7e8eff;
+  color: #ffffff;
+}
+
+.sql-erd-controls span {
+  color: #8f9bc3;
+  font-size: 0.72rem;
+  padding: 0 0.25rem;
+}
+
+.mapper-input-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  .mapper-input-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mapper-sql-textarea {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: var(--ifm-background-surface-color);
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  resize: vertical;
+  min-height: 120px;
+}
+
+.mapper-sql-textarea:focus {
+  outline: none;
+  border-color: var(--ifm-color-primary);
+}
+
+.mapper-stat {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.mapper-error {
+  margin: 0.75rem 0;
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.5rem;
+  background: rgba(200, 60, 60, 0.12);
+  border: 1px solid var(--ifm-color-danger);
+  color: var(--ifm-color-danger);
+  font-size: 0.9rem;
+}
+
+.mapper-erd-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 992px) {
+  .mapper-erd-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mapper-erd-group h4 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.mapper-erd-table {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: var(--ifm-color-emphasis-50);
+}
+
+.mapper-erd-table-name {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.mapper-erd-columns {
+  width: 100%;
+  font-size: 0.8rem;
+  border-collapse: collapse;
+}
+
+.mapper-erd-columns th,
+.mapper-erd-columns td {
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.mapper-erd-columns th {
+  font-weight: 600;
+}
+
+.mapper-fk-rewrite {
+  color: var(--ifm-color-primary);
+  font-weight: 500;
+}
+
+.mapper-mappings-table {
+  width: 100%;
+  font-size: 0.9rem;
+  border-collapse: collapse;
+}
+
+.mapper-mappings-table th,
+.mapper-mappings-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.mapper-mappings-table select {
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: var(--ifm-background-surface-color);
+  font-size: 0.85rem;
+  min-width: 12rem;
+}
+
+.mapper-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mapper-actions .mapper-output {
+  min-height: 200px;
+  margin-top: 0.5rem;
+}
+
+/* ========== Interactive ERD diagram (Lucidchart-style) ========== */
+.erd-diagram-wrap {
+  position: relative;
+  width: 100%;
+  height: 520px;
+  border-radius: 10px;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: var(--ifm-color-emphasis-50);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.erd-diagram-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--ifm-color-emphasis-600);
+  font-size: 0.9rem;
+}
+
+.erd-diagram-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--ifm-background-surface-color);
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.erd-diagram-hint {
+  font-size: 0.75rem;
+  color: var(--ifm-color-emphasis-600);
+  margin-right: auto;
+}
+
+.erd-diagram-zoom-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 6px;
+  background: var(--ifm-background-surface-color);
+  color: var(--ifm-font-color-base);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.erd-diagram-zoom-btn:hover {
+  background: var(--ifm-color-emphasis-100);
+  border-color: var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+}
+
+.erd-diagram-svg {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: block;
+}
+
+.erd-diagram-node text {
+  user-select: none;
+  pointer-events: none;
+}
+
+.mapper-erd-fullpage-wrap {
+  min-height: calc(100vh - 180px);
+  margin: 0 -1rem;
+}
+
+.erd-diagram-wrap--fullpage {
+  height: 100%;
+  min-height: calc(100vh - 220px);
+  display: flex;
+  flex-direction: column;
+  background: var(--ifm-background-color);
+  border-radius: 0;
+}
+
+.erd-diagram-wrap--fullpage .erd-diagram-svg {
+  flex: 1;
+  min-height: 400px;
+}
+
+.erd-context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 160px;
+  padding: 4px 0;
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.erd-context-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  text-align: left;
+  border: none;
+  background: none;
+  font-size: 0.875rem;
+  color: var(--ifm-font-color-base);
+  cursor: pointer;
+}
+
+.erd-context-menu-item:hover {
+  background: var(--ifm-color-emphasis-100);
+}
+
+.erd-context-menu-item--danger:hover {
+  background: rgba(200, 60, 60, 0.15);
+  color: var(--ifm-color-danger);
+}
+
+.erd-context-menu-item--muted {
+  cursor: default;
+  color: var(--ifm-color-emphasis-600);
+  font-size: 0.8rem;
+}
+
+.erd-context-menu-sub {
+  position: relative;
+}
+
+.erd-context-menu-submenu {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  min-width: 140px;
+  padding: 4px 0;
+  margin-left: 2px;
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.erd-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+}
+
+.erd-modal {
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 12px;
+  padding: 1.25rem;
+  min-width: 280px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}
+
+.erd-modal h4 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+}
+
+.erd-add-column-form label {
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+.erd-add-column-form label span {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--ifm-color-emphasis-600);
+  margin-bottom: 0.25rem;
+}
+
+.erd-add-column-form input {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: var(--ifm-background-color);
+  font-size: 0.9rem;
+}
+
+.erd-modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.erd-modal-actions button {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.erd-modal-actions button[type='submit'] {
+  background: var(--ifm-color-primary);
+  color: white;
+  border: none;
+}
+
+.erd-modal-actions button[type='button'] {
+  background: transparent;
+  border: 1px solid var(--ifm-color-emphasis-300);
+}
+
 /* Bug report form */
 .bug-form {
   margin-top: 1rem;

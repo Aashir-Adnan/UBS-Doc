@@ -1,22 +1,6 @@
 # Secure Hybrid SaaS Integration for OPERA PMS
 ## Solution Architecture Options — Revised
 
-**Document Version:** 4.0
-**Status:** Draft
-**Reference PRD Version:** 1.0 (Amended)
-**Supersedes:** Version 3.0
-
----
-
-## Changelog v3.0 → v4.0
-
-| Change | Detail |
-|---|---|
-| **MongoDB Atlas removed** | Atlas has been removed from all solutions. It served only as a read cache and real-time push layer — both roles are fulfilled by the cloud SQL DB (reads) and the Node.js backend SSE/WebSocket layer (push). Retaining Atlas would mean maintaining two cloud databases with identical data and no architectural differentiation |
-| **DB-1 simplified** | The cloud SQL DB (MySQL or PostgreSQL) is now the sole authoritative cloud data store. All OPERA sync targets this single database |
-| **On-premises change requirements added** | Each solution's pros and cons section now includes a dedicated block listing every on-premises network, firewall, and infrastructure change required to support that solution from a standard OPERA 5 deployment |
-| **SSE/WebSocket frontend push** | Where Atlas Change Streams previously drove real-time React updates, the Node.js backend now pushes events directly to connected clients via SSE or WebSocket — no additional infrastructure required |
-
 ---
 
 ## Table of Contents
@@ -45,44 +29,15 @@
 | **PII** | Personally Identifiable Information | Any data that can identify an individual (name, passport, email, phone, date of birth) — subject to masking requirements under SC-2 |
 | **SSE** | Server-Sent Events | A unidirectional HTTP-based push mechanism from server to client; lighter than WebSocket for read-only streams |
 
----
 
-## 2. Updated Constraints Summary <a name="overview"></a>
-
-| Constraint | Requirement |
-|---|---|
-| **TR-1** | Bidirectional sync permitted; both push and pull patterns are acceptable at the network level |
-| **TR-2** | OPERA must remain in **continuous, real-time sync** with the MERN cloud service. Polling of any kind is strictly prohibited. All sync must be event-driven or push-based |
-| **TR-3** | Static IP and port forwarding are permitted at the hotel site where operationally justified |
-| **SC-1** | TLS 1.3 for all data in transit — non-negotiable across every network hop |
-| **SC-2** | PII masked or hashed before leaving on-premises, unless required for a core booking operation |
-| **SC-3** | Integration DB user must support `SELECT`, `INSERT`, and `UPDATE` on reservation and booking tables at minimum. `DELETE`, `DROP`, `TRUNCATE`, and all DDL remain prohibited |
-| **SA-1** | MFA required for all external users |
-| **SA-2** | General stakeholder reads target the cloud SQL DB. Booking write operations use a dedicated, separately authenticated write path |
-| **DB-1** | All OPERA data changes must be propagated in real time to the MERN app's cloud-hosted relational database (MySQL or PostgreSQL). This is the single authoritative cloud data store — MongoDB Atlas is not used |
-
-> **On TR-2 (No Polling):** Any architecture relying on a scheduled interval query — against OPERA directly, OWS, OHIP, or any intermediary — is non-compliant. Acceptable real-time mechanisms: CDC redo log capture, WebSocket push, OHIP or OWS webhooks, and Kafka event consumption.
-
-> **On SC-2 and bookings:** Guest name, contact details, and identification data are required for reservation operations and are exempt from PII masking on the write path. They must be encrypted in transit (SC-1) and at rest in the cloud SQL DB.
-
-> **On SC-3:** A dedicated Oracle DB user with scoped `INSERT`/`UPDATE` permissions on `RESERVATION`, `RESERVATION_NAME`, `ALLOTMENT`, and related tables must be provisioned separately from the read-only reporting user.
-
-> **On DB-1:** The cloud SQL DB serves as the authoritative transactional store for the MERN application's business logic — separate from the OPERA Oracle DB as the system of record. It must remain consistent with OPERA in real time. The Node.js backend pushes state changes directly to connected React clients via SSE or WebSocket, replacing the Change Streams role previously filled by MongoDB Atlas.
-
----
-
-## 3. OPERA 5 On-Premises — Capability Reference <a name="opera5"></a>
+## 2. OPERA 5 On-Premises — Capability Reference <a name="opera5"></a>
 # https://ubs-doc.vercel.app/docs/projects/badar-hms/Opera_Config
 
 ---
 
-## 4. Hybrid Read/Write Solutions <a name="solutions"></a>
+## 3. Hybrid Read/Write Solutions <a name="solutions"></a>
 
-> **Note on MongoDB Atlas:** Atlas has been removed from all solutions. The cloud SQL DB (MySQL or PostgreSQL) serves all read and write workloads previously attributed to Atlas. Real-time push to the React frontend is handled by SSE or WebSocket directly from the Node.js backend.
 
-> **Note on on-premises change requirements:** Each solution's pros and cons section includes an **On-Premises Changes Required** block listing every infrastructure, network, and configuration change needed at the hotel site relative to a standard OPERA 5 deployment with no external integration.
-
----
 
 ### Solution 1: OHIP REST API (Bidirectional) + MERN Backend + Cloud SQL DB
 
@@ -374,7 +329,7 @@ The most enterprise-grade option and the highest sync fidelity available. **Orac
 
 ---
 
-## 5. Comparison Matrix <a name="comparison-matrix"></a>
+## 4. Comparison Matrix <a name="comparison-matrix"></a>
 
 | Solution | Write Channel | Sync Mechanism | Cloud DB | Polling? | Static IP | On-Prem Footprint | Complexity | Cost |
 |---|---|---|---|---|---|---|---|---|
@@ -412,7 +367,7 @@ The most enterprise-grade option and the highest sync fidelity available. **Orac
 
 ---
 
-## 6. Recommended Architecture <a name="recommendation"></a>
+## 5. Recommended Architecture <a name="recommendation"></a>
 
 ### Primary Recommendation: Solution 3 (WebSocket Agent)
 
@@ -441,4 +396,3 @@ At 10+ properties, where millisecond sync fidelity, full event replay, and downs
 
 ---
 
-*Document Version 4.0 — prepared for review. All solutions subject to Oracle OPERA PMS version compatibility assessment, hotel IT infrastructure audit, and Oracle DBA sign-off on SC-3 write permissions prior to implementation. The OPERA 5 capability reference in Section 3 reflects standard deployment configurations and should be validated against the specific property's Oracle support agreement and IT environment.*
