@@ -8,14 +8,14 @@
 ---
 
 ## Table of Contents
-1. [Overview & Constraints Summary](#overview)
-2. [Read-Only Solutions (5 Options)](#read-only-solutions)
-3. [Read & Write Solutions (3 Options)](#read-write-solutions)
-4. [Comparison Matrix](#comparison-matrix)
+1. [Overview & Constraints Summary](#1-overview--constraints-summary-)
+2. [Read-Only Solutions (5 Options)](#2-read-only-solutions-)
+3. [Read & Write Solutions (3 Options)](#3-read--write-solutions-)
+4. [Comparison Matrix](#4-comparison-matrix-)
 
 ---
 
-## 1. Overview & Constraints Summary <a name="overview"></a>
+## 1. Overview & Constraints Summary <a id="overview"></a>
 
 All solutions must satisfy the following non-negotiable constraints derived from the PRD:
 
@@ -32,7 +32,7 @@ All solutions must satisfy the following non-negotiable constraints derived from
 
 ---
 
-## 2. Read-Only Solutions <a name="read-only-solutions"></a>
+## 2. Read-Only Solutions <a id="read-only-solutions"></a>
 
 ---
 
@@ -220,7 +220,7 @@ A **Temporal.io** workflow engine deployed in the cloud orchestrates durable, re
 
 ---
 
-## 3. Read & Write Solutions <a name="read-write-solutions"></a>
+## 3. Read & Write Solutions <a id="read-write-solutions"></a>
 
 > ⚠️ **Critical Compliance Note:** The PRD (SC-3) mandates that the OPERA Oracle integration user be restricted to `SELECT` permissions. **Write-back to the OPERA production Oracle DB is explicitly out of scope.** The following solutions address write access to the **SaaS-managed cloud data layer** (e.g., replica, enrichment tables, workflow state), not to the OPERA database itself. Where OPERA write-back is a genuine business requirement, a separate privileged service account with audited, scoped `INSERT/UPDATE` permissions and change-approval workflows must be provisioned — this is a **PRD amendment** that requires sign-off.
 
@@ -333,7 +333,7 @@ This is the most architecturally mature option. A **CQRS (Command Query Responsi
 
 ---
 
-## 4. Comparison Matrix <a name="comparison-matrix"></a>
+## 4. Comparison Matrix <a id="comparison-matrix"></a>
 
 | Solution | Type | Connectivity Method | Complexity | Cost | OXI/OHIP Native | Write Capable |
 |---|---|---|---|---|---|---|

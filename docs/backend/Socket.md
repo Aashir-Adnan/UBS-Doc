@@ -127,14 +127,17 @@ Src/
 │   ├── RegisterDelegates.js
 │       └── Controllers/
 │           ├── QuizController/
-│           └── LabController/```
+│           └── LabController/
+```
 
+<a id="customization"></a>
 ## Customization
 
 - **Add Middleware**: Pass middleware functions in the service config.
 - **Extend Delegates**: Add custom event handlers and lifecycle methods.
 - **Global Access**: Use the registry to access any socket service anywhere.
 
+<a id="development-best-practices"></a>
 ## Development Best Practices
 
 - **Keep business logic in delegates/controllers.**
@@ -143,6 +146,7 @@ Src/
 - **Register all socket services in `RegisterDelegates.js` for clarity.**
 - **Use logical names for services to simplify global access.**
 
+<a id="installation"></a>
 ## Installation
 
 1. Clone the repository:

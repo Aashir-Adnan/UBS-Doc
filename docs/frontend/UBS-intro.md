@@ -4,8 +4,8 @@
 
 - [Overview](#overview)
 - [Features](#features)
-- [API Object Configuration](#api-object-configuration)
-- [CRUD Object Structure](#crud-object-structure)
+- [API Object Configuration](#api-object-structure)
+- [CRUD Object Structure](#api-object-rules)
 - [Middleware Components](#middleware-components)
 - [Customization](#customization)
 - [Ease of Use](#ease-of-use)
@@ -13,7 +13,6 @@
 - [5-Minute Setup](#5-minute-setup)
 - [Usage](#usage)
 - [Installation](#installation)
-- [License](#license)
 
 ## Overview
 

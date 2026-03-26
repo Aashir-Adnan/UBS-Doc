@@ -4,7 +4,6 @@ const React = require('react');
 
 
 module.exports = function () {
-  console.log('portalPlugin', process.env)
   return {
     name: 'portal-plugin',
     injectHtmlTags() {

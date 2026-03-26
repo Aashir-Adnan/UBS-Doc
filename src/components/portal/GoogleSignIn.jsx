@@ -23,18 +23,6 @@ export default function GoogleSignIn() {
       const { user } = result;
       const idToken = await user.getIdToken();
 
-      // Debug: print Firebase auth return and idToken example
-      console.log("Firebase auth result:", {
-        user: {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-        },
-        idToken,
-        credential: result.credential ? "(OAuthCredential present)" : null,
-      });
-
       setUser({
         uid: user.uid,
         email: user.email ?? null,
@@ -42,8 +30,9 @@ export default function GoogleSignIn() {
         photoURL: user.photoURL ?? null,
       });
     } catch (e) {
-      if (e.code !== "auth/popup-closed-by-user") {
-        console.error("Firebase sign-in failed", e);
+      // Keep the UI silent on "popup closed by user", but surface other failures.
+      if (e?.code !== "auth/popup-closed-by-user") {
+        setError(e?.message || "Firebase sign-in failed");
       }
     } finally {
       setLoading(false);

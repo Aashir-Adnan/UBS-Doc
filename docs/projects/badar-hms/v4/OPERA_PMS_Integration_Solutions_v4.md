@@ -5,16 +5,16 @@
 
 ## Table of Contents
 
-1. [Acronym Legend](#acronym-legend)
-2. [Updated Constraints Summary](#overview)
-3. [OPERA 5 On-Premises Capability Reference](#opera5)
-4. [Hybrid Read/Write Solutions (4 Options)](#solutions)
-5. [Comparison Matrix](#comparison-matrix)
-6. [Recommended Architecture](#recommendation)
+1. [Acronym Legend](#1-acronym-legend-)
+2. [Updated Constraints Summary](#2-opera-5-on-premises--capability-reference-)
+3. [OPERA 5 On-Premises Capability Reference](#3-hybrid-readwrite-solutions-)
+4. [Hybrid Read/Write Solutions (4 Options)](#4-comparison-matrix-)
+5. [Comparison Matrix](#5-recommended-architecture-)
+6. [Recommended Architecture](#5-recommended-architecture-)
 
 ---
 
-## 1. Acronym Legend <a name="acronym-legend"></a>
+## 1. Acronym Legend <a id="acronym-legend"></a>
 
 | Acronym | Full Name | Description |
 |---|---|---|
@@ -30,12 +30,12 @@
 | **SSE** | Server-Sent Events | A unidirectional HTTP-based push mechanism from server to client; lighter than WebSocket for read-only streams |
 
 
-## 2. OPERA 5 On-Premises — Capability Reference <a name="opera5"></a>
+## 2. OPERA 5 On-Premises — Capability Reference <a id="opera5"></a>
 # https://ubs-doc.vercel.app/docs/projects/badar-hms/Opera_Config
 
 ---
 
-## 3. Hybrid Read/Write Solutions <a name="solutions"></a>
+## 3. Hybrid Read/Write Solutions <a id="solutions"></a>
 
 
 
@@ -329,7 +329,7 @@ The most enterprise-grade option and the highest sync fidelity available. **Orac
 
 ---
 
-## 4. Comparison Matrix <a name="comparison-matrix"></a>
+## 4. Comparison Matrix <a id="comparison-matrix"></a>
 
 | Solution | Write Channel | Sync Mechanism | Cloud DB | Polling? | Static IP | On-Prem Footprint | Complexity | Cost |
 |---|---|---|---|---|---|---|---|---|
@@ -367,7 +367,7 @@ The most enterprise-grade option and the highest sync fidelity available. **Orac
 
 ---
 
-## 5. Recommended Architecture <a name="recommendation"></a>
+## 5. Recommended Architecture <a id="recommendation"></a>
 
 ### Primary Recommendation: Solution 3 (WebSocket Agent)
 

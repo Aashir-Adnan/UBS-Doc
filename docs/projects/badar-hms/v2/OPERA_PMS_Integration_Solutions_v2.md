@@ -21,14 +21,14 @@
 ---
 
 ## Table of Contents
-1. [Updated Constraints Summary](#overview)
-2. [Hybrid Read/Write Solutions (5 Options)](#solutions)
-3. [Comparison Matrix](#comparison-matrix)
-4. [Recommended Architecture](#recommendation)
+1. [Updated Constraints Summary](#1-updated-constraints-summary-)
+2. [Hybrid Read/Write Solutions (5 Options)](#2-hybrid-readwrite-solutions-)
+3. [Comparison Matrix](#3-comparison-matrix-)
+4. [Recommended Architecture](#4-recommended-architecture-)
 
 ---
 
-## 1. Updated Constraints Summary <a name="overview"></a>
+## 1. Updated Constraints Summary <a id="overview"></a>
 
 | Constraint | Requirement |
 |---|---|
@@ -47,7 +47,7 @@
 
 ---
 
-## 2. Hybrid Read/Write Solutions <a name="solutions"></a>
+## 2. Hybrid Read/Write Solutions <a id="solutions"></a>
 
 ---
 
@@ -332,7 +332,7 @@ The most robust and enterprise-grade option. **Change Data Capture (CDC)** via O
 
 ---
 
-## 3. Comparison Matrix <a name="comparison-matrix"></a>
+## 3. Comparison Matrix <a id="comparison-matrix"></a>
 
 | Solution | Write Channel | Read Channel | Sync Model | Real-Time? | Static IP Required | Complexity | Cost |
 |---|---|---|---|---|---|---|---|
@@ -354,7 +354,7 @@ The most robust and enterprise-grade option. **Change Data Capture (CDC)** via O
 
 ---
 
-## 4. Recommended Architecture <a name="recommendation"></a>
+## 4. Recommended Architecture <a id="recommendation"></a>
 
 ### Primary Recommendation: Solution 3 (On-Prem Node.js Agent + WebSocket)
 

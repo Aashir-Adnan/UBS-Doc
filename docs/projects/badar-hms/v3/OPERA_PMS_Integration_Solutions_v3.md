@@ -22,16 +22,16 @@
 
 ## Table of Contents
 
-1. [Acronym Legend](#acronym-legend)
-2. [Updated Constraints Summary](#overview)
-3. [OPERA 5 On-Premises Capability Reference](#opera5)
-4. [Hybrid Read/Write Solutions (4 Options)](#solutions)
-5. [Comparison Matrix](#comparison-matrix)
-6. [Recommended Architecture](#recommendation)
+1. [Acronym Legend](#1-acronym-legend-)
+2. [Updated Constraints Summary](#2-updated-constraints-summary-)
+3. [OPERA 5 On-Premises Capability Reference](#3-opera-5-on-premises--capability-reference-)
+4. [Hybrid Read/Write Solutions (4 Options)](#4-hybrid-readwrite-solutions-)
+5. [Comparison Matrix](#5-comparison-matrix-)
+6. [Recommended Architecture](#6-recommended-architecture-)
 
 ---
 
-## 1. Acronym Legend <a name="acronym-legend"></a>
+## 1. Acronym Legend <a id="acronym-legend"></a>
 
 | Acronym | Full Name | Description |
 |---|---|---|
@@ -48,7 +48,7 @@
 
 ---
 
-## 2. Updated Constraints Summary <a name="overview"></a>
+## 2. Updated Constraints Summary <a id="overview"></a>
 
 | Constraint | Requirement |
 |---|---|
@@ -72,10 +72,10 @@
 
 ---
 
-## 3. OPERA 5 On-Premises — Capability Reference <a name="opera5"></a>
+## 3. OPERA 5 On-Premises — Capability Reference <a id="opera5"></a>
 # https://ubs-doc.vercel.app/docs/projects/badar-hms/Opera_Config
 
-## 4. Hybrid Read/Write Solutions <a name="solutions"></a>
+## 4. Hybrid Read/Write Solutions <a id="solutions"></a>
 
 > **Note on polling removal:** Solution 4 (GraphQL + OWS with 30–60s polling) from v2.0 has been retired as it cannot satisfy TR-2's no-polling requirement. The four remaining solutions all use event-driven or push-based sync exclusively.
 
@@ -320,7 +320,7 @@ The most enterprise-grade option. **Change Data Capture (CDC)** via Oracle Golde
 
 ---
 
-## 5. Comparison Matrix <a name="comparison-matrix"></a>
+## 5. Comparison Matrix <a id="comparison-matrix"></a>
 
 | Solution | Write Channel | OPERA Read Sync | Atlas Sync | SQL DB Sync | Polling? | Static IP | Complexity | Cost |
 |---|---|---|---|---|---|---|---|---|
@@ -349,7 +349,7 @@ The most enterprise-grade option. **Change Data Capture (CDC)** via Oracle Golde
 
 ---
 
-## 6. Recommended Architecture <a name="recommendation"></a>
+## 6. Recommended Architecture <a id="recommendation"></a>
 
 ### Primary Recommendation: Solution 3 (WebSocket Agent)
 

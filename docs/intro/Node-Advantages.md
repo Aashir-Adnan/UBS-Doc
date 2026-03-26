@@ -121,4 +121,4 @@ For developers who want to write features, not framework code.
 
 ---
 
-*See [FRAMEWORK_ADVANTAGES.md](./FRAMEWORK_ADVANTAGES.md) for technical details. See [README.md](./README.md) and [UBS-intro.md](./UBS-intro.md) for setup and API structure.*
+*See [UBS_Framework_Features.md](./UBS_Framework_Features.md) for technical details, setup, and API structure.*

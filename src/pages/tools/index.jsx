@@ -15,7 +15,6 @@ function isGranjurEmail(email) {
 
 function ToolsHub() {
   const { user, signOut } = useAuth();
-  console.log('user', user);
   const canAccessPortal = !!user && isGranjurEmail(user?.email);
 
   if (!user) {
