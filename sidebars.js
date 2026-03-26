@@ -57,6 +57,11 @@ const sidebars = {
     },
     {
       type: 'category',
+      label: 'Framework Agents',
+      items: ['agents/agent-issue-format', 'agents/claude-github-issues-agent'],
+    },
+    {
+      type: 'category',
       label: 'Tutorial',
       items: ['tutorial-basics/create-a-document', 'tutorial-basics/create-a-page', 'tutorial-basics/deploy-your-site', 'tutorial-basics/markdown-features'],
     },
