@@ -4,11 +4,7 @@ import Link from '@docusaurus/Link';
 import { useAuth } from '../../components/portal/authStore';
 import GoogleSignIn from '../../components/portal/GoogleSignIn';
 import LucidSanitize from '../../components/portal/LucidSanitize';
-
-function isGranjurEmail(email) {
-  const e = (email || '').toLowerCase();
-  return e.endsWith('@granjur.com') || e.endsWith('@granjur,com');
-}
+import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
 
 function LucidToolContent() {
   const { user, signOut } = useAuth();

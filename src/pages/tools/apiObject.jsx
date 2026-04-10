@@ -3,15 +3,7 @@ import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 import { useAuth } from '../../components/portal/authStore';
 import GoogleSignIn from '../../components/portal/GoogleSignIn';
-
-function isGranjurEmail(email) {
-  const e = (email || '').toLowerCase();
-  return (
-    e.endsWith('@granjur.com') ||
-    e.endsWith('@granjur,com') ||
-    e === 'dev.alikhalil@gmail.com'
-  );
-}
+import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
 
 /** Converts URL path to object name: /test/api → TestApi_object */
 function urlToObjectName(url) {

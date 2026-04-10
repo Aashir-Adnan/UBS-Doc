@@ -4,15 +4,7 @@ import Link from '@docusaurus/Link';
 import { useAuth } from '@site/src/components/portal/authStore';
 import GoogleSignIn from '@site/src/components/portal/GoogleSignIn';
 import { projects } from '@site/src/data/projectsConfig';
-
-function isGranjurEmail(email) {
-  const e = (email || '').toLowerCase();
-  return (
-    e.endsWith('@granjur.com') ||
-    e.endsWith('@granjur,com') ||
-    e === 'dev.alikhalil@gmail.com'
-  );
-}
+import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
 
 function ProjectsContent() {
   const { user, signOut } = useAuth();

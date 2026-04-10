@@ -3,15 +3,7 @@ import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 import { useAuth } from '@site/src/components/portal/authStore';
 import GoogleSignIn from '@site/src/components/portal/GoogleSignIn';
-
-function isGranjurEmail(email) {
-  const e = (email || '').toLowerCase();
-  return (
-    e.endsWith('@granjur.com') ||
-    e.endsWith('@granjur,com') ||
-    e === 'dev.alikhalil@gmail.com'
-  );
-}
+import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
 
 function ToolsHub() {
   const { user, signOut } = useAuth();

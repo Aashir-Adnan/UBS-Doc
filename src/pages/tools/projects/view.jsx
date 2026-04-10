@@ -8,20 +8,12 @@ import {
   projects,
   getProjectComponent,
 } from '@site/src/data/projectsConfig';
+import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
 
 function useProjectSlug() {
   const { search } = useLocation();
   const params = new URLSearchParams(search);
   return params.get('project');
-}
-
-function isGranjurEmail(email) {
-  const e = (email || '').toLowerCase();
-  return (
-    e.endsWith('@granjur.com') ||
-    e.endsWith('@granjur,com') ||
-    e === 'dev.alikhalil@gmail.com'
-  );
 }
 
 function ProjectViewContent() {
