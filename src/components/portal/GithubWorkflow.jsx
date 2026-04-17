@@ -358,6 +358,7 @@ function ReplyBox({ repo, issue, comments, onReplied }) {
 function IssueRow({ issue, comments, repo, currentUserEmail, onRefresh }) {
   const [open, setOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [openComments, setOpenComments] = useState({});
 
   const stage = getIssueStage(comments);
   const awaitingHuman = stage === 'human';
@@ -397,13 +398,31 @@ function IssueRow({ issue, comments, repo, currentUserEmail, onRefresh }) {
                   {comments.map((c) => {
                     const firstChar = (c.body || '').trimStart()[0];
                     const isBot = firstChar === '🤖' || firstChar === '⚠️';
+                    const isCommentOpen = !!openComments[c.id];
+                    const preview = (c.body || '').replace(/\s+/g, ' ').trim();
                     return (
                       <div key={c.id} className={`gh-comment${isBot ? ' gh-comment--bot' : ''}`}>
-                        <div className="gh-comment-header">
+                        <button
+                          type="button"
+                          className="gh-comment-toggle"
+                          onClick={() =>
+                            setOpenComments((prev) => ({
+                              ...prev,
+                              [c.id]: !prev[c.id],
+                            }))
+                          }
+                        >
                           <span className="gh-comment-author">{isBot ? firstChar : '👤'} {c.user?.login}</span>
                           <span className="gh-comment-time">{new Date(c.created_at).toLocaleString()}</span>
-                        </div>
-                        <p className="gh-comment-body">{c.body}</p>
+                          <span className={`gh-comment-chevron${isCommentOpen ? ' open' : ''}`}>▸</span>
+                        </button>
+                        {isCommentOpen ? (
+                          <p className="gh-comment-body">{c.body}</p>
+                        ) : (
+                          <p className="gh-comment-preview">
+                            {preview || '(empty comment)'}
+                          </p>
+                        )}
                       </div>
                     );
                   })}
