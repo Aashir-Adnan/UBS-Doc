@@ -393,19 +393,21 @@ function IssueRow({ issue, comments, repo, currentUserEmail, onRefresh }) {
                 {commentsOpen ? 'Hide' : 'Show'} {comments.length} comment{comments.length !== 1 ? 's' : ''}
               </button>
               <div className={`gh-comments-list${commentsOpen ? ' gh-comments-list--open' : ''}`}>
-                {comments.map((c) => {
-                  const firstChar = (c.body || '').trimStart()[0];
-                  const isBot = firstChar === '🤖' || firstChar === '⚠️';
-                  return (
-                    <div key={c.id} className={`gh-comment${isBot ? ' gh-comment--bot' : ''}`}>
-                      <div className="gh-comment-header">
-                        <span className="gh-comment-author">{isBot ? firstChar : '👤'} {c.user?.login}</span>
-                        <span className="gh-comment-time">{new Date(c.created_at).toLocaleString()}</span>
+                <div className="gh-comments-list-inner">
+                  {comments.map((c) => {
+                    const firstChar = (c.body || '').trimStart()[0];
+                    const isBot = firstChar === '🤖' || firstChar === '⚠️';
+                    return (
+                      <div key={c.id} className={`gh-comment${isBot ? ' gh-comment--bot' : ''}`}>
+                        <div className="gh-comment-header">
+                          <span className="gh-comment-author">{isBot ? firstChar : '👤'} {c.user?.login}</span>
+                          <span className="gh-comment-time">{new Date(c.created_at).toLocaleString()}</span>
+                        </div>
+                        <p className="gh-comment-body">{c.body}</p>
                       </div>
-                      <p className="gh-comment-body">{c.body}</p>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
