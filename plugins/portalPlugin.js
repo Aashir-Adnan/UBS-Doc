@@ -31,7 +31,12 @@ module.exports = function () {
           },
           {
             tagName: 'script',
-            innerHTML: `window.__FIREBASE_CONFIG__=${JSON.stringify(config)};window.__API_BASE_URL__=${JSON.stringify(apiBaseUrl)};`,
+            innerHTML: [
+              `window.__FIREBASE_CONFIG__=${JSON.stringify(config)};`,
+              `window.__API_BASE_URL__=${JSON.stringify(apiBaseUrl)};`,
+              `window.__GIT_USERNAME__=${JSON.stringify(process.env.GIT_USERNAME || '')};`,
+              `window.__GIT_PAT__=${JSON.stringify(process.env.GIT_PERSONAL_ACCESS_TOKEN || '')};`,
+            ].join(''),
           },
         ],
       };
