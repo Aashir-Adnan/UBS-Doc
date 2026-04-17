@@ -18,4 +18,5 @@ export const githubRepos = [
   { slug: 'csaas-backend',            name: 'CSAAS_Backend',                    owner: 'Aashir-Adnan',   repo: 'CSAAS_Backend' },
   { slug: 'ubs-doc',                  name: 'UBS-Doc',                          owner: 'Aashir-Adnan',   repo: 'UBS-Doc' },
   { slug: 'scholarspace-ubs',         name: 'ScholarSpace-UBS-Framework',       owner: 'Aashir-Adnan',   repo: 'ScholarSpace-UBS-Framework' },
+  { slug: 'qf',               name: 'QF',              owner: 'UBS-Dev-Org',   repo: 'qf-granjur-1' },
 ];
