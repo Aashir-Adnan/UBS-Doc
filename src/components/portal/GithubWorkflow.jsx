@@ -684,13 +684,23 @@ const WORKSPACE_TABS = [
 
 function RepoWorkspace({ repo, user, notifications, onNewNotification, onBack, onDismiss, onDismissAll }) {
   const [tab, setTab] = useState('issues');
+  const [displayTab, setDisplayTab] = useState('issues');
+  const [tabFading, setTabFading] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [entering, setEntering] = useState(true);
+  const tabSwapTimerRef = useRef(null);
 
   useEffect(() => {
     const t = setTimeout(() => setEntering(false), 20);
     return () => clearTimeout(t);
   }, []);
+
+  useEffect(
+    () => () => {
+      if (tabSwapTimerRef.current) clearTimeout(tabSwapTimerRef.current);
+    },
+    [],
+  );
 
   // Auto-poll
   useEffect(() => {
@@ -698,7 +708,24 @@ function RepoWorkspace({ repo, user, notifications, onNewNotification, onBack, o
     return () => clearInterval(id);
   }, []);
 
-  const handleIssueCreated = () => { setTab('issues'); setRefreshTick((t) => t + 1); };
+  const handleTabChange = useCallback(
+    (nextTab) => {
+      if (nextTab === tab) return;
+      setTab(nextTab);
+      setTabFading(true);
+      if (tabSwapTimerRef.current) clearTimeout(tabSwapTimerRef.current);
+      tabSwapTimerRef.current = setTimeout(() => {
+        setDisplayTab(nextTab);
+        setTabFading(false);
+      }, 280);
+    },
+    [tab],
+  );
+
+  const handleIssueCreated = () => {
+    handleTabChange('issues');
+    setRefreshTick((t) => t + 1);
+  };
 
   return (
     <div className={`gh-workspace${entering ? ' gh-workspace--entering' : ''}`}>
@@ -717,7 +744,7 @@ function RepoWorkspace({ repo, user, notifications, onNewNotification, onBack, o
             {WORKSPACE_TABS.map((t) => (
               <button key={t.id} type="button"
                 className={`gh-view-tab${tab === t.id ? ' gh-view-tab--active' : ''}`}
-                onClick={() => setTab(t.id)}>
+                onClick={() => handleTabChange(t.id)}>
                 {t.label}
               </button>
             ))}
@@ -737,33 +764,35 @@ function RepoWorkspace({ repo, user, notifications, onNewNotification, onBack, o
 
         {/* Main content */}
         <main className="gh-workspace-main">
-          {tab === 'issues' && (
-            <>
-              <div className="gh-panel-header">
-                <h3 className="gh-panel-title">Open Agent Issues</h3>
-                <button type="button" className="gh-refresh-btn" onClick={() => setRefreshTick((t) => t + 1)} title="Refresh">↻</button>
-              </div>
-              <IssuesPanel repo={repo} currentUserEmail={user?.email || ''}
-                onNewNotification={onNewNotification} refreshTick={refreshTick}
-                onRefresh={() => setRefreshTick((t) => t + 1)} />
-            </>
-          )}
-          {tab === 'prs' && (
-            <>
-              <div className="gh-panel-header">
-                <h3 className="gh-panel-title">Open Pull Requests</h3>
-              </div>
-              <PRsPanel repo={repo} />
-            </>
-          )}
-          {tab === 'create' && (
-            <>
-              <div className="gh-panel-header">
-                <h3 className="gh-panel-title">New Agent Issue</h3>
-              </div>
-              <IssueForm repo={repo} onCreated={handleIssueCreated} userEmail={user?.email || ''} />
-            </>
-          )}
+          <div className={`gh-tab-panel${tabFading ? ' gh-tab-panel--fading' : ''}`}>
+            {displayTab === 'issues' && (
+              <>
+                <div className="gh-panel-header">
+                  <h3 className="gh-panel-title">Open Agent Issues</h3>
+                  <button type="button" className="gh-refresh-btn" onClick={() => setRefreshTick((t) => t + 1)} title="Refresh">↻</button>
+                </div>
+                <IssuesPanel repo={repo} currentUserEmail={user?.email || ''}
+                  onNewNotification={onNewNotification} refreshTick={refreshTick}
+                  onRefresh={() => setRefreshTick((t) => t + 1)} />
+              </>
+            )}
+            {displayTab === 'prs' && (
+              <>
+                <div className="gh-panel-header">
+                  <h3 className="gh-panel-title">Open Pull Requests</h3>
+                </div>
+                <PRsPanel repo={repo} />
+              </>
+            )}
+            {displayTab === 'create' && (
+              <>
+                <div className="gh-panel-header">
+                  <h3 className="gh-panel-title">New Agent Issue</h3>
+                </div>
+                <IssueForm repo={repo} onCreated={handleIssueCreated} userEmail={user?.email || ''} />
+              </>
+            )}
+          </div>
         </main>
       </div>
 
