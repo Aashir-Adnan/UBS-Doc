@@ -7,18 +7,26 @@ module.exports = function () {
   return {
     name: 'portal-plugin',
     injectHtmlTags() {
+      const env = process.env;
       const config = {
-        apiKey: process.env.FIREBASE_API_KEY || '',
-        authDomain: process.env.FIREBASE_AUTH_DOMAIN || '',
-        projectId: process.env.FIREBASE_PROJECT_ID || '',
-        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || '',
+        apiKey: env.FIREBASE_API_KEY || '',
+        authDomain: env.FIREBASE_AUTH_DOMAIN || '',
+        projectId: env.FIREBASE_PROJECT_ID || '',
+        storageBucket: env.FIREBASE_STORAGE_BUCKET || '',
         messagingSenderId:
-          process.env.FIREBASE_MESSAGING_SENDER_ID || '',
-        appId: process.env.FIREBASE_APP_ID || '',
-        measurementId: process.env.FIREBASE_MEASUREMENT_ID || '',
+          env.FIREBASE_MESSAGING_SENDER_ID || '',
+        appId: env.FIREBASE_APP_ID || '',
+        measurementId: env.FIREBASE_MEASUREMENT_ID || '',
       };
       const apiBaseUrl =
-        process.env.API_BASE_URL || 'http://localhost:3000';
+        env.VITE_BASE_URL || env.API_BASE_URL || 'http://localhost:3000';
+      const runtimeEnv = {
+        VITE_SECRET_KEY: env.VITE_SECRET_KEY || env.SECRET_KEY || '',
+        VITE_PLATFORM_KEY: env.VITE_PLATFORM_KEY || env.PLATFORM_KEY || '',
+        VITE_PLATFORM_NAME: env.VITE_PLATFORM_NAME || env.PLATFORM_NAME || '',
+        VITE_PLATFORM_VERSION:
+          env.VITE_PLATFORM_VERSION || env.PLATFORM_VERSION || '',
+      };
       return {
         preBodyTags: [
           {
@@ -31,7 +39,14 @@ module.exports = function () {
           },
           {
             tagName: 'script',
-            innerHTML: `window.__FIREBASE_CONFIG__=${JSON.stringify(config)};window.__API_BASE_URL__=${JSON.stringify(apiBaseUrl)};`,
+            innerHTML: `
+window.__FIREBASE_CONFIG__=${JSON.stringify(config)};
+window.__API_BASE_URL__=${JSON.stringify(apiBaseUrl)};
+window.__VITE_SECRET_KEY__=${JSON.stringify(runtimeEnv.VITE_SECRET_KEY)};
+window.__VITE_PLATFORM_KEY__=${JSON.stringify(runtimeEnv.VITE_PLATFORM_KEY)};
+window.__VITE_PLATFORM_NAME__=${JSON.stringify(runtimeEnv.VITE_PLATFORM_NAME)};
+window.__VITE_PLATFORM_VERSION__=${JSON.stringify(runtimeEnv.VITE_PLATFORM_VERSION)};
+`,
           },
         ],
       };

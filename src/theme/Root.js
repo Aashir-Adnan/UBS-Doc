@@ -1,6 +1,7 @@
 import React from 'react';
-import { AuthProvider } from '@site/src/components/portal/authStore';
+import { Provider } from 'react-redux';
+import { store } from '@site/src/state/store';
 
 export default function Root({ children }) {
-  return <AuthProvider>{children}</AuthProvider>;
+  return <Provider store={store}>{children}</Provider>;
 }

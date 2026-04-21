@@ -109,6 +109,15 @@ function ToolsHub() {
               dashboards.
             </p>
           </Link>
+
+          <Link to="/tools/meetingWorkflow" className="tool-card">
+            <div className="tool-card-icon">📋</div>
+            <h3>Meeting Workflow</h3>
+            <p>
+              Create meetings, transcribe audio, generate tasks and push
+              approved work to GitHub issues.
+            </p>
+          </Link>
         </div>
       </section>
     </>

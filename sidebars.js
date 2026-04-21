@@ -44,7 +44,7 @@ const sidebars = {
         {
           type: 'category',
           label: 'Integrations',
-          items: ['backend/Socket',  'backend/Payments'],
+          items: ['backend/Socket', 'backend/Payments', 'backend/local-whisper-setup'],
         },
         'backend/FAQs'
     
