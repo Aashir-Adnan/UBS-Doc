@@ -39,14 +39,19 @@ module.exports = function () {
           },
           {
             tagName: 'script',
-            innerHTML: `
+            innerHTML: [
+              `
 window.__FIREBASE_CONFIG__=${JSON.stringify(config)};
-window.__API_BASE_URL__=${JSON.stringify(apiBaseUrl)};
+`,
+              `window.__API_BASE_URL__=${JSON.stringify(apiBaseUrl)};
 window.__VITE_SECRET_KEY__=${JSON.stringify(runtimeEnv.VITE_SECRET_KEY)};
 window.__VITE_PLATFORM_KEY__=${JSON.stringify(runtimeEnv.VITE_PLATFORM_KEY)};
 window.__VITE_PLATFORM_NAME__=${JSON.stringify(runtimeEnv.VITE_PLATFORM_NAME)};
 window.__VITE_PLATFORM_VERSION__=${JSON.stringify(runtimeEnv.VITE_PLATFORM_VERSION)};
 `,
+              `window.__GIT_USERNAME__=${JSON.stringify(process.env.GIT_USERNAME || '')};`,
+              `window.__GIT_PAT__=${JSON.stringify(process.env.GIT_PERSONAL_ACCESS_TOKEN || '')};`,
+            ].join(''),
           },
         ],
       };

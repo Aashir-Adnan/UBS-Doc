@@ -1,10 +1,10 @@
 .pitchMain {
   min-height: 100vh;
   background:
-    radial-gradient(1100px 600px at 20% -10%, rgba(110, 86, 255, 0.22), transparent 60%),
-    radial-gradient(900px 500px at 90% 10%, rgba(0, 200, 255, 0.14), transparent 55%),
-    #050507;
-  color: #e9ecff;
+    radial-gradient(950px 520px at 18% -8%, rgba(255, 122, 26, 0.16), transparent 62%),
+    radial-gradient(780px 460px at 90% 6%, rgba(255, 122, 26, 0.12), transparent 58%),
+    var(--ifm-background-color);
+  color: var(--ifm-font-color-base);
   padding-bottom: 4rem;
 }
 
@@ -18,13 +18,13 @@
 .heroGlow {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 60%);
+  background: linear-gradient(180deg, rgba(255, 122, 26, 0.06), transparent 60%);
   pointer-events: none;
 }
 
 .kicker {
   margin: 0;
-  color: #9ca6d0;
+  color: var(--ifm-color-emphasis-700);
   text-transform: uppercase;
   letter-spacing: 0.16em;
   font-size: 0.72rem;
@@ -35,13 +35,13 @@
   font-size: clamp(2.2rem, 5.5vw, 4.4rem);
   line-height: 1.05;
   letter-spacing: -0.02em;
-  color: #f6f8ff;
+  color: var(--ifm-font-color-base);
 }
 
 .heroSubtitle {
   margin: 1rem 0 0;
   max-width: 740px;
-  color: #b8c0e8;
+  color: var(--ifm-color-emphasis-700);
   font-size: clamp(1rem, 1.65vw, 1.25rem);
   line-height: 1.7;
 }
@@ -64,15 +64,15 @@
 }
 
 .ctaPrimary {
-  background: linear-gradient(120deg, #6b7cff, #5a65df);
-  color: #fff;
-  border: 1px solid #7d8dff;
+  background: linear-gradient(120deg, var(--ifm-color-primary), var(--ifm-color-primary-dark));
+  color: #ffffff;
+  border: 1px solid var(--ifm-color-primary-light);
 }
 
 .ctaGhost {
-  border: 1px solid #333d67;
-  color: #dce2ff;
-  background: rgba(19, 23, 40, 0.6);
+  border: 1px solid var(--ifm-color-emphasis-400);
+  color: var(--ifm-font-color-base);
+  background: color-mix(in srgb, var(--ifm-background-surface-color) 82%, transparent);
 }
 
 .ctaPrimary:hover,
@@ -93,8 +93,8 @@
   position: sticky;
   top: 86px;
   align-self: start;
-  background: rgba(14, 17, 30, 0.86);
-  border: 1px solid #262d4f;
+  background: color-mix(in srgb, var(--ifm-background-surface-color) 90%, transparent);
+  border: 1px solid var(--ifm-color-emphasis-300);
   border-radius: 1rem;
   padding: 1rem;
 }
@@ -106,7 +106,7 @@
 
 .docsSidebar p {
   margin: 0.35rem 0 0.8rem;
-  color: #9aa5d0;
+  color: var(--ifm-color-emphasis-700);
   font-size: 0.82rem;
 }
 
@@ -117,7 +117,7 @@
 }
 
 .docsSidebar nav a {
-  color: #c9d1fb;
+  color: var(--ifm-font-color-base);
   font-size: 0.85rem;
   text-decoration: none;
   border: 1px solid transparent;
@@ -126,8 +126,8 @@
 }
 
 .docsSidebar nav a:hover {
-  border-color: #38406d;
-  background: rgba(39, 45, 78, 0.35);
+  border-color: var(--ifm-color-primary);
+  background: rgba(255, 122, 26, 0.1);
 }
 
 .storyRail {
@@ -145,7 +145,7 @@
   opacity: 0.18;
   transform: translateY(16px);
   transition: opacity 480ms ease, transform 480ms ease;
-  border-bottom: 1px solid rgba(91, 107, 178, 0.22);
+  border-bottom: 1px solid color-mix(in srgb, var(--ifm-color-primary) 25%, transparent);
   padding-bottom: 2.2rem;
 }
 
@@ -153,14 +153,14 @@
   margin: 0;
   font-size: clamp(1.6rem, 3vw, 2.6rem);
   letter-spacing: -0.01em;
-  color: #f1f4ff;
+  color: var(--ifm-font-color-base);
 }
 
 .storyCard p {
   margin: 0.9rem 0 0;
   max-width: 720px;
   line-height: 1.8;
-  color: #aeb9e2;
+  color: var(--ifm-color-emphasis-700);
   font-size: clamp(0.98rem, 1.4vw, 1.1rem);
 }
 

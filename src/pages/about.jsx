@@ -7,8 +7,8 @@ export default function AboutPage() {
       title="About Dev"
       description="About the developer and Granjur Dev"
     >
-      <main className="portal-main-wrapper">
-        <section className="portal-section">
+      <main className="portal-main-wrapper portal-main-wrapper--center">
+        <section className="portal-section about-section">
           <div className="portal-section-header">
             <h3>About the developer</h3>
             <p>Connect with Aashir across platforms.</p>

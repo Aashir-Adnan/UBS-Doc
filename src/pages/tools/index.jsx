@@ -110,12 +110,12 @@ function ToolsHub() {
             </p>
           </Link>
 
-          <Link to="/tools/meetingWorkflow" className="tool-card">
-            <div className="tool-card-icon">📋</div>
-            <h3>Meeting Workflow</h3>
+          <Link to="/tools/github" className="tool-card">
+            <div className="tool-card-icon">🐙</div>
+            <h3>GitHub Dev Workflow</h3>
             <p>
-              Create meetings, transcribe audio, generate tasks and push
-              approved work to GitHub issues.
+              Browse repositories and dispatch agent tasks as GitHub issues
+              directly from the portal.
             </p>
           </Link>
         </div>
