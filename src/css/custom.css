@@ -1416,6 +1416,22 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
 
+.gh-workspace-main {
+  width: 100%;
+  min-height: 680px;
+}
+
+.gh-tab-panel {
+  width: 100%;
+  min-height: 680px;
+  opacity: 1;
+  transition: opacity 360ms ease;
+}
+
+.gh-tab-panel--fading {
+  opacity: 0;
+}
+
 /* Sidebar + content */
 .gh-workspace-body {
   display: grid;
@@ -3483,12 +3499,15 @@ body {
 
 .ubs-route-fade {
   position: fixed;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 220px;
   background: #000000;
   opacity: 0;
   pointer-events: none;
   transition: opacity 320ms ease;
-  z-index: 850;
+  z-index: 30;
 }
 
 .ubs-route-fade.is-active {
@@ -3604,6 +3623,10 @@ body {
   .ubs-page-stage {
     margin-left: 176px;
   }
+
+  .ubs-route-fade {
+    left: 176px;
+  }
 }
 
 @media (max-width: 680px) {
@@ -3646,5 +3669,10 @@ body {
 
   .ubs-page-stage {
     margin-left: 0;
+  }
+
+  .ubs-route-fade {
+    left: 0;
+    top: 0;
   }
 }
