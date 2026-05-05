@@ -40,27 +40,32 @@ function extractEmail(body = '') {
   return m ? m[1] : null;
 }
 
+function getBotMarker(comment) {
+  const body = comment?.body || '';
+  // Match bot marker at the beginning of any line, not just first char.
+  const markerMatch = body.match(/(?:^|\n)\s*(🤖|⚠️)\b/m);
+  if (markerMatch?.[1]) return markerMatch[1];
+  if (comment?.user?.type === 'Bot') return '🤖';
+  return null;
+}
+
 /**
  * Stage logic:
  * - No comments → "Awaiting Bot Response"
- * - Last comment starts with 🤖 or ⚠️ → "Awaiting Human Response"
- * - Last comment starts with anything else → "Awaiting Bot Response"
+ * - Last comment contains 🤖/⚠️ marker (or is from Bot user) → "Awaiting Human Response"
+ * - Last comment otherwise → "Awaiting Bot Response"
  */
 function getIssueStage(comments) {
   if (!comments || comments.length === 0) return 'bot';
   const last = comments[comments.length - 1];
-  const firstChar = (last.body || '').trimStart()[0];
-  if (firstChar === '🤖' || firstChar === '⚠️') return 'human';
+  if (getBotMarker(last)) return 'human';
   return 'bot';
 }
 
 function getLastBotEmoji(comments) {
   if (!comments || comments.length === 0) return null;
   const last = comments[comments.length - 1];
-  const firstChar = (last.body || '').trimStart()[0];
-  if (firstChar === '🤖') return '🤖';
-  if (firstChar === '⚠️') return '⚠️';
-  return null;
+  return getBotMarker(last);
 }
 
 function buildIssueBody({ task, context, type, priority, email }) {
@@ -396,8 +401,8 @@ function IssueRow({ issue, comments, repo, currentUserEmail, onRefresh }) {
               <div className={`gh-comments-list${commentsOpen ? ' gh-comments-list--open' : ''}`}>
                 <div className="gh-comments-list-inner">
                   {comments.map((c) => {
-                    const firstChar = (c.body || '').trimStart()[0];
-                    const isBot = firstChar === '🤖' || firstChar === '⚠️';
+                    const botMarker = getBotMarker(c);
+                    const isBot = !!botMarker;
                     const isCommentOpen = !!openComments[c.id];
                     const preview = (c.body || '').replace(/\s+/g, ' ').trim();
                     return (
@@ -412,7 +417,7 @@ function IssueRow({ issue, comments, repo, currentUserEmail, onRefresh }) {
                             }))
                           }
                         >
-                          <span className="gh-comment-author">{isBot ? firstChar : '👤'} {c.user?.login}</span>
+                          <span className="gh-comment-author">{isBot ? botMarker : '👤'} {c.user?.login}</span>
                           <span className="gh-comment-time">{new Date(c.created_at).toLocaleString()}</span>
                           <span className={`gh-comment-chevron${isCommentOpen ? ' open' : ''}`}>▸</span>
                         </button>
