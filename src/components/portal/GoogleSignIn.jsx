@@ -1,15 +1,27 @@
 import { GoogleAuthProvider, getAuth, signInWithPopup } from "firebase/auth";
 import { useAuth } from "./authStore";
 import { initFirebase } from "./firebase";
-import { useState } from "react";
-import { useSelector } from "react-redux";
+import { useState, useEffect } from "react";
+import { store } from "@site/src/state/store";
 
 const provider = new GoogleAuthProvider();
 
 export default function GoogleSignIn() {
   const { setUser } = useAuth();
-  const runtimeStatus = useSelector((state) => state.runtimeKeys.status);
-  const runtimeError = useSelector((state) => state.runtimeKeys.error);
+  const [runtimeStatus, setRuntimeStatus] = useState(
+    () => store.getState().runtimeKeys.status
+  );
+  const [runtimeError, setRuntimeError] = useState(
+    () => store.getState().runtimeKeys.error
+  );
+
+  useEffect(() => {
+    return store.subscribe(() => {
+      const { status, error } = store.getState().runtimeKeys;
+      setRuntimeStatus(status);
+      setRuntimeError(error);
+    });
+  }, []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const handleSignIn = async () => {
