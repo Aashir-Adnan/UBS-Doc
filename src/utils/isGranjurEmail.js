@@ -4,6 +4,7 @@ export function isGranjurEmail(email) {
     e.endsWith('@granjur.com') ||
     e.endsWith('@granjur,com') ||
     e === 'dev.alikhalil@gmail.com' ||
-    e === 'usamaijaz2119@gmail.com'
+    e === 'usamaijaz2119@gmail.com' ||
+    e === 'hamzawaqar924@gmail.com'
   );
 }
