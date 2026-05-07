@@ -14,7 +14,18 @@ function MeetingWorkflowContent() {
   const [selectedMeeting, setSelectedMeeting] = useState(null);
   const [listKey, setListKey] = useState(0);
 
-  const handleCreated = useCallback(() => setListKey((k) => k + 1), []);
+  const handleCreated = useCallback(() => {
+    setListKey((k) => k + 1);
+  }, []);
+
+  const handleSelectMeeting = useCallback((meeting) => {
+    setSelectedMeeting(meeting);
+  }, []);
+
+  // Refresh the selected meeting object after a stage completes
+  const handleStageComplete = useCallback(() => {
+    setListKey((k) => k + 1);
+  }, []);
 
   if (!user) {
     return (
@@ -23,7 +34,7 @@ function MeetingWorkflowContent() {
           <h2 className="card-title">Sign in</h2>
           <p className="card-subtitle">Use your Google account to access Granjur Dev tools.</p>
           <GoogleSignIn />
-          <p className="card-helper">Use your organization&apos;s @granjur.com account for full access.</p>
+          <p className="card-helper">Use your @granjur.com account for full access.</p>
         </div>
       </section>
     );
@@ -53,20 +64,32 @@ function MeetingWorkflowContent() {
         <div className="portal-hero-text">
           <h2>Meeting Workflow</h2>
           <p>
-            Create meetings, transcribe audio, generate tasks, approve and push to GitHub.
-            Signed in as <strong>{user.name || user.email}</strong>.{' '}
+            Create meetings, transcribe audio with Whisper, generate AI-powered notes and HTML
+            reports with Claude, then sync tasks to GitHub.{' '}
+            Signed in as <strong>{user.name || user.email}</strong>.
+          </p>
+          <p>
             <button type="button" className="portal-signout-link" onClick={signOut}>Sign out</button>
           </p>
         </div>
       </section>
 
       <section className="portal-section">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-          <CreateMeeting onCreated={handleCreated} />
-          <MeetingList key={listKey} onSelectMeeting={setSelectedMeeting} />
+        <div className="mw-top-grid">
+          <CreateMeeting onCreated={handleCreated} userEmail={user.email} />
+          <MeetingList
+            key={listKey}
+            onSelectMeeting={handleSelectMeeting}
+            selectedId={selectedMeeting?.meeting_id}
+          />
         </div>
 
-        {selectedMeeting && <WorkflowPanel meeting={selectedMeeting} />}
+        {selectedMeeting && (
+          <WorkflowPanel
+            meeting={selectedMeeting}
+            onStageComplete={handleStageComplete}
+          />
+        )}
       </section>
     </>
   );
@@ -74,7 +97,7 @@ function MeetingWorkflowContent() {
 
 export default function MeetingWorkflowPage() {
   return (
-    <Layout title="Meeting Workflow" description="Meeting-to-delivery workflow tool">
+    <Layout title="Meeting Workflow" description="End-to-end meeting-to-delivery workflow with AI">
       <main className="portal-main-wrapper">
         <MeetingWorkflowContent />
       </main>

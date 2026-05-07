@@ -4,7 +4,7 @@ import React, {
   useCallback,
   useRef,
 } from 'react';
-import { githubRepos } from '@site/src/data/githubReposConfig';
+import { fetchTrackedRepos } from '@site/src/data/githubReposConfig';
 
 /* ─────────────────────────────────────────────
    GitHub API helpers
@@ -42,21 +42,35 @@ function extractEmail(body = '') {
 
 function getBotMarker(comment) {
   const body = comment?.body || '';
-  // Match bot marker at the beginning of any line, not just first char.
-  const markerMatch = body.match(/(?:^|\n)\s*(🤖|⚠️)\b/m);
+  const markerMatch = body.match(/(?:^|\n)\s*(🤖|⚠️|✅)\b/m);
   if (markerMatch?.[1]) return markerMatch[1];
   if (comment?.user?.type === 'Bot') return '🤖';
   return null;
 }
 
+function extractPrUrl(comments) {
+  if (!comments) return null;
+  for (let i = comments.length - 1; i >= 0; i--) {
+    const body = comments[i]?.body || '';
+    if (body.includes('**Committed and PR opened**')) {
+      const m = body.match(/https:\/\/github\.com\/[^\s)]+\/pull\/\d+/);
+      return m ? m[0] : null;
+    }
+  }
+  return null;
+}
+
 /**
  * Stage logic:
- * - No comments → "Awaiting Bot Response"
- * - Last comment contains 🤖/⚠️ marker (or is from Bot user) → "Awaiting Human Response"
- * - Last comment otherwise → "Awaiting Bot Response"
+ * - Any comment contains "Committed and PR opened" → 'done'
+ * - No comments → 'bot'
+ * - Last comment has 🤖/⚠️/✅ marker → 'human'
+ * - Last comment otherwise → 'bot'
  */
 function getIssueStage(comments) {
   if (!comments || comments.length === 0) return 'bot';
+  const hasPrComment = comments.some((c) => (c.body || '').includes('**Committed and PR opened**'));
+  if (hasPrComment) return 'done';
   const last = comments[comments.length - 1];
   if (getBotMarker(last)) return 'human';
   return 'bot';
@@ -297,24 +311,19 @@ function IssueForm({ repo, onCreated, userEmail }) {
 ───────────────────────────────────────────── */
 
 function ReplyBox({ repo, issue, comments, onReplied }) {
-  const [action, setAction] = useState('');
   const [info, setInfo] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
   const emoji = getLastBotEmoji(comments);
   const isWarning = emoji === '⚠️';
-
-  const actions = isWarning
-    ? [{ value: '!continue', label: '!continue' }]
-    : [
-        { value: '!commit', label: '!commit' },
-        { value: '!discuss', label: '!discuss' },
-      ];
+  const action = isWarning ? '!continue' : '!discuss';
+  const placeholder = isWarning
+    ? 'Reduce the Context paths and describe what to narrow down.'
+    : 'Describe what to change or refine — the agent will update the PR.';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!action) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -324,7 +333,7 @@ function ReplyBox({ repo, issue, comments, onReplied }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body }),
       });
-      setAction(''); setInfo('');
+      setInfo('');
       onReplied();
     } catch (err) {
       setError(err.message);
@@ -335,22 +344,16 @@ function ReplyBox({ repo, issue, comments, onReplied }) {
 
   return (
     <form className="gh-reply-box" onSubmit={handleSubmit}>
-      <div className="gh-reply-actions">
-        {actions.map((a) => (
-          <button key={a.value} type="button"
-            className={`gh-reply-action-btn${action === a.value ? ' active' : ''}`}
-            onClick={() => setAction(a.value)}>
-            {a.label}
-          </button>
-        ))}
-      </div>
-      {action && (
-        <textarea className="gh-reply-info" rows={2} placeholder="Additional information (optional)"
-          value={info} onChange={(e) => setInfo(e.target.value)} />
-      )}
+      <p className="gh-reply-label">
+        {isWarning
+          ? 'Context too large — reduce paths, then continue:'
+          : 'Request a change or refinement:'}
+      </p>
+      <textarea className="gh-reply-info" rows={3} placeholder={placeholder}
+        value={info} onChange={(e) => setInfo(e.target.value)} />
       {error && <p className="gh-form-error" style={{ margin: 0 }}>{error}</p>}
-      <button type="submit" className="gh-submit-btn gh-submit-btn--sm" disabled={submitting || !action}>
-        {submitting ? <><span className="status-spinner" /> Sending…</> : 'Send reply'}
+      <button type="submit" className="gh-submit-btn gh-submit-btn--sm" disabled={submitting}>
+        {submitting ? <><span className="status-spinner" /> Sending…</> : `Send ${action}`}
       </button>
     </form>
   );
@@ -365,22 +368,39 @@ function IssueRow({ issue, comments, repo, currentUserEmail, onRefresh }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [openComments, setOpenComments] = useState({});
 
-  const stage = getIssueStage(comments);
+  // Closed issues are always 'done' regardless of comment state.
+  const stage = issue.state === 'closed' ? 'done' : getIssueStage(comments);
+  const isDone = stage === 'done';
   const awaitingHuman = stage === 'human';
   const myIssue = extractEmail(issue.body || '')?.toLowerCase() === (currentUserEmail || '').toLowerCase();
+  const prUrl = isDone ? extractPrUrl(comments) : null;
+
+  const stageLabel = isDone ? 'PR Ready' : awaitingHuman ? 'Awaiting Your Response' : 'Awaiting Bot Response';
+  const rowClass = [
+    'gh-issue-row',
+    isDone ? ' gh-issue-row--done' : '',
+    awaitingHuman ? ' gh-issue-row--alert' : '',
+    open ? ' gh-issue-row--open' : '',
+  ].join('');
+
+  const lightClass = `gh-status-light${isDone ? ' gh-status-light--done' : awaitingHuman ? ' gh-status-light--alert' : ' gh-status-light--ok'}`;
 
   return (
-    <div className={`gh-issue-row${awaitingHuman ? ' gh-issue-row--alert' : ''}${open ? ' gh-issue-row--open' : ''}`}>
+    <div className={rowClass}>
       {/* Header */}
       <button type="button" className="gh-issue-row-header" onClick={() => setOpen((v) => !v)}>
-        <span className={`gh-status-light${awaitingHuman ? ' gh-status-light--alert' : ' gh-status-light--ok'}`} />
+        <span className={lightClass} />
         <span className="gh-status-number">#{issue.number}</span>
         <span className="gh-status-title">{issue.title.replace(/^\[Agent Call\]\s*/, '')}</span>
         <div className="gh-status-meta">
           {myIssue && <span className="gh-status-badge gh-status-badge--mine">mine</span>}
-          <span className={`gh-stage-badge gh-stage-badge--${stage}`}>
-            {awaitingHuman ? 'Awaiting Human Response' : 'Awaiting Bot Response'}
-          </span>
+          <span className={`gh-stage-badge gh-stage-badge--${stage}`}>{stageLabel}</span>
+          {prUrl && (
+            <a href={prUrl} target="_blank" rel="noopener noreferrer"
+              className="gh-pr-badge" onClick={(e) => e.stopPropagation()}>
+              ⎇ View PR ↗
+            </a>
+          )}
           {comments.length > 0 && <span className="gh-status-comments">💬 {comments.length}</span>}
           <span className={`gh-chevron${open ? ' open' : ''}`}>▸</span>
         </div>
@@ -389,6 +409,14 @@ function IssueRow({ issue, comments, repo, currentUserEmail, onRefresh }) {
       {/* Expanded body */}
       <div className={`gh-issue-detail${open ? ' gh-issue-detail--open' : ''}`}>
         <div className="gh-issue-detail-inner">
+          {isDone && prUrl && (
+            <div className="gh-pr-ready-banner">
+              <span>✅ PR is ready.</span>
+              <a href={prUrl} target="_blank" rel="noopener noreferrer">Review &amp; merge ↗</a>
+              <span className="gh-pr-refine-hint">Need changes? Reply below with <code>!discuss</code> — the agent will update the same PR.</span>
+            </div>
+          )}
+
           <pre className="gh-issue-body-pre">{issue.body}</pre>
 
           {/* Comments */}
@@ -410,12 +438,7 @@ function IssueRow({ issue, comments, repo, currentUserEmail, onRefresh }) {
                         <button
                           type="button"
                           className="gh-comment-toggle"
-                          onClick={() =>
-                            setOpenComments((prev) => ({
-                              ...prev,
-                              [c.id]: !prev[c.id],
-                            }))
-                          }
+                          onClick={() => setOpenComments((prev) => ({ ...prev, [c.id]: !prev[c.id] }))}
                         >
                           <span className="gh-comment-author">{isBot ? botMarker : '👤'} {c.user?.login}</span>
                           <span className="gh-comment-time">{new Date(c.created_at).toLocaleString()}</span>
@@ -424,9 +447,7 @@ function IssueRow({ issue, comments, repo, currentUserEmail, onRefresh }) {
                         {isCommentOpen ? (
                           <p className="gh-comment-body">{c.body}</p>
                         ) : (
-                          <p className="gh-comment-preview">
-                            {preview || '(empty comment)'}
-                          </p>
+                          <p className="gh-comment-preview">{preview || '(empty comment)'}</p>
                         )}
                       </div>
                     );
@@ -436,8 +457,8 @@ function IssueRow({ issue, comments, repo, currentUserEmail, onRefresh }) {
             </div>
           )}
 
-          {/* Reply box — only when awaiting human */}
-          {awaitingHuman && (
+          {/* Reply box — when awaiting human, or when done (to request further changes) */}
+          {(awaitingHuman || isDone) && (
             <ReplyBox repo={repo} issue={issue} comments={comments} onReplied={onRefresh} />
           )}
 
@@ -463,8 +484,13 @@ function IssuesPanel({ repo, currentUserEmail, onNewNotification, refreshTick, o
   const fetchIssues = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await ghFetch(`/repos/${repo.owner}/${repo.repo}/issues?state=open&per_page=50`);
-      const agentIssues = data.filter((i) => i.title?.startsWith('[Agent Call]') || i.body?.includes('[Agent Call]'));
+      // Fetch both open and closed — closed issues have had their PR created.
+      const [openData, closedData] = await Promise.all([
+        ghFetch(`/repos/${repo.owner}/${repo.repo}/issues?state=open&per_page=50`),
+        ghFetch(`/repos/${repo.owner}/${repo.repo}/issues?state=closed&per_page=50`),
+      ]);
+      const data = [...openData, ...closedData];
+      const agentIssues = data.filter((i) => !i.pull_request && (i.title?.startsWith('[Agent Call]') || i.body?.includes('[Agent Call]')));
       setIssues(agentIssues);
       const entries = await Promise.all(
         agentIssues.slice(0, 20).map(async (issue) => {
@@ -522,35 +548,174 @@ function IssuesPanel({ repo, currentUserEmail, onNewNotification, refreshTick, o
    Pull Requests Panel
 ───────────────────────────────────────────── */
 
-function PRsPanel({ repo }) {
-  const [prs, setPrs] = useState([]);
-  const [loading, setLoading] = useState(false);
+function PRFileList({ owner, repo, prNumber }) {
+  const [files, setFiles] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    ghFetch(`/repos/${owner}/${repo}/pulls/${prNumber}/files?per_page=50`)
+      .then(setFiles)
+      .catch((e) => setError(e.message));
+  }, [owner, repo, prNumber]);
+
+  if (error) return <p className="gh-pr-files-error">Could not load files: {error}</p>;
+  if (!files) return <p className="gh-pr-files-loading">Loading changed files…</p>;
+  if (files.length === 0) return <p className="gh-pr-files-empty">No changed files.</p>;
+
+  return (
+    <ul className="gh-pr-files-list">
+      {files.map((f) => (
+        <li key={f.filename} className={`gh-pr-file gh-pr-file--${f.status}`}>
+          <span className="gh-pr-file-status">{f.status}</span>
+          <span className="gh-pr-file-name">{f.filename}</span>
+          <span className="gh-pr-file-stats">
+            {f.additions > 0 && <span className="gh-pr-adds">+{f.additions}</span>}
+            {f.deletions > 0 && <span className="gh-pr-dels">−{f.deletions}</span>}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function PRRow({ pr, owner, repo, user }) {
+  const [open, setOpen] = useState(false);
+  const [pingStatus, setPingStatus] = useState(null); // null | 'sending' | 'sent' | 'error'
+  const [pingError, setPingError] = useState(null);
+
+  const createdAt = new Date(pr.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  const isDraft = pr.draft;
+  const isMergeable = pr.mergeable === true;
+
+  const handlePing = async (e) => {
+    e.stopPropagation();
+    setPingStatus('sending');
+    setPingError(null);
+    try {
+      const sender = user?.name || user?.email || 'A team member';
+      const body = `👋 **Merge request** from ${sender}\n\nThis PR is ready for review and merge. Please take a look when you get a chance.\n\n> _Sent via the UBS Dev Portal_`;
+      await ghFetch(`/repos/${owner}/${repo}/issues/${pr.number}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body }),
+      });
+      setPingStatus('sent');
+    } catch (err) {
+      setPingStatus('error');
+      setPingError(err.message);
+    }
+  };
+
+  return (
+    <div className={`gh-pr-card${open ? ' gh-pr-card--open' : ''}${isDraft ? ' gh-pr-card--draft' : ''}`}>
+      {/* Header row */}
+      <button type="button" className="gh-pr-card-header" onClick={() => setOpen((v) => !v)}>
+        <span className="gh-pr-icon">⎇</span>
+        <div className="gh-pr-info">
+          <span className="gh-pr-title">
+            {isDraft && <span className="gh-pr-draft-tag">Draft</span>}
+            {pr.title}
+          </span>
+          <span className="gh-pr-meta">
+            #{pr.number} · {pr.user?.login} · {pr.head?.ref} → {pr.base?.ref} · {createdAt}
+            {pr.comments > 0 && ` · 💬 ${pr.comments}`}
+          </span>
+        </div>
+        <div className="gh-pr-card-actions" onClick={(e) => e.stopPropagation()}>
+          {pingStatus === 'sent' ? (
+            <span className="gh-ping-sent">Pinged ✓</span>
+          ) : (
+            <button
+              type="button"
+              className="gh-ping-btn"
+              disabled={pingStatus === 'sending'}
+              onClick={handlePing}
+              title="Post a comment on this PR asking the owner to merge it"
+            >
+              {pingStatus === 'sending' ? 'Pinging…' : 'Ping to merge'}
+            </button>
+          )}
+          <a href={pr.html_url} target="_blank" rel="noopener noreferrer"
+            className="gh-pr-open-link" title="Open on GitHub">↗</a>
+        </div>
+        <span className={`gh-chevron${open ? ' open' : ''}`}>▸</span>
+      </button>
+
+      {pingStatus === 'error' && (
+        <p className="gh-ping-error">Failed to ping: {pingError}</p>
+      )}
+
+      {/* Expanded detail */}
+      {open && (
+        <div className="gh-pr-card-body">
+          {isMergeable && (
+            <div className="gh-pr-mergeable-banner">✅ No merge conflicts — ready to merge.</div>
+          )}
+          {pr.mergeable === false && (
+            <div className="gh-pr-conflict-banner">⚠️ This branch has conflicts with the base branch.</div>
+          )}
+
+          {pr.body ? (
+            <div className="gh-pr-description">
+              <p className="gh-pr-section-label">Description</p>
+              <pre className="gh-pr-body-pre">{pr.body}</pre>
+            </div>
+          ) : (
+            <p className="gh-pr-no-body">No description provided.</p>
+          )}
+
+          <div className="gh-pr-files-section">
+            <p className="gh-pr-section-label">Changed files</p>
+            <PRFileList owner={owner} repo={repo} prNumber={pr.number} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PRsPanel({ repo, user }) {
+  const [prs, setPrs] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [stateFilter, setStateFilter] = useState('open');
+
+  const load = useCallback(() => {
     setLoading(true);
-    ghFetch(`/repos/${repo.owner}/${repo.repo}/pulls?state=open&per_page=30`)
+    setError(null);
+    ghFetch(`/repos/${repo.owner}/${repo.repo}/pulls?state=${stateFilter}&per_page=30`)
       .then(setPrs)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [repo]);
+  }, [repo, stateFilter]);
 
-  if (loading) return <div className="gh-status-loading">Loading pull requests…</div>;
-  if (error) return <div className="gh-explorer-error">Could not load PRs: {error}</div>;
-  if (prs.length === 0) return <div className="gh-status-empty">No open pull requests.</div>;
+  useEffect(() => { load(); }, [load]);
 
   return (
-    <div className="gh-pr-list">
-      {prs.map((pr) => (
-        <a key={pr.number} href={pr.html_url} target="_blank" rel="noopener noreferrer" className="gh-pr-row">
-          <span className="gh-pr-icon">⎇</span>
-          <div className="gh-pr-info">
-            <span className="gh-pr-title">{pr.title}</span>
-            <span className="gh-pr-meta">#{pr.number} · {pr.user?.login} · {pr.head?.ref} → {pr.base?.ref}</span>
-          </div>
-          <span className="gh-pr-arrow">↗</span>
-        </a>
-      ))}
+    <div className="gh-prs-panel">
+      <div className="gh-prs-filter-row">
+        {['open', 'closed', 'all'].map((s) => (
+          <button key={s} type="button"
+            className={`gh-prs-filter-btn${stateFilter === s ? ' gh-prs-filter-btn--active' : ''}`}
+            onClick={() => setStateFilter(s)}>
+            {s.charAt(0).toUpperCase() + s.slice(1)}
+          </button>
+        ))}
+        <button type="button" className="gh-refresh-btn" onClick={load} title="Refresh">↻</button>
+      </div>
+
+      {loading && <div className="gh-status-loading">Loading pull requests…</div>}
+      {error && <div className="gh-explorer-error">Could not load PRs: {error}</div>}
+      {!loading && !error && prs.length === 0 && (
+        <div className="gh-status-empty">No {stateFilter === 'all' ? '' : stateFilter + ' '}pull requests.</div>
+      )}
+      {!loading && !error && prs.length > 0 && (
+        <div className="gh-pr-list">
+          {prs.map((pr) => (
+            <PRRow key={pr.number} pr={pr} owner={repo.owner} repo={repo.repo} user={user} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -784,9 +949,9 @@ function RepoWorkspace({ repo, user, notifications, onNewNotification, onBack, o
             {displayTab === 'prs' && (
               <>
                 <div className="gh-panel-header">
-                  <h3 className="gh-panel-title">Open Pull Requests</h3>
+                  <h3 className="gh-panel-title">Pull Requests</h3>
                 </div>
-                <PRsPanel repo={repo} />
+                <PRsPanel repo={repo} user={user} />
               </>
             )}
             {displayTab === 'create' && (
@@ -813,10 +978,20 @@ function RepoWorkspace({ repo, user, notifications, onNewNotification, onBack, o
 
 function RepoSelector({ onSelect }) {
   const [search, setSearch] = useState('');
-  const filtered = githubRepos.filter((r) =>
+  const [repos, setRepos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchTrackedRepos()
+      .then(setRepos)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = repos.filter((r) =>
     r.name.toLowerCase().includes(search.toLowerCase()) ||
-    r.owner.toLowerCase().includes(search.toLowerCase()) ||
-    (r.description || '').toLowerCase().includes(search.toLowerCase())
+    r.owner.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -826,6 +1001,8 @@ function RepoSelector({ onSelect }) {
         <input className="gh-selector-search" placeholder="Search repositories…"
           value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />
       </div>
+      {loading && <div className="gh-status-loading">Loading repositories…</div>}
+      {error && <div className="gh-explorer-error">Could not load repos: {error}</div>}
       <div className="gh-repo-grid">
         {filtered.map((r) => (
           <button key={r.slug} type="button" className="gh-repo-card" onClick={() => onSelect(r)}>
@@ -833,11 +1010,12 @@ function RepoSelector({ onSelect }) {
             <div className="gh-repo-card-body">
               <strong className="gh-repo-card-name">{r.name}</strong>
               <span className="gh-repo-handle">{r.owner}/{r.repo}</span>
-              {r.description && <span className="gh-repo-desc">{r.description}</span>}
             </div>
           </button>
         ))}
-        {filtered.length === 0 && <p className="gh-status-empty">No repositories match "{search}"</p>}
+        {!loading && filtered.length === 0 && repos.length > 0 && (
+          <p className="gh-status-empty">No repositories match "{search}"</p>
+        )}
       </div>
     </div>
   );

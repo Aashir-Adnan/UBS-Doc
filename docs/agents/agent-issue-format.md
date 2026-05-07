@@ -84,9 +84,17 @@ Context:
 Services/SysScripts/AgentScripts/, Services/Integrations/CronJobs/issueScannerCron.js
 ```
 
+## What happens after you submit
+
+1. The agent picks up the issue on the next cron tick (every minute).
+2. It implements the task, commits to a new branch, opens a PR, and closes the issue.
+3. A notification email is sent to `NotifyEmail:` (or the server fallback) with the PR link.
+4. To request changes: reopen the issue and comment `!discuss <what to change>`. The agent updates the same PR.
+
 ## Notes
 
 - If `Task:` is missing or empty, the issue is ignored.
 - If `[Agent Call]` is missing from both title and body, the issue is ignored.
 - Keep the title brief; put implementation details in `Task:`.
+- There is no `!commit` step — the agent commits immediately on first scan.
 

@@ -118,6 +118,24 @@ function ToolsHub() {
               directly from the portal.
             </p>
           </Link>
+
+          <Link to="/tools/meetingWorkflow" className="tool-card">
+            <div className="tool-card-icon">🎙️</div>
+            <h3>Meeting Workflow</h3>
+            <p>
+              Create meetings, transcribe recordings, generate AI-powered notes
+              and HTML reports, then sync tasks to GitHub.
+            </p>
+          </Link>
+
+          <Link to="/tools/repos" className="tool-card">
+            <div className="tool-card-icon">📂</div>
+            <h3>Tracked Repositories</h3>
+            <p>
+              Add, remove, and pull the GitHub repositories that are cloned
+              locally and monitored by the agent pipeline.
+            </p>
+          </Link>
         </div>
       </section>
     </>

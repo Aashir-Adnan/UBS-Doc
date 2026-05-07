@@ -1,22 +1,34 @@
+import { API_BASE_URL } from '@site/src/components/portal/config';
+
 /**
- * GitHub repositories registry for the Dev Workflow tool.
+ * Fetch tracked repos from the backend and normalize them into the shape
+ * expected by GithubWorkflow: { slug, name, owner, repo, description? }
  *
- * Each entry maps a display name to a GitHub repo (owner/repo).
- * The PAT and username are injected at build time via portalPlugin
- * and exposed as window.__GIT_USERNAME__ / window.__GIT_PAT__.
- *
- * @type {{ slug: string; name: string; owner: string; repo: string; description?: string }[]}
+ * URL is parsed to extract owner/repo from the GitHub URL.
  */
-export const githubRepos = [
-  { slug: 'framework-node',           name: 'Framework_Node',                   owner: 'UBS-Dev-Org',    repo: 'Framework_Node' },
-  { slug: 'edarete-node',             name: 'Edarete_Node',                     owner: 'ITULahore',      repo: 'Edarete_Node' },
-  { slug: 'edarete-react',            name: 'Edarete_React',                    owner: 'ITULahore',      repo: 'Edarete_React' },
-  { slug: 'frameworkscript',          name: 'FrameworkScript',                  owner: 'UBS-Dev-Org',    repo: 'FrameworkScript' },
-  { slug: 'badar-hms-node',           name: 'Badar_HMS_Node',                   owner: 'GranjurTech',    repo: 'Badar_HMS_Node' },
-  { slug: 'framework-react',          name: 'Framework_React',                  owner: 'UBS-Dev-Org',    repo: 'Framework_React' },
-  { slug: 'ilmversity-aicredits',     name: 'Ilmversity_aicredits_node_v2',     owner: 'ilmversity',     repo: 'Ilmversity_aicredits_node_v2' },
-  { slug: 'csaas-backend',            name: 'CSAAS_Backend',                    owner: 'Aashir-Adnan',   repo: 'CSAAS_Backend' },
-  { slug: 'ubs-doc',                  name: 'UBS-Doc',                          owner: 'Aashir-Adnan',   repo: 'UBS-Doc' },
-  { slug: 'scholarspace-ubs',         name: 'ScholarSpace-UBS-Framework',       owner: 'Aashir-Adnan',   repo: 'ScholarSpace-UBS-Framework' },
-  { slug: 'qf',               name: 'QF',              owner: 'UBS-Dev-Org',   repo: 'qf-granjur-1' },
-];
+export async function fetchTrackedRepos() {
+  const r = await fetch(`${API_BASE_URL}/api/tracked/repos/list?version=1`);
+  if (!r.ok) throw new Error(`Failed to fetch tracked repos: ${r.status}`);
+  const json = await r.json();
+  const rows = json.payload?.return?.repos ?? json.payload?.repos ?? [];
+  return rows.map((row) => {
+    const { owner, repo } = parseGithubUrl(row.url);
+    return {
+      slug: row.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      name: row.name,
+      owner,
+      repo,
+      branch: row.branch || 'main',
+      id: row.id,
+    };
+  });
+}
+
+function parseGithubUrl(url = '') {
+  // Handle https://github.com/owner/repo or https://github.com/owner/repo.git
+  const clean = url.replace(/\.git$/, '').replace(/\/$/, '');
+  const parts = clean.split('/');
+  const repo = parts.pop() || '';
+  const owner = parts.pop() || '';
+  return { owner, repo };
+}
