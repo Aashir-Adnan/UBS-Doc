@@ -260,3 +260,96 @@ config: {
 Use this only for testing.
 
 ---
+
+## What is the API blueprint? How should request/response payloads be structured?
+
+### Request Format
+
+All requests must send `Content-Type: application/json`.
+
+For **encrypted endpoints**, the encrypted payload is sent either:
+- In the request **header** as `encryptedRequest`, or
+- In the request **body** as `{ "encryptedRequest": "..." }`
+
+The encrypted request decrypts into an `encryptionDetails` object plus the actual `reqData`. The `encryptionDetails` must include:
+
+```json
+{
+  "PlatformName": "your-platform",
+  "PlatformVersion": "1.0",
+  "accessToken": "<jwt-token>"
+}
+```
+
+`accessToken` can also be passed directly via the `accesstoken` header.
+
+The encryption key is built by concatenating:
+1. The `accessToken` (if `accessToken: true` in config)
+2. A `plainKey` (if configured)
+3. The platform's `encryption_key` from the database (looked up by `PlatformName` + `PlatformVersion`)
+
+### Response Format
+
+Every response follows this envelope:
+
+**Success:**
+```json
+{
+  "success": true,
+  "message": "Human-readable status message",
+  "data": { }
+}
+```
+
+**Failure:**
+```json
+{
+  "success": false,
+  "message": "Human-readable error description",
+  "error": "Internal error detail"
+}
+```
+
+---
+
+## What are the HTTP status codes?
+
+| Code | Meaning | When it occurs |
+|---|---|---|
+| `200` | OK | Request succeeded |
+| `400` | Bad Request | Missing/invalid input, encryption errors, missing payload |
+| `401` | Unauthorized | Missing or invalid `accessToken`, authentication failure |
+| `404` | Not Found | Requested resource does not exist |
+| `500` | Internal Server Error | Unhandled server-side exception |
+
+**Session expiry** returns `401` with:
+```json
+{
+  "success": false,
+  "message": "Session expired. Please log in again.",
+  "error": "TokenExpiredError"
+}
+```
+
+---
+
+## What are the framework error codes (SSC)?
+
+These are internal error codes returned in error messages from the framework middleware:
+
+| Code | Message |
+|---|---|
+| `E10` | Please check your input and try again |
+| `E22` | A system error occurred. Please try again later |
+| `E24` | Security verification failed. Please try again |
+| `E31` | You do not have permission to perform this action |
+| `E40` | Authentication failed. Please log in again |
+| `E42` | Verification code is incorrect. Please try again |
+| `E50` | The requested resource was not found |
+| `E51` | This platform or client is not supported |
+| `E52` | This operation is not allowed |
+| `E99` | An unexpected error occurred. Please try again or contact support if the problem persists |
+
+`E10` specifically covers: missing encrypted payload, missing encryption details, or invalid `PlatformName`/`PlatformVersion`.
+
+---

@@ -18,6 +18,17 @@ const DOC_NAV_ITEMS = [
   { label: 'Projects', to: '/docs/projects/badar-hms/Opera_Config' },
 ];
 
+const TOOLS_NAV_ITEMS = [
+  { icon: '🗄️', label: 'Database Tools', to: '/tools/database' },
+  { icon: '🎨', label: 'Lucid Sanitize', to: '/tools/lucid' },
+  { icon: '✉️', label: 'Notify', to: '/tools/notify' },
+  { icon: '⚙️', label: 'API Builder', to: '/tools/apiObject' },
+  { icon: '📁', label: 'Projects', to: '/tools/projects' },
+  { icon: '🐙', label: 'GitHub', to: '/tools/github' },
+  { icon: '🎙️', label: 'Meetings', to: '/tools/meetingWorkflow' },
+  { icon: '📂', label: 'Repositories', to: '/tools/repos' },
+];
+
 const TRANSITION_MS = 320;
 const THEME_ANIM_MS = 700;
 const WELCOME_MS = 1800;
@@ -70,6 +81,12 @@ export default function Root({ children }) {
     if (typeof document === 'undefined') return;
     const current = document.documentElement.getAttribute('data-theme') || 'light';
     setTheme(current);
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const show = typeof window !== 'undefined' ? window.__TILE_OUTLINES__ !== false : true;
+    document.body.classList.toggle('ubs-no-outlines', !show);
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -152,6 +169,27 @@ export default function Root({ children }) {
               </nav>
             </div>
           )}
+          {location.pathname.startsWith('/tools') && (
+            <div className="ubs-doc-nav-shell">
+              <p className="ubs-doc-nav-title">Dev Tools</p>
+              <nav className="ubs-doc-nav-links" aria-label="Dev tools sections">
+                {TOOLS_NAV_ITEMS.map((item) => {
+                  const active = location.pathname === item.to || location.pathname.startsWith(item.to + '/');
+                  return (
+                    <button
+                      key={item.to}
+                      type="button"
+                      className={`ubs-doc-nav-link ubs-tools-nav-link${active ? ' is-active' : ''}`}
+                      onClick={() => handleNavigate(item.to)}
+                    >
+                      <span className="ubs-tools-nav-icon" aria-hidden="true">{item.icon}</span>
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          )}
           <button
             type="button"
             className="ubs-theme-toggle"
@@ -179,7 +217,7 @@ export default function Root({ children }) {
         {showWelcome && (
           <div
             className={`ubs-welcome-overlay${welcomeFading ? ' is-fading' : ''}`}
-            style={{ position: 'fixed', inset: 0, background: '#000000' }}
+            style={{ position: 'fixed', inset: 0, background: '#093C5D' }}
           >
             <p className="ubs-welcome-text">Welcome</p>
           </div>

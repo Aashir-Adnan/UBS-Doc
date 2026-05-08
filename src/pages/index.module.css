@@ -1,8 +1,8 @@
 .pitchMain {
   min-height: 100vh;
   background:
-    radial-gradient(950px 520px at 18% -8%, rgba(255, 122, 26, 0.16), transparent 62%),
-    radial-gradient(780px 460px at 90% 6%, rgba(255, 122, 26, 0.12), transparent 58%),
+    radial-gradient(950px 520px at 18% -8%, rgba(9, 60, 93, 0.18), transparent 62%),
+    radial-gradient(780px 460px at 90% 6%, rgba(111, 209, 215, 0.10), transparent 58%),
     var(--ifm-background-color);
   color: var(--ifm-font-color-base);
   padding-bottom: 4rem;
@@ -18,7 +18,7 @@
 .heroGlow {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(255, 122, 26, 0.06), transparent 60%);
+  background: linear-gradient(180deg, rgba(9, 60, 93, 0.06), transparent 60%);
   pointer-events: none;
 }
 
@@ -127,7 +127,7 @@
 
 .docsSidebar nav a:hover {
   border-color: var(--ifm-color-primary);
-  background: rgba(255, 122, 26, 0.1);
+  background: var(--brand-primary-alpha-10);
 }
 
 .storyRail {

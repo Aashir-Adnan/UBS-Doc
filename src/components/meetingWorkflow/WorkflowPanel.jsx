@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { mwGet, mwPost, mwPostForm } from './api';
+import { mwGet, mwPost } from './api';
 import NoteEditor from './NoteEditor';
+import LiveTranscribeStage from './LiveTranscribeStage';
 
 const STAGES = [
   { id: 0, label: 'Pre-Meeting', icon: '📋' },
@@ -49,14 +50,24 @@ function StatusBar({ message, type }) {
 // ─── Stage 0: Pre-Meeting Notes ───────────────────────────────────────────────
 function PreMeetingStage({ meeting, onDone }) {
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState(null);
+  const [md, setMd] = useState(meeting.pre_meeting_notes || '');
+  const [html, setHtml] = useState(meeting.pre_meeting_html || '');
+  const [keyTopics, setKeyTopics] = useState([]);
+  const [openItems, setOpenItems] = useState([]);
+  const [view, setView] = useState('md'); // 'md' | 'html'
   const [error, setError] = useState('');
 
+  const hasContent = !!(md || html);
+
   async function run() {
-    setBusy(true); setError(''); setResult(null);
+    setBusy(true); setError('');
     try {
       const data = await mwPost('/meeting/workflow/premeeting', { meeting_id: meeting.meeting_id });
-      setResult(data);
+      setMd(data.preMeetingNotes || '');
+      setHtml(data.preMeetingHtml || '');
+      setKeyTopics(data.keyTopics || []);
+      setOpenItems(data.openItems || []);
+      setView(data.preMeetingHtml ? 'html' : 'md');
       onDone?.();
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
@@ -66,102 +77,86 @@ function PreMeetingStage({ meeting, onDone }) {
     <div className="mw-stage-content">
       <h3 className="mw-stage-title">Pre-Meeting Notes</h3>
       <p className="mw-stage-desc">
-        Claude fetches previous meetings and open tasks, then generates a briefing to help participants prepare.
+        Claude queries the database for the selected repositories and features, searches the codebase for relevant code paths, then generates a brief telling participants what has already been built and where.
       </p>
+
       {meeting.agenda && (
         <div className="mw-preexisting">
           <p className="mw-label">Agenda:</p>
           <pre className="mw-pre">{meeting.agenda}</pre>
         </div>
       )}
-      {meeting.pre_meeting_notes && !result && (
-        <div className="mw-preexisting">
-          <p className="mw-label">Existing notes:</p>
-          <pre className="mw-pre">{meeting.pre_meeting_notes}</pre>
-        </div>
-      )}
+
       <StatusBar message={error} type="error" />
-      {result && (
-        <div className="mw-result">
-          <p className="mw-label">Generated brief:</p>
-          <pre className="mw-pre">{result.preMeetingNotes}</pre>
-          {result.keyTopics?.length > 0 && (
-            <>
-              <p className="mw-label">Key topics:</p>
-              <ul className="mw-list">{result.keyTopics.map((t, i) => <li key={i}>{t}</li>)}</ul>
-            </>
-          )}
-          {result.openItems?.length > 0 && (
-            <>
-              <p className="mw-label">Open items from previous meetings:</p>
-              <ul className="mw-list">{result.openItems.map((t, i) => <li key={i}>{t}</li>)}</ul>
-            </>
-          )}
-        </div>
-      )}
+
       <button className="mw-btn mw-btn--primary" onClick={run} disabled={busy} type="button">
-        {busy ? 'Generating…' : meeting.pre_meeting_notes ? 'Regenerate Notes' : 'Generate Pre-Meeting Notes'}
+        {busy ? 'Generating…' : hasContent ? 'Regenerate Notes' : 'Generate Pre-Meeting Notes'}
       </button>
+
+      {hasContent && (
+        <div className="mw-note-editor" style={{ marginTop: '1.25rem' }}>
+          {/* Tab bar */}
+          <div className="mw-note-editor-header">
+            <div className="mw-tab-row">
+              <button
+                className={`mw-tab${view === 'html' ? ' mw-tab--active' : ''}`}
+                onClick={() => setView('html')}
+                type="button"
+                disabled={!html}
+                title={html ? 'HTML preview' : 'HTML not yet generated'}
+              >
+                HTML Preview
+              </button>
+              <button
+                className={`mw-tab${view === 'md' ? ' mw-tab--active' : ''}`}
+                onClick={() => setView('md')}
+                type="button"
+              >
+                Markdown
+              </button>
+            </div>
+          </div>
+
+          {view === 'html' && html && (
+            <iframe
+              srcDoc={html}
+              title="Pre-Meeting Notes"
+              className="mw-html-iframe"
+              sandbox="allow-same-origin"
+            />
+          )}
+
+          {view === 'md' && (
+            <div className="mw-notes-panel">
+              <pre className="mw-pre" style={{ maxHeight: '60vh', overflowY: 'auto', whiteSpace: 'pre-wrap' }}>{md}</pre>
+            </div>
+          )}
+
+          {/* Key topics + open items as side metadata */}
+          {(keyTopics.length > 0 || openItems.length > 0) && (
+            <div className="mw-premeeting-meta">
+              {keyTopics.length > 0 && (
+                <div>
+                  <p className="mw-label">Key topics:</p>
+                  <ul className="mw-list">{keyTopics.map((t, i) => <li key={i}>{t}</li>)}</ul>
+                </div>
+              )}
+              {openItems.length > 0 && (
+                <div>
+                  <p className="mw-label">Open items from previous meetings:</p>
+                  <ul className="mw-list">{openItems.map((t, i) => <li key={i}>{t}</li>)}</ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Stage 1: Transcribe ─────────────────────────────────────────────────────
-function TranscribeStage({ meeting, onDone }) {
-  const [file, setFile] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState('');
-
-  async function run() {
-    if (!file) return setError('Please select an audio file.');
-    setBusy(true); setError(''); setResult(null);
-    try {
-      const fd = new FormData();
-      fd.append('audio', file);
-      fd.append('meeting_id', meeting.meeting_id);
-      const data = await mwPostForm('/meeting/workflow/transcribe', fd);
-      setResult(data);
-      onDone?.();
-    } catch (e) { setError(e.message); }
-    finally { setBusy(false); }
-  }
-
-  return (
-    <div className="mw-stage-content">
-      <h3 className="mw-stage-title">Transcribe Meeting</h3>
-      <p className="mw-stage-desc">
-        Upload the meeting recording. OpenAI Whisper will transcribe it and store the text for analysis.
-      </p>
-      {meeting.transcript_preview && !result && (
-        <div className="mw-preexisting">
-          <p className="mw-label">Existing transcript preview:</p>
-          <blockquote className="mw-blockquote">{meeting.transcript_preview}</blockquote>
-        </div>
-      )}
-      <StatusBar message={error} type="error" />
-      {result && (
-        <div className="mw-result">
-          <p className="mw-label">Transcription complete ({result.transcriptLength?.toLocaleString()} chars):</p>
-          <blockquote className="mw-blockquote">{result.transcriptPreview}</blockquote>
-        </div>
-      )}
-      <label className="mw-file-label" htmlFor="mw-audio-upload">
-        {file ? file.name : 'Choose audio file (mp3, mp4, wav, m4a…)'}
-      </label>
-      <input
-        id="mw-audio-upload"
-        type="file"
-        accept="audio/*,video/mp4"
-        className="mw-file-input"
-        onChange={(e) => { setFile(e.target.files[0] || null); setError(''); }}
-      />
-      <button className="mw-btn mw-btn--primary" onClick={run} disabled={busy || !file} type="button">
-        {busy ? 'Transcribing…' : 'Transcribe'}
-      </button>
-    </div>
-  );
-}
+// ─── Stage 1: Transcribe (live) ──────────────────────────────────────────────
+// Delegated to LiveTranscribeStage component
 
 // ─── Stage 2: Analyze ────────────────────────────────────────────────────────
 function AnalyzeStage({ meeting, onDone }) {
@@ -512,7 +507,7 @@ export default function WorkflowPanel({ meeting, onStageComplete }) {
 
   const stageComponents = {
     0: <PreMeetingStage  meeting={meeting} onDone={handleDone} />,
-    1: <TranscribeStage  meeting={meeting} onDone={handleDone} />,
+    1: <LiveTranscribeStage meeting={meeting} onDone={handleDone} />,
     2: <AnalyzeStage     meeting={meeting} onDone={handleDone} />,
     3: <TasksStage       meeting={meeting} onDone={handleDone} />,
     4: <ApproveStage     meeting={meeting} onDone={handleDone} />,

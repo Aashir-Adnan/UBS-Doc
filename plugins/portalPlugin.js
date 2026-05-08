@@ -51,6 +51,7 @@ window.__VITE_PLATFORM_VERSION__=${JSON.stringify(runtimeEnv.VITE_PLATFORM_VERSI
 `,
               `window.__GIT_USERNAME__=${JSON.stringify(process.env.GIT_USERNAME || '')};`,
               `window.__GIT_PAT__=${JSON.stringify(process.env.GIT_PERSONAL_ACCESS_TOKEN || '')};`,
+              `window.__TILE_OUTLINES__=${JSON.stringify(process.env.TILE_OUTLINES !== 'false')};`,
             ].join(''),
           },
         ],

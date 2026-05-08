@@ -71,27 +71,32 @@ function ProjectsContent() {
         <div className="projects-grid">
           {projects.map((project) => (
             <div key={project.slug} className="project-card">
-              <div className="project-card-header">
-                <h3>{project.name}</h3>
-                {project.description && (
-                  <p className="project-card-desc">{project.description}</p>
-                )}
+              <div className="project-card-face">
+                <div className="project-card-face-icon">📁</div>
+                <div className="project-card-header">
+                  <h3>{project.name}</h3>
+                </div>
               </div>
-              <div className="project-card-actions">
-                <Link
-                  to={project.docPath}
-                  className="button button--secondary button--sm"
-                >
-                  {project.docLabel || 'Documentation'}
-                </Link>
-                {project.hasCustomView && (
-                  <Link
-                    to={`/tools/projects/view?project=${encodeURIComponent(project.slug)}`}
-                    className="button button--primary button--sm"
-                  >
-                    Open project view
-                  </Link>
+              <div className="project-card-hover-layer">
+                {project.description && (
+                  <p className="project-card-hover-desc">{project.description}</p>
                 )}
+                <div className="project-card-actions">
+                  <Link
+                    to={project.docPath}
+                    className="button button--secondary button--sm"
+                  >
+                    {project.docLabel || 'Documentation'}
+                  </Link>
+                  {project.hasCustomView && (
+                    <Link
+                      to={`/tools/projects/view?project=${encodeURIComponent(project.slug)}`}
+                      className="button button--primary button--sm"
+                    >
+                      Open view
+                    </Link>
+                  )}
+                </div>
               </div>
             </div>
           ))}

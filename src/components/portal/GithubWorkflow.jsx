@@ -578,99 +578,199 @@ function PRFileList({ owner, repo, prNumber }) {
   );
 }
 
+const PING_MARKER = 'Sent via the UBS Dev Portal';
+
+function PingConfirmModal({ pr, onConfirm, onCancel }) {
+  return (
+    <div className="gh-modal-overlay" onClick={onCancel}>
+      <div className="gh-modal" onClick={(e) => e.stopPropagation()}>
+        <p className="gh-modal-title">Ping to merge?</p>
+        <div className="gh-modal-body">
+          <p className="gh-modal-pr-title">{pr.title}</p>
+          <p className="gh-modal-pr-meta">
+            #{pr.number} · {pr.user?.login} · {pr.head?.ref} → {pr.base?.ref}
+          </p>
+          <p className="gh-modal-description">
+            This will post a comment on the PR asking the author to review and merge it.
+          </p>
+        </div>
+        <div className="gh-modal-actions">
+          <button type="button" className="gh-modal-cancel" onClick={onCancel}>Cancel</button>
+          <button type="button" className="gh-modal-confirm" onClick={onConfirm}>Send ping</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PRRow({ pr, owner, repo, user }) {
   const [open, setOpen] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [pingStatus, setPingStatus] = useState(null); // null | 'sending' | 'sent' | 'error'
   const [pingError, setPingError] = useState(null);
+  const [pings, setPings] = useState(null); // null = not loaded
+  const [pingsOpen, setPingsOpen] = useState(false);
+  const [deletingIds, setDeletingIds] = useState(new Set());
 
   const createdAt = new Date(pr.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   const isDraft = pr.draft;
   const isMergeable = pr.mergeable === true;
 
-  const handlePing = async (e) => {
-    e.stopPropagation();
+  const loadPings = useCallback(async () => {
+    try {
+      const comments = await ghFetch(`/repos/${owner}/${repo}/issues/${pr.number}/comments`);
+      setPings(comments.filter((c) => (c.body || '').includes(PING_MARKER)));
+    } catch { setPings([]); }
+  }, [owner, repo, pr.number]);
+
+  // Load pings whenever the card is opened
+  useEffect(() => {
+    if (open) loadPings();
+  }, [open, loadPings]);
+
+  // Re-load pings after a new ping is sent
+  const refreshPings = () => { setPings(null); loadPings(); };
+
+  const handlePingConfirmed = async () => {
+    setShowConfirm(false);
     setPingStatus('sending');
     setPingError(null);
     try {
       const sender = user?.name || user?.email || 'A team member';
-      const body = `👋 **Merge request** from ${sender}\n\nThis PR is ready for review and merge. Please take a look when you get a chance.\n\n> _Sent via the UBS Dev Portal_`;
+      const body = `👋 **Merge request** from ${sender}\n\nThis PR is ready for review and merge. Please take a look when you get a chance.\n\n> _${PING_MARKER}_`;
       await ghFetch(`/repos/${owner}/${repo}/issues/${pr.number}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body }),
       });
       setPingStatus('sent');
+      refreshPings();
     } catch (err) {
       setPingStatus('error');
       setPingError(err.message);
     }
   };
 
+  const handleDeletePing = async (commentId) => {
+    setDeletingIds((prev) => new Set(prev).add(commentId));
+    try {
+      await ghFetch(`/repos/${owner}/${repo}/issues/comments/${commentId}`, { method: 'DELETE' });
+      setPings((prev) => (prev || []).filter((c) => c.id !== commentId));
+      if (pingStatus === 'sent') setPingStatus(null);
+    } catch { /* silent */ } finally {
+      setDeletingIds((prev) => { const s = new Set(prev); s.delete(commentId); return s; });
+    }
+  };
+
   return (
-    <div className={`gh-pr-card${open ? ' gh-pr-card--open' : ''}${isDraft ? ' gh-pr-card--draft' : ''}`}>
-      {/* Header row */}
-      <button type="button" className="gh-pr-card-header" onClick={() => setOpen((v) => !v)}>
-        <span className="gh-pr-icon">⎇</span>
-        <div className="gh-pr-info">
-          <span className="gh-pr-title">
-            {isDraft && <span className="gh-pr-draft-tag">Draft</span>}
-            {pr.title}
-          </span>
-          <span className="gh-pr-meta">
-            #{pr.number} · {pr.user?.login} · {pr.head?.ref} → {pr.base?.ref} · {createdAt}
-            {pr.comments > 0 && ` · 💬 ${pr.comments}`}
-          </span>
-        </div>
-        <div className="gh-pr-card-actions" onClick={(e) => e.stopPropagation()}>
-          {pingStatus === 'sent' ? (
-            <span className="gh-ping-sent">Pinged ✓</span>
-          ) : (
-            <button
-              type="button"
-              className="gh-ping-btn"
-              disabled={pingStatus === 'sending'}
-              onClick={handlePing}
-              title="Post a comment on this PR asking the owner to merge it"
-            >
-              {pingStatus === 'sending' ? 'Pinging…' : 'Ping to merge'}
-            </button>
-          )}
-          <a href={pr.html_url} target="_blank" rel="noopener noreferrer"
-            className="gh-pr-open-link" title="Open on GitHub">↗</a>
-        </div>
-        <span className={`gh-chevron${open ? ' open' : ''}`}>▸</span>
-      </button>
-
-      {pingStatus === 'error' && (
-        <p className="gh-ping-error">Failed to ping: {pingError}</p>
+    <>
+      {showConfirm && (
+        <PingConfirmModal
+          pr={pr}
+          onConfirm={handlePingConfirmed}
+          onCancel={() => setShowConfirm(false)}
+        />
       )}
 
-      {/* Expanded detail */}
-      {open && (
-        <div className="gh-pr-card-body">
-          {isMergeable && (
-            <div className="gh-pr-mergeable-banner">✅ No merge conflicts — ready to merge.</div>
-          )}
-          {pr.mergeable === false && (
-            <div className="gh-pr-conflict-banner">⚠️ This branch has conflicts with the base branch.</div>
-          )}
-
-          {pr.body ? (
-            <div className="gh-pr-description">
-              <p className="gh-pr-section-label">Description</p>
-              <pre className="gh-pr-body-pre">{pr.body}</pre>
-            </div>
-          ) : (
-            <p className="gh-pr-no-body">No description provided.</p>
-          )}
-
-          <div className="gh-pr-files-section">
-            <p className="gh-pr-section-label">Changed files</p>
-            <PRFileList owner={owner} repo={repo} prNumber={pr.number} />
+      <div className={`gh-pr-card${open ? ' gh-pr-card--open' : ''}${isDraft ? ' gh-pr-card--draft' : ''}`}>
+        {/* Header row */}
+        <button type="button" className="gh-pr-card-header" onClick={() => setOpen((v) => !v)}>
+          <span className="gh-pr-icon">⎇</span>
+          <div className="gh-pr-info">
+            <span className="gh-pr-title">
+              {isDraft && <span className="gh-pr-draft-tag">Draft</span>}
+              {pr.title}
+            </span>
+            <span className="gh-pr-meta">
+              #{pr.number} · {pr.user?.login} · {pr.head?.ref} → {pr.base?.ref} · {createdAt}
+              {pr.comments > 0 && ` · 💬 ${pr.comments}`}
+            </span>
           </div>
-        </div>
-      )}
-    </div>
+          <div className="gh-pr-card-actions" onClick={(e) => e.stopPropagation()}>
+            {pingStatus === 'sent' ? (
+              <span className="gh-ping-sent">Pinged ✓</span>
+            ) : (
+              <button
+                type="button"
+                className="gh-ping-btn"
+                disabled={pingStatus === 'sending'}
+                onClick={(e) => { e.stopPropagation(); setShowConfirm(true); }}
+                title="Post a comment on this PR asking the owner to merge it"
+              >
+                {pingStatus === 'sending' ? 'Pinging…' : 'Ping to merge'}
+              </button>
+            )}
+            <a href={pr.html_url} target="_blank" rel="noopener noreferrer"
+              className="gh-pr-open-link" title="Open on GitHub">↗</a>
+          </div>
+          <span className={`gh-chevron${open ? ' open' : ''}`}>▸</span>
+        </button>
+
+        {pingStatus === 'error' && (
+          <p className="gh-ping-error">Failed to ping: {pingError}</p>
+        )}
+
+        {/* Expanded detail */}
+        {open && (
+          <div className="gh-pr-card-body">
+            {isMergeable && (
+              <div className="gh-pr-mergeable-banner">✅ No merge conflicts — ready to merge.</div>
+            )}
+            {pr.mergeable === false && (
+              <div className="gh-pr-conflict-banner">⚠️ This branch has conflicts with the base branch.</div>
+            )}
+
+            {pr.body ? (
+              <div className="gh-pr-description">
+                <p className="gh-pr-section-label">Description</p>
+                <pre className="gh-pr-body-pre">{pr.body}</pre>
+              </div>
+            ) : (
+              <p className="gh-pr-no-body">No description provided.</p>
+            )}
+
+            <div className="gh-pr-files-section">
+              <p className="gh-pr-section-label">Changed files</p>
+              <PRFileList owner={owner} repo={repo} prNumber={pr.number} />
+            </div>
+
+            {/* Pings section */}
+            <div className="gh-pr-pings-section">
+              <button type="button" className="gh-comments-toggle" onClick={() => setPingsOpen((v) => !v)}>
+                <span className={`gh-advanced-arrow${pingsOpen ? ' open' : ''}`}>▸</span>
+                {pingsOpen ? 'Hide' : 'Show'} pings
+                {pings !== null && pings.length > 0 && ` (${pings.length})`}
+              </button>
+              {pingsOpen && (
+                <div className="gh-pings-list">
+                  {pings === null && <p className="gh-pings-loading">Loading…</p>}
+                  {pings !== null && pings.length === 0 && (
+                    <p className="gh-pings-empty">No pings sent yet.</p>
+                  )}
+                  {pings !== null && pings.map((c) => (
+                    <div key={c.id} className="gh-ping-item">
+                      <div className="gh-ping-item-info">
+                        <span className="gh-ping-item-author">{c.user?.login}</span>
+                        <span className="gh-ping-item-time">{new Date(c.created_at).toLocaleString()}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="gh-ping-delete-btn"
+                        disabled={deletingIds.has(c.id)}
+                        onClick={() => handleDeletePing(c.id)}
+                        title="Delete this ping"
+                      >
+                        {deletingIds.has(c.id) ? '…' : '✕'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -859,6 +959,8 @@ function RepoWorkspace({ repo, user, notifications, onNewNotification, onBack, o
   const [refreshTick, setRefreshTick] = useState(0);
   const [entering, setEntering] = useState(true);
   const tabSwapTimerRef = useRef(null);
+  const ghTabRefs = useRef({});
+  const [ghTabIndicator, setGhTabIndicator] = useState(null);
 
   useEffect(() => {
     const t = setTimeout(() => setEntering(false), 20);
@@ -877,6 +979,11 @@ function RepoWorkspace({ repo, user, notifications, onNewNotification, onBack, o
     const id = setInterval(() => setRefreshTick((t) => t + 1), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    const el = ghTabRefs.current[tab];
+    if (el) setGhTabIndicator({ left: el.offsetLeft, width: el.offsetWidth });
+  }, [tab]);
 
   const handleTabChange = useCallback(
     (nextTab) => {
@@ -911,8 +1018,10 @@ function RepoWorkspace({ repo, user, notifications, onNewNotification, onBack, o
         <div className="gh-workspace-header-right">
           <NotificationBell notifications={notifications} onDismiss={onDismiss} onDismissAll={onDismissAll} />
           <div className="gh-view-tabs">
+            {ghTabIndicator && <div className="gh-view-tab-indicator" style={{ left: ghTabIndicator.left, width: ghTabIndicator.width }} />}
             {WORKSPACE_TABS.map((t) => (
               <button key={t.id} type="button"
+                ref={(el) => { ghTabRefs.current[t.id] = el; }}
                 className={`gh-view-tab${tab === t.id ? ' gh-view-tab--active' : ''}`}
                 onClick={() => handleTabChange(t.id)}>
                 {t.label}
@@ -1006,10 +1115,15 @@ function RepoSelector({ onSelect }) {
       <div className="gh-repo-grid">
         {filtered.map((r) => (
           <button key={r.slug} type="button" className="gh-repo-card" onClick={() => onSelect(r)}>
-            <div className="gh-repo-card-icon">📦</div>
-            <div className="gh-repo-card-body">
-              <strong className="gh-repo-card-name">{r.name}</strong>
-              <span className="gh-repo-handle">{r.owner}/{r.repo}</span>
+            <div className="gh-repo-card-face">
+              <div className="gh-repo-card-icon">📦</div>
+              <div className="gh-repo-card-body">
+                <strong className="gh-repo-card-name">{r.name}</strong>
+                <span className="gh-repo-handle">{r.owner}/{r.repo}</span>
+              </div>
+            </div>
+            <div className="gh-repo-card-desc-layer">
+              <span className="gh-repo-desc">{r.owner}/{r.repo}</span>
             </div>
           </button>
         ))}

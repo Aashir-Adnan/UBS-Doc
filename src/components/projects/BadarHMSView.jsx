@@ -19,12 +19,14 @@ export default function BadarHMSView({ project }) {
 
       <div className="project-view-grid">
         <Link to="/docs/projects/badar-hms/Opera_Integration" className="project-view-card">
-          <div className="project-view-card-icon">📄</div>
-          <h3>Opera Integration</h3>
-          <p>
+          <div className="project-view-card-face">
+            <div className="project-view-card-icon">📄</div>
+            <h3>Opera Integration</h3>
+          </div>
+          <div className="project-view-card-desc-layer">
             Secure hybrid SaaS integration for OPERA PMS: architecture options,
             read-only and read/write solutions, comparison matrix.
-          </p>
+          </div>
         </Link>
       </div>
 

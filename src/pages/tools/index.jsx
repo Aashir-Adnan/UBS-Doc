@@ -66,76 +66,26 @@ function ToolsHub() {
 
       <section className="portal-section">
         <div className="tools-hub-grid">
-          <Link to="/tools/database" className="tool-card">
-            <div className="tool-card-icon">🗄️</div>
-            <h3>Database Tools</h3>
-            <p>
-              Upload SQL schemas to generate internal resources and automation
-              utilities.
-            </p>
-          </Link>
-
-          <Link to="/tools/lucid" className="tool-card">
-            <div className="tool-card-icon">🎨</div>
-            <h3>Lucid Sanitize</h3>
-            <p>
-              Upload and sanitize Lucid chart exports for cleaner diagrams.
-            </p>
-          </Link>
-
-          <Link to="/tools/notify" className="tool-card">
-            <div className="tool-card-icon">✉️</div>
-            <h3>Notify Maintainer</h3>
-            <p>
-              Send quick bug reports or feature requests directly to the
-              maintainer.
-            </p>
-          </Link>
-
-          <Link to="/tools/apiObject" className="tool-card">
-            <div className="tool-card-icon">⚙️</div>
-            <h3>API Object Builder</h3>
-            <p>
-              Create custom API objects with flags and pre/post process
-              functions. Copy the generated JS file.
-            </p>
-          </Link>
-
-          <Link to="/tools/projects" className="tool-card">
-            <div className="tool-card-icon">📁</div>
-            <h3>Projects</h3>
-            <p>
-              Browse project documentation and open custom project views and
-              dashboards.
-            </p>
-          </Link>
-
-          <Link to="/tools/github" className="tool-card">
-            <div className="tool-card-icon">🐙</div>
-            <h3>GitHub Dev Workflow</h3>
-            <p>
-              Browse repositories and dispatch agent tasks as GitHub issues
-              directly from the portal.
-            </p>
-          </Link>
-
-          <Link to="/tools/meetingWorkflow" className="tool-card">
-            <div className="tool-card-icon">🎙️</div>
-            <h3>Meeting Workflow</h3>
-            <p>
-              Create meetings, transcribe recordings, generate AI-powered notes
-              and HTML reports, then sync tasks to GitHub.
-            </p>
-          </Link>
-
-          <Link to="/tools/repos" className="tool-card">
-            <div className="tool-card-icon">📂</div>
-            <h3>Tracked Repositories</h3>
-            <p>
-              Add, remove, and pull the GitHub repositories that are cloned
-              locally and monitored by the agent pipeline.
-            </p>
-          </Link>
+          {[
+            { to: '/tools/database', icon: '🗄️', label: 'Database Tools', desc: 'Upload SQL schemas to generate internal resources and automation utilities.' },
+            { to: '/tools/lucid', icon: '🎨', label: 'Lucid Sanitize', desc: 'Upload and sanitize Lucid chart exports for cleaner diagrams.' },
+            { to: '/tools/notify', icon: '✉️', label: 'Notify Maintainer', desc: 'Send quick bug reports or feature requests directly to the maintainer.' },
+            { to: '/tools/apiObject', icon: '⚙️', label: 'API Object Builder', desc: 'Create custom API objects with flags and pre/post process functions.' },
+            { to: '/tools/projects', icon: '📁', label: 'Projects', desc: 'Browse project documentation and open custom project views and dashboards.' },
+            { to: '/tools/github', icon: '🐙', label: 'GitHub Dev Workflow', desc: 'Browse repositories and dispatch agent tasks as GitHub issues.' },
+            { to: '/tools/meetingWorkflow', icon: '🎙️', label: 'Meeting Workflow', desc: 'Create meetings, transcribe recordings, generate AI-powered notes and sync to GitHub.' },
+            { to: '/tools/repos', icon: '📂', label: 'Tracked Repositories', desc: 'Add, remove, and pull GitHub repos monitored by the agent pipeline.' },
+          ].map(({ to, icon, label, desc }) => (
+            <Link key={to} to={to} className="tool-card">
+              <div className="tool-card-face">
+                <div className="tool-card-icon">{icon}</div>
+                <h3>{label}</h3>
+              </div>
+              <div className="tool-card-desc-layer">
+                <p>{desc}</p>
+              </div>
+            </Link>
+          ))}
         </div>
       </section>
     </>
