@@ -38,12 +38,15 @@ function NoteInput({ elapsedSec, onAdd }) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function LiveTranscribeStage({ meeting, onDone }) {
+export default function LiveTranscribeStage({ meeting, detail, onDone }) {
+  const savedMeeting = detail?.meeting || {};
+  const hasExistingTranscript = !!(savedMeeting.transcript || meeting.transcript);
+
   const [phase, setPhase] = useState('idle'); // idle | recording | processing | done | error
   const [elapsedSec, setElapsedSec] = useState(0);
   const [segments, setSegments] = useState([]); // { index, startSec, transcript, status }
   const [timedNotes, setTimedNotes] = useState([]);
-  const [analysis, setAnalysis] = useState(null);
+  const [analysis, setAnalysis] = useState(savedMeeting.analysis_json || null);
   const [clarifications, setClarifications] = useState([]);
   const [error, setError] = useState('');
   const [segmentProcessing, setSegmentProcessing] = useState(false);
@@ -270,6 +273,28 @@ export default function LiveTranscribeStage({ meeting, onDone }) {
 
   const allSegmentsDone = segments.length > 0 && segments.every((s) => s.status === 'done' || s.status === 'error');
 
+  // Restore saved timed notes from DB when detail loads
+  useEffect(() => {
+    if (!detail?.meeting?.timed_notes_json) return;
+    const saved = Array.isArray(detail.meeting.timed_notes_json)
+      ? detail.meeting.timed_notes_json
+      : [];
+    if (saved.length > 0 && timedNotes.length === 0) {
+      setTimedNotes(saved);
+    }
+  }, [detail]);
+
+  // Restore saved analysis from DB when detail loads
+  useEffect(() => {
+    if (!detail?.meeting?.analysis_json) return;
+    if (!analysis) setAnalysis(detail.meeting.analysis_json);
+  }, [detail]);
+
+  const savedTranscript = detail?.meeting?.transcript || meeting.transcript || '';
+  const savedTimedNotes = Array.isArray(detail?.meeting?.timed_notes_json)
+    ? detail.meeting.timed_notes_json
+    : [];
+
   return (
     <div className="mw-stage-content lt-root">
       <h3 className="mw-stage-title">Live Transcription</h3>
@@ -278,10 +303,31 @@ export default function LiveTranscribeStage({ meeting, onDone }) {
         Add timestamped notes at any point — these are included in the Claude analysis alongside the transcript.
       </p>
 
+      {/* ── Saved transcript (shown when revisiting an old meeting) ── */}
+      {hasExistingTranscript && phase === 'idle' && (
+        <div className="lt-saved-section">
+          <div className="lt-section-label">Saved Transcript</div>
+          <pre className="mw-pre lt-saved-transcript">{savedTranscript}</pre>
+          {savedTimedNotes.length > 0 && (
+            <div style={{ marginTop: '0.75rem' }}>
+              <div className="lt-section-label">Saved Notes ({savedTimedNotes.length})</div>
+              <ul className="lt-notes-list">
+                {savedTimedNotes.map((n, i) => (
+                  <li key={i} className="lt-note-item">
+                    <span className="lt-note-time">{fmtTime(n.at)}</span>
+                    <span className="lt-note-text">{n.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Controls ── */}
       {phase === 'idle' && (
         <button className="mw-btn mw-btn--primary lt-record-btn" onClick={startRecording} type="button">
-          <span className="lt-rec-dot lt-rec-dot--idle" /> Start Recording
+          <span className="lt-rec-dot lt-rec-dot--idle" /> {hasExistingTranscript ? 'Re-record Meeting' : 'Start Recording'}
         </button>
       )}
 
@@ -399,7 +445,7 @@ export default function LiveTranscribeStage({ meeting, onDone }) {
       )}
 
       {/* ── Claude analysis output ── */}
-      {isDone && analysis && (
+      {(isDone || (phase === 'idle' && analysis)) && analysis && (
         <div className="lt-analysis">
           <div className="lt-section-label">Claude Analysis</div>
 

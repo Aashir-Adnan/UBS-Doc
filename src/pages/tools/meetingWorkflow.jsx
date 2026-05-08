@@ -8,21 +8,24 @@ import MeetingList from '@site/src/components/meetingWorkflow/MeetingList';
 import CreateMeeting from '@site/src/components/meetingWorkflow/CreateMeeting';
 import WorkflowPanel from '@site/src/components/meetingWorkflow/WorkflowPanel';
 
+// Three views: 'list' | 'create' | 'meeting'
 function MeetingWorkflowContent() {
   const { user, signOut } = useAuth();
   const canAccess = !!user && isGranjurEmail(user?.email);
+  const [view, setView] = useState('list');          // 'list' | 'create' | 'meeting'
   const [selectedMeeting, setSelectedMeeting] = useState(null);
   const [listKey, setListKey] = useState(0);
 
   const handleCreated = useCallback(() => {
     setListKey((k) => k + 1);
+    setView('list');
   }, []);
 
   const handleSelectMeeting = useCallback((meeting) => {
     setSelectedMeeting(meeting);
+    setView('meeting');
   }, []);
 
-  // Refresh the selected meeting object after a stage completes
   const handleStageComplete = useCallback(() => {
     setListKey((k) => k + 1);
   }, []);
@@ -56,35 +59,55 @@ function MeetingWorkflowContent() {
 
   return (
     <>
-      <div className="portal-breadcrumb">
-        <Link to="/tools">← Back to Dev Tools</Link>
+      {/* ── Header bar ── */}
+      <div className="mw-page-header">
+        <div className="mw-page-header-left">
+          <Link to="/tools" className="mw-back-link">← Dev Tools</Link>
+          {view !== 'list' && (
+            <button type="button" className="mw-back-link mw-back-btn" onClick={() => setView('list')}>
+              ← Meetings
+            </button>
+          )}
+          <h1 className="mw-page-title">
+            {view === 'list' && 'Meetings'}
+            {view === 'create' && 'Schedule a Meeting'}
+            {view === 'meeting' && (selectedMeeting?.title || 'Meeting')}
+          </h1>
+        </div>
+        <div className="mw-page-header-right">
+          <span className="mw-user-pill">
+            {user.photoURL && <img src={user.photoURL} className="mw-user-avatar" alt="" />}
+            {user.name || user.email}
+          </span>
+          <button type="button" className="mw-btn mw-btn--ghost mw-btn--sm" onClick={signOut}>Sign out</button>
+          {view === 'list' && (
+            <button type="button" className="mw-btn mw-btn--primary mw-btn--sm" onClick={() => setView('create')}>
+              + New Meeting
+            </button>
+          )}
+        </div>
       </div>
 
-      <section className="portal-hero">
-        <div className="portal-hero-text">
-          <h2>Meeting Workflow</h2>
-          <p>
-            Create meetings, transcribe audio with Whisper, generate AI-powered notes and HTML
-            reports with Claude, then sync tasks to GitHub.{' '}
-            Signed in as <strong>{user.name || user.email}</strong>.
-          </p>
-          <p>
-            <button type="button" className="portal-signout-link" onClick={signOut}>Sign out</button>
-          </p>
-        </div>
-      </section>
-
-      <section className="portal-section">
-        <div className="mw-top-grid">
-          <CreateMeeting onCreated={handleCreated} userEmail={user.email} />
+      {/* ── Views ── */}
+      <section className="portal-section mw-page-body">
+        {view === 'list' && (
           <MeetingList
             key={listKey}
             onSelectMeeting={handleSelectMeeting}
             selectedId={selectedMeeting?.meeting_id}
+            onCreateClick={() => setView('create')}
           />
-        </div>
+        )}
 
-        {selectedMeeting && (
+        {view === 'create' && (
+          <CreateMeeting
+            onCreated={handleCreated}
+            onCancel={() => setView('list')}
+            userEmail={user.email}
+          />
+        )}
+
+        {view === 'meeting' && selectedMeeting && (
           <WorkflowPanel
             meeting={selectedMeeting}
             onStageComplete={handleStageComplete}
