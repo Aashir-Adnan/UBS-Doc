@@ -5496,8 +5496,66 @@ body.ubs-no-outlines .repo-row:hover {
   margin: 0;
 }
 
-.mw-green { color: #38a169; }
-.mw-red   { color: #e53e3e; }
+.mw-green  { color: #38a169; }
+.mw-red    { color: #e53e3e; }
+.mw-orange { color: #dd6b20; }
+
+/* ── Context Files Panel ── */
+.mw-context-files {
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.mw-dropzone {
+  border: 2px dashed #cbd5e0;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  color: #718096;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+.mw-dropzone:hover,
+.mw-dropzone:focus {
+  border-color: #4a90e2;
+  background: #ebf4ff;
+  outline: none;
+}
+
+.mw-context-file-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.6rem 0 0;
+}
+
+.mw-context-file-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.85rem;
+}
+.mw-context-file-item:last-child { border-bottom: none; }
+
+.mw-context-file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #2d3748;
+}
+
+.mw-context-file-meta {
+  color: #718096;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
 
 /* NoteEditor */
 .mw-report-area {

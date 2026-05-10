@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { mwGet, mwPost } from './api';
+import { mwGet, mwPost, mwPostForm } from './api';
 import NoteEditor from './NoteEditor';
 import LiveTranscribeStage from './LiveTranscribeStage';
 
@@ -118,6 +118,96 @@ function EditableCell({ value, field, taskId, meetingId, options, onSaved, multi
   );
 }
 
+// ─── Context Files Panel ─────────────────────────────────────────────────────
+// Allows uploading reference files that Claude uses as extra context.
+
+function ContextFilesPanel({ meetingId }) {
+  const [files, setFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    mwGet(`/meeting/workflow/context-files?meeting_id=${meetingId}`)
+      .then((d) => setFiles(d.files || []))
+      .catch(() => {});
+  }, [meetingId]);
+
+  async function handleFiles(fileList) {
+    if (!fileList?.length) return;
+    setUploading(true); setError('');
+    try {
+      const form = new FormData();
+      form.append('meeting_id', meetingId);
+      for (const f of fileList) form.append('files', f);
+      const data = await mwPostForm('/meeting/workflow/context-files', form);
+      const uploaded = data.uploaded || [];
+      // Refresh list
+      const fresh = await mwGet(`/meeting/workflow/context-files?meeting_id=${meetingId}`);
+      setFiles(fresh.files || []);
+    } catch (e) { setError(e.message); }
+    finally { setUploading(false); }
+  }
+
+  async function removeFile(fileId) {
+    try {
+      await mwPost('/meeting/workflow/context-files/delete', { file_id: fileId, meeting_id: meetingId });
+      setFiles((prev) => prev.filter((f) => f.file_id !== fileId));
+    } catch (e) { setError(e.message); }
+  }
+
+  function onDrop(e) {
+    e.preventDefault();
+    handleFiles(e.dataTransfer.files);
+  }
+
+  return (
+    <div className="mw-context-files">
+      <p className="mw-label" style={{ marginBottom: '0.5rem' }}>
+        Context Files <span className="mw-optional">(uploaded text is injected into Claude prompts)</span>
+      </p>
+      <div
+        className="mw-dropzone"
+        onDrop={onDrop}
+        onDragOver={(e) => e.preventDefault()}
+        onClick={() => inputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.click()}
+      >
+        {uploading ? 'Uploading…' : 'Drop files here or click to browse'}
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          style={{ display: 'none' }}
+          onChange={(e) => handleFiles(e.target.files)}
+        />
+      </div>
+      {error && <p className="mw-field-error" style={{ marginTop: '0.25rem' }}>{error}</p>}
+      {files.length > 0 && (
+        <ul className="mw-context-file-list">
+          {files.map((f) => (
+            <li key={f.file_id} className="mw-context-file-item">
+              <span className="mw-context-file-name" title={f.filename}>{f.filename}</span>
+              <span className="mw-context-file-meta">
+                {f.file_size ? `${(f.file_size / 1024).toFixed(1)} KB` : ''}
+                {f.has_text ? ' · text ✓' : ' · binary'}
+              </span>
+              <button
+                className="mw-btn mw-btn--danger mw-btn--sm"
+                onClick={() => removeFile(f.file_id)}
+                type="button"
+                title="Remove"
+              >✕</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // ─── Stage 0: Pre-Meeting Notes ───────────────────────────────────────────────
 function PreMeetingStage({ meeting, detail, onDone }) {
   const [busy, setBusy] = useState(false);
@@ -158,8 +248,9 @@ function PreMeetingStage({ meeting, detail, onDone }) {
           <pre className="mw-pre">{meeting.agenda}</pre>
         </div>
       )}
+      <ContextFilesPanel meetingId={meeting.meeting_id} />
       <StatusBar message={error} type="error" />
-      <button className="mw-btn mw-btn--primary" onClick={run} disabled={busy} type="button">
+      <button className="mw-btn mw-btn--primary" onClick={run} disabled={busy} type="button" style={{ marginTop: '0.75rem' }}>
         {busy ? 'Generating…' : hasContent ? 'Regenerate Notes' : 'Generate Pre-Meeting Notes'}
       </button>
       {hasContent && (
@@ -574,6 +665,11 @@ function TasksStage({ meeting, detail, onDone }) {
                       <li key={i}>
                         {r.error
                           ? <span className="mw-red">Task {r.task_id}: {r.error}</span>
+                          : r.skipped
+                          ? <span className="mw-orange" title={`${Math.round((r.match_ratio || 0) * 100)}% keyword overlap`}>
+                              Task {r.task_id}: skipped — duplicate of&nbsp;
+                              <a href={r.duplicate_url} target="_blank" rel="noreferrer">#{r.duplicate_of}</a>
+                            </span>
                           : <a href={r.issue_url} target="_blank" rel="noreferrer">#{r.issue_number} — Task {r.task_id}</a>}
                       </li>
                     ))}
