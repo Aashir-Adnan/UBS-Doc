@@ -1,0 +1,523 @@
+{
+  "projects": [
+    "Framework",
+    "Edarete",
+    "HMS",
+    "QF",
+    "Da1",
+    "ilmverseAi"
+  ],
+  "platforms": [
+    "React Web",
+    "React Native",
+    "Flutter",
+    "Backend"
+  ],
+  "referenceProject": "Framework",
+  "categories": [
+    {
+      "title": "Data Display",
+      "description": "List, grid, filter, sort and import/export capabilities."
+    },
+    {
+      "title": "Forms",
+      "description": "Form capabilities available to CRUD flows."
+    },
+    {
+      "title": "UI & Experience",
+      "description": "Theming, language, layout and navigation behaviors."
+    },
+    {
+      "title": "Infrastructure",
+      "description": "Security, customization and platform glue."
+    }
+  ],
+  "features": [
+    {
+      "title": "Multi view modes",
+      "category": "Data Display",
+      "description": "Table and grid view toggle for the same dataset.",
+      "platforms": [
+        "React Web",
+        "React Native",
+        "Flutter"
+      ],
+      "subFeatures": [
+        {
+          "title": "Table view",
+          "description": "Tabular rendering with pagination and sort."
+        },
+        {
+          "title": "Grid view",
+          "description": "Card-style grid rendering for the same dataset."
+        },
+        {
+          "title": "View toggle",
+          "description": "Switch between table and grid without reloading data."
+        }
+      ]
+    },
+    {
+      "title": "Sort",
+      "category": "Data Display",
+      "description": "Column / field sorting on the list.",
+      "platforms": [
+        "React Web",
+        "React Native",
+        "Flutter",
+        "Backend"
+      ],
+      "subFeatures": [
+        {
+          "title": "Single column sort",
+          "description": "Click a header to cycle asc → desc → none."
+        },
+        {
+          "title": "Server-driven sort",
+          "description": "Emit sort_by/sort_order query params and rely on the server."
+        }
+      ]
+    },
+    {
+      "title": "Filter new UI",
+      "category": "Data Display",
+      "description": "Redesigned filter panel with chips and facets.",
+      "platforms": [
+        "React Web",
+        "React Native",
+        "Flutter"
+      ],
+      "subFeatures": [
+        {
+          "title": "Filter panel",
+          "description": "Drawer/popover with grouped facets and inputs."
+        },
+        {
+          "title": "Quick filters",
+          "description": "Common filters exposed as one-click buttons."
+        }
+      ]
+    },
+    {
+      "title": "Filter chips on UI",
+      "category": "Data Display",
+      "description": "Active filters shown as removable chips above the list.",
+      "platforms": [
+        "React Web",
+        "React Native",
+        "Flutter"
+      ],
+      "subFeatures": [
+        {
+          "title": "Active filter chips",
+          "description": "Applied filters shown as removable chips above the list."
+        }
+      ]
+    },
+    {
+      "title": "Expandable tiles UI",
+      "category": "Data Display",
+      "description": "Overflowed columns shown in an expandable detail panel per row.",
+      "platforms": [
+        "React Web",
+        "React Native",
+        "Flutter"
+      ],
+      "subFeatures": [
+        {
+          "title": "Inline detail panel",
+          "description": "Expanding a row shows overflowed columns as tiles."
+        }
+      ]
+    },
+    {
+      "title": "JSON format Props in list",
+      "category": "Data Display",
+      "description": "List is driven by a JSON config — no per-page coding.",
+      "platforms": [
+        "React Web",
+        "React Native",
+        "Flutter"
+      ],
+      "subFeatures": [
+        {
+          "title": "Config-driven list",
+          "description": "Entire list wired via a JSON schema — no bespoke code."
+        }
+      ]
+    },
+    {
+      "title": "Deep linking feature in list",
+      "category": "Data Display",
+      "description": "URL carries filter/sort/pagination so links reproduce list state.",
+      "platforms": [
+        "React Web"
+      ],
+      "subFeatures": [
+        {
+          "title": "Query-string state",
+          "description": "Filter/sort/page reflected in URL for shareable links."
+        }
+      ]
+    },
+    {
+      "title": "Import",
+      "category": "Data Display",
+      "description": "Bulk import records from CSV/Excel.",
+      "platforms": [
+        "React Web",
+        "Backend"
+      ],
+      "subFeatures": [
+        {
+          "title": "CSV / Excel import",
+          "description": "Bulk create records from a spreadsheet upload."
+        }
+      ]
+    },
+    {
+      "title": "Export",
+      "category": "Data Display",
+      "description": "Export filtered list to CSV/Excel.",
+      "platforms": [
+        "React Web",
+        "Backend"
+      ],
+      "subFeatures": [
+        {
+          "title": "CSV / Excel export",
+          "description": "Download the current filtered list."
+        }
+      ]
+    },
+    {
+      "title": "Multistep form",
+      "category": "Forms",
+      "description": "Wizard-style stepped forms with validation per step.",
+      "platforms": [
+        "React Web",
+        "React Native",
+        "Flutter"
+      ],
+      "subFeatures": [
+        {
+          "title": "Stepper UI",
+          "description": "Wizard layout with progress indicator."
+        },
+        {
+          "title": "Per-step validation",
+          "description": "Each step validates before advancing."
+        }
+      ]
+    },
+    {
+      "title": "2 columns support in form",
+      "category": "Forms",
+      "description": "Two-column field layout inside a single step.",
+      "platforms": [
+        "React Web",
+        "React Native",
+        "Flutter"
+      ],
+      "subFeatures": [
+        {
+          "title": "Two-column layout",
+          "description": "Side-by-side field rendering inside a step."
+        }
+      ]
+    },
+    {
+      "title": "File update field",
+      "category": "Forms",
+      "description": "Replace / update an existing file attachment in edit mode.",
+      "platforms": [
+        "React Web",
+        "React Native",
+        "Flutter",
+        "Backend"
+      ],
+      "subFeatures": [
+        {
+          "title": "Replace attachment",
+          "description": "Edit mode allows swapping the existing file."
+        }
+      ]
+    },
+    {
+      "title": "Signature loading UI",
+      "category": "UI & Experience",
+      "description": "Branded loading overlay / spinner used across the app.",
+      "platforms": [
+        "React Web",
+        "React Native",
+        "Flutter"
+      ],
+      "subFeatures": [
+        {
+          "title": "Branded overlay",
+          "description": "Full-screen loading overlay with brand motif."
+        }
+      ]
+    },
+    {
+      "title": "User detail modals",
+      "category": "UI & Experience",
+      "description": "Rich user detail modal with inline actions.",
+      "platforms": [
+        "React Web",
+        "React Native",
+        "Flutter"
+      ],
+      "subFeatures": [
+        {
+          "title": "Detail modal",
+          "description": "Rich modal summarizing a user with inline actions."
+        }
+      ]
+    },
+    {
+      "title": "Semester design component",
+      "category": "UI & Experience",
+      "description": "Dedicated semester planner / design widget.",
+      "platforms": [
+        "React Web"
+      ],
+      "subFeatures": [
+        {
+          "title": "Planner widget",
+          "description": "Dedicated semester planner component."
+        }
+      ]
+    },
+    {
+      "title": "Multi language support (LTR/RTL)",
+      "category": "UI & Experience",
+      "description": "Runtime language switch with RTL layout support.",
+      "platforms": [
+        "React Web",
+        "React Native",
+        "Flutter"
+      ],
+      "subFeatures": [
+        {
+          "title": "Runtime language switch",
+          "description": "Translate and re-layout on the fly."
+        },
+        {
+          "title": "RTL layout support",
+          "description": "Mirror layout and alignment for Arabic/Urdu."
+        }
+      ]
+    },
+    {
+      "title": "Theme implementation from single file",
+      "category": "UI & Experience",
+      "description": "Single source-of-truth theme file drives the whole app.",
+      "platforms": [
+        "React Web",
+        "React Native",
+        "Flutter"
+      ],
+      "subFeatures": [
+        {
+          "title": "Central theme file",
+          "description": "Single source-of-truth file drives palette and tokens."
+        }
+      ]
+    },
+    {
+      "title": "Auto scroll sidebar + one tab open at a time",
+      "category": "UI & Experience",
+      "description": "Sidebar auto-scrolls to active item; only one accordion open at a time.",
+      "platforms": [
+        "React Web"
+      ],
+      "subFeatures": [
+        {
+          "title": "Auto-scroll",
+          "description": "Sidebar scrolls the active item into view."
+        },
+        {
+          "title": "Single-open accordion",
+          "description": "Only one sidebar group is expanded at a time."
+        }
+      ]
+    },
+    {
+      "title": "Encryption with accessToken + platform",
+      "category": "Infrastructure",
+      "description": "Double-layer AES encryption using access token + platform key.",
+      "platforms": [
+        "React Web",
+        "React Native",
+        "Flutter",
+        "Backend"
+      ],
+      "subFeatures": [
+        {
+          "title": "Double-layer AES",
+          "description": "Payload encrypted with token + platform key."
+        }
+      ]
+    },
+    {
+      "title": "Custom",
+      "category": "Infrastructure",
+      "description": "Project-specific customizations built on top of the platform.",
+      "platforms": [
+        "React Web",
+        "React Native",
+        "Flutter",
+        "Backend"
+      ],
+      "subFeatures": [
+        {
+          "title": "Project-specific screens",
+          "description": "Anything unique to this project sits here."
+        }
+      ]
+    }
+  ],
+  "customNotes": {
+    "Framework": "Dashboard",
+    "Edarete": "Dashboard and student side",
+    "HMS": "Dashboards, landing page, login pages",
+    "QF": "Dashboard, Content component, login page",
+    "Da1": "Dashboard",
+    "ilmverseAi": "Dashboard, merged other projects into it"
+  },
+  "statuses": {
+    "Framework": {
+      "Signature loading UI": "done",
+      "Multistep form": "done",
+      "Multi view modes": "done",
+      "Sort": "done",
+      "Filter new UI": "done",
+      "Import": "pending",
+      "Export": "pending",
+      "User detail modals": "pending",
+      "Semester design component": "pending",
+      "Multi language support (LTR/RTL)": "done",
+      "Theme implementation from single file": "done",
+      "Expandable tiles UI": "done",
+      "JSON format Props in list": "done",
+      "Deep linking feature in list": "done",
+      "Filter chips on UI": "done",
+      "Auto scroll sidebar + one tab open at a time": "pending",
+      "2 columns support in form": "pending",
+      "Encryption with accessToken + platform": "done",
+      "File update field": "done",
+      "Custom": "done"
+    },
+    "Edarete": {
+      "Signature loading UI": "done",
+      "Multistep form": "pending",
+      "Multi view modes": "done",
+      "Sort": "done",
+      "Filter new UI": "pending",
+      "Import": "pending",
+      "Export": "pending",
+      "User detail modals": "pending",
+      "Semester design component": "pending",
+      "Multi language support (LTR/RTL)": "pending",
+      "Theme implementation from single file": "pending",
+      "Expandable tiles UI": "done",
+      "JSON format Props in list": "done",
+      "Deep linking feature in list": "pending",
+      "Filter chips on UI": "pending",
+      "Auto scroll sidebar + one tab open at a time": "pending",
+      "2 columns support in form": "pending",
+      "Encryption with accessToken + platform": "done",
+      "File update field": "pending",
+      "Custom": "done"
+    },
+    "HMS": {
+      "Signature loading UI": "done",
+      "Multistep form": "done",
+      "Multi view modes": "done",
+      "Sort": "done",
+      "Filter new UI": "done",
+      "Import": "pending",
+      "Export": "pending",
+      "User detail modals": "pending",
+      "Semester design component": "pending",
+      "Multi language support (LTR/RTL)": "done",
+      "Theme implementation from single file": "pending",
+      "Expandable tiles UI": "done",
+      "JSON format Props in list": "done",
+      "Deep linking feature in list": "done",
+      "Filter chips on UI": "done",
+      "Auto scroll sidebar + one tab open at a time": "pending",
+      "2 columns support in form": "done",
+      "Encryption with accessToken + platform": "done",
+      "File update field": "done",
+      "Custom": "done"
+    },
+    "QF": {
+      "Signature loading UI": "done",
+      "Multistep form": "done",
+      "Multi view modes": "done",
+      "Sort": "done",
+      "Filter new UI": "done",
+      "Import": "pending",
+      "Export": "pending",
+      "User detail modals": "done",
+      "Semester design component": "done",
+      "Multi language support (LTR/RTL)": "done",
+      "Theme implementation from single file": "done",
+      "Expandable tiles UI": "done",
+      "JSON format Props in list": "done",
+      "Deep linking feature in list": "done",
+      "Filter chips on UI": "done",
+      "Auto scroll sidebar + one tab open at a time": "done",
+      "2 columns support in form": "done",
+      "Encryption with accessToken + platform": "done",
+      "File update field": "done",
+      "Custom": "done"
+    },
+    "Da1": {
+      "Signature loading UI": "pending",
+      "Multistep form": "pending",
+      "Multi view modes": "done",
+      "Sort": "pending",
+      "Filter new UI": "pending",
+      "Import": "pending",
+      "Export": "pending",
+      "User detail modals": "pending",
+      "Semester design component": "pending",
+      "Multi language support (LTR/RTL)": "pending",
+      "Theme implementation from single file": "pending",
+      "Expandable tiles UI": "pending",
+      "JSON format Props in list": "pending",
+      "Deep linking feature in list": "pending",
+      "Filter chips on UI": "pending",
+      "Auto scroll sidebar + one tab open at a time": "pending",
+      "2 columns support in form": "pending",
+      "Encryption with accessToken + platform": "pending",
+      "File update field": "pending",
+      "Custom": "done"
+    },
+    "ilmverseAi": {
+      "Signature loading UI": "pending",
+      "Multistep form": "pending",
+      "Multi view modes": "done",
+      "Sort": "done",
+      "Filter new UI": "pending",
+      "Import": "pending",
+      "Export": "pending",
+      "User detail modals": "pending",
+      "Semester design component": "pending",
+      "Multi language support (LTR/RTL)": "pending",
+      "Theme implementation from single file": "pending",
+      "Expandable tiles UI": "pending",
+      "JSON format Props in list": "done",
+      "Deep linking feature in list": "pending",
+      "Filter chips on UI": "pending",
+      "Auto scroll sidebar + one tab open at a time": "pending",
+      "2 columns support in form": "pending",
+      "Encryption with accessToken + platform": "done",
+      "File update field": "pending",
+      "Custom": "done"
+    }
+  }
+}
