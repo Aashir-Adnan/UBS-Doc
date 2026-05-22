@@ -254,42 +254,46 @@ function IssueForm({ repo, onCreated, userEmail }) {
       </div>
 
       <div className={`gh-advanced-panel${showAdvanced ? ' gh-advanced-panel--open' : ''}`}>
-        <div className="gh-form-field">
-          <label className="gh-form-label">Context paths <span className="gh-optional-badge gh-optional-badge--inline">optional</span></label>
-          <p className="gh-context-warning">
-            <span>⚠️</span> Context is entirely optional — the agent works without it. Only add paths if directly relevant; a wrong path can mislead the agent.
-          </p>
-          <button type="button" className={`gh-explorer-toggle${showExplorer ? ' gh-explorer-toggle--open' : ''}`}
-            onClick={() => setShowExplorer((v) => !v)}>
-            <span className={`gh-advanced-arrow${showExplorer ? ' open' : ''}`}>▸</span>
-            {showExplorer ? 'Hide file explorer' : 'Browse repository files'}
-          </button>
-          <div className={`gh-explorer-wrap${showExplorer ? ' gh-explorer-wrap--open' : ''}`}>
-            {showExplorer && <FileExplorer owner={repo.owner} repo={repo.repo} onSelect={setContext} selected={context} />}
+        <div className="gh-advanced-panel-inner">
+          <div className="gh-form-field">
+            <label className="gh-form-label">Context paths <span className="gh-optional-badge gh-optional-badge--inline">optional</span></label>
+            <p className="gh-context-warning">
+              <span>⚠️</span> Context is entirely optional — the agent works without it. Only add paths if directly relevant; a wrong path can mislead the agent.
+            </p>
+            <button type="button" className={`gh-explorer-toggle${showExplorer ? ' gh-explorer-toggle--open' : ''}`}
+              onClick={() => setShowExplorer((v) => !v)}>
+              <span className={`gh-advanced-arrow${showExplorer ? ' open' : ''}`}>▸</span>
+              {showExplorer ? 'Hide file explorer' : 'Browse repository files'}
+            </button>
+            {showExplorer && (
+              <div className="gh-explorer-inline">
+                <FileExplorer owner={repo.owner} repo={repo.repo} onSelect={setContext} selected={context} />
+              </div>
+            )}
+            {context.length > 0 && (
+              <div className="gh-context-chips">
+                {context.map((p) => (
+                  <span key={p} className="gh-context-chip">
+                    {p}
+                    <button type="button" className="gh-chip-remove" onClick={() => setContext((prev) => prev.filter((x) => x !== p))}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-          {context.length > 0 && (
-            <div className="gh-context-chips">
-              {context.map((p) => (
-                <span key={p} className="gh-context-chip">
-                  {p}
-                  <button type="button" className="gh-chip-remove" onClick={() => setContext((prev) => prev.filter((x) => x !== p))}>×</button>
-                </span>
-              ))}
+          <div className="gh-form-row--cols">
+            <div className="gh-form-field">
+              <label className="gh-form-label">Type</label>
+              <select className="gh-form-select" value={type} onChange={(e) => setType(e.target.value)}>
+                {TYPES.map((t) => <option key={t} value={t}>{t || '— not specified —'}</option>)}
+              </select>
             </div>
-          )}
-        </div>
-        <div className="gh-form-row--cols">
-          <div className="gh-form-field">
-            <label className="gh-form-label">Type</label>
-            <select className="gh-form-select" value={type} onChange={(e) => setType(e.target.value)}>
-              {TYPES.map((t) => <option key={t} value={t}>{t || '— not specified —'}</option>)}
-            </select>
-          </div>
-          <div className="gh-form-field">
-            <label className="gh-form-label">Priority</label>
-            <select className="gh-form-select" value={priority} onChange={(e) => setPriority(e.target.value)}>
-              {PRIORITIES.map((p) => <option key={p} value={p}>{p || '— not specified —'}</option>)}
-            </select>
+            <div className="gh-form-field">
+              <label className="gh-form-label">Priority</label>
+              <select className="gh-form-select" value={priority} onChange={(e) => setPriority(e.target.value)}>
+                {PRIORITIES.map((p) => <option key={p} value={p}>{p || '— not specified —'}</option>)}
+              </select>
+            </div>
           </div>
         </div>
       </div>

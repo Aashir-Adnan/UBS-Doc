@@ -1716,7 +1716,7 @@
 /* Sidebar + content */
 .gh-workspace-body {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: minmax(260px, 320px) 1fr;
   gap: 1rem;
   align-items: start;
 }
@@ -1750,9 +1750,13 @@
 }
 
 .gh-sidebar-explorer {
+  overflow-x: hidden;
   overflow-y: auto;
-  padding: 0.4rem 0.35rem;
+  padding: 0.45rem 0.4rem;
   flex: 1;
+  min-height: 14rem;
+  min-width: 0;
+  -webkit-overflow-scrolling: touch;
 }
 
 .gh-workspace-main {
@@ -1791,7 +1795,7 @@
 }
 
 /* ── File Tree ── */
-.gh-explorer { font-size: 0.8rem; }
+.gh-explorer { font-size: 0.8rem; min-width: 0; }
 .gh-tree-list { list-style: none; margin: 0; padding: 0; }
 .gh-tree-item { margin: 0; }
 
@@ -2492,6 +2496,7 @@
 
 .gh-optional-badge--inline { margin-left: 0.3rem; }
 
+/* Single-row accordion wrapper; content lives inside .gh-advanced-panel-inner only */
 .gh-advanced-panel {
   display: grid;
   grid-template-rows: 0fr;
@@ -2501,9 +2506,9 @@
 
 .gh-advanced-panel--open { grid-template-rows: 1fr; }
 
-.gh-advanced-panel > * { overflow: hidden; }
+.gh-advanced-panel > .gh-advanced-panel-inner { overflow: hidden; min-height: 0; }
 
-.gh-advanced-panel--open > * {
+.gh-advanced-panel--open > .gh-advanced-panel-inner {
   overflow: visible;
   display: flex;
   flex-direction: column;
@@ -2556,6 +2561,21 @@
   background: var(--ifm-color-emphasis-100);
 }
 
+/* Inline explorer in issue form: fixed scroll region so nested accordions can't collapse height */
+.gh-explorer-inline {
+  margin-top: 0.45rem;
+  min-height: 12rem;
+  max-height: min(26rem, 52vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 0.55rem;
+  background: var(--ifm-background-color);
+  padding: 0.4rem 0.35rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Legacy wrap (accordion); keep for older markup if any still references classes */
 .gh-explorer-wrap {
   display: grid;
   grid-template-rows: 0fr;
@@ -2564,11 +2584,12 @@
 }
 
 .gh-explorer-wrap--open { grid-template-rows: 1fr; }
-.gh-explorer-wrap > * { overflow: hidden; }
+.gh-explorer-wrap > * { overflow: hidden; min-height: 0; }
 
 .gh-explorer-wrap--open > * {
   overflow-y: auto;
-  max-height: 240px;
+  min-height: 12rem;
+  max-height: min(26rem, 52vh);
   border: 1px solid var(--ifm-color-emphasis-300);
   border-radius: 0.55rem;
   background: var(--ifm-background-color);
@@ -3162,22 +3183,14 @@
   margin-left: 0.35rem;
 }
 
+/* Accordion: single child .gh-advanced-panel-inner only (overrides earlier block timing for this section) */
 .gh-advanced-panel {
-  display: grid;
-  grid-template-rows: 0fr;
   transition: grid-template-rows 0.3s ease;
-  overflow: hidden;
 }
 
-.gh-advanced-panel > * {
-  overflow: hidden;
-}
+.gh-advanced-panel > .gh-advanced-panel-inner { overflow: hidden; min-height: 0; }
 
-.gh-advanced-panel--open {
-  grid-template-rows: 1fr;
-}
-
-.gh-advanced-panel--open > * {
+.gh-advanced-panel--open > .gh-advanced-panel-inner {
   overflow: visible;
   display: flex;
   flex-direction: column;
@@ -3229,29 +3242,17 @@
   background: var(--ifm-color-emphasis-100);
 }
 
-/* File explorer */
+/* File explorer — align with gh-explorer-inline / legacy wrap earlier in this file */
 .gh-explorer-wrap {
-  display: grid;
-  grid-template-rows: 0fr;
   transition: grid-template-rows 0.3s ease;
-  overflow: hidden;
 }
 
-.gh-explorer-wrap > * {
-  overflow: hidden;
-}
-
-.gh-explorer-wrap--open {
-  grid-template-rows: 1fr;
-}
+.gh-explorer-wrap > * { overflow: hidden; min-height: 0; }
 
 .gh-explorer-wrap--open > * {
-  border: 1px solid var(--ifm-color-emphasis-300);
-  border-radius: 0.6rem;
-  background: var(--ifm-background-color);
-  max-height: 280px;
   overflow-y: auto;
-  padding: 0.5rem;
+  min-height: 12rem;
+  max-height: min(26rem, 52vh);
 }
 
 .gh-explorer-loading,
