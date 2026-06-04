@@ -67,6 +67,25 @@ const sidebars = {
     },
     {
       type: 'category',
+      label: 'HMS Documentation',
+      items: [
+        {
+          type: 'category',
+          label: 'Guest APIs',
+          items: [
+            {
+              type: 'category',
+              label: 'Guest Booking Check In',
+              items: [
+                'hms-documentation/guest-apis/guest-booking-checkin/guest-booking-checkin',
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      type: 'category',
       label: 'Projects',
       items: [
         {

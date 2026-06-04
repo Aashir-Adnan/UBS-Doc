@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useHistory, useLocation } from '@docusaurus/router';
-import { AuthProvider } from '@site/src/components/portal/authStore';
+import { AuthProvider, useAuth } from '@site/src/components/portal/authStore';
+import GoogleSignIn from '@site/src/components/portal/GoogleSignIn';
 
 const NAV_ITEMS = [
   { label: 'Home', to: '/' },
@@ -126,6 +127,7 @@ export default function Root({ children }) {
 
   return (
     <AuthProvider>
+      <AuthGate>
       <div className="ubs-app-shell">
         <aside className="ubs-side-nav">
           <div className="ubs-side-nav-brand">UBS</div>
@@ -223,6 +225,41 @@ export default function Root({ children }) {
           </div>
         )}
       </div>
+    </AuthGate>
     </AuthProvider>
   );
+}
+
+function AuthGate({ children }) {
+  const { user } = useAuth();
+
+  if (!user) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        background: '#093C5D',
+      }}>
+        <div style={{
+          background: '#fff',
+          borderRadius: '12px',
+          padding: '40px',
+          maxWidth: '400px',
+          width: '100%',
+          textAlign: 'center',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
+        }}>
+          <h2 style={{ margin: '0 0 8px', color: '#093C5D' }}>Sign in to UBS</h2>
+          <p style={{ color: '#666', marginBottom: '24px' }}>
+            Use your Google account to access the UBS documentation and tools.
+          </p>
+          <GoogleSignIn />
+        </div>
+      </div>
+    );
+  }
+
+  return children;
 }
