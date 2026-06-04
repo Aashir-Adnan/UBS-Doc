@@ -80,6 +80,20 @@ const sidebars = {
                 'hms-documentation/guest-apis/guest-booking-checkin/guest-booking-checkin',
               ],
             },
+            {
+              type: 'category',
+              label: 'Guest Booking Cancel',
+              items: [
+                'hms-documentation/guest-apis/guest-booking-cancel/guest-booking-cancel',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Favorites',
+              items: [
+                'hms-documentation/guest-apis/guest-favorites/guest-favorites',
+              ],
+            }
           ],
         },
       ],
