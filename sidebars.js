@@ -124,6 +124,13 @@ const sidebars = {
             },
             {
               type: 'category',
+              label: 'Guest Scheduler',
+              items: [
+                'hms-documentation/guest-apis/guest-scheduler/guest-scheduler',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Guest Service Categories',
               items: [
                 'hms-documentation/guest-apis/guest-service-categories/guest-service-categories',
