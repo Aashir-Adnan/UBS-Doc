@@ -117,6 +117,13 @@ const sidebars = {
             },
             {
               type: 'category',
+              label: 'Guest Service Categories',
+              items: [
+                'hms-documentation/guest-apis/guest-service-categories/guest-service-categories',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Guest Check-In Eligibility',
               items: [
                 'hms-documentation/guest-apis/guest-checkin-eligibility/guest-checkin-eligibility',
