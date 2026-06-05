@@ -75,6 +75,13 @@ const sidebars = {
           items: [
             {
               type: 'category',
+              label: 'Guest Current Booking',
+              items: [
+                'hms-documentation/guest-apis/guest-bookings-current/guest-bookings-current',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Guest Booking Check In',
               items: [
                 'hms-documentation/guest-apis/guest-booking-checkin/guest-booking-checkin',
