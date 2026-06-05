@@ -2,9 +2,9 @@
 
 **GET** `/api/guest/scheduler`
 
-Returns the full scheduling tree for the guest booking UI: schedulable service categories, the locations that offer services in each category, the services available at each location (the "options"), and the time slots for each service on a given date. Excludes non-schedulable categories (`stay`, `amenities`, `networking`, `room-service`).
+Returns the full scheduling tree for the guest booking UI: schedulable service categories, the locations that offer services in each category, the services available at each location (the "options"), and the time slots for each service across a date range. Excludes non-schedulable categories (`stay`, `amenities`, `networking`, `room-service`).
 
-This is the primary endpoint powering the **Schedule now / Reschedule** flow for booking add-ons. The guest makes a two-step selection: (1) pick a service at a location, then (2) pick a time slot.
+This is the primary endpoint powering the **Schedule now / Reschedule** flow for booking add-ons. The guest makes a two-step selection: (1) pick a service at a location, then (2) pick a date and time slot.
 
 ---
 
@@ -18,22 +18,34 @@ Uses **AUTH_PLATFORM** — requires a valid guest JWT (`accessToken`). The guest
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `date` | `string` | No | Date to compute slot availability for (YYYY-MM-DD). Defaults to today. |
+| `from` | `string` | No | Start of date range (YYYY-MM-DD). Defaults to today. |
+| `to` | `string` | No | End of date range (YYYY-MM-DD, inclusive). Defaults to `from + 6 days`. Maximum range: 14 days. |
 | `categoryId` | `number` | No | Filter to a single service category. If omitted, all schedulable categories are returned. |
 
-### Example: All categories for a date
+### Example: Week-long range
 
 ```json
 {
-  "date": "2026-07-02"
+  "from": "2026-07-01",
+  "to": "2026-07-07"
 }
 ```
 
-### Example: Single category
+### Example: Single day
 
 ```json
 {
-  "date": "2026-07-02",
+  "from": "2026-07-02",
+  "to": "2026-07-02"
+}
+```
+
+### Example: Single category with date range
+
+```json
+{
+  "from": "2026-07-01",
+  "to": "2026-07-03",
   "categoryId": 5
 }
 ```
@@ -43,18 +55,19 @@ Uses **AUTH_PLATFORM** — requires a valid guest JWT (`accessToken`). The guest
 ## Behavior
 
 1. Resolves the guest's `urdd_id` from the JWT via `ensureGuestUrdd`.
-2. Fetches all active service categories, excluding non-schedulable categories (`stay`, `amenities`, `networking`, `room-service`). Stay is booked through the room/package flow; amenities are non-schedulable add-ons. Deduplicates by slug.
-3. If `categoryId` is provided, filters to that single category.
-4. For each category, finds all active services in that category and joins through `service_locations` → `locations` to build the location tree. Only services linked to at least one active location appear.
-5. For each service, computes time slot availability for the requested date using `computeServiceAvailability`, which:
+2. Validates and expands the date range (`from` to `to`, inclusive). If `to` is omitted, defaults to `from + 6 days`. Maximum range is 14 days.
+3. Fetches all active service categories, excluding non-schedulable categories (`stay`, `amenities`, `networking`, `room-service`). Stay is booked through the room/package flow; amenities are non-schedulable add-ons. Deduplicates by slug.
+4. If `categoryId` is provided, filters to that single category.
+5. For each category, finds all active services in that category and joins through `service_locations` → `locations` to build the location tree. Only services linked to at least one active location appear.
+6. For each service, computes time slot availability **for every date in the range** using `computeServiceAvailability`, which:
    - Queries `unit_availability` windows for the service's delivery units and locations.
    - Breaks windows into discrete slots based on `slot_duration_min`.
    - Checks for conflicts against `booking_items` and `booking_service_slots`.
    - Applies booking gates: `advance_booking_min_days`, `advance_booking_max_days`, `blackout_dates`, `lead_time_hours`, `cutoff_time`.
    - Applies gender-restricted windows where configured.
-6. Enriches each service with Arabic translations, catalog pricing, and parsed image arrays.
-7. Enriches each category with its `duration_unit` from `hms_config`.
-8. Returns the nested tree grouped as: category → location → service → slots.
+7. Enriches each service with Arabic translations, catalog pricing, and parsed image arrays.
+8. Enriches each category with its `duration_unit` from `hms_config`.
+9. Returns the nested tree grouped as: category → location → service → `availability[]` (one entry per date, each containing that date's slots).
 
 ---
 
@@ -95,7 +108,8 @@ Each **service** at a location is a schedulable option. Each **delivery unit** (
 
 ```json
 {
-  "date": "2026-07-02",
+  "from": "2026-07-01",
+  "to": "2026-07-03",
   "categories": [
     {
       "categoryId": 5,
@@ -117,23 +131,47 @@ Each **service** at a location is a schedulable option. Each **delivery unit** (
               "images": ["20", "21"],
               "unitPrice": 75,
               "currency": "SAR",
-              "unavailableReason": null,
-              "slots": [
+              "availability": [
                 {
-                  "start": "07:00",
-                  "end": "08:00",
-                  "unitId": 5,
-                  "locationId": 12,
-                  "available": true,
-                  "genderConstraint": null
+                  "date": "2026-07-01",
+                  "unavailableReason": null,
+                  "slots": [
+                    {
+                      "start": "07:00",
+                      "end": "08:00",
+                      "unitId": 5,
+                      "locationId": 12,
+                      "available": true,
+                      "genderConstraint": null
+                    },
+                    {
+                      "start": "08:00",
+                      "end": "09:00",
+                      "unitId": 5,
+                      "locationId": 12,
+                      "available": false,
+                      "genderConstraint": null
+                    }
+                  ]
                 },
                 {
-                  "start": "08:00",
-                  "end": "09:00",
-                  "unitId": 5,
-                  "locationId": 12,
-                  "available": false,
-                  "genderConstraint": null
+                  "date": "2026-07-02",
+                  "unavailableReason": null,
+                  "slots": [
+                    {
+                      "start": "07:00",
+                      "end": "08:00",
+                      "unitId": 5,
+                      "locationId": 12,
+                      "available": true,
+                      "genderConstraint": null
+                    }
+                  ]
+                },
+                {
+                  "date": "2026-07-03",
+                  "unavailableReason": "blackout",
+                  "slots": []
                 }
               ]
             },
@@ -144,35 +182,10 @@ Each **service** at a location is a schedulable option. Each **delivery unit** (
               "images": [],
               "unitPrice": 120,
               "currency": "SAR",
-              "unavailableReason": null,
-              "slots": [
-                {
-                  "start": "12:00",
-                  "end": "13:00",
-                  "unitId": 6,
-                  "locationId": 12,
-                  "available": true,
-                  "genderConstraint": null
-                }
-              ]
-            },
-            {
-              "serviceId": 78,
-              "label": { "en": "Dinner Tasting", "ar": "عشاء تذوق" },
-              "shortDescription": null,
-              "images": [],
-              "unitPrice": 200,
-              "currency": "SAR",
-              "unavailableReason": null,
-              "slots": [
-                {
-                  "start": "19:00",
-                  "end": "20:00",
-                  "unitId": 7,
-                  "locationId": 12,
-                  "available": true,
-                  "genderConstraint": null
-                }
+              "availability": [
+                { "date": "2026-07-01", "unavailableReason": null, "slots": [{ "start": "12:00", "end": "13:00", "unitId": 6, "locationId": 12, "available": true, "genderConstraint": null }] },
+                { "date": "2026-07-02", "unavailableReason": null, "slots": [{ "start": "12:00", "end": "13:00", "unitId": 6, "locationId": 12, "available": true, "genderConstraint": null }] },
+                { "date": "2026-07-03", "unavailableReason": "blackout", "slots": [] }
               ]
             }
           ]
@@ -199,62 +212,17 @@ Each **service** at a location is a schedulable option. Each **delivery unit** (
               "images": ["30"],
               "unitPrice": 250,
               "currency": "SAR",
-              "unavailableReason": null,
-              "slots": [
+              "availability": [
                 {
-                  "start": "09:00",
-                  "end": "10:00",
-                  "unitId": 20,
-                  "locationId": 15,
-                  "available": true,
-                  "genderConstraint": null
+                  "date": "2026-07-01",
+                  "unavailableReason": null,
+                  "slots": [
+                    { "start": "09:00", "end": "10:00", "unitId": 20, "locationId": 15, "available": true, "genderConstraint": null },
+                    { "start": "10:00", "end": "11:00", "unitId": 20, "locationId": 15, "available": true, "genderConstraint": "female" }
+                  ]
                 },
-                {
-                  "start": "10:00",
-                  "end": "11:00",
-                  "unitId": 20,
-                  "locationId": 15,
-                  "available": true,
-                  "genderConstraint": "female"
-                }
-              ]
-            },
-            {
-              "serviceId": 91,
-              "label": { "en": "Thai Massage", "ar": "مساج تايلاندي" },
-              "shortDescription": null,
-              "images": [],
-              "unitPrice": 300,
-              "currency": "SAR",
-              "unavailableReason": null,
-              "slots": [
-                {
-                  "start": "09:00",
-                  "end": "10:00",
-                  "unitId": 21,
-                  "locationId": 15,
-                  "available": true,
-                  "genderConstraint": null
-                }
-              ]
-            },
-            {
-              "serviceId": 92,
-              "label": { "en": "Facial Treatment", "ar": "علاج الوجه" },
-              "shortDescription": null,
-              "images": [],
-              "unitPrice": 180,
-              "currency": "SAR",
-              "unavailableReason": null,
-              "slots": [
-                {
-                  "start": "09:00",
-                  "end": "10:00",
-                  "unitId": 22,
-                  "locationId": 15,
-                  "available": true,
-                  "genderConstraint": null
-                }
+                { "date": "2026-07-02", "unavailableReason": null, "slots": [{ "start": "09:00", "end": "10:00", "unitId": 20, "locationId": 15, "available": true, "genderConstraint": null }] },
+                { "date": "2026-07-03", "unavailableReason": null, "slots": [{ "start": "09:00", "end": "10:00", "unitId": 20, "locationId": 15, "available": true, "genderConstraint": null }] }
               ]
             }
           ]
@@ -281,62 +249,17 @@ Each **service** at a location is a schedulable option. Each **delivery unit** (
               "images": [],
               "unitPrice": 80,
               "currency": "SAR",
-              "unavailableReason": null,
-              "slots": [
-                {
-                  "start": "08:00",
-                  "end": "08:30",
-                  "unitId": 25,
-                  "locationId": 18,
-                  "available": true,
-                  "genderConstraint": null
-                },
-                {
-                  "start": "08:30",
-                  "end": "09:00",
-                  "unitId": 25,
-                  "locationId": 18,
-                  "available": true,
-                  "genderConstraint": null
-                }
-              ]
-            },
-            {
-              "serviceId": 96,
-              "label": { "en": "Beard Grooming", "ar": "تهذيب اللحية" },
-              "shortDescription": null,
-              "images": [],
-              "unitPrice": 50,
-              "currency": "SAR",
-              "unavailableReason": null,
-              "slots": [
-                {
-                  "start": "08:00",
-                  "end": "08:30",
-                  "unitId": 26,
-                  "locationId": 18,
-                  "available": true,
-                  "genderConstraint": null
-                }
-              ]
-            },
-            {
-              "serviceId": 97,
-              "label": { "en": "Hot Towel Shave", "ar": "حلاقة بالمنشفة الساخنة" },
-              "shortDescription": null,
-              "images": [],
-              "unitPrice": 60,
-              "currency": "SAR",
-              "unavailableReason": null,
-              "slots": [
-                {
-                  "start": "08:00",
-                  "end": "08:30",
-                  "unitId": 27,
-                  "locationId": 18,
-                  "available": true,
-                  "genderConstraint": null
-                }
+              "availability": [
+                { "date": "2026-07-01", "unavailableReason": null, "slots": [
+                  { "start": "08:00", "end": "08:30", "unitId": 25, "locationId": 18, "available": true, "genderConstraint": null },
+                  { "start": "08:30", "end": "09:00", "unitId": 25, "locationId": 18, "available": true, "genderConstraint": null }
+                ]},
+                { "date": "2026-07-02", "unavailableReason": null, "slots": [
+                  { "start": "08:00", "end": "08:30", "unitId": 25, "locationId": 18, "available": true, "genderConstraint": null }
+                ]},
+                { "date": "2026-07-03", "unavailableReason": null, "slots": [
+                  { "start": "08:00", "end": "08:30", "unitId": 25, "locationId": 18, "available": true, "genderConstraint": null }
+                ]}
               ]
             }
           ]
@@ -378,8 +301,15 @@ Each **service** at a location is a schedulable option. Each **delivery unit** (
 | `images` | `string[]` | Attachment IDs / URLs for service images. |
 | `unitPrice` | `number` | Catalog price per unit. |
 | `currency` | `string\|null` | Currency code (e.g. `"SAR"`). |
-| `unavailableReason` | `string\|null` | If the entire service is unavailable for the date: `"advance_booking_min_days"`, `"advance_booking_max_days"`, `"blackout"`, `"cutoff_time"`. `null` if available. |
-| `slots` | `array` | Available time slots for this service on the requested date. |
+| `availability` | `array` | One entry per date in the requested range. Each contains that date's slots. |
+
+### Availability Entry Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `date` | `string` | The date (YYYY-MM-DD). |
+| `unavailableReason` | `string\|null` | If the entire service is unavailable for this date: `"advance_booking_min_days"`, `"advance_booking_max_days"`, `"blackout"`, `"cutoff_time"`. `null` if available. |
+| `slots` | `array` | Time slots for this service on this date. Empty if unavailable. |
 
 ### Slot Fields
 
@@ -443,6 +373,9 @@ Each service has its own delivery unit with availability windows for all 7 days 
 
 | Status | Message | Condition |
 |---|---|---|
-| 400 | `Invalid date format. Use YYYY-MM-DD.` | Malformed date parameter. |
+| 400 | `Invalid 'from' date format. Use YYYY-MM-DD.` | Malformed `from` parameter. |
+| 400 | `Invalid 'to' date format. Use YYYY-MM-DD.` | Malformed `to` parameter. |
+| 400 | `'to' must be on or after 'from'.` | `to` is before `from`. |
+| 400 | `Date range cannot exceed 14 days.` | Range exceeds the maximum. |
 | 401 | Unauthenticated | Missing or invalid access token. |
 | 500 | `Failed to fetch scheduler` | Internal query or processing error. |

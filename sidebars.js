@@ -96,6 +96,13 @@ const sidebars = {
             },
             {
               type: 'category',
+              label: 'Guest Bookings Service',
+              items: [
+                'hms-documentation/guest-apis/guest-bookings-service/guest-bookings-service',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Guest Favorites',
               items: [
                 'hms-documentation/guest-apis/guest-favorites/guest-favorites',
