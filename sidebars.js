@@ -24,7 +24,7 @@ const sidebars = {
     {
       type: 'category',
       label: 'Framework Introduction',
-      items: ['intro/Node-Advantages'],
+      items: ['intro/UBS_Framework_Features', 'intro/Node-Advantages'],
     },
     {
       type: 'category',
@@ -93,7 +93,50 @@ const sidebars = {
               items: [
                 'hms-documentation/guest-apis/guest-favorites/guest-favorites',
               ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Services',
+              items: [
+                'hms-documentation/guest-apis/guest-services/guest-services',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Onboarding KYC',
+              items: [
+                'hms-documentation/guest-apis/guest-onboarding-kyc/guest-onboarding-kyc',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Booking Reschedule',
+              items: [
+                'hms-documentation/guest-apis/guest-booking-reschedule/guest-booking-reschedule',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Check-In Eligibility',
+              items: [
+                'hms-documentation/guest-apis/guest-checkin-eligibility/guest-checkin-eligibility',
+              ],
             }
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Payment Gateways',
+          items: [
+            {
+              type: 'category',
+              label: 'Moyasar',
+              items: [
+                'hms-documentation/payment-gateways/moyasar/setup',
+                'hms-documentation/payment-gateways/moyasar/payment-flow',
+                'hms-documentation/payment-gateways/moyasar/webhook',
+              ],
+            },
           ],
         },
       ],
