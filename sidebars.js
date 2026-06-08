@@ -37,6 +37,7 @@ const sidebars = {
       label: 'Framework Backend',
       items: [
         'backend/UBS-intro',
+        'backend/tenancy',
         {
           type: 'category',
           label: 'Github Workflows',
@@ -48,7 +49,7 @@ const sidebars = {
           items: ['backend/Socket', 'backend/Payments', 'backend/local-whisper-setup'],
         },
         'backend/FAQs'
-    
+
       ],
     },
     {

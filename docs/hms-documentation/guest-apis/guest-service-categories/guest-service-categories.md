@@ -10,6 +10,12 @@ Returns the list of active service categories available to guests, along with th
 
 Uses **PUBLIC_ENCRYPTED_PLATFORM** — no JWT required, but requests must be encrypted via the standard platform encryption layer.
 
+### Tenancy and actionPerformerURDD
+
+This endpoint's initial SQL passes through the query resolver. When `TENANCY_CHECK` is enabled, sending a tenant-specific URDD will scope results to that tenant's categories only. To get the full cross-tenant list, the frontend must send the **global URDD** (`tenantUrddMap.global`, which has `tenant_id = NULL`).
+
+See [Multi-Tenant Query Scoping](/docs/backend/tenancy) for details.
+
 ---
 
 ## Request Payload

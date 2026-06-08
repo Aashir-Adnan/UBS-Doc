@@ -10,6 +10,14 @@ Fetches the guest-facing services catalog. Operates in two modes depending on wh
 
 Uses **PUBLIC_ENCRYPTED_PLATFORM** — no JWT required, but requests must be encrypted via the standard platform encryption layer.
 
+### Tenancy and actionPerformerURDD
+
+This endpoint's initial SQL passes through the query resolver. When `TENANCY_CHECK` is enabled, the query resolver reads `actionPerformerURDD` from the payload and applies a `created_by` tenant-scoping filter.
+
+To get **cross-tenant** results (the full catalog), the frontend must send the **global URDD** (`tenantUrddMap.global`), which has `tenant_id = NULL`. A null tenant causes the tenancy filter to be skipped. Sending a tenant-specific URDD will scope results to that tenant only.
+
+See [Multi-Tenant Query Scoping](/docs/backend/tenancy) for details.
+
 ---
 
 ## Modes

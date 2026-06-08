@@ -10,6 +10,8 @@ Returns the guest's active bookings where today falls within the check-in/check-
 
 Uses **AUTH_PLATFORM** — requires a valid guest JWT (`accessToken`). The guest's identity is resolved via `ensureGuestUrdd`.
 
+The frontend must send a **tenant-specific URDD** (`tenantUrddMap[tenantId]`) for this endpoint. When `TENANCY_CHECK` is enabled, the query resolver scopes results to the acting tenant. See [Multi-Tenant Query Scoping](/docs/backend/tenancy).
+
 ---
 
 ## Request Payload
