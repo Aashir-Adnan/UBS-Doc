@@ -26,7 +26,7 @@ This endpoint takes no request parameters. Send an empty encrypted body.
 
 ## Behavior
 
-1. Fetches all rows from `service_categories` where `status = 'active'`.
+1. Fetches all rows from `service_categories` where `status = 'active'`. Only categories linked to services from **active tenants** (`t.status = 'active' AND t.is_active = 1`) are considered.
 2. Excludes hidden categories (`networking`, `room-service`) which are internal-only per Phase 6.
 3. Deduplicates by `slug` — if multiple rows share the same slug, only one entry is returned (lowest `category_id` wins).
 4. For each category, resolves the `duration_unit` from `hms_config` (key: `duration_unit`). Falls back to `"session"` when no config row exists.

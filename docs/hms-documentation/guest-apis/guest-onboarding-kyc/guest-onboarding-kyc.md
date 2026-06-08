@@ -198,3 +198,32 @@ Primary key: `guest_passport_document_id` (auto-increment). Upsert uses `idempot
 | `table_name` | Key format: `guest_kyc_{docType}_{side}` (e.g. `guest_kyc_national_id_front`). |
 | `primary_key` | The user's ID. |
 | `attachment_id` | FK to `attachments` table. |
+
+---
+
+## Known Issue — Attachment Upload Status (Issue #236)
+
+:::caution Resolved
+The two-step attachment upload flow (`GET /api/get/file/url/local` → `POST /upload?token=…`) creates rows with `status = 'pending'` and the upload handler never transitions them to `'active'`. Because `validateAttachment` queries `WHERE status = 'active'`, freshly uploaded attachments are rejected with `"attachment not found"`.
+
+**Root cause:** `Src/Routes/upload.router.js` line 56 — the `UPDATE` sets `attachment_name`, `attachment_type`, `attachment_size`, and `attachment_link` but omits `status = 'active'`.
+
+**Fix:** Add `status = 'active'` to the upload router's UPDATE statement.
+:::
+
+---
+
+## Attachment Upload Flow (prerequisite)
+
+Before submitting KYC, the client must upload each image through the two-step attachment flow:
+
+| Step | Call | Returns |
+|------|------|---------|
+| 1. Reserve | `GET /api/get/file/url/local` | `{ uploadUrl, attachmentId }` |
+| 2. Upload | `POST {uploadUrl}` — raw bytes with `Content-Type: image/…` | `{ success, data: { name, attachmentId } }` |
+
+The `attachmentId` returned in step 1 is the value passed to `frontImageId`, `backImageId`, or `selfieId` in the KYC payload.
+
+### Sim test
+
+The test script at `Services/SysScripts/TestScripts/sim/guestOnboardingKyc.js` exercises the full flow end-to-end: uploads three images via the real attachment API, verifies each DB row, then runs all KYC validation and submission tests. Run `guestOtpFlow.js` first to populate `credentials.json`.

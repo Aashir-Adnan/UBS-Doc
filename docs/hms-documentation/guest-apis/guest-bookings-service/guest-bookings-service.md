@@ -255,3 +255,49 @@ Only services where `standaloneBookable: true` in the service catalog (`GET /gue
 | 422 | `Stay services must be booked via POST /bookings/room` | Service is in the stay category. |
 | 422 | `Service belongs to a different hotel` | Service tenant doesn't match hotel ID. |
 | 500 | `Failed to create service booking` | Internal error. |
+
+---
+
+## Issue #238 — formData Auto-Derivation
+
+:::info Resolved
+The endpoint now **auto-derives** identity and scheduling fields from the authenticated guest and the request payload. Clients no longer need to redundantly provide `full_name`, `email`, `phone`, `reservation_date`, `party_size`, or `meal_type` in `formData`.
+:::
+
+### Auto-derived fields
+
+| Field | Source |
+|---|---|
+| `full_name` | `users.first_name + last_name` (via URDD) |
+| `email` | `users.email` |
+| `phone` | `users.phone_no` |
+| `party_size` | `adults` from the request payload |
+| `reservation_date` | Primary slot date from `meals[].date` or `sessions[].start` |
+| `meal_type` | `meals[0].mealType` from the request payload |
+
+Explicitly provided `formData` values take precedence — auto-derivation only fills in missing fields.
+
+### Form schema discovery
+
+`GET /guest/services?serviceId=<id>` now returns a `formSchema` array in the detail response:
+
+```json
+{
+  "id": 76,
+  "category": { "id": 2, "name": "Dining" },
+  "formSchema": [
+    { "key": "full_name", "label": "Full Name", "type": "text", "isRequired": true },
+    { "key": "email", "label": "Email Address", "type": "email", "isRequired": true },
+    { "key": "phone", "label": "Phone Number", "type": "tel", "isRequired": true },
+    { "key": "reservation_date", "label": "Reservation Date & Time", "type": "datetime", "isRequired": true },
+    { "key": "party_size", "label": "Number of Guests", "type": "number", "isRequired": true },
+    { "key": "meal_type", "label": "Meal Type", "type": "dropdown", "isRequired": true }
+  ]
+}
+```
+
+The schema is per-category — each service category has different required fields, defined in `hms_config_keys` with `category_id=12`.
+
+### Sim test
+
+`guestBookingsServiceCreate.js` — 44 tests including formSchema exposure (Test 0a) and auto-derivation without explicit formData (Test 0b).

@@ -21,6 +21,7 @@ const sidebars = {
   // But you can create a sidebar manually
 
   tutorialSidebar: [
+    'init',
     {
       type: 'category',
       label: 'Framework Introduction',
@@ -148,6 +149,13 @@ const sidebars = {
               label: 'Guest Check-In Eligibility',
               items: [
                 'hms-documentation/guest-apis/guest-checkin-eligibility/guest-checkin-eligibility',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Token Refresh',
+              items: [
+                'hms-documentation/guest-apis/guest-token-refresh/guest-token-refresh',
               ],
             }
           ],

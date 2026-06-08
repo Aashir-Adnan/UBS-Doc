@@ -110,3 +110,14 @@ Requires the **AUTH_PLATFORM** (guest JWT). The `actionPerformerURDD` is validat
 ## Important
 
 The Flutter app should call `PUT /api/guest/booking/reschedule` with IDs in the payload. Do **not** use the path-parameter pattern (`/guest/bookings/{id}/services/{serviceId}`) — the framework does not reliably inject multiple path parameters.
+
+---
+
+## Issue #227 — Verified Working
+
+The reschedule handler correctly sets `slot_status = 'scheduled'` and persists timing data. All 8 sim tests pass (`guestBookingReschedule.js`).
+
+**Key clarifications:**
+- `service_id` in the payload must be the **catalog `serviceId`** (from `services.service_id`), not the `bookingServiceId`.
+- The `updated` count reflects the number of slot entries processed.
+- Meal slots support auto-assignment: if `slotId` is omitted, slots are assigned sequentially from the available pool.

@@ -35,9 +35,10 @@ This endpoint takes no request parameters. Send an empty encrypted body.
 3. Results are ordered by `check_in_date DESC` (most recent first).
 4. For each matching booking, the full v2 booking bundle is built via `buildBookingsBundle`, which:
    - Fetches the master booking record (dates, amounts, package info, currency).
-   - Resolves the primary service from `booking_items` (unit assignment — room/table/seat).
+   - Resolves the primary service from `booking_items` (unit assignment — room/table/seat). Only services from **active tenants** (`t.status = 'active' AND t.is_active = 1`) are included.
    - Fetches addon services from `booking_services` with per-slot scheduling from `booking_service_slots`.
    - Enriches with category amenities, duration units, Arabic translations, ratings, form values, and cancellation metadata.
+   - Resolves currency codes from both direct config values (`{"en":"SAR"}`) and currency ID references (`[4]` → currencies table lookup).
    - For standalone-service bookings (no unit assignment), promotes the first `booking_services` row as the primary.
 5. Pagination is disabled — all matching bookings are returned.
 6. Returns an empty array if the guest has no current bookings.
@@ -258,6 +259,7 @@ This endpoint takes no request parameters. Send an empty encrypted body.
 | `status` | `active` | Excludes soft-deleted bookings. |
 | `booking_status` | `checked_in`, `confirmed` | Only active or confirmed stays. |
 | Date range | `CURDATE() BETWEEN check_in_date AND check_out_date` | Only bookings spanning today. |
+| Tenant | `t.status = 'active' AND t.is_active = 1` | Only bookings from active tenants. |
 
 ---
 
