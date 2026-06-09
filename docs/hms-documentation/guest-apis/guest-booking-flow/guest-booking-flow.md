@@ -81,7 +81,14 @@ Same endpoint as step 2 but with `include=packages`. Returns bundled packages th
 
 Returns all bookable add-on services for the hotel (excludes rooms/stay services and amenities). These can be attached to the booking as addons.
 
-Each service object is a minimal landing-card shape with `id`, `name`, `category`, `price`, `images`, etc.
+Each service object is a minimal landing-card shape with `id`, `name`, `category`, `price`, `images`, etc. The `category.slug` determines which scheduling shape the frontend should collect for each addon:
+
+| Category slug | What to collect | Scheduling field |
+|---------------|----------------|------------------|
+| `dining`, `room-service` | Date + meal type | `meals: [{ date, mealType }]` |
+| `transport` | Pickup time + locations | `transport: { tripType, pickupDateTime, pickupLocation, dropoffLocation }` |
+| `spa`, `barber`, `gym`, `kids`, `networking` | Date + time slot | `sessions: [{ date, slot }]` |
+| Any | Nothing (schedule later) | Omit — created as `unscheduled` |
 
 ---
 
@@ -102,7 +109,12 @@ Each service object is a minimal landing-card shape with `id`, `name`, `category
   "checkOut": "2026-07-17",
   "guests": { "adults": 1, "children": 0 },
   "isMainGuest": true,
-  "addons": [{ "serviceId": 76 }],
+  "addons": [
+    { "serviceId": 79, "sessions": [{ "date": "2026-07-15", "slot": "10:00-11:00" }] },
+    { "serviceId": 76, "meals": [{ "date": "2026-07-14", "mealType": "breakfast" }] },
+    { "serviceId": 102, "transport": { "tripType": "airport_pickup", "pickupDateTime": "2026-07-14 14:00:00", "pickupLocation": "Airport", "dropoffLocation": "Hotel" } },
+    { "serviceId": 90 }
+  ],
   "paymentPlan": "full"
 }
 ```
@@ -116,8 +128,21 @@ Each service object is a minimal landing-card shape with `id`, `name`, `category
 | `checkOut` | `string` | Yes | Check-out date (YYYY-MM-DD) |
 | `guests` | `object` | Yes | `{ adults: number, children: number }` |
 | `isMainGuest` | `boolean` | Yes | Whether the booker is the primary guest |
-| `addons` | `array` | No | Array of `{ serviceId }` objects from step 4 |
+| `addons` | `array` | No | Array of addon objects (see **Addon Scheduling** below) |
 | `paymentPlan` | `string` | Yes | `"full"` or `"partial"` |
+
+### Addon Scheduling
+
+Each addon in the `addons` array carries the `serviceId` plus an **optional scheduling block** whose shape depends on the service's category. If scheduling is omitted, the slot is created as `unscheduled` and the guest can schedule later via `PUT /guest/booking/reschedule`.
+
+| Category slug | Scheduling field | Shape | Example |
+|---------------|-----------------|-------|---------|
+| `dining`, `room-service` | `meals` | `[{ date, mealType }]` | `{ "date": "2026-07-14", "mealType": "breakfast" }` |
+| `transport` | `transport` | `{ tripType, pickupDateTime, pickupLocation, dropoffLocation }` | See example above |
+| `spa`, `barber`, `gym`, `kids`, `networking` | `sessions` | `[{ date, slot }]` | `{ "date": "2026-07-15", "slot": "10:00-11:00" }` |
+| Any (no scheduling) | _(omit)_ | `{ serviceId }` only | `{ "serviceId": 90 }` |
+
+> **This is the same shape used across all booking creation endpoints** (`/bookings/room`, `/bookings/package`, `/bookings/service`) and matches what the read bundle (`GET /guest/bookings`) returns in `services[].meals[]`, `services[].sessions[]`, and `services[].transport`. The `id` field in each read-side slot is the `slotId` used for rescheduling.
 
 ### Response
 

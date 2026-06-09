@@ -103,13 +103,15 @@ Requires the **AUTH_PLATFORM** (guest JWT). The `actionPerformerURDD` is validat
 | 400 | `booking_id and service_id are required` | Missing either ID. |
 | 401 | `Authenticated user required` | No `userId` in the session. |
 | 403 | `Invalid or expired URDD` | URDD validation failed. |
-| 404 | `Service slot rows not found for this booking` | No slots exist for this booking/service combination, or the booking doesn't belong to the caller. |
+| 404 | `Service slot rows not found for this booking` | No slots exist for this booking/service combination, or the booking doesn't belong to the caller. Previously, this also occurred when the caller's URDD had a `NULL` tenant_id (global URDD) — now handled. |
 
 ---
 
 ## Important
 
-The Flutter app should call `PUT /api/guest/booking/reschedule` with IDs in the payload. Do **not** use the path-parameter pattern (`/guest/bookings/{id}/services/{serviceId}`) — the framework does not reliably inject multiple path parameters.
+- The Flutter app should call `PUT /api/guest/booking/reschedule` with IDs in the payload. Do **not** use the path-parameter pattern (`/guest/bookings/{id}/services/{serviceId}`) — the framework does not reliably inject multiple path parameters.
+- The scheduling shape (`sessions`, `meals`, or `transport`) is determined by the service's category slug — the same shape used at booking creation time. See [Addon Scheduling](../guest-booking-flow/guest-booking-flow.md#addon-scheduling) for the full category → shape mapping.
+- To get `slotId` values, read the booking via `GET /guest/bookings` — each addon's slots appear as `services[].sessions[].id`, `services[].meals[].id`, or `services[].transport.id`. These are the `booking_service_slots.slot_id` values the reschedule expects.
 
 ---
 
@@ -121,3 +123,11 @@ The reschedule handler correctly sets `slot_status = 'scheduled'` and persists t
 - `service_id` in the payload must be the **catalog `serviceId`** (from `services.service_id`), not the `bookingServiceId`.
 - The `updated` count reflects the number of slot entries processed.
 - Meal slots support auto-assignment: if `slotId` is omitted, slots are assigned sequentially from the available pool.
+
+---
+
+## Change Log
+
+| Date | Change |
+|---|---|
+| 2026-06-09 | Fixed 404 when the caller's URDD has `tenant_id = NULL` (global URDD). The ownership query now skips the tenant check when tenant_id is null, relying on `urdd_id` ownership alone (fixes [#246](https://github.com/UBS-Dev-Org/hms/issues/246)). |
