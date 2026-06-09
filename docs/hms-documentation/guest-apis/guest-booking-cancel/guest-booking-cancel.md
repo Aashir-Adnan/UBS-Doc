@@ -130,6 +130,14 @@ The `cancellation` metadata block on the booking object also updates:
 | `updated_by` | Previous value | `actionPerformerURDD` |
 | `status` | `'active'` | `'active'` (unchanged) |
 
+### `booking_items` table
+
+| Column | Before | After |
+|---|---|---|
+| `item_status` | `'reserved'` | `'cancelled'` |
+
+The `item_status` cascade frees the delivery unit so it can be assigned to future bookings. The availability check (`pickAvailableUnitForService`) skips items with `item_status IN ('cancelled', 'checked_out')`.
+
 ### Schema Reference
 
 The `bookings` table has two distinct status columns:
@@ -137,4 +145,12 @@ The `bookings` table has two distinct status columns:
 - **`booking_status`** — Business lifecycle: `pending | confirmed | checked_in | checked_out | cancelled | no_show`
 - **`status`** — Soft-delete flag: `active | inactive`
 
-The cancel operation only modifies `booking_status`. The `status` column stays `'active'` so the booking remains visible in list queries.
+The cancel operation modifies `booking_status` and cascades `item_status = 'cancelled'` to all `booking_items` rows for the booking, freeing their delivery units for future bookings. The `status` column stays `'active'` so the booking remains visible in list queries.
+
+---
+
+## Change Log
+
+| Date | Change |
+|---|---|
+| 2026-06-09 | Cancel now cascades `item_status = 'cancelled'` to `booking_items`, freeing delivery units for rebooking. Previously, cancelled booking items kept `item_status = 'reserved'`, permanently blocking room availability (fixes [#255](https://github.com/UBS-Dev-Org/hms/issues/255)). |

@@ -32,8 +32,7 @@ This endpoint takes no request parameters. Send an empty encrypted body.
 2. Queries `bookings` where:
    - `urdd_id` matches the authenticated guest.
    - `status` is `active` (not soft-deleted).
-   - `booking_status` is `checked_in` or `confirmed`.
-   - Today's date (`CURDATE()`) falls between `check_in_date` and `check_out_date`.
+   - **Either** `booking_status` is `checked_in` **and** `actual_check_out IS NULL` (active stay, regardless of scheduled dates), **or** `booking_status` is `confirmed` **and** today's date falls between `check_in_date` and `check_out_date` (scheduled window).
 3. Results are ordered by `check_in_date DESC` (most recent first).
 4. For each matching booking, the full v2 booking bundle is built via `buildBookingsBundle`, which:
    - Fetches the master booking record (dates, amounts, package info, currency).
@@ -259,8 +258,9 @@ This endpoint takes no request parameters. Send an empty encrypted body.
 |---|---|---|
 | `urdd_id` | From JWT | Only the authenticated guest's bookings. |
 | `status` | `active` | Excludes soft-deleted bookings. |
-| `booking_status` | `checked_in`, `confirmed` | Only active or confirmed stays. |
-| Date range | `CURDATE() BETWEEN check_in_date AND check_out_date` | Only bookings spanning today. |
+| `booking_status` | `checked_in`, `confirmed` | Active or confirmed stays. |
+| Checked-in gate | `booking_status = 'checked_in' AND actual_check_out IS NULL` | Any active stay (no date constraint — covers early check-in). |
+| Confirmed gate | `booking_status = 'confirmed' AND CURDATE() BETWEEN check_in_date AND check_out_date` | Confirmed bookings whose scheduled window includes today. |
 | Tenant | `t.status = 'active' AND t.is_active = 1` | Only bookings from active tenants. |
 
 ---
@@ -271,3 +271,12 @@ This endpoint takes no request parameters. Send an empty encrypted body.
 |---|---|---|
 | 401 | Unauthenticated | Missing or invalid access token. |
 | 500 | `Failed to fetch current booking` | Internal query or processing error. |
+
+---
+
+## Change Log
+
+| Date | Change |
+|---|---|
+| 2026-06-09 | Fixed query so `checked_in` bookings always appear regardless of scheduled dates (previously required `CURDATE() BETWEEN check_in_date AND check_out_date` for all statuses, causing early check-ins to vanish). Fixes [#248](https://github.com/UBS-Dev-Org/hms/issues/248). |
+| 2026-06-09 | After checkout (`POST /guest/booking/checkout`), bookings with `booking_status = 'checked_out'` no longer appear here because the query requires `actual_check_out IS NULL` for checked-in bookings ([#253](https://github.com/UBS-Dev-Org/hms/issues/253)). |
