@@ -77,6 +77,20 @@ const sidebars = {
           items: [
             {
               type: 'category',
+              label: 'Guest Booking Flow',
+              items: [
+                'hms-documentation/guest-apis/guest-booking-flow/guest-booking-flow',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Upcoming Bookings',
+              items: [
+                'hms-documentation/guest-apis/guest-bookings-upcoming/guest-bookings-upcoming',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Guest Current Booking',
               items: [
                 'hms-documentation/guest-apis/guest-bookings-current/guest-bookings-current',
@@ -87,6 +101,13 @@ const sidebars = {
               label: 'Guest Booking Check In',
               items: [
                 'hms-documentation/guest-apis/guest-booking-checkin/guest-booking-checkin',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Booking Check Out',
+              items: [
+                'hms-documentation/guest-apis/guest-booking-checkout/guest-booking-checkout',
               ],
             },
             {
