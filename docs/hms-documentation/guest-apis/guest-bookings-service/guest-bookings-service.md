@@ -26,6 +26,8 @@ Uses **AUTH_PLATFORM** — requires a valid guest JWT (`accessToken`). The guest
 | `adults` | `number` | No | Number of guests (default: 1). |
 | `specialRequests` | `string` | No | Free-text special requests. |
 | `addons` | `array` | No | Additional services to add to the booking. Each: `{ serviceId, sessions?, meals?, transport? }`. |
+| `checkIn` | `string` | No | Explicit check-in date (`YYYY-MM-DD`). Fallback if not derivable from scheduling fields. |
+| `checkOut` | `string` | No | Explicit check-out date (`YYYY-MM-DD`). Defaults to `checkIn` for single-day services. |
 | `formData` | `object` | No | Category-specific form fields (e.g. `parent_name` for Kids Center, `guardian_name` for Spa). |
 
 ### Example: Dining reservation with meal scheduling
@@ -159,7 +161,7 @@ Returns the full v2 booking bundle — same shape as `/bookings/room` and `/book
   "paidAmount": 0,
   "currency": "SAR",
   "checkIn": "2026-07-02",
-  "checkOut": null,
+  "checkOut": "2026-07-02",
   "actualCheckIn": null,
   "actualCheckOut": null,
   "createdAt": "2026-06-05T12:00:00.000Z",
@@ -217,7 +219,7 @@ Returns the full v2 booking bundle — same shape as `/bookings/room` and `/book
 | `services` | Addon services array. Empty if no addons were added. |
 | `package` | Always `null` for standalone service bookings. |
 | `room` | Always `null` (no unit assignment for non-stay services). |
-| `checkIn` / `checkOut` | Derived from the scheduling fields. `null` if booked without scheduling. |
+| `checkIn` / `checkOut` | Derived from the scheduling fields for **all** service types. For single-day services, `checkOut` mirrors `checkIn`. `null` only if booked without scheduling and no explicit `checkIn` sent. |
 
 ---
 
@@ -298,6 +300,59 @@ Explicitly provided `formData` values take precedence — auto-derivation only f
 
 The schema is per-category — each service category has different required fields, defined in `hms_config_keys` with `category_id=12`.
 
+---
+
+## Issue #263 — checkIn/checkOut for all standalone service types
+
+:::info Resolved
+`checkIn` / `checkOut` are now populated for **all** standalone service booking types, not just dining.
+:::
+
+Previously, only dining bookings derived `checkIn`/`checkOut` from the scheduling fields. Spa, barber, transport, and other categories left both as `null` even though the date was sent in the request.
+
+### checkIn/checkOut derivation order
+
+The endpoint derives `checkIn`/`checkOut` in this priority:
+
+| Priority | Source | Example |
+|---|---|---|
+| 1 | Scheduling fields | `sessions[0].date`, `meals[0].date`, `transport.pickupDateTime` |
+| 2 | Explicit request body | `checkIn` / `checkOut` (or `check_in` / `check_out`) |
+| 3 | Mirror | If `checkIn` is set but `checkOut` is not, `checkOut` = `checkIn` |
+
+### What changed in `summariseDates`
+
+| Category | Before | After |
+|---|---|---|
+| **Dining** | Read `meals[].date` | No change (already worked) |
+| **Session** (spa/barber/gym) | Only read `sessions[].start` (legacy format) | Now also reads `sessions[].date` (mobile format) |
+| **Transport** | Only read `transport.pickupAt` (legacy) | Now also reads `transport.pickupDateTime` (mobile format) |
+
 ### Sim test
 
+`guestServiceBookingCheckInOut.js` — verifies checkIn/checkOut for each service type:
+
+| Test | What it proves |
+|---|---|
+| 1: Spa session | `checkIn`/`checkOut` derived from `sessions[0].date` |
+| 2: Dining meal | `checkIn`/`checkOut` derived from `meals[0].date` (regression check) |
+| 3: Transport | `checkIn`/`checkOut` derived from `transport.pickupDateTime` |
+| 4: Explicit fallback | `checkIn`/`checkOut` from request body when no scheduling fields sent |
+| 5: Bundle response | The booking listing API returns populated `checkIn`/`checkOut` |
+
+```bash
+node Services/SysScripts/TestScripts/sim/guestServiceBookingCheckInOut.js
+```
+
+### Other sim tests
+
 `guestBookingsServiceCreate.js` — 44 tests including formSchema exposure (Test 0a) and auto-derivation without explicit formData (Test 0b).
+
+---
+
+## Change Log
+
+| Date | Change |
+|---|---|
+| 2026-06-10 | Fixed #263: `checkIn`/`checkOut` now derived for all standalone service types (spa, barber, transport), not just dining. `summariseDates` handles mobile format (`sessions[].date`, `transport.pickupDateTime`). Explicit `checkIn`/`checkOut` in request body honored as fallback. Single-day bookings mirror `checkIn` → `checkOut`. |
+| 2026-06-07 | Fixed #238: Auto-derivation of formData identity/scheduling fields. |
