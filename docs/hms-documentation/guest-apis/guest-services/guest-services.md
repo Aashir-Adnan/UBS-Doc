@@ -282,3 +282,51 @@ Results are ordered by:
 | Status | Message | Condition |
 |---|---|---|
 | 500 | `Failed to fetch services` | Internal query or processing error. |
+
+---
+
+## Test Coverage
+
+### `guestLandingDetailConsistency.js` — Landing/detail consistency (251 tests)
+
+Fetches the landing feed, then individually fetches the detail for every package and service to verify nothing returns null and all fields are present.
+
+| Step | Tests | What it proves |
+|---|---|---|
+| 1: Fetch landing | 1 | Landing returns items (packages + services). |
+| 2: Landing shapes | ~72 | Every landing object has valid `name.en`, `images[]` (number array), `additional_attributes.tags[]` ({en,ar} pairs), `rating` (star breakdown + reviews array with title/description), `base_price`, `current_price`, `currency`. |
+| 3: Package detail | ~100 | Every landing package fetched via `GET /guest/packages` with `{id}` in body returns a non-null detail with `services[]` line items, each having `id`, `name`, `packageServiceId`, `images`, `category`, `amenities`, `cancellation_info`, `termsAndConditions`. |
+| 4: Service detail | ~75 | Every landing service fetched via `GET /guest/services` with `{serviceId}` in body returns a non-null detail with `category`, `amenities`, `cancellation_info`, `termsAndConditions`. |
+| 5: Search consistency | 1 | Every landing item also appears in `GET /guest/search/filter` results — no filter divergence. |
+| 6: Package list→detail | 1 | Every item from the paginated package list can be fetched as detail (no null). |
+| 7: Service list→detail | 1 | Every item from the paginated service list can be fetched as detail (no null). |
+
+### `guestDataAuditAndSeed.js` — Data completeness
+
+Audits all published packages and services for required data fields. Seeds missing values so the response objects are always populated:
+
+| Field | Config key | Seeded value |
+|---|---|---|
+| `images` | `media` | Reuses existing attachment IDs from other configs. |
+| `tags` | `keyword_tags` | Reuses existing tag from another config, or `{en:"Popular", ar:"شائع"}`. |
+| `base_price` | `base_price` | `{"en":"500"}` |
+| `currency` | `base_currency` | SAR currency ID reference. |
+| `rating/reviews` | `feedback` table | 3 sample reviews (5-star, 4-star, 5-star). |
+
+### Running the tests
+
+```bash
+# Consistency test (read-only, no DB writes)
+node Services/SysScripts/TestScripts/sim/guestLandingDetailConsistency.js
+
+# Data audit + seed (writes missing config/feedback rows)
+node Services/SysScripts/TestScripts/sim/guestDataAuditAndSeed.js
+```
+
+---
+
+## Change Log
+
+| Date | Change |
+|---|---|
+| 2026-06-10 | Fixed publish date filter mismatch between detail SQL and searchQueries.js. Detail SQL now uses `COALESCE($.en, $[0])` to handle both config value shapes, matching the landing/search queries. Harmonized visibility subquery to `CAST(id AS JSON)`. Added consistency tests and data audit/seed script. |
