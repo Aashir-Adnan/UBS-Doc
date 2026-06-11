@@ -51,16 +51,16 @@ All fields are sent in the encrypted request body.
 ```json
 {
   "return": {
-    "wifi_name": "{\"en\":\"Hotel-Guest-WiFi\"}",
-    "wifi_password": "{\"en\":\"welcome2024\"}"
+    "wifi_name": "MBS-Guest",
+    "wifi_password": "MBSWelcome2026!"
   }
 }
 ```
 
 | Field | Type | Description |
 |---|---|---|
-| `wifi_name` | `string` \| `null` | The `config_value` from `hms_config` for the `wifi_name` key. JSON string — extract `$.en` for English. `null` if not configured. |
-| `wifi_password` | `string` \| `null` | The `config_value` for the `wifi_password` key. `null` if not configured. |
+| `wifi_name` | `string` \| `null` | The WiFi SSID for the service/package. Plain string (e.g. `"MBS-Guest"`). `null` if not configured. |
+| `wifi_password` | `string` \| `null` | The WiFi password. Plain string. `null` if not configured. |
 
 ### No Config Found
 
@@ -125,13 +125,39 @@ WiFi details are stored as config values attached to a service or package entity
 
 ---
 
+## Seed Data
+
+Migration `20260611_2_seed_networking_details_for_all_services.sql` seeds `wifi_name` and `wifi_password` for **all** active services and packages. WiFi credentials are assigned per tenant:
+
+| Tenant | SSID | Password |
+|---|---|---|
+| Makkah Royal Suites (1) | `MRS-Guest` | `MRSWelcome2026!` |
+| Makkah Blue Suites (3) | `MBS-Guest` | `MBSWelcome2026!` |
+| Royal Palm (5) | `RP-Guest` | `RPWelcome2026!` |
+| Pearl Continental (6) | `PC-Guest` | `PCWelcome2026!` |
+
+The `DevSeedTenant` flow also seeds wifi config for the `NET` (networking) category service using tenant-local cloned config keys.
+
+---
+
 ## Test Coverage
 
 Sim test: `Services/SysScripts/TestScripts/sim/guestNetworkingDetailsCheck.js`
 
+Full seed + test + cleanup flow:
+
 | # | Test | Expected |
 |---|---|---|
-| 1 | Fetch details for a networking service | Returns `wifi_name` and `wifi_password` keys in response. |
-| 2 | Fetch details for a package | Returns valid response shape. |
-| 3 | Invalid `baseTable` (`"bookings"`) | 400 error. |
-| 4 | Non-existent `recordId` | Both fields are `null`. |
+| 1 | Seed temporary service with wifi config | DB rows created with correct values. |
+| 2 | Fetch networking details for seeded service via API | Returns exact seeded `wifi_name` and `wifi_password`. |
+| 3 | Spot-check migration-seeded services for tenant | Existing services return non-null wifi values. |
+| 4 | Fetch networking details for an existing package | Returns valid response with wifi data. |
+| 5 | Invalid `baseTable` (`"bookings"`) | 400 error. |
+| 6 | Non-existent `recordId` (999999) | Both fields are `null`. |
+| 7 | Coverage check — count services/packages with wifi config | Most active services and packages have wifi config seeded. |
+
+```bash
+node Services/SysScripts/TestScripts/sim/guestNetworkingDetailsCheck.js
+```
+
+Prerequisites: server running on `localhost:3000`, `credentials.json` populated (run `guestOtpFlow.js` first).
