@@ -158,6 +158,12 @@ Returns a single service object with the same base fields as list items, plus ad
     "physical_dimension": { "L": 0, "W": 0, "H": 0 },
     "tags": [{ "en": "premium", "ar": "متميز" }]
   },
+  "maxAdults": 4,
+  "maxChildren": 2,
+  "minAdults": 1,
+  "minNights": null,
+  "maxNights": null,
+  "sessionDurationMinutes": 120,
   "category": {
     "id": 2,
     "name": "Dining"
@@ -281,6 +287,12 @@ Possible value JSON supports three shapes:
 | `is_featured` | `boolean` | Both | Whether the service is featured. |
 | `rating` | `object\|null` | Both | Rating breakdown (null if no reviews). |
 | `additional_attributes` | `object` | Both | Physical dimensions and keyword tags. |
+| `maxAdults` | `number\|null` | Detail | Maximum adults allowed per booking. From `max_adults` config, falls back to `max_persons_per_booking`. |
+| `maxChildren` | `number\|null` | Detail | Maximum children allowed per booking. From `max_children` config, falls back to `max_children_per_guardian`. |
+| `minAdults` | `number\|null` | Detail | Minimum adults per booking (from `min_persons_per_booking`). |
+| `minNights` | `number\|null` | Detail | Minimum stay nights (stay category only). |
+| `maxNights` | `number\|null` | Detail | Maximum stay nights (stay category only). |
+| `sessionDurationMinutes` | `number\|null` | Detail | Session duration in minutes (from `slot_duration_minutes`). |
 | `category` | `{ id, name }` | Detail | Service category info. |
 | `amenities` | `array` | Detail | Category amenities list. |
 | `cancellation_info` | `object` | Detail | Cancellation margin and exceptions. |
@@ -395,6 +407,7 @@ node Services/SysScripts/TestScripts/sim/guestDataAuditAndSeed.js
 
 | Date | Change |
 |---|---|
+| 2026-06-11 | Added `maxAdults`, `maxChildren`, `minAdults`, `minNights`, `maxNights`, `sessionDurationMinutes` to the detail response field reference. `maxAdults` and `maxChildren` use the new dedicated config keys, falling back to `max_persons_per_booking` and `max_children_per_guardian` respectively. |
 | 2026-06-10 | `formSchema` is now always `[]` (never undefined) on detail objects when a category has no form fields. Previously only attached when non-empty. |
 | 2026-06-10 | `fetchFormSchema` dropdown resolution now falls back to `hms_config_possible_values.config_id` FK when `hms_config_keys.possible_values` column is NULL or has no entries for the requested category. Also handles `{label:{en,ar}, key}` possible value shape. |
 | 2026-06-10 | Fixed publish date filter mismatch between detail SQL and searchQueries.js. Detail SQL now uses `COALESCE($.en, $[0])` to handle both config value shapes, matching the landing/search queries. Harmonized visibility subquery to `CAST(id AS JSON)`. Added consistency tests and data audit/seed script. |

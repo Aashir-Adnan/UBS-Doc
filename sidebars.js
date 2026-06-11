@@ -48,14 +48,13 @@ const sidebars = {
           label: 'Integrations',
           items: ['backend/Socket', 'backend/Payments', 'backend/local-whisper-setup'],
         },
-        'backend/FAQs'
-
+        'backend/FAQs',
       ],
     },
     {
       type: 'category',
       label: 'Framework Frontend',
-      items: ['frontend/UBS-intro'],
+      items: ['frontend/UBS-intro', 'frontend/intro', 'frontend/FAQs'],
     },
     {
       type: 'category',
@@ -64,8 +63,31 @@ const sidebars = {
     },
     {
       type: 'category',
-      label: 'Tutorial',
-      items: ['tutorial-basics/create-a-document', 'tutorial-basics/create-a-page', 'tutorial-basics/deploy-your-site', 'tutorial-basics/markdown-features'],
+      label: 'API Reference',
+      items: [
+        'api/overview',
+        'api/authentication',
+        'api/permissions',
+        {
+          type: 'category',
+          label: 'Guest APIs',
+          items: [
+            'api/guest-auth-refresh-tokens',
+            'api/guest-networking-details',
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Admin APIs',
+          items: [
+            'api/admin-code',
+          ],
+        },
+        'api/payment-gateways',
+        'api/payment-methods',
+        'api/plan-management',
+        'api/utilities',
+      ],
     },
     {
       type: 'category',
