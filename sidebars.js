@@ -197,6 +197,24 @@ const sidebars = {
             },
           ],
         },
+        {
+          type: 'category',
+          label: 'Tenant Governance',
+          items: [
+            'hms-documentation/tenant-governance/README',
+            'hms-documentation/tenant-governance/tenant-governance-model/governance-model',
+            'hms-documentation/tenant-governance/per-tenant-cloning/per-tenant-cloning',
+            'hms-documentation/tenant-governance/per-tenant-resource-assignment/resource-assignments',
+            {
+              type: 'category',
+              label: 'Config Keys',
+              items: [
+                'hms-documentation/tenant-governance/config-keys/config-keys',
+                'hms-documentation/tenant-governance/config-keys/config-keys-catalog/config-keys-catalog',
+              ],
+            },
+          ],
+        },
       ],
     },
     {
