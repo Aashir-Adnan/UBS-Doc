@@ -179,6 +179,20 @@ const sidebars = {
               items: [
                 'hms-documentation/guest-apis/guest-token-refresh/guest-token-refresh',
               ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Email Notifications',
+              items: [
+                'hms-documentation/guest-apis/guest-email-notifications/guest-email-notifications',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Networking Details',
+              items: [
+                'hms-documentation/guest-apis/guest-networking-details/guest-networking-details',
+              ],
             }
           ],
         },
