@@ -31,6 +31,7 @@ Sent as encrypted JSON (standard platform encryption).
 | `frontImageId` | `number` | Yes | Attachment ID of the front image (uploaded separately). |
 | `backImageId` | `number` | Conditional | Attachment ID of the back image. **Required for `national_id` and `iqama`**. Optional for `passport`. |
 | `selfieId` | `number` | No | Attachment ID of a selfie for identity verification. |
+| `tags` | `string[]` | No | Array of tag names to associate with the document attachments (e.g. `["visa", "KSA"]`). Stored as comma-separated in `dynamic_attachments.tags`. |
 
 ---
 
@@ -64,7 +65,7 @@ The `documentType` field is **case-insensitive** — `"PASSPORT"`, `"Passport"`,
 }
 ```
 
-### National ID submission
+### National ID submission (with tags)
 
 ```json
 {
@@ -77,7 +78,8 @@ The `documentType` field is **case-insensitive** — `"PASSPORT"`, `"Passport"`,
   "expiryDate": "2030-05-15",
   "consent": true,
   "frontImageId": 42,
-  "backImageId": 43
+  "backImageId": 43,
+  "tags": ["visa", "KSA"]
 }
 ```
 
@@ -99,6 +101,7 @@ All attachment IDs are validated against the `attachments` table — they must e
    - `guest_kyc_{documentType}_front`
    - `guest_kyc_{documentType}_back`
    - `guest_kyc_{documentType}_selfie` (if selfieId provided)
+3. If `tags` is provided, stores the array as a comma-separated string in `dynamic_attachments.tags` for each created row (e.g. `["visa", "KSA"]` becomes `"visa,KSA"`).
 
 ---
 
@@ -198,6 +201,7 @@ Primary key: `guest_passport_document_id` (auto-increment). Upsert uses `idempot
 | `table_name` | Key format: `guest_kyc_{docType}_{side}` (e.g. `guest_kyc_national_id_front`). |
 | `primary_key` | The user's ID. |
 | `attachment_id` | FK to `attachments` table. |
+| `tags` | Comma-separated tag string (e.g. `"visa,KSA"`). Nullable. Set from the `tags` array in the request payload. |
 
 ---
 

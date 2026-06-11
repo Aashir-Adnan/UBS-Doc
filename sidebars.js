@@ -193,6 +193,20 @@ const sidebars = {
               items: [
                 'hms-documentation/guest-apis/guest-networking-details/guest-networking-details',
               ],
+            },
+            {
+              type: 'category',
+              label: 'Fetch Guest Documents',
+              items: [
+                'hms-documentation/guest-apis/fetch-guest-documents/fetch-guest-documents',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Fetch Guest Document Tags',
+              items: [
+                'hms-documentation/guest-apis/fetch-guest-document-tags/fetch-guest-document-tags',
+              ],
             }
           ],
         },
