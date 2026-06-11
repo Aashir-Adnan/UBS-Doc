@@ -63,34 +63,6 @@ const sidebars = {
     },
     {
       type: 'category',
-      label: 'API Reference',
-      items: [
-        'api/overview',
-        'api/authentication',
-        'api/permissions',
-        {
-          type: 'category',
-          label: 'Guest APIs',
-          items: [
-            'api/guest-auth-refresh-tokens',
-            'api/guest-networking-details',
-          ],
-        },
-        {
-          type: 'category',
-          label: 'Admin APIs',
-          items: [
-            'api/admin-code',
-          ],
-        },
-        'api/payment-gateways',
-        'api/payment-methods',
-        'api/plan-management',
-        'api/utilities',
-      ],
-    },
-    {
-      type: 'category',
       label: 'HMS Documentation',
       items: [
         {
@@ -229,6 +201,20 @@ const sidebars = {
               items: [
                 'hms-documentation/guest-apis/fetch-guest-document-tags/fetch-guest-document-tags',
               ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Auth Refresh Tokens',
+              items: [
+                'api/guest-auth-refresh-tokens',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Networking Details',
+              items: [
+                'api/guest-networking-details',
+              ],
             }
           ],
         },
@@ -263,6 +249,13 @@ const sidebars = {
                 'hms-documentation/tenant-governance/config-keys/config-keys-catalog/config-keys-catalog',
               ],
             },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Admin APIs',
+          items: [
+            'api/admin-code',
           ],
         },
       ],
