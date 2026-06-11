@@ -204,6 +204,13 @@ const sidebars = {
             },
             {
               type: 'category',
+              label: 'Push Notifications',
+              items: [
+                'hms-documentation/guest-apis/push-notifications/push-notifications',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Guest Auth Refresh Tokens',
               items: [
                 'api/guest-auth-refresh-tokens',
