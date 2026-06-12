@@ -10,17 +10,18 @@ Creates a booking on behalf of a guest — combining room booking, package booki
 
 Uses **PUBLIC_ENCRYPTED_PLATFORM** — encrypted request/response using the platform key only. No guest JWT is required.
 
-### Admin URDD Constraint
+### Authorization (tenant staff + RBAC permission)
 
-Same as [Admin Create Guest User](./admin-create-guest-user.md) — the `actionPerformerURDD` must have:
+Same validator as [Admin Create Guest User](./admin-create-guest-user.md), but gated on the **`add_bookings`** permission (the user endpoint uses `add_users`). The `actionPerformerURDD` must be tenant staff of the hotel that holds `add_bookings`:
 
-| Dimension | Required Value |
+| Check | Required Value |
 |---|---|
-| Role | `Admin` |
 | Designation | `TENANT` |
 | Department | `TENANT_<hotel_code>` |
+| `tenant_id` | must equal the `hotelId` |
+| Permission | `add_bookings` (active, in the actor's URDP) |
 
-The URDD's `tenant_id` must match the `hotelId`.
+The **role is not hardcoded** — both **Tenant Admin** and **Tenant Manager** qualify (both are `designation = TENANT` and hold `add_bookings`).
 
 ---
 
@@ -309,7 +310,7 @@ All existing booking validations apply — the admin does not bypass any busines
 | Status | Condition |
 |---|---|
 | 400 | Missing required fields, validation failures (stay duration, party size, etc.) |
-| 403 | Admin URDD lacks required role/designation/department |
+| 403 | `actionPerformerURDD` is not tenant staff (`TENANT` designation + `TENANT_<hotel_code>` department) for this hotel, or lacks the `add_bookings` permission |
 | 404 | Hotel, service, package, or guest URDD not found |
 | 409 | No available rooms/units for the selected dates |
 | 422 | Cross-hotel addon, stay-as-addon, package has no services |
@@ -343,7 +344,7 @@ All existing booking validations apply — the admin does not bypass any busines
 |---|---|
 | `Src/Apis/ProjectSpecificApis/GuestSpecificApis/AdminCreateGuestBooking/AdminCreateGuestBooking.js` | API object definition |
 | `Src/Apis/ProjectSpecificApis/GuestSpecificApis/AdminCreateGuestBooking/CRUD_parameters.js` | Request parameter schema |
-| `Src/HelperFunctions/PreProcessingFunctions/Guest/validateAdminForTenant.js` | Admin authorization validator (shared) |
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/validateAdminForTenant.js` | Authorization validator (shared) — factory `validateAdminForTenant("add_bookings")`: tenant-staff + permission gate |
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/adminCreateGuestBooking.js` | Booking type router + guest payload builder |
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/createRoomBooking.js` | Room booking logic (reused) |
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/createPackageBooking.js` | Package booking logic (reused) |

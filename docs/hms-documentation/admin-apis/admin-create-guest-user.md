@@ -10,17 +10,18 @@ Creates a guest user account on behalf of a walk-in guest. The desk clerk collec
 
 Uses **PUBLIC_ENCRYPTED_PLATFORM** — encrypted request/response using the platform key only. No guest JWT is required (the admin is the actor, not the guest).
 
-### Admin URDD Constraint
+### Authorization (tenant staff + RBAC permission)
 
-The `actionPerformerURDD` must resolve to a URDD with **all three** of the following:
+The `actionPerformerURDD` must resolve to **tenant staff of the requested hotel that holds the `add_users` permission**:
 
-| Dimension | Required Value |
+| Check | Required Value |
 |---|---|
-| Role | `Admin` |
 | Designation | `TENANT` |
 | Department | `TENANT_<hotel_code>` (e.g. `TENANT_HOTEL1`) |
+| `tenant_id` | must equal the `hotelId` in the request |
+| Permission | `add_users` (active, in the actor's URDP) |
 
-The URDD's `tenant_id` must also match the `hotelId` in the request. Any mismatch returns **403 Forbidden**.
+The **role is no longer hardcoded** — authorization follows RBAC. Both a **Tenant Admin** (`role = Admin`) and a **Tenant Manager** (`role = Manager`) qualify, because both carry `designation = TENANT` and hold `add_users`. Any other persona (guest, service manager) is rejected because it lacks the `TENANT` designation and/or the permission. Any mismatch returns **403 Forbidden**.
 
 ---
 
@@ -81,8 +82,11 @@ The URDD's `tenant_id` must also match the `hotelId` in the request. Any mismatc
 ## What Gets Created
 
 1. **User record** in the `users` table with `created_by` set to the admin's URDD.
-2. **Global URDD** (null-tenant) on the default guest RDD (`role=default, designation=default, department=default`).
-3. **Per-tenant URDDs** for every active hotel in the system (same default guest RDD, one per tenant). This is the same eager provisioning used by the self-service guest signup flow.
+2. **Global URDD** (null-tenant) on the consolidated global guest RDD (`Guest / STANDARD / GENERAL`).
+3. **Per-tenant URDDs** for every **eligible** active hotel (excludes the platform/system tenant), each bound to **that tenant's own Guest RDD clone** (`Guest / STANDARD / TENANT_<code>`; falls back to the global guest RDD when a tenant has no clone yet). This reuses the exact same shared helper (`reconcileGuestTenantUrdds`) as guest self-signup and login — so an admin-created guest is identical to a self-signed-up one.
+4. **URDP (per-user permissions)** materialized for each per-tenant guest URDD from that tenant's **`PG-STANDARD-GUEST`** permission group (per-tenant clone preferred, global fallback). This is currently a no-op because the guest group has no permissions seeded yet, but it keeps every guest in sync the moment guest permissions are added (also re-applied on signup and login).
+
+> The same `reconcileGuestTenantUrdds` step runs on **guest signup** and **guest login**, so guests created before a tenant existed (or before guest permissions were seeded) are back-filled the next time they authenticate.
 
 ---
 
@@ -91,7 +95,7 @@ The URDD's `tenant_id` must also match the `hotelId` in the request. Any mismatc
 | Status | Condition |
 |---|---|
 | 400 | Missing `first_name` or `email`, invalid email format, invalid passport format |
-| 403 | `actionPerformerURDD` does not have the required Admin/TENANT role for this hotel |
+| 403 | `actionPerformerURDD` is not tenant staff (`TENANT` designation + `TENANT_<hotel_code>` department) for this hotel, or lacks the `add_users` permission |
 | 404 | Hotel (`hotelId`) not found |
 | 409 | Email already exists in the system |
 
@@ -112,5 +116,6 @@ The URDD's `tenant_id` must also match the `hotelId` in the request. Any mismatc
 |---|---|
 | `Src/Apis/ProjectSpecificApis/GuestSpecificApis/AdminCreateGuestUser/AdminCreateGuestUser.js` | API object definition |
 | `Src/Apis/ProjectSpecificApis/GuestSpecificApis/AdminCreateGuestUser/CRUD_parameters.js` | Request parameter schema |
-| `Src/HelperFunctions/PreProcessingFunctions/Guest/validateAdminForTenant.js` | Admin authorization validator |
-| `Src/HelperFunctions/PreProcessingFunctions/Guest/adminCreateGuestUser.js` | User + URDD creation logic |
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/validateAdminForTenant.js` | Authorization validator — factory `validateAdminForTenant("add_users")`: tenant-staff + permission gate |
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/adminCreateGuestUser.js` | User + global URDD creation; delegates per-tenant URDDs + URDP to `reconcileGuestTenantUrdds` |
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/reconcileGuestTenantUrdds.js` | Shared helper (signup/login/admin-create): per-tenant guest URDDs + URDP resolve from `PG-STANDARD-GUEST` |
