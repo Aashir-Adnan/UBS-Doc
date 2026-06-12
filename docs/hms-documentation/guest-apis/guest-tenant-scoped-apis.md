@@ -1,18 +1,18 @@
-# Guest Tenant-Scoped APIs
+# Guest APIs — URDD & Tenant Scoping
 
-This page lists every guest API endpoint that requires the `actionPerformerURDD` to be a **tenant-specific URDD** — meaning the guest must supply the URDD for the hotel they are interacting with, not their global (null-tenant) URDD.
+Every authenticated guest API runs `ensureGuestUrdd` to validate the `actionPerformerURDD`. However, **not all of them require a tenant-specific URDD**. Some only need a valid URDD (including the global null-tenant one), while others use the resolved `tenant_id` in their queries and will break without it.
+
+This page classifies every authenticated guest endpoint by its actual tenant requirement.
 
 ---
 
-## How It Works
-
-All endpoints below use **AUTH_PLATFORM** (encrypted + JWT required) and run `ensureGuestUrdd` as the first preProcess function. This function:
+## How `ensureGuestUrdd` Works
 
 1. Extracts `actionPerformerURDD` from the request body or query.
 2. Validates that it belongs to the authenticated `userId` and is active.
 3. Resolves `tenant_id` from the URDD row and stamps it onto `decryptedPayload`.
 
-If the URDD is invalid, expired, or doesn't belong to the user, the API returns **403 Forbidden**.
+The `tenant_id` can be **NULL** if the guest sends their global URDD. Whether that matters depends on what the downstream preProcess function does with it.
 
 ### Where Does the Guest Get Their Tenant URDD?
 
@@ -25,97 +25,120 @@ The mobile/web client stores the `tenantUrddMap` locally and sends the correct U
 
 ---
 
-## Complete Endpoint List
+## Tenant-Specific URDD Required
+
+These endpoints use `tenant_id` in WHERE clauses, INSERT statements, or business logic. Sending the global (null-tenant) URDD will cause query failures or incorrect data.
 
 ### Bookings — Create
 
-| Endpoint | Method | preProcessFunctions |
+| Endpoint | Method | Why tenant_id is needed |
 |---|---|---|
-| `/api/guest/bookings/room` | POST | `ensureGuestUrdd` → `createRoomBooking` |
-| `/api/guest/bookings/package` | POST | `ensureGuestUrdd` → `createPackageBooking` |
-| `/api/guest/bookings/service` | POST | `ensureGuestUrdd` → `createServiceBooking` |
-
-### Bookings — Read
-
-| Endpoint | Method | preProcessFunctions |
-|---|---|---|
-| `/api/guest/bookings` | GET | `ensureGuestUrdd` |
-| `/api/guest/bookings/upcoming` | GET | `ensureGuestUrdd` |
-| `/api/guest/bookings/current` | GET | `ensureGuestUrdd` |
-| `/api/guest/bookings/folio` | GET | `ensureGuestUrdd` |
-
-### Bookings — Lifecycle
-
-| Endpoint | Method | preProcessFunctions |
-|---|---|---|
-| `/api/guest/booking/checkin` | POST | `ensureGuestUrdd` → `performCheckin` |
-| `/api/guest/booking/checkout` | POST | `ensureGuestUrdd` → `performCheckout` |
-| `/api/guest/booking/cancel` | POST | `ensureGuestUrdd` → `computeCancellationFee` |
-| `/api/guest/booking/reschedule` | PUT | `ensureGuestUrdd` → `rescheduleBookingService` |
-| `/api/guest/booking/checkin/eligibility` | GET | `ensureGuestUrdd` → `preProcess` |
+| `/api/guest/bookings/room` | POST | Inserted into `bookings.tenant_id`; used for service/unit resolution |
+| `/api/guest/bookings/package` | POST | Inserted into `bookings.tenant_id`; validates package belongs to hotel |
+| `/api/guest/bookings/service` | POST | Inserted into `bookings.tenant_id`; validates service belongs to hotel |
 
 ### Booking Services (Addons)
 
-| Endpoint | Method | preProcessFunctions |
+| Endpoint | Method | Why tenant_id is needed |
 |---|---|---|
-| `/api/guest/bookings/{id}/services` | POST | `ensureGuestUrdd` → `addBookingServices` |
-| `/api/guest/bookings/{id}/services` | PUT | `ensureGuestUrdd` → `rescheduleBookingService` |
-| `/api/guest/bookings/{id}/services` | DELETE | `ensureGuestUrdd` → `removeBookingService` |
+| `/api/guest/bookings/{id}/services` | POST | `addBookingServices` verifies booking ownership via `tenant_id` |
+| `/api/guest/bookings/{id}/services` | DELETE | `removeBookingService` filters `WHERE tenant_id = ?` |
+| `/api/guest/bookings/{id}/services` | PUT | `rescheduleBookingService` uses `tenant_id` in booking lookup |
 
-### Scheduler
+### Bookings — Read (Tenant-Filtered)
 
-| Endpoint | Method | preProcessFunctions |
+| Endpoint | Method | Why tenant_id is needed |
 |---|---|---|
-| `/api/guest/scheduler` | GET | `ensureGuestUrdd` → `preProcessList` |
+| `/api/guest/bookings/folio` | GET | Query filters `WHERE b.tenant_id = {{tenant_id}}` |
+| `/api/guest/booking/checkin/eligibility` | GET | Query filters `WHERE b.tenant_id = ?` |
 
 ### Profile & Identity
 
-| Endpoint | Method | preProcessFunctions |
+| Endpoint | Method | Why tenant_id is needed |
 |---|---|---|
-| `/api/guest/profile` | GET | `ensureGuestUrdd` |
-| `/api/guest/profile` | PUT | `ensureGuestUrdd` |
-| `/api/guest/profile/image` | POST | `ensureGuestUrdd` → `uploadGuestProfileImage` |
-| `/api/guest/onboarding/kyc` | POST | `ensureGuestUrdd` → `submitGuestKyc` |
-
-### Documents
-
-| Endpoint | Method | preProcessFunctions |
-|---|---|---|
-| `/api/fetch/guest/documents` | GET | `ensureGuestUrdd` → `loadGuestDocuments` |
-| `/api/fetch/guest/document/tags` | GET | `ensureGuestUrdd` → `loadDocumentTags` |
+| `/api/guest/profile/image` | POST | Inserted into `attachments.tenant_id` |
+| `/api/guest/onboarding/kyc` | POST | Inserted into `guest_passport_documents.tenant_id` |
 
 ### Loyalty
 
-| Endpoint | Method | preProcessFunctions |
+| Endpoint | Method | Why tenant_id is needed |
 |---|---|---|
-| `/api/guest/loyalty` | GET | `ensureGuestUrdd` → `loadGuestLoyalty` |
-| `/api/guest/loyalty/redeem` | POST | `ensureGuestUrdd` → `redeemReward` |
+| `/api/guest/loyalty` | GET | Queries `guest_profiles WHERE tenant_id = ?` and tenant-specific packages |
+| `/api/guest/loyalty/redeem` | POST | Uses `tenant_id` for tenant-scoped reward lookup (has fallback logic) |
 
 ### QR
 
-| Endpoint | Method | preProcessFunctions |
+| Endpoint | Method | Why tenant_id is needed |
 |---|---|---|
-| `/api/guest/qr/issue` | POST | `ensureGuestUrdd` → `issueGuestQrToken` |
-
-### AI Assistant
-
-| Endpoint | Method | preProcessFunctions |
-|---|---|---|
-| `/api/guest/assistant/threads` | GET | `ensureGuestUrdd` → `hydrateGuestAssistantThreadView` |
-| `/api/guest/assistant/threads` | DELETE | `softDeleteGuestAssistantThread` |
-| `/api/guest/assistant/messages` | POST | `ensureGuestUrdd` → `processGuestAssistantMessage` |
+| `/api/guest/qr/issue` | POST | Verifies booking ownership via `tenant_id`; included in JWT claims |
 
 ### Networking
 
-| Endpoint | Method | preProcessFunctions |
+| Endpoint | Method | Why tenant_id is needed |
 |---|---|---|
-| `/api/guest/networking/details` | GET | `ensureGuestUrdd` → `preProcessValidate` |
+| `/api/guest/networking/details` | GET | Query uses `JSON_CONTAINS(hck.tenant_id, CAST({{tenant_id}} AS JSON))` |
+
+### AI Assistant
+
+| Endpoint | Method | Why tenant_id is needed |
+|---|---|---|
+| `/api/guest/assistant/messages` | POST | Inserted into `guest_assistant_threads.tenant_id` |
 
 ---
 
-## Endpoints That Do NOT Require a Tenant URDD
+## Any Valid URDD Accepted (Including Global)
 
-The following guest endpoints use **PUBLIC_ENCRYPTED_PLATFORM** (no JWT, no URDD) or handle auth differently:
+These endpoints run `ensureGuestUrdd` to validate the URDD is real and active, but their downstream logic **does not use `tenant_id`**. They filter by `urdd_id`, `userId`, or other non-tenant columns. The global (null-tenant) URDD works fine.
+
+### Bookings — Read (URDD-Filtered)
+
+| Endpoint | Method | Filtered by |
+|---|---|---|
+| `/api/guest/bookings` | GET | `bookings.urdd_id = {{actionPerformerURDD}}` |
+| `/api/guest/bookings/upcoming` | GET | `bookings.urdd_id = {{actionPerformerURDD}}` |
+| `/api/guest/bookings/current` | GET | `bookings.urdd_id = {{actionPerformerURDD}}` |
+
+### Bookings — Lifecycle
+
+| Endpoint | Method | Filtered by |
+|---|---|---|
+| `/api/guest/booking/checkin` | POST | `booking_id` + `urdd_id` |
+| `/api/guest/booking/checkout` | POST | `booking_id` + `urdd_id` |
+| `/api/guest/booking/cancel` | POST | `booking_id` + `urdd_id` |
+| `/api/guest/booking/reschedule` | PUT | `booking_id` + `urdd_id` |
+
+### Profile
+
+| Endpoint | Method | Filtered by |
+|---|---|---|
+| `/api/guest/profile` | GET | `users.user_id = {{userId}}` |
+| `/api/guest/profile` | PUT | `users.user_id = {{userId}}` |
+
+### Scheduler
+
+| Endpoint | Method | Filtered by |
+|---|---|---|
+| `/api/guest/scheduler` | GET | `categoryId` + date range (no tenant filter) |
+
+### Documents
+
+| Endpoint | Method | Filtered by |
+|---|---|---|
+| `/api/fetch/guest/documents` | GET | `user_id` via guest profile |
+| `/api/fetch/guest/document/tags` | GET | Global tags, no filtering |
+
+### AI Assistant — Threads
+
+| Endpoint | Method | Filtered by |
+|---|---|---|
+| `/api/guest/assistant/threads` | GET | `user_id` |
+| `/api/guest/assistant/threads` | DELETE | `thread_id` + `user_id` |
+
+---
+
+## Endpoints That Do NOT Use `ensureGuestUrdd`
+
+These endpoints use **PUBLIC_ENCRYPTED_PLATFORM** (no JWT, no URDD) or handle auth differently:
 
 | Endpoint | Method | Platform | Purpose |
 |---|---|---|---|
