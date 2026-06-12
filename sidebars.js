@@ -263,6 +263,8 @@ const sidebars = {
           label: 'Admin APIs',
           items: [
             'api/admin-code',
+            'hms-documentation/admin-apis/admin-create-guest-user',
+            'hms-documentation/admin-apis/admin-create-guest-booking',
           ],
         },
       ],

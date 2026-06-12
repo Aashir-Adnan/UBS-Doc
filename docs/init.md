@@ -119,6 +119,98 @@ All documentation lives in `C:\Users\adnan\VS_Code\Clones\UBS_DOC\docs\`.
    - Reference to the sim test script.
 2. **Register in sidebar** if adding a new doc page (`sidebars.js`).
 
+### How to Add a New Documentation Page
+
+#### Step 1: Create the Markdown file
+
+Create a `.md` file inside the appropriate directory under `docs/`. The directory structure maps to the sidebar hierarchy:
+
+```
+docs/
+├── hms-documentation/
+│   ├── guest-apis/           # Guest-facing API docs
+│   │   └── <feature-name>/
+│   │       └── <feature-name>.md
+│   ├── admin-apis/           # Admin-initiated API docs
+│   │   └── <feature-name>.md
+│   ├── payment-gateways/     # Payment integration docs
+│   └── tenant-governance/    # RBAC & tenant model docs
+├── api/                      # Standalone API reference pages
+├── backend/                  # Framework backend docs
+└── frontend/                 # Framework frontend docs
+```
+
+Each `.md` file needs a title as a top-level heading (`# Title`). Optionally, add frontmatter for sidebar positioning:
+
+```markdown
+---
+sidebar_position: 5
+---
+
+# My New API
+
+Content here...
+```
+
+#### Step 2: Register in `sidebars.js`
+
+Open `sidebars.js` at the project root and add the doc path (relative to `docs/`, without the `.md` extension) to the correct category.
+
+**Example — adding a new admin API doc:**
+
+```js
+{
+  type: 'category',
+  label: 'Admin APIs',
+  items: [
+    'api/admin-code',
+    'hms-documentation/admin-apis/admin-create-guest-user',   // ← new
+    'hms-documentation/admin-apis/admin-create-guest-booking', // ← new
+  ],
+},
+```
+
+**Example — adding a new guest API doc with its own subcategory:**
+
+```js
+{
+  type: 'category',
+  label: 'My New Feature',
+  items: [
+    'hms-documentation/guest-apis/my-new-feature/my-new-feature',
+  ],
+},
+```
+
+The item string is the file path relative to `docs/` without `.md`. For a file at `docs/hms-documentation/admin-apis/my-page.md`, the sidebar entry is `'hms-documentation/admin-apis/my-page'`.
+
+#### Step 3: (Optional) Add a `_category_.json` for auto-generated index
+
+If creating a new directory that should appear as a sidebar category with an auto-generated index page, add a `_category_.json`:
+
+```json
+{
+  "label": "Admin APIs",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "title": "Admin APIs",
+    "description": "Short description of this section."
+  }
+}
+```
+
+Note: `_category_.json` only works with Docusaurus auto-generated sidebars. Since this project uses an explicit `sidebars.js`, you must **always** add entries there — `_category_.json` alone will not make a page appear in the sidebar.
+
+#### Step 4: Verify
+
+```bash
+cd C:\Users\adnan\VS_Code\Clones\UBS_Doc
+npm start
+```
+
+Check the sidebar renders correctly and the page loads without errors.
+
 ---
 
 ## 6. Report — Post findings on GitHub
