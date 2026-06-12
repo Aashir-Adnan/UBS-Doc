@@ -95,7 +95,19 @@ All fields are optional and sent in the encrypted request body.
       "type": "Service",
       "view_count": 0,
       "is_featured": false,
-      "rating": null,
+      "rating": {
+        "total_stars": 14,
+        "total_ratings": 3,
+        "5_stars": 2,
+        "4_stars": 1,
+        "3_stars": 0,
+        "2_stars": 0,
+        "1_stars": 0,
+        "reviews": [
+          { "title": "Excellent experience", "description": "Really enjoyed Deluxe Room." },
+          { "title": "Very good", "description": "Great stay overall." }
+        ]
+      },
       "additional_attributes": {
         "physical_dimension": { "L": 0, "W": 0, "H": 0 },
         "tags": [{ "en": "luxury", "ar": "فاخر" }]
@@ -113,31 +125,48 @@ All fields are optional and sent in the encrypted request body.
 
 ### Detail Mode (200)
 
-Returns a single service object with the same base fields as list items, plus additional detail fields:
+Returns a single service object with the same base fields as list items, plus additional detail fields. `formSchema` is **always** an array (empty `[]` when the category has no form fields configured).
 
 ```json
 {
-  "id": 71,
-  "hotelId": 2,
-  "name": { "en": "Deluxe Room", "ar": "غرفة ديلوكس" },
-  "description": { "en": "Spacious room with city view", "ar": null },
-  "base_price": 450,
-  "current_price": 450,
+  "id": 13,
+  "hotelId": 3,
+  "name": { "en": "Fine Dining", "ar": "مطعم فاخر" },
+  "description": { "en": "Exquisite dining experience", "ar": null },
+  "base_price": 200,
+  "current_price": 200,
   "currency": "SAR",
-  "images": [12, 13, 14],
-  "duration": 1,
-  "duration_units": "night",
+  "images": [42, 43],
+  "duration": 2,
+  "duration_units": "hour",
   "type": "Service",
-  "view_count": 0,
+  "view_count": 5,
   "is_featured": false,
-  "rating": null,
+  "rating": {
+    "total_stars": 14,
+    "total_ratings": 3,
+    "5_stars": 2,
+    "4_stars": 1,
+    "3_stars": 0,
+    "2_stars": 0,
+    "1_stars": 0,
+    "reviews": [
+      { "title": "Excellent experience", "description": "Really enjoyed Fine Dining." }
+    ]
+  },
   "additional_attributes": {
     "physical_dimension": { "L": 0, "W": 0, "H": 0 },
-    "tags": []
+    "tags": [{ "en": "premium", "ar": "متميز" }]
   },
+  "maxAdults": 4,
+  "maxChildren": 2,
+  "minAdults": 1,
+  "minNights": null,
+  "maxNights": null,
+  "sessionDurationMinutes": 120,
   "category": {
-    "id": 1,
-    "name": "Stay"
+    "id": 2,
+    "name": "Dining"
   },
   "amenities": [],
   "cancellation_info": {
@@ -154,13 +183,43 @@ Returns a single service object with the same base fields as list items, plus ad
       "autoDerivable": true
     },
     {
+      "key": "email",
+      "label": "Email",
+      "type": "text",
+      "isRequired": true,
+      "autoDerivable": true
+    },
+    {
+      "key": "phone",
+      "label": "Phone",
+      "type": "text",
+      "isRequired": true,
+      "autoDerivable": true
+    },
+    {
+      "key": "reservation_date",
+      "label": "Reservation Date",
+      "type": "datetime",
+      "isRequired": true,
+      "autoDerivable": true
+    },
+    {
+      "key": "party_size",
+      "label": "Party Size",
+      "type": "number",
+      "isRequired": true,
+      "autoDerivable": true
+    },
+    {
       "key": "meal_type",
       "label": "Meal Type",
       "type": "dropdown",
       "isRequired": true,
       "autoDerivable": true,
       "options": [
-        { "value": "Breakfast", "label": { "en": "Breakfast", "ar": "إفطار" } }
+        { "value": "breakfast", "label": { "en": "breakfast", "ar": "فطور" } },
+        { "value": "lunch", "label": { "en": "lunch", "ar": "غداء" } },
+        { "value": "dinner", "label": { "en": "dinner", "ar": "عشاء" } }
       ]
     }
   ]
@@ -171,44 +230,43 @@ Returns `null` if the service does not exist, is not published, or belongs to a 
 
 #### Form Schema (Detail Mode)
 
-When a service's category has booking form fields configured (category 12 config keys), the detail response includes a `formSchema` array describing the fields the guest should fill in:
+`formSchema` is **always present** on detail objects — it is an empty array `[]` when the category has no form fields, never `undefined` or `null`. This was fixed on 2026-06-10; previously it was only attached when non-empty.
+
+Each field has the following shape:
+
+| Field | Type | Description |
+|---|---|---|
+| `key` | `string` | Machine-readable field key (e.g. `"full_name"`, `"meal_type"`). |
+| `label` | `string` | Human-readable display label. |
+| `type` | `string` | Input type: `"text"`, `"number"`, `"checkbox"`, `"datetime"`, `"dropdown"`. |
+| `isRequired` | `boolean` | Whether the field is required for booking. |
+| `autoDerivable` | `boolean` | Whether the server auto-fills this from the guest profile (client should not prompt for input). |
+| `options` | `array` | **Dropdown only.** Array of selectable values. Absent for non-dropdown types. |
+
+#### Dropdown Options Resolution
+
+For `type: "dropdown"` fields, `options` is always a non-empty array. Each option has:
 
 ```json
-{
-  "formSchema": [
-    {
-      "key": "full_name",
-      "label": "Full Name",
-      "type": "text",
-      "isRequired": true,
-      "autoDerivable": true
-    },
-    {
-      "key": "meal_type",
-      "label": "Meal Type",
-      "type": "dropdown",
-      "isRequired": true,
-      "autoDerivable": true,
-      "options": [
-        { "value": "Breakfast", "label": { "en": "Breakfast", "ar": "إفطار" } },
-        { "value": "Lunch", "label": { "en": "Lunch", "ar": "غداء" } },
-        { "value": "Dinner", "label": { "en": "Dinner", "ar": "عشاء" } }
-      ]
-    },
-    {
-      "key": "party_size",
-      "label": "Party Size",
-      "type": "number",
-      "isRequired": true,
-      "autoDerivable": true
-    }
-  ]
-}
+{ "value": "breakfast", "label": { "en": "breakfast", "ar": "فطور" } }
 ```
 
-**Auto-derivable fields** (`autoDerivable: true`) are fields the server can fill automatically from the guest's profile or the request context. The client should not require the guest to manually enter these. The auto-derivable keys are: `full_name`, `email`, `phone`, `party_size`, `reservation_date`, `meal_type`.
+| Field | Type | Description |
+|---|---|---|
+| `value` | `string` | The value to submit in `formData` when booking. |
+| `label.en` | `string` | English display label. |
+| `label.ar` | `string` | Arabic display label. |
 
-**Dropdown options** are resolved from `hms_config_possible_values` for each service category. The `options` array is only present for `type: "dropdown"` fields that have possible values configured for the service's category.
+Options are resolved from `hms_config_possible_values` in two ways:
+1. **Primary**: The `hms_config_keys.possible_values` column stores a JSON object keyed by `category_id` mapping to arrays of `hms_config_possible_values.id` — this gives category-specific option sets.
+2. **Fallback**: If the `possible_values` column is NULL or has no entries for the category, all `hms_config_possible_values` rows linked via `config_id` FK are returned.
+
+Possible value JSON supports three shapes:
+- `{"en": "breakfast", "ar": "فطور"}` — value = `en` string
+- `{"label": {"en": "Stay", "ar": "إقامة"}, "key": "stay"}` — value = `key` string
+- Plain string — value = the string itself
+
+**Auto-derivable fields** (`autoDerivable: true`) are fields the server can fill automatically from the guest's profile or the request context. The client should not require the guest to manually enter these. The auto-derivable keys are: `full_name`, `email`, `phone`, `party_size`, `reservation_date`, `meal_type`.
 
 ### Response Field Reference
 
@@ -229,6 +287,12 @@ When a service's category has booking form fields configured (category 12 config
 | `is_featured` | `boolean` | Both | Whether the service is featured. |
 | `rating` | `object\|null` | Both | Rating breakdown (null if no reviews). |
 | `additional_attributes` | `object` | Both | Physical dimensions and keyword tags. |
+| `maxAdults` | `number\|null` | Detail | Maximum adults allowed per booking. From `max_adults` config, falls back to `max_persons_per_booking`. |
+| `maxChildren` | `number\|null` | Detail | Maximum children allowed per booking. From `max_children` config, falls back to `max_children_per_guardian`. |
+| `minAdults` | `number\|null` | Detail | Minimum adults per booking (from `min_persons_per_booking`). |
+| `minNights` | `number\|null` | Detail | Minimum stay nights (stay category only). |
+| `maxNights` | `number\|null` | Detail | Maximum stay nights (stay category only). |
+| `sessionDurationMinutes` | `number\|null` | Detail | Session duration in minutes (from `slot_duration_minutes`). |
 | `category` | `{ id, name }` | Detail | Service category info. |
 | `amenities` | `array` | Detail | Category amenities list. |
 | `cancellation_info` | `object` | Detail | Cancellation margin and exceptions. |
@@ -282,3 +346,68 @@ Results are ordered by:
 | Status | Message | Condition |
 |---|---|---|
 | 500 | `Failed to fetch services` | Internal query or processing error. |
+
+---
+
+## Test Coverage
+
+### `guestLandingDetailConsistency.js` — Landing/detail consistency (251 tests)
+
+Fetches the landing feed, then individually fetches the detail for every package and service to verify nothing returns null and all fields are present.
+
+| Step | Tests | What it proves |
+|---|---|---|
+| 1: Fetch landing | 1 | Landing returns items (packages + services). |
+| 2: Landing shapes | ~72 | Every landing object has valid `name.en`, `images[]` (number array), `additional_attributes.tags[]` ({en,ar} pairs), `rating` (star breakdown + reviews array with title/description), `base_price`, `current_price`, `currency`. |
+| 3: Package detail | ~100 | Every landing package fetched via `GET /guest/packages` with `{id}` in body returns a non-null detail with `services[]` line items, each having `id`, `name`, `packageServiceId`, `images`, `category`, `amenities`, `cancellation_info`, `termsAndConditions`. |
+| 4: Service detail | ~75 | Every landing service fetched via `GET /guest/services` with `{serviceId}` in body returns a non-null detail with `category`, `amenities`, `cancellation_info`, `termsAndConditions`. |
+| 5: Search consistency | 1 | Every landing item also appears in `GET /guest/search/filter` results — no filter divergence. |
+| 6: Package list→detail | 1 | Every item from the paginated package list can be fetched as detail (no null). |
+| 7: Service list→detail | 1 | Every item from the paginated service list can be fetched as detail (no null). |
+
+### `guestDataAuditAndSeed.js` — Data completeness
+
+Audits all published packages and services for required data fields. Seeds missing values so the response objects are always populated:
+
+| Field | Config key | Seeded value |
+|---|---|---|
+| `images` | `media` | Reuses existing attachment IDs from other configs. |
+| `tags` | `keyword_tags` | Reuses existing tag from another config, or `{en:"Popular", ar:"شائع"}`. |
+| `base_price` | `base_price` | `{"en":"500"}` |
+| `currency` | `base_currency` | SAR currency ID reference. |
+| `rating/reviews` | `feedback` table | 3 sample reviews (5-star, 4-star, 5-star). |
+
+### `guestFormSchemaDropdownCheck.js` — FormSchema dropdown validation
+
+Verifies that every dropdown field in `formSchema` has a non-empty `options[]` array with valid `{value, label:{en,ar}}` entries.
+
+| Step | What it proves |
+|---|---|
+| 1: DB audit | Every dropdown `hms_config_keys` row (category_id=12) has possible values via the `possible_values` column or `config_id` FK fallback. |
+| 2: Service formSchema | Each category's dropdown fields return resolved `options[]` arrays. Validates field shape (`key`, `label`, `type`, `isRequired`). |
+| 3: Summary | Reports all dropdown fields and their option counts. |
+| 4: Package line items | Dropdown options also resolve in `services[].formSchema` inside package detail responses. |
+
+### Running the tests
+
+```bash
+# Consistency test (read-only, no DB writes)
+node Services/SysScripts/TestScripts/sim/guestLandingDetailConsistency.js
+
+# FormSchema dropdown validation
+node Services/SysScripts/TestScripts/sim/guestFormSchemaDropdownCheck.js
+
+# Data audit + seed (writes missing config/feedback rows)
+node Services/SysScripts/TestScripts/sim/guestDataAuditAndSeed.js
+```
+
+---
+
+## Change Log
+
+| Date | Change |
+|---|---|
+| 2026-06-11 | Added `maxAdults`, `maxChildren`, `minAdults`, `minNights`, `maxNights`, `sessionDurationMinutes` to the detail response field reference. `maxAdults` and `maxChildren` use the new dedicated config keys, falling back to `max_persons_per_booking` and `max_children_per_guardian` respectively. |
+| 2026-06-10 | `formSchema` is now always `[]` (never undefined) on detail objects when a category has no form fields. Previously only attached when non-empty. |
+| 2026-06-10 | `fetchFormSchema` dropdown resolution now falls back to `hms_config_possible_values.config_id` FK when `hms_config_keys.possible_values` column is NULL or has no entries for the requested category. Also handles `{label:{en,ar}, key}` possible value shape. |
+| 2026-06-10 | Fixed publish date filter mismatch between detail SQL and searchQueries.js. Detail SQL now uses `COALESCE($.en, $[0])` to handle both config value shapes, matching the landing/search queries. Harmonized visibility subquery to `CAST(id AS JSON)`. Added consistency tests and data audit/seed script. |

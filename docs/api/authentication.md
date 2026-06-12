@@ -96,7 +96,15 @@ Content-Type: application/json
 
 ## POST /api/ExtSignUp
 
-Registers or updates a user via external OAuth sign-up (e.g. Google, Apple). If the email already exists the record is updated (upsert). On success, returns the same payload as `LoginWithPassword`.
+Registers or signs in a user via an external OAuth provider (Google, Apple, or Firebase). The endpoint validates the provider's `idToken`, upserts the user record (insert or update on duplicate email), and returns the full login payload — identical to `POST /api/LoginWithPassword`.
+
+**No encryption or access token** is required — the endpoint uses `PUBLIC_PLATFORM` (plain JSON, no AES).
+
+### How it works
+
+1. The **`signUpVerif` pre-processor** validates the `idToken` with the provider and extracts `{ userId, email, name, picture, source }`.
+2. The query upserts into `users` (`ON DUPLICATE KEY UPDATE`) using the extracted email and name.
+3. The **`loginWithPW` post-processor** runs the standard login flow (fetch user, device, roles, permissions, generate JWT) and returns the full user context.
 
 ### Request
 
@@ -105,24 +113,116 @@ POST /api/ExtSignUp
 Content-Type: application/json
 ```
 
-The body is processed by a pre-processor (`signUpVerif`) that validates the OAuth token and extracts user info. The raw fields sent depend on the OAuth provider but must resolve to:
+```json
+{
+  "signUp_flag": "Google",
+  "idToken": "<provider_id_token>"
+}
+```
 
-| Field (resolved internally) | Type | Description |
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `signUp_flag` | string | Yes | OAuth provider identifier. One of: `"Google"`, `"Apple"` (or `"apple"`), `"Firebase"` |
+| `idToken` | string | Yes | The ID token issued by the OAuth provider after the user consents |
+| `device_name` | string | No | Device label stored for session tracking |
+
+### Supported Providers
+
+#### Google (`signUp_flag: "Google"`)
+
+Validates via `https://oauth2.googleapis.com/tokeninfo?id_token=<token>`. Extracts `sub`, `email`, `name`, `picture` from the Google tokeninfo response.
+
+No server-side configuration required.
+
+#### Apple (`signUp_flag: "Apple"` or `"apple"`)
+
+Validates the JWT signature against Apple's public JWKS (`https://appleid.apple.com/auth/keys`). Verifies:
+- Algorithm: RS256
+- Issuer: `https://appleid.apple.com`
+- Audience: `APPLE_CLIENT_ID` or `APPLE_BUNDLE_ID` env var
+
+The JWKS is cached for 1 hour. If `name` is not present in the token, falls back to the email prefix (e.g. `alice@example.com` -> `"alice"`).
+
+| Env Var | Required | Description |
 |---|---|---|
-| `name` | string | Display name from OAuth provider |
-| `email` | string | Email address from OAuth provider |
-| `signUp_flag` | string | Sign-in method flag (e.g. `"google"`, `"apple"`) |
+| `APPLE_CLIENT_ID` | Yes (or `APPLE_BUNDLE_ID`) | The Apple Services ID or Bundle ID used as the JWT audience |
+
+#### Firebase (`signUp_flag: "Firebase"`)
+
+Validates via Firebase Admin SDK (`auth().verifyIdToken()`). Extracts `uid`, `email`, `name`, `picture` from the decoded token. Falls back to `firebase.identities.email[0]` for email if the top-level claim is absent.
+
+| Env Var | Required | Description |
+|---|---|---|
+| `FIREBASE_PROJECT_ID` | Yes | Firebase project ID |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | One of these | Inline JSON string of the service account credentials |
+| `FIREBASE_SERVICE_ACCOUNT_PATH` | One of these | File path to the service account JSON |
+| `GOOGLE_APPLICATION_CREDENTIALS` | One of these | Standard GCP ADC path (uses `applicationDefault()`) |
 
 ### Response — 200 OK
 
-Same structure as `POST /api/LoginWithPassword` — returns full user context with `access_token`.
+Same structure as `POST /api/LoginWithPassword` — returns full user context with `access_token`, `user_roles_designations_departments`, `user_permissions`, etc.
+
+```json
+{
+  "success": true,
+  "message": "Configuration generated successfully!",
+  "data": {
+    "user_id": 42,
+    "user": {
+      "user_id": 42,
+      "username": "Alice",
+      "first_name": "Alice",
+      "email": "alice@example.com",
+      "signIn_Flag": "Google",
+      "user_image": null
+    },
+    "access_token": "<jwt_token>",
+    "user_roles_designations_departments": [ ... ],
+    "user_permissions": { ... }
+  }
+}
+```
 
 ### Error Responses
 
-| Status | `message` | Cause |
+| Status | `message` / `error` | Cause |
 |---|---|---|
-| `400` | `"There was an error generating the configuration."` | OAuth token invalid or user data extraction failed |
-| `500` | `"There was an error generating the configuration."` | Server-side exception |
+| `400` | `"Unsupported signUp_flag"` | `signUp_flag` is not one of the supported providers |
+| `400` | `"Apple verification failed: missing token kid"` | Apple `idToken` has no `kid` header |
+| `400` | `"Apple verification failed: unknown token kid"` | Token's `kid` not found in Apple's JWKS |
+| `400` | `"Apple verification failed: ..."` | Signature, issuer, or audience mismatch |
+| `400` | `"Facebook verification not implemented yet"` | Facebook provider not yet supported |
+| `400` | `"Microsoft verification not implemented yet"` | Microsoft provider not yet supported |
+| `500` | `"There was an error generating the configuration."` | Server-side exception (token validation, DB, or login flow) |
+
+### `signUpVerif` Pre-Processor — Internal Reference
+
+**File:** `Src/HelperFunctions/PreProcessingFunctions/signUpVerif.js`
+
+The `signUpVerif` function is the pre-processing step for external sign-up. It reads `signUp_flag` and `idToken` from the decrypted payload, dispatches to the appropriate provider verification logic, and returns a normalized result object that the query layer uses for the upsert.
+
+**Input** (from `decryptedPayload`):
+
+| Key | Type | Description |
+|---|---|---|
+| `signUp_flag` | string | Provider identifier (`"Google"`, `"Apple"`, `"apple"`, `"Firebase"`) |
+| `idToken` | string | Raw ID token from the provider's OAuth/OIDC flow |
+
+**Output** (stored as `decryptedPayload.signUpVerif`):
+
+| Key | Type | Description |
+|---|---|---|
+| `success` | boolean | `true` if verification passed |
+| `userId` | string | Provider-specific user ID (`sub` for Google/Apple, `uid` for Firebase) |
+| `email` | string | Verified email address |
+| `name` | string | Display name (falls back to email prefix for Apple if absent) |
+| `picture` | string or null | Profile picture URL (null if unavailable) |
+| `source` | string | Provider name (`"Google"`, `"Apple"`, `"Firebase"`) |
+| `error` | string | Present only when `success: false` — describes the failure |
+
+The query template in `extSignUp.js` reads `decryptedPayload.signUpVerif.name` and `.email` to build the `INSERT ... ON DUPLICATE KEY UPDATE` into the `users` table. The `signUp_flag` is stored in `users.signIn_Flag`.
+
+**Unit tests:** `Services/SysScripts/TestScripts/signUpVerif.test.js` — covers Apple success, missing token, unknown kid, and audience mismatch scenarios using mocked JWKS.
 
 ---
 

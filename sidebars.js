@@ -48,24 +48,18 @@ const sidebars = {
           label: 'Integrations',
           items: ['backend/Socket', 'backend/Payments', 'backend/local-whisper-setup'],
         },
-        'backend/FAQs'
-
+        'backend/FAQs',
       ],
     },
     {
       type: 'category',
       label: 'Framework Frontend',
-      items: ['frontend/UBS-intro'],
+      items: ['frontend/UBS-intro', 'frontend/intro', 'frontend/FAQs'],
     },
     {
       type: 'category',
       label: 'Framework Agents',
       items: ['agents/agent-issue-format', 'agents/claude-github-issues-agent'],
-    },
-    {
-      type: 'category',
-      label: 'Tutorial',
-      items: ['tutorial-basics/create-a-document', 'tutorial-basics/create-a-page', 'tutorial-basics/deploy-your-site', 'tutorial-basics/markdown-features'],
     },
     {
       type: 'category',
@@ -179,6 +173,55 @@ const sidebars = {
               items: [
                 'hms-documentation/guest-apis/guest-token-refresh/guest-token-refresh',
               ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Email Notifications',
+              items: [
+                'hms-documentation/guest-apis/guest-email-notifications/guest-email-notifications',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Networking Details',
+              items: [
+                'hms-documentation/guest-apis/guest-networking-details/guest-networking-details',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Fetch Guest Documents',
+              items: [
+                'hms-documentation/guest-apis/fetch-guest-documents/fetch-guest-documents',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Fetch Guest Document Tags',
+              items: [
+                'hms-documentation/guest-apis/fetch-guest-document-tags/fetch-guest-document-tags',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Push Notifications',
+              items: [
+                'hms-documentation/guest-apis/push-notifications/push-notifications',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Auth Refresh Tokens',
+              items: [
+                'api/guest-auth-refresh-tokens',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Networking Details',
+              items: [
+                'api/guest-networking-details',
+              ],
             }
           ],
         },
@@ -214,6 +257,13 @@ const sidebars = {
               ],
             },
             'hms-documentation/tenant-governance/original-to-clone-propagation/original-to-clone-propagation',
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Admin APIs',
+          items: [
+            'api/admin-code',
           ],
         },
       ],
