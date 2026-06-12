@@ -69,6 +69,7 @@ const sidebars = {
           type: 'category',
           label: 'Guest APIs',
           items: [
+            'hms-documentation/guest-apis/guest-tenant-scoped-apis',
             {
               type: 'category',
               label: 'Guest Booking Flow',
