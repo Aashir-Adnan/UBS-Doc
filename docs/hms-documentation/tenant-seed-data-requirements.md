@@ -69,7 +69,7 @@ Almost every guest-facing response field comes from `hms_config` + `hms_config_k
 | `is_featured` | Featured flag | `is_featured` |
 | `visibility` | Published state (default: visible if absent) | Controls visibility in listings |
 | `keyword_tags` | Tags (MULTI-VALUE: one row per tag) | `additional_attributes.tags` |
-| `physical_dimension` | L/W/H dimensions | `additional_attributes.physical_dimension` |
+| `physical_dimension` | length/width/height dimensions | `additional_attributes.physical_dimension` |
 | `cancellation_margin` | Cancellation policy (bilingual JSON) | `cancellation_info.margin` |
 | `cancellation_exceptions` | Policy exceptions (bilingual JSON) | `cancellation_info.exceptions` |
 | `terms_and_conditions` | T&C text (bilingual JSON) | `termsAndConditions` |
@@ -105,7 +105,7 @@ Almost every guest-facing response field comes from `hms_config` + `hms_config_k
 | config_key | Purpose | Response Field |
 |------------|---------|---------------|
 | `duration_unit` | Default unit for category | `GuestServiceCategories.unit` |
-| `keyword_tags` | Amenity chips (hierarchical: `is_category=1` headers + `is_category=0` chips) | `GuestServiceCategories.amenities`, `GuestServiceTags` |
+| `amenities_tags` | Amenity chips (hierarchical: `is_category=1` headers + `is_category=0` chips) | `GuestServiceCategories.amenities`, `GuestServiceTags` |
 
 ### Tier 4: Translations
 
@@ -223,6 +223,17 @@ Each package includes: `base_price`, `base_currency`, `media`, `duration`, `dura
 ---
 
 ## Config Value Storage Format
+
+The `is_input` flag on `hms_config` rows determines how `config_value` is interpreted:
+
+| `is_input` | Meaning | `config_value` contains |
+|---|---|---|
+| `1` | Direct value | The actual value stored as a JSON string (e.g. `{"en":"500","ar":"500"}`) |
+| `0` | ID references | A JSON array of IDs that reference rows in `hms_config_possible_values` (e.g. `[3, 7, 12]`) |
+
+When `is_input=0`, the system resolves the IDs against the `hms_config_possible_values` table to produce the final display values (used for dropdowns, multi-selects, etc.).
+
+### `is_input=1` — Direct values
 
 Values in `hms_config` use `is_input=1` with JSON `{"en":"value","ar":"value"}` format:
 

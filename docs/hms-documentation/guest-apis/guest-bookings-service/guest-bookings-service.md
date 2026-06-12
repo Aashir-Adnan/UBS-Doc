@@ -73,6 +73,40 @@ Uses **AUTH_PLATFORM** — requires a valid guest JWT (`accessToken`). The guest
 }
 ```
 
+### Example: Kids Center session
+
+Kids Center bookings require guardian details in `formData` and scheduling in `sessions` (top-level, not inside `formData`):
+
+```json
+{
+  "actionPerformerURDD": 89,
+  "serviceId": 196,
+  "adults": 1,
+  "sessions": [
+    { "date": "2026-06-16", "slot": "10:00-12:00" }
+  ],
+  "formData": {
+    "parent_name": "Father",
+    "parent_phone": "531955842",
+    "child_name": "Kid",
+    "child_age": 3
+  }
+}
+```
+
+### Example: Spa session
+
+```json
+{
+  "actionPerformerURDD": 16,
+  "serviceId": 55,
+  "sessions": [
+    { "date": "2026-07-02", "slot": "15:00-16:00" }
+  ],
+  "adults": 1
+}
+```
+
 ### Example: Book now, schedule later
 
 ```json
@@ -84,6 +118,35 @@ Uses **AUTH_PLATFORM** — requires a valid guest JWT (`accessToken`). The guest
 ```
 
 When no scheduling fields are provided, the booking is created with `schedulingStatus: "unscheduled"`. The guest can schedule later via the reschedule API (`PUT /guest/booking/reschedule`).
+
+:::caution Scheduling fields are top-level, not inside formData
+A common mistake is placing `sessions`, `meals`, or `transport` inside `formData`. These must be **top-level request fields**. Data inside `formData` is stored as guest form values only — it does not create scheduled slots.
+
+**Wrong** — results in `schedulingStatus: "unscheduled"`:
+```json
+{
+  "serviceId": 196,
+  "formData": {
+    "booking_date": "2026-06-16",
+    "session_duration": "2 hours"
+  }
+}
+```
+
+**Correct** — results in `schedulingStatus: "complete"`:
+```json
+{
+  "serviceId": 196,
+  "sessions": [
+    { "date": "2026-06-16", "slot": "10:00-12:00" }
+  ],
+  "formData": {
+    "parent_name": "Father",
+    "child_name": "Kid"
+  }
+}
+```
+:::
 
 ---
 
@@ -97,7 +160,7 @@ When no scheduling fields are provided, the booking is created with `schedulingS
    - `min_persons_per_booking` / `max_persons_per_booking` — validates party size.
    - `advance_booking_min_days` / `advance_booking_max_days` — validates booking date window.
    - `blackout_dates` — rejects bookings during closure periods.
-   - `confirmation_mode` / `requires_approval` — determines booking status.
+   - `requires_approval` — if `true`, booking starts as `pending` instead of `confirmed`.
 6. Derives primary slot date from the scheduling fields (`sessions`, `meals`, or `transport`) for date validation.
 7. Validates category-specific rules:
    - **Kids Center** (category_id=6): Guardian name/phone required if `guardian_rule` is set. Age bracket validation.
@@ -120,13 +183,12 @@ When no scheduling fields are provided, the booking is created with `schedulingS
 
 ## Booking Status
 
-The booking status is determined by service configs:
+Bookings default to `confirmed`. Only services with `requires_approval` explicitly set to `true` in `hms_config` produce `pending` bookings:
 
-| `confirmation_mode` | `requires_approval` | Result |
-|---|---|---|
-| `auto-confirm` | `false` | `confirmed` |
-| `auto-confirm` | `true` | `pending` |
-| Any other / not set | Any | `pending` |
+| `requires_approval` | Result |
+|---|---|
+| `false` / not set (default) | `confirmed` |
+| `true` | `pending` |
 
 ---
 
@@ -354,5 +416,6 @@ node Services/SysScripts/TestScripts/sim/guestServiceBookingCheckInOut.js
 
 | Date | Change |
 |---|---|
+| 2026-06-12 | Booking status defaults to `confirmed` (removed `confirmation_mode` dependency). Only `requires_approval: true` produces `pending`. Added Kids Center example. Added warning about scheduling fields vs formData. |
 | 2026-06-10 | Fixed #263: `checkIn`/`checkOut` now derived for all standalone service types (spa, barber, transport), not just dining. `summariseDates` handles mobile format (`sessions[].date`, `transport.pickupDateTime`). Explicit `checkIn`/`checkOut` in request body honored as fallback. Single-day bookings mirror `checkIn` → `checkOut`. |
 | 2026-06-07 | Fixed #238: Auto-derivation of formData identity/scheduling fields. |
