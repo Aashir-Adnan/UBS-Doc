@@ -222,6 +222,13 @@ const sidebars = {
               items: [
                 'api/guest-networking-details',
               ],
+            },
+            {
+              type: 'category',
+              label: 'Authentication',
+              items: [
+                'api/authentication',
+              ],
             }
           ],
         },
