@@ -264,6 +264,7 @@ const sidebars = {
                 'hms-documentation/tenant-governance/config-keys/config-keys-catalog/config-keys-catalog',
               ],
             },
+            'hms-documentation/tenant-governance/original-to-clone-propagation/original-to-clone-propagation',
           ],
         },
         'hms-documentation/tenant-seed-data-requirements',
