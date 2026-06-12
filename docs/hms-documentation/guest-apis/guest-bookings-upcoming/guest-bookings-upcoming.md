@@ -2,7 +2,7 @@
 
 **GET** `/api/guest/bookings/upcoming`
 
-Returns a paginated list of the guest's upcoming bookings — future bookings that are pending, confirmed, or cancelled. This drives the Upcoming, and Cancelled tabs on the Booking History screen.
+Returns a paginated list of the guest's upcoming bookings — bookings that have not been checked into yet and whose stay window includes today or is in the future. Only `confirmed` and `pending` bookings are included.
 
 ---
 
@@ -39,8 +39,8 @@ GET /api/guest/bookings/upcoming?page=1&pageSize=10
 2. Queries `bookings` where:
    - `urdd_id` matches the authenticated guest.
    - `status` is `active` (not soft-deleted).
-   - `booking_status` is `confirmed`, `pending`, or `cancelled`.
-   - `check_in_date` is strictly after today (`DATE(check_in_date) > CURDATE()`).
+   - `booking_status` is `confirmed` or `pending`.
+   - Today is before check-in (`DATE(check_in_date) >= CURDATE()`) **or** today falls within the stay window (`DATE(check_in_date) <= CURDATE() AND DATE(check_out_date) >= CURDATE()`).
 3. Results are ordered by `check_in_date ASC` (soonest first).
 4. Results are paginated using `page` and `pageSize` query params.
 5. For each booking in the current page, the full v2 booking bundle is built via `buildBookingsBundle`, which:
@@ -343,3 +343,4 @@ GET /api/guest/bookings/upcoming?page=1&pageSize=10
 | 2026-06-09 | Added `cancelled` to the `booking_status` filter so cancelled bookings remain visible after page reload (fixes [#250](https://github.com/UBS-Dev-Org/hms/issues/250)). |
 | 2026-06-09 | Added `eligibleForCheckin` and `checkinIneligibleReason` fields to every booking object in the bundle (implements [#254](https://github.com/UBS-Dev-Org/hms/issues/254)). |
 | 2026-06-09 | Added `checked_out` and `completed` to the `booking_status` filter so completed bookings are visible in the Completed tab ([#253](https://github.com/UBS-Dev-Org/hms/issues/253)). |
+| 2026-06-12 | Upcoming now includes same-day and in-progress bookings (`>= CURDATE` + check_out window). Restricted `booking_status` filter to `confirmed` and `pending` only (removed `cancelled`, `checked_out`, `completed`). |
