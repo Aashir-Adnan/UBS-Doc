@@ -226,6 +226,146 @@ The query template in `extSignUp.js` reads `decryptedPayload.signUpVerif.name` a
 
 ---
 
+## POST /api/guest/auth/social-signup
+
+Registers or signs in a **guest** via an external OAuth provider (Google, Apple, or Firebase). Uses the same `signUpVerif` pre-processor as `ExtSignUp` to validate the provider's `idToken`, but creates a **guest account** (with guest URDDs) instead of a staff account, and returns the full **guest login payload** — identical to `POST /api/guest/auth/verify-otp`.
+
+If the email already exists, the user is logged in directly (idempotent — no duplicate account created).
+
+**Platform:** `PUBLIC_ENCRYPTED_PLATFORM` (AES-ECB with platform key, no access token required).
+
+### How it works
+
+1. The **`signUpVerif` pre-processor** validates the `idToken` with the provider and extracts `{ userId, email, name, picture, source }`.
+2. The **`signupGuestSocial` pre-processor** either finds the existing user by email or creates a new one, sets up guest URDDs (global + per-tenant for all active hotels), and builds the full guest login payload via `buildGuestLoginPayload` — the same function used by `verifyGuestOtp`.
+3. The **post-processor** returns the login payload directly.
+
+### Difference from ExtSignUp
+
+| | ExtSignUp (`/api/ExtSignUp`) | Guest Social Signup (`/api/guest/auth/social-signup`) |
+|---|---|---|
+| **Target user type** | Staff / Admin | Guest |
+| **URDD creation** | None (staff RDDs managed separately) | Global + per-tenant guest URDDs |
+| **Login payload** | Staff login (via `loginWithPW`) | Guest login (via `buildGuestLoginPayload`) |
+| **Tokens** | Staff access token | Guest access token + refresh token (JTI rotation) |
+| **Platform** | Plain JSON (no encryption) | `PUBLIC_ENCRYPTED_PLATFORM` (encrypted) |
+| **Gate** | Rejects guest-only accounts | Rejects staff-only accounts (via guest URDD check) |
+
+### Request
+
+```http
+POST /api/guest/auth/social-signup
+Content-Type: application/json
+x-platform-key: <platform_key>
+x-client-key: <client_key>
+```
+
+Encrypted body:
+
+```json
+{
+  "signUp_flag": "Google",
+  "idToken": "<provider_id_token>"
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `signUp_flag` | string | Yes | OAuth provider identifier. One of: `"Google"`, `"Apple"` (or `"apple"`), `"Firebase"` |
+| `idToken` | string | Yes | The ID token issued by the OAuth provider after the user consents |
+
+### Supported Providers
+
+Same as `ExtSignUp` — see [supported providers](#supported-providers) above (Google, Apple, Firebase).
+
+### Response — 200 OK
+
+Same structure as `POST /api/guest/auth/verify-otp` — returns the full guest login payload with access token, refresh token, and user context.
+
+```json
+{
+  "success": true,
+  "message": "Social signup successful",
+  "data": {
+    "user_id": 5,
+    "user": {
+      "user_id": 5,
+      "first_name": "Alice",
+      "last_name": "",
+      "email": "alice@example.com",
+      "user_image": null
+    },
+    "device_name": "Chrome / Windows",
+    "access_token": "<jwt>",
+    "accesstoken": "<jwt>",
+    "refreshToken": "rfh_<jwt>",
+    "expiresIn": 900,
+    "tenantUrddMap": {
+      "global": 14,
+      "3": 16,
+      "5": 18
+    },
+    "user_roles_designations_departments": [
+      {
+        "user_id": 5,
+        "email": "alice@example.com",
+        "user_role_designation_department_id": 14,
+        "tenant_id": null,
+        "role_name": "default",
+        "designation_name": "default",
+        "department_name": "default"
+      }
+    ],
+    "user_devices": [ "..." ],
+    "user_devices_notifications": [],
+    "user_roles": [ "..." ],
+    "user_permissions": {},
+    "collective_user_permissions": [],
+    "user_departments": [ "..." ],
+    "user_designations": [ "..." ]
+  }
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `access_token` | string | Short-lived guest JWT (~15 min) |
+| `refreshToken` | string | Long-lived JWT (prefixed `rfh_`, 24 hr) for token refresh |
+| `expiresIn` | number | Seconds until the access token expires |
+| `tenantUrddMap` | object | Maps `"global"` and each `tenant_id` (as string) to the guest's URDD id for that context |
+
+### Error Responses
+
+| Status | Message | Cause |
+|---|---|---|
+| `401` | `"Social identity verification failed"` | `signUpVerif` returned `success: false` |
+| `400` | `"Email is required from the social provider"` | Provider token did not contain an email |
+| `400` | `"Unsupported signUp_flag"` | Provider not supported |
+| `400` | `"Apple verification failed: ..."` | Apple token validation error |
+| `500` | `"Social signup failed"` | Server-side exception |
+
+### Behaviour on Existing Users
+
+If the email extracted from the OAuth token already exists in the `users` table:
+
+- **No new user is created** — the existing `user_id` is used
+- **No duplicate URDDs** — existing URDDs are preserved (the `buildGuestUrddList` call returns whatever URDDs the user already has)
+- **A new session is created** — fresh access + refresh tokens are issued and stored on the device
+- **The full login payload is returned** — identical to a fresh login via OTP
+
+This makes the endpoint safe to call repeatedly — it acts as "signup or login" in one call.
+
+### Implementation Files
+
+| File | Purpose |
+|---|---|
+| `Src/HelperFunctions/PreProcessingFunctions/signUpVerif.js` | OAuth token verification (shared with ExtSignUp) |
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/signupGuestSocial.js` | Guest user creation + login payload |
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/buildGuestLoginPayload.js` | Shared login payload builder (used by both `verifyGuestOtp` and `signupGuestSocial`) |
+| `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestAuthSocialSignup/GuestAuthSocialSignup.js` | API object definition |
+
+---
+
 ## POST /api/ForgotPassword — Step 1: Request OTP
 
 Sends a one-time password (OTP) to the user's registered email address.

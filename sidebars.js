@@ -69,6 +69,7 @@ const sidebars = {
           type: 'category',
           label: 'Guest APIs',
           items: [
+            'hms-documentation/guest-apis/guest-tenant-scoped-apis',
             {
               type: 'category',
               label: 'Guest Booking Flow',
@@ -222,6 +223,13 @@ const sidebars = {
               items: [
                 'api/guest-networking-details',
               ],
+            },
+            {
+              type: 'category',
+              label: 'Authentication',
+              items: [
+                'api/authentication',
+              ],
             }
           ],
         },
@@ -259,11 +267,14 @@ const sidebars = {
             'hms-documentation/tenant-governance/original-to-clone-propagation/original-to-clone-propagation',
           ],
         },
+        'hms-documentation/tenant-seed-data-requirements',
         {
           type: 'category',
           label: 'Admin APIs',
           items: [
             'api/admin-code',
+            'hms-documentation/admin-apis/admin-create-guest-user',
+            'hms-documentation/admin-apis/admin-create-guest-booking',
           ],
         },
       ],

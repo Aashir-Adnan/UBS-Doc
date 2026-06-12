@@ -124,7 +124,7 @@ The `cancellation` metadata block on the booking object also updates:
 
 | Column | Before | After |
 |---|---|---|
-| `booking_status` | `'pending'` / `'confirmed'` | `'cancelled'` |
+| `booking_status` | `'confirmed'` (default) / `'pending'` | `'cancelled'` |
 | `cancellation_reason` | `NULL` | Provided reason text |
 | `cancelled_at` | `NULL` | Current timestamp |
 | `updated_by` | Previous value | `actionPerformerURDD` |

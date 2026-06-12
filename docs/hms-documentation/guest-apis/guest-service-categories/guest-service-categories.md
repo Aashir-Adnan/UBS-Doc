@@ -36,7 +36,7 @@ This endpoint takes no request parameters. Send an empty encrypted body.
 2. Excludes hidden categories (`networking`, `room-service`) which are internal-only per Phase 6.
 3. Deduplicates by `slug` — if multiple rows share the same slug, only one entry is returned (lowest `category_id` wins).
 4. For each category, resolves the `duration_unit` from `hms_config` (key: `duration_unit`). Falls back to `"session"` when no config row exists.
-5. For each category, batch-fetches amenity chips from `hms_config` (key: `keyword_tags`), deduplicating chips by key within each category.
+5. For each category, batch-fetches amenity chips from `hms_config` (key: `amenities_tags`, id 182), deduplicating chips by key within each category. **Note:** This must use `amenities_tags` (id 182), not `keyword_tags` (id 191). `keyword_tags` is for service-level classification tags (`additional_attributes.tags`), while `amenities_tags` is for category-level grouped amenity chips.
 6. Derives `standaloneBookable` — all categories are standalone-bookable except `stay`, which is the unit-assignment anchor and can only be booked as part of a package or room flow.
 7. Parses the `label` column as JSON (`{ en, ar }`). If it's a plain string, wraps it as `{ en: value, ar: "" }`.
 8. Results are ordered by `sort_order ASC`, then `category_id ASC`.
@@ -91,7 +91,7 @@ This endpoint takes no request parameters. Send an empty encrypted body.
 | `icon` | `string\|null` | Icon identifier for the category. |
 | `unit` | `string` | Duration unit for services in this category (`"night"`, `"meal"`, `"session"`, `"ride"`, `"visit"`). |
 | `standaloneBookable` | `boolean` | `true` for all categories except `stay`. Stay services require a room/package booking flow. |
-| `amenities` | `array` | Amenity chips associated with this category (from `keyword_tags` config). |
+| `amenities` | `array` | Amenity chips associated with this category (from `amenities_tags` config, id 182). Must not be confused with `keyword_tags` (id 191) which drives service-level classification tags. |
 | `amenities[].id` | `number` | `hms_config.id` of the chip row. |
 | `amenities[].key` | `string` | Machine-readable amenity key (e.g. `"wifi"`, `"pool"`). |
 | `amenities[].label` | `{ en, ar }` | Localized amenity label. |
@@ -117,3 +117,19 @@ The following category slugs are always excluded from this endpoint:
 | Status | Message | Condition |
 |---|---|---|
 | 500 | `Failed to fetch service categories` | Internal query or processing error. |
+
+---
+
+## Known Issues
+
+| Issue | Description | Fix Required |
+|---|---|---|
+| Keyword tags in amenities | The backend reads `keyword_tags` (id 191) instead of `amenities_tags` (id 182) for the `amenities` field. This causes service-level classification tags to appear as amenity chips. | Backend must change the config key lookup from `keyword_tags` to `amenities_tags` in the service-categories query. |
+
+---
+
+## Change Log
+
+| Date | Change |
+|---|---|
+| 2026-06-12 | Documented `amenities_tags` (id 182) vs `keyword_tags` (id 191) distinction. Amenities should source from `amenities_tags`, not `keyword_tags`. |

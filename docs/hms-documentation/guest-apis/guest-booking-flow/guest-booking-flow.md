@@ -175,7 +175,7 @@ Returns a full v2 booking bundle object:
         "quantity": 1,
         "unitPrice": 420,
         "totalPrice": 420,
-        "status": "pending"
+        "status": "confirmed"
       }
     ],
     "cancellation": {
@@ -190,7 +190,7 @@ Returns a full v2 booking bundle object:
 Key response fields:
 - `bookingId` — database primary key, used for all subsequent operations
 - `id` — human-readable booking number (e.g. `"BK026892806908"`)
-- `status` — `"confirmed"` or `"pending"`
+- `status` — `"confirmed"` (default for new bookings)
 - `pricing` — breakdown of primary service, addons, discounts, and balance
 - `services` — addon services attached to the booking
 - `cancellation` — whether the booking can be cancelled and estimated refund
@@ -265,3 +265,4 @@ The test exercises all 7 steps above plus direct DB verification, and automatica
 | Date | Change |
 |------|--------|
 | 2026-06-09 | Initial documentation of the end-to-end guest booking flow ([#252](https://github.com/UBS-Dev-Org/hms/issues/252)). |
+| 2026-06-12 | Default `booking_status` changed from `pending` to `confirmed` for new bookings. |

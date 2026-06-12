@@ -109,7 +109,7 @@ All fields are optional and sent in the encrypted request body.
         ]
       },
       "additional_attributes": {
-        "physical_dimension": { "L": 0, "W": 0, "H": 0 },
+        "physical_dimension": { "length": 0, "width": 0, "height": 0 },
         "tags": [{ "en": "luxury", "ar": "فاخر" }]
       }
     }
@@ -155,7 +155,7 @@ Returns a single service object with the same base fields as list items, plus ad
     ]
   },
   "additional_attributes": {
-    "physical_dimension": { "L": 0, "W": 0, "H": 0 },
+    "physical_dimension": { "length": 0, "width": 0, "height": 0 },
     "tags": [{ "en": "premium", "ar": "متميز" }]
   },
   "maxAdults": 4,
@@ -411,3 +411,4 @@ node Services/SysScripts/TestScripts/sim/guestDataAuditAndSeed.js
 | 2026-06-10 | `formSchema` is now always `[]` (never undefined) on detail objects when a category has no form fields. Previously only attached when non-empty. |
 | 2026-06-10 | `fetchFormSchema` dropdown resolution now falls back to `hms_config_possible_values.config_id` FK when `hms_config_keys.possible_values` column is NULL or has no entries for the requested category. Also handles `{label:{en,ar}, key}` possible value shape. |
 | 2026-06-10 | Fixed publish date filter mismatch between detail SQL and searchQueries.js. Detail SQL now uses `COALESCE($.en, $[0])` to handle both config value shapes, matching the landing/search queries. Harmonized visibility subquery to `CAST(id AS JSON)`. Added consistency tests and data audit/seed script. |
+| 2026-06-12 | Changed `physical_dimension` response keys from abbreviated `L`/`W`/`H` to full `length`/`width`/`height`. Seed data updated accordingly. |
