@@ -30,7 +30,7 @@ The refresh token JWT itself is **only returned to the client** — the server s
 ## Token Lifecycle Diagram
 
 ```
-Guest Login (OTP verify)
+Guest Login (OTP verify OR social signup)
   │
   ├─► access token  (15 min TTL)  ──► used for API calls
   └─► refresh token (24 hr TTL)   ──► client stores for later refresh
@@ -290,3 +290,16 @@ WHERE user_device_id = ? AND user_id = ? AND status = 'active';
 | Expired < 10 min ago | `POST /api/auth/refresh` with valid refresh token | **New access + refresh pair** returned; DB updated |
 | Expired ≥ 10 min ago | `POST /api/auth/refresh` | **401 access_expired_beyond_grace** — must re-authenticate via OTP |
 | Expired (any age) | Any authenticated API call | **401 Token Expired** — use refresh API or re-authenticate |
+
+---
+
+## Login Methods
+
+Guest tokens are issued by two endpoints, both producing the same token pair:
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `POST /api/guest/auth/verify-otp` | OTP | Email-based OTP login (send-otp → verify-otp) |
+| `POST /api/guest/auth/social-signup` | OAuth | Social provider login/signup (Google, Apple, Firebase) — signup-or-login in one call |
+
+Both return the same response shape: `{ access_token, refreshToken, expiresIn, tenantUrddMap, user, ... }`. The token lifecycle (auto-renewal, refresh, expiry) works identically regardless of login method.
