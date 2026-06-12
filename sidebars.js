@@ -266,6 +266,7 @@ const sidebars = {
             },
           ],
         },
+        'hms-documentation/tenant-seed-data-requirements',
         {
           type: 'category',
           label: 'Admin APIs',
