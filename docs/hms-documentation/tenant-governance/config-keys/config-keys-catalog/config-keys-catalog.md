@@ -413,7 +413,7 @@ Two slugs deliberately exist twice — disambiguate by `id` / `category_id`:
 | 79 | `payment_timing` | Payment Timing | svc,pkg | booking | `*` | dropdown | —/✓ | When payment is collected (at booking, at service, partial deposit). |
 | 80 | `deposit_amount` | Deposit Amount | svc,pkg | booking | `[1,"package"]` | deposit_form | —/— | Deposit collected at booking. JSON `{type:"percent"\|"fixed",value}`. |
 | 81 | `accepted_payment_methods` | Accepted Payment Methods | svc,pkg | booking | `*` | multi_checkbox | —/✓ | Accepted payment methods (mada, apple_pay, visa, …). |
-| 82 | `cancellation_margin` | Cancellation Margin | svc,pkg | booking | `*` | cancellation_form | —/— | Cancellation policy template (`free >72h, 50% 24-72h, 100% <24h` by default). |
+| 82 | `cancellation_margin` | Cancellation Margin | svc,pkg | booking | `*` | cancellation_form | —/— | Cancellation policy template (free >72h, 50% 24-72h, 100% <24h by default). |
 | 84 | `extension_allowed` | Extension Allowed | svc,pkg | consumption | `[1,6,7,"package"]` | checkbox | —/— | Whether the stay or session can be extended. Default: true for Stay. |
 | 85 | `extension_unit` | Extension Unit | svc | consumption | `[1,"package"]` | max_extension_length_label | —/— | Unit for stay extension. Default: night. |
 | 86 | `max_extension_length` | Maximum Extension Length | svc | consumption | `[1,"package"]` | number | —/— | Max extension length in the configured unit. |

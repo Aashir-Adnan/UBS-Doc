@@ -31,9 +31,9 @@ Two consequences a newcomer should internalise:
 
 ```
         assign (POST)                  edit by tenant            propagate (PUT)            revoke (DELETE)
-SaaS-global ───────────► tenant clone ───────────► customised ──────────────► (kept,        ───────────► inactive clone
- original    deep-clone   (created_by=URDD-B′)      clone        diff & flag    flagged        soft-delete   (id kept;
-                                                                 needs_review)  if diverged)                 reactivates on re-assign)
+SaaS-global ───────────► tenant clone ───────────► customised ──────────────► (unedited     ───────────► inactive clone
+ original    deep-clone   (created_by=URDD-B′)      clone        diff & sync    synced;        soft-delete   (id kept;
+                                                                 edited clones  left as-is)                  reactivates on re-assign)
 ```
 
 | Stage | Verb | Who | Effect |
@@ -57,6 +57,8 @@ SaaS-global ───────────► tenant clone ──────
 
 > `assign` and `revoke` are **not** separate routes — they are POST and DELETE on the *same* object. The "verb" is the HTTP method.
 
+> **`config_key` is cascade-only for assign/revoke.** POST/DELETE reject it with a **400** — config keys clone/soft-delete only as a side effect of their `service_category` (§5, §6.3, §7). PUT (**propagate**), GET (**View**), and GET (**List**) still accept `config_key`.
+
 ---
 
 ## 4. Request payload
@@ -73,12 +75,16 @@ All verbs share one field set:
 
 ```json
 {
-  "resource_type": "config_key",
-  "source_id": 67,
+  "resource_type": "service_category",
+  "source_id": 31,
   "target_tenant_id": 12,
   "actionPerformerURDD": 5
 }
 ```
+
+> **`config_key` is not a directly assignable type.** Config keys are assigned and
+> revoked **only** as a side effect of their **service category** (§5, §6.3, §7). A
+> direct `config_key` assign/revoke is rejected with a **400**.
 
 > **`source_id` vs `clone_id` — don't mix them up.** `source_id` is the id of the *global original* (used to assign/propagate). `clone_id` is the PK of the *tenant's copy* (used to revoke/view). Assigning by clone id, or revoking by source id, is a common first mistake.
 
@@ -92,12 +98,14 @@ All verbs share one field set:
 
 | Path | Types | Lineage column | What's special |
 |---|---|---|---|
-| **Source-tracked deep clone** | `config_key`, `service_category`, `scenario_config` | `source_*_id` | Carries a lineage column pointing back to the global original, so `propagate` can re-sync it later. Each delegates to a dedicated deep-clone helper. |
+| **Source-tracked deep clone** | `service_category` | `source_*_id` | Carries a lineage column pointing back to the global original, so `propagate` can re-sync it later. Delegates to a dedicated deep-clone helper. |
 | **Simple clone** | `location_type` | — | No lineage; tenancy is *only* `created_by = URDD-B′`. Copies all columns except PK/timestamps. The admin may override `parent_id` at assign time. |
+
+**Cascade-only — `config_key`.** Config keys still deep-clone (with a `source_hms_config_key_id` lineage column, and they remain **propagatable**, **viewable**, and **listable**), but they are **no longer assigned or revoked on their own**. A config key rides on its **service category**: assigning a `service_category` cascade-clones every SaaS-global key whose `applies_to` includes that category (or is `*`); revoking the category cascade-revokes the keys it leaves orphaned. A direct `resource_type: "config_key"` POST/DELETE is rejected with a **400** ("assigned automatically with its service category"). See §6.3 and §7.
 
 **Not assignable — shared reference data.** `currency`, `region`, `country`, and `supported_payment_method` are platform-global reference data (tenancy-exempt — shared with every tenant via the resolver, never cloned). Every verb rejects them with a **400**, and List returns `[]`. The old per-tenant clones of these were retired by a migration. (See the exempt-tables list in [governance-model.md](../tenant-governance-model/governance-model.md#45-exempt-tables-shared-reference-data).)
 
-> Why two paths? Source-tracked types are *configuration* that the platform keeps improving, so they need a lineage link to support re-sync. `location_type` is a simple lookup with no such need — copying it plainly is enough.
+> Why two paths? Source-tracked types are *configuration* that the platform keeps improving, so they need a lineage link to support re-sync. `location_type` is a simple lookup with no such need — copying it plainly is enough. **Config keys** are source-tracked too, but the platform models them as *belonging to* a service category, so they cascade from it rather than being picked individually.
 
 ---
 
@@ -110,53 +118,63 @@ When a `POST` arrives:
 3. **Reactivate-after-revoke.** If the existing clone is `inactive`, flip it back to `active` in place — keeping its id and any tenant edits — and return `reactivated: true`.
 4. **Clone.** Deep-clone (or simple-copy) the row, stamping `created_by = URDD-B′`.
 
-### 6.1 Worked example — assign a config key
+### 6.1 Worked example — assign a service category (config keys cascade)
 
 ```http
 POST /api/tenantAssignmentsGroupedCrud
-{ "resource_type": "config_key", "source_id": 67,
+{ "resource_type": "service_category", "source_id": 31,
   "target_tenant_id": 12, "actionPerformerURDD": 5 }
 ```
 
 Response (first time):
 
 ```json
-{ "success": true, "clone_id": 412, "resource_type": "config_key",
-  "source_id": 67, "target_tenant_id": 12, "already_existed": false }
+{ "success": true, "clone_id": 205, "resource_type": "service_category",
+  "source_id": 31, "target_tenant_id": 12, "already_existed": false }
 ```
 
-Now Hotel 12 owns clone `412` of the `base_price` key, and the Tenant Admin can configure it via the [config-keys API](../config-keys/config-keys.md). Calling the same assign again returns `already_existed: true` with the same `clone_id`.
+Now Hotel 12 owns clone `205` of the Stay category — **and**, in the same transaction, every SaaS-global config key that applies to Stay (e.g. `base_price`) has been cloned into Hotel 12 too, plus the eager Service-Manager RDD (§6.3). The Tenant Admin can configure those cloned keys via the [config-keys API](../config-keys/config-keys.md). Calling the same assign again returns `already_existed: true` with the same `clone_id` (the cascade re-affirms the keys idempotently).
+
+> Trying to assign `config_key` directly — `{ "resource_type": "config_key", ... }` — is rejected with **400** "assigned automatically with its service category". Assign the relevant service category instead.
 
 ### 6.2 Bulk assign / revoke
 
 Pass an **id array** to assign or revoke many at once; the shared attributes (`resource_type`, `target_tenant_id`, `actionPerformerURDD`) stay on the wire once. Each item runs in its **own transaction**, so one bad id (404, a guard 409, a revoke blocked by dependents) is reported in its own slot without rolling back or blocking the others:
 
 ```json
-{ "success": true, "bulk": true, "resource_type": "config_key",
+{ "success": true, "bulk": true, "resource_type": "service_category",
   "total": 3, "succeeded": 2, "failed": 1,
   "results": [
-    { "success": true,  "clone_id": 412, "source_id": 67, "already_existed": false },
-    { "success": true,  "clone_id": 413, "source_id": 68, "already_existed": true  },
+    { "success": true,  "clone_id": 205, "source_id": 31, "already_existed": false },
+    { "success": true,  "clone_id": 206, "source_id": 32, "already_existed": true  },
     { "success": false, "source_id": 99, "statusCode": 404, "error": "source not found" }
   ] }
 ```
 
 Top-level `success` is `failed === 0`. A **single** id returns the familiar single-object shape, byte-for-byte unchanged — so callers that send one id never have to handle the bulk envelope.
 
-### 6.3 Side effect — assigning a `service_category`
+### 6.3 Side effects — assigning a `service_category`
 
-Assigning a `service_category` also, **in the same transaction**, eagerly clones the per-category **Service Manager RDD** (`Manager` / `<category>` designation / the hotel's department `TENANT_<code>`, owned by URDD-B′). This means the Service Manager persona shows up in RDD pickers **immediately**, before any Service Manager is actually provisioned. (The lazy provisioning path later dedups onto this same RDD.)
+Assigning a `service_category` triggers two cascades **in the same transaction**:
+
+**(a) Config keys cascade-clone.** Every SaaS-global config key (`source_hms_config_key_id IS NULL`, active) whose `applies_to` includes this category — or is the bare `*` sentinel — is deep-cloned into the tenant (`assignConfigKeysForCategory`). The clone is **idempotent and status-aware**, so:
+- a key **shared** with a category the tenant already owns is cloned **once** (the second category just re-affirms it and back-fills its values);
+- a key clone that was **previously revoked** (because its last owning category was revoked) is **reactivated in place**, keeping its id and any tenant edits — the re-assign-after-revoke path.
+
+Because the category clone exists before the cascade runs, every cloned key has at least one in-scope owned category, so the [D5 guard](#64-config-key-clone-specifics) never trips on this path.
+
+**(b) Eager Service-Manager RDD.** The per-category **Service Manager RDD** (`Manager` / `<category>` designation / the hotel's department `TENANT_<code>`, owned by URDD-B′) is cloned so the Service Manager persona shows up in RDD pickers **immediately**, before any Service Manager is provisioned. (The lazy provisioning path later dedups onto this same RDD.)
 
 > This is the re-modelled shape: the category lives on the **designation**, and the SM's department is the hotel. There is no longer a per-category `DEPT_<code>` department.
 
 ### 6.4 Config-key clone specifics
 
-The `config_key` deep clone is scoped to the tenant's **owned categories** and is order-independent:
+A config key only ever clones via its category cascade (§6.3a). Each clone is scoped to the tenant's **owned categories** and is order-independent:
 
 - **`applies_to`** — the bare `*` sentinel is preserved as `*`; an explicit id array is filtered to the tenant's owned category ids.
 - **Values** — service-scope possible values (`hms_config`) are cloned **only for owned categories ∩ `applies_to`**, remapped to the tenant's category ids. `possible_values` is **rebuilt** from the cloned rows (never copied); `enabled_for` is **pruned** to owned categories. Applied-value data in `services`/`packages` is **never** cloned.
-- **D5 guard** — assigning a category-scoped key when the tenant owns *no* in-scope category → **409 "assign the relevant service categories first"** (package-only keys are exempt).
-- **Back-sync** — assigning a `service_category` *after* its configs already exist back-fills that category's possible values and `enabled_for` flag.
+- **D5 guard** — the deep-clone helper still refuses to clone a category-scoped key with *no* in-scope owned category (**409**), but the category cascade always satisfies it (the category was just assigned). Package-only keys are exempt — and, having no category scope, are never pulled in by the cascade.
+- **Back-sync** — assigning a `service_category` *after* its keys were already cloned (for a different category) back-fills that category's possible values and `enabled_for` flag onto the existing clones (`backfillCategoryAcrossConfigKeys`), so the order in which categories are assigned never matters.
 - **`category_id` is copied verbatim, not remapped.** A key's `category_id` is a FK to the framework-global `hms_config_categories` lookup (the admin-UI grouping), **not** `service_categories`. Remapping it through the category-id map would point it at a non-existent row and break the FK. (The id-remap *does* apply to the genuine `service_categories` references — `applies_to`, `enabled_for`, `hms_config.record_id`.)
 
 ---
@@ -169,11 +187,15 @@ Revoke is a **soft-delete** (`status = 'inactive'`) gated by a **dependency chec
 |---|---|
 | `service_category` | `services` / `packages` / `delivery_units` |
 | `location_type` | `service_locations` |
-| `config_key` / `scenario_config` | nothing (no hard FK) — never blocked |
+| `config_key` | not directly revocable — cascades from its `service_category` (no dependency check) |
 
-A blocked revoke returns **409** with a `dependents` array listing what's in the way. Source-tracked types also require a non-null `source_*_id` (it refuses to revoke a row that isn't actually a clone). Revoking a `service_category` **cascades**: its value rows are soft-deleted and the category is pruned from every clone key's `possible_values` / `enabled_for` / `applies_to`.
+A blocked revoke returns **409** with a `dependents` array listing what's in the way. Source-tracked types also require a non-null `source_*_id` (it refuses to revoke a row that isn't actually a clone).
 
-Revoking is reversible: a later assign of the same resource **reactivates** the inactive clone in place (§6 step 3), preserving its id and the tenant's edits.
+**Revoking a `service_category` cascades to its config keys.** First (`cascadeCategoryRevoke`) the category's value rows are soft-deleted and the category is pruned from every clone key's `possible_values` / `enabled_for` / `applies_to`. Then (`cascadeRevokeOrphanedConfigKeys`) the key clones this **orphans** are soft-deleted — but **only** those with no owning category left:
+
+> A config key shared across several categories survives until **every** owning category is revoked. A `*` clone is orphaned only when the tenant owns **zero** active categories; an explicit-array clone is orphaned only when **none** of its `applies_to` ids is still an owned-active category. (The just-revoked category is already `inactive` when this runs, so it is excluded from the recomputed scope.)
+
+Revoking is reversible: a later assign of the same resource **reactivates** the inactive clone in place (§6 step 3), preserving its id and the tenant's edits — including the cascade-revoked config keys, which reactivate when their category is re-assigned. `config_key` itself **cannot** be revoked directly (it is cascade-only — a direct `config_key` DELETE is rejected with a **400**).
 
 ---
 
@@ -181,8 +203,10 @@ Revoking is reversible: a later assign of the same resource **reactivates** the 
 
 Clones never auto-update. **Propagate** is the SaaS Admin's *explicit* re-sync of an edited global original into its clones. This `PUT` diffs the original against each clone and:
 
-- **auto-updates** clones that haven't diverged → returned in `updated[]`
-- **flags** clones the tenant has already customised for manual review → returned in `conflicts[]`
+- **auto-updates** clones the tenant hasn't edited since creation → returned in `updated[]`
+- **leaves untouched** clones the tenant has already customised — never overwritten, no status change → returned in `conflicts[]`
+
+> Full algorithm (edit-detection, the `enabled_for` merge, why no status flag is written) is in [original-to-clone-propagation.md](../original-to-clone-propagation/original-to-clone-propagation.md).
 
 ```http
 PUT /api/tenantAssignmentsGroupedCrud
@@ -207,7 +231,7 @@ It accepts a `source_id` **array** to batch several originals (one transaction p
 ## 10. Other behaviours worth knowing
 
 - **Audit.** Each assign/revoke writes an `audit_logs` row (`action = 'assign'|'revoke'`), wrapped so a missing `audit_logs` table is non-fatal.
-- **List is a cross-tenant admin read.** A Tenant Manager listing a *target* tenant's clones can't go through the generic List path — the tenancy filter would inject the *acting* tenant's URDDs and empty the result. So `listAssignedResources` resolves the scope explicitly (`created_by → URDD → tenant_id`) on its own connection. It excludes revoked clones (`status != 'inactive'`) but keeps `needs_review` rows. Per type, the match/revoke fields differ: `config_key`/`service_category`/`scenario_config` → `source_id` + `clone_id`; `location_type` → `type` + `id`.
+- **List is a cross-tenant admin read.** A Tenant Manager listing a *target* tenant's clones can't go through the generic List path — the tenancy filter would inject the *acting* tenant's URDDs and empty the result. So `listAssignedResources` resolves the scope explicitly (`created_by → URDD → tenant_id`) on its own connection. It excludes revoked clones (`status != 'inactive'`). Per type, the match/revoke fields differ: `config_key`/`service_category` → `source_id` + `clone_id`; `location_type` → `type` + `id`.
 - **One local transaction per call** (`START TRANSACTION` … `COMMIT`/`ROLLBACK`, connection released in `finally`). Bulk wraps one transaction *per item*.
 
 ---
@@ -229,12 +253,13 @@ All responses use the standard envelope: `{ success, data, meta, error }`. The p
 
 | Status | Message | Condition |
 |---|---|---|
+| 400 | `assigned/revoked automatically with its service category` | A direct `config_key` assign/revoke — config keys are cascade-only (assign/revoke the `service_category` instead). |
 | 400 | `resource_type is shared reference data` | `currency` / `region` / `country` / `supported_payment_method` — not assignable. |
 | 400 | `BAD_REQUEST` | Missing/invalid `resource_type`, `source_id`, or `clone_id`; `location_type` `parent_id` not owned. |
 | 403 | Forbidden (`E41`) | The actor lacks the `assign_*`/`revoke_*` permission. |
 | 404 | source / clone not found | `source_id` is not a SaaS-global original, or `clone_id` does not exist. |
 | 409 | `run provisioning first` | The tenant has no URDD-B′ — it was never provisioned. |
-| 409 | `assign the relevant service categories first` | **D5 guard** — a category-scoped `config_key` assigned with no owned in-scope category. |
+| 409 | `assign the relevant service categories first` | **D5 guard** inside the config-key deep clone — a category-scoped key with no owned in-scope category. With config keys now cascading *from* the category assign, the category is always owned first, so this is effectively unreachable via the public API (kept as an internal safety net). |
 | 409 | revoke blocked (`{ dependents: [...] }`) | The clone still has active dependents (services / packages / delivery units / service locations). |
 
 ---
@@ -243,10 +268,9 @@ All responses use the standard envelope: `{ success, data, meta, error }`. The p
 
 | Table | Written when |
 |---|---|
-| `hms_config_keys` | `config_key` assign (clone INSERT / reactivate); propagate (clone UPDATE); revoke (soft-delete + cascade prune of `possible_values`/`enabled_for`/`applies_to`). |
-| `hms_config` / `hms_config_possible_values` | `config_key` assign (cloned value rows); `service_category` revoke (cascade soft-delete). |
+| `hms_config_keys` | `service_category` assign (cascade clone INSERT / reactivate of in-scope keys); propagate (clone UPDATE); `service_category` revoke (cascade prune of `possible_values`/`enabled_for`/`applies_to`, then soft-delete of orphaned key clones). |
+| `hms_config` / `hms_config_possible_values` | `service_category` assign (cloned value rows for the cascaded keys); `service_category` revoke (cascade soft-delete). |
 | `service_categories` | `service_category` assign (clone INSERT); revoke (soft-delete). |
-| `hms_scenario_config` | `scenario_config` assign (clone INSERT, remapped `hms_config.id` refs). |
 | `location_type` | `location_type` assign (simple clone INSERT). |
 | `roles_designations_department` | `service_category` assign — eager per-category Service-Manager RDD clone. |
 | `audit_logs` | Every assign / revoke (`action='assign'|'revoke'`; non-fatal if absent). |
@@ -259,6 +283,7 @@ All clones are stamped `created_by = URDD-B′`.
 
 | Date | Change |
 |---|---|
+| 2026-06-12 | **`config_key` is now cascade-only.** Config keys are no longer assigned/revoked individually — assigning a `service_category` cascade-clones every in-scope key (`applies_to` ⊇ the category, or `*`); revoking it cascade-revokes the keys it orphans (a key shared across categories survives until its last owning category is revoked). Direct `config_key` assign/revoke → **400**; propagate / View / List unchanged. (`assignConfigKeysForCategory` / `cascadeRevokeOrphanedConfigKeys`.) |
 | 2026-06-10 | Initial documentation of the assign / revoke / propagate API. |
 | 2026-06-09 | Persona re-model — the Service-Manager category moved onto the **designation**; the eager SM RDD now uses the tenant's hotel department `TENANT_<code>` (the per-category `DEPT_<code>` department is no longer created). |
 | 2026-06-05 | `currency` / `region` / `country` / `supported_payment_method` reclassified as shared reference data (no longer assignable); pre-existing clones deactivated by migration `20260605_6`. |

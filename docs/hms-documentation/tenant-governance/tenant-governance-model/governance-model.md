@@ -35,7 +35,7 @@ The governance model is the four-tier structure that expresses this, and it is b
 A narrative for each, so the table isn't abstract:
 
 - **SaaS Admin** is the platform owner's "build the product" hat. When the SaaS Admin adds a new config key like `base_price`, *no hotel has it yet* — it exists only at the platform level.
-- **Tenant Manager** is the platform owner's "run the business" hat. It creates a new hotel ("provision a tenant"), then hands that hotel the framework pieces it needs by **assigning** them (e.g. "give Hotel X the Stay category and the `base_price` key"). Assigning is where cloning happens (§5).
+- **Tenant Manager** is the platform owner's "run the business" hat. It creates a new hotel ("provision a tenant"), then hands that hotel the framework pieces it needs by **assigning** them (e.g. "give Hotel X the Stay category" — its config keys, including `base_price`, come with it, since config keys cascade from their service category). Assigning is where cloning happens (§5).
 - **Tenant Admin** logs in for one hotel and configures it: turns config keys on/off for their categories, sets prices, manages staff.
 - **Service Manager** is scoped down to a single category in a single hotel — e.g. the Dining manager at Hotel X sees and edits only Dining services there.
 
