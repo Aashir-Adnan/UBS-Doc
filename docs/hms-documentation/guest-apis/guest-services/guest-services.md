@@ -108,9 +108,19 @@ All fields are optional and sent in the encrypted request body.
           { "title": "Very good", "description": "Great stay overall." }
         ]
       },
+      "isConsumable": false,
+      "consumptionLimit": null,
+      "operatingHours": [
+        { "dayOfWeek": 0, "open": "14:00", "close": "22:00" },
+        { "dayOfWeek": 1, "open": "14:00", "close": "22:00" }
+      ],
+      "amenities": [
+        { "key": "king-bed", "icon": "king_bed", "label": { "en": "King Bed", "ar": "سرير كينغ" }, "group": { "key": "beds", "en": "Beds", "ar": "أسرّة" } }
+      ],
       "additional_attributes": {
         "physical_dimension": { "length": 0, "width": 0, "height": 0 },
-        "tags": [{ "en": "luxury", "ar": "فاخر" }]
+        "tags": [{ "en": "luxury", "ar": "فاخر" }],
+        "maxQuantityPerBooking": 1
       }
     }
   ],
@@ -156,19 +166,35 @@ Returns a single service object with the same base fields as list items, plus ad
   },
   "additional_attributes": {
     "physical_dimension": { "length": 0, "width": 0, "height": 0 },
-    "tags": [{ "en": "premium", "ar": "متميز" }]
+    "tags": [{ "en": "premium", "ar": "متميز" }],
+    "maxQuantityPerBooking": 5
   },
   "maxAdults": 4,
   "maxChildren": 2,
   "minAdults": 1,
   "minNights": null,
   "maxNights": null,
+  "maxQuantityPerBooking": 5,
   "sessionDurationMinutes": 120,
+  "isConsumable": false,
+  "consumptionLimit": null,
+  "operatingHours": [
+    { "dayOfWeek": 0, "open": "09:00", "close": "21:00" },
+    { "dayOfWeek": 1, "open": "09:00", "close": "21:00" },
+    { "dayOfWeek": 2, "open": "09:00", "close": "21:00" }
+  ],
   "category": {
     "id": 2,
     "name": "Dining"
   },
-  "amenities": [],
+  "amenities": [
+    {
+      "key": "halal",
+      "icon": "verified",
+      "label": { "en": "Halal", "ar": "حلال" },
+      "group": { "key": "dietary", "en": "Dietary", "ar": "النظام الغذائي" }
+    }
+  ],
   "cancellation_info": {
     "margin": { "en": "", "ar": "" },
     "exceptions": { "en": "", "ar": "" }
@@ -274,8 +300,8 @@ Possible value JSON supports three shapes:
 |---|---|---|---|
 | `id` | `number` | Both | Service ID. |
 | `hotelId` | `number` | Both | Hotel/tenant ID. |
-| `name` | `{ en, ar }` | Both | Localized service name. |
-| `description` | `{ en, ar }` | Both | Localized description. |
+| `name` | `object` | Both | Localized service name. |
+| `description` | `object` | Both | Localized description. |
 | `base_price` | `number` | Both | Original price before pricing rules. |
 | `current_price` | `number` | Both | Price after active pricing rules applied. |
 | `currency` | `string` | Both | Currency code (e.g. `"SAR"`). |
@@ -293,10 +319,14 @@ Possible value JSON supports three shapes:
 | `minNights` | `number\|null` | Detail | Minimum stay nights (stay category only). |
 | `maxNights` | `number\|null` | Detail | Maximum stay nights (stay category only). |
 | `sessionDurationMinutes` | `number\|null` | Detail | Session duration in minutes (from `slot_duration_minutes`). |
+| `maxQuantityPerBooking` | `number` | Both | Maximum times this service can be booked in a single reservation (default: 1). From `max_quantity_per_booking` config. |
+| `isConsumable` | `boolean` | Both | Whether consumption tracking is enabled. Always `false` for standalone services; overridden by `package_services.is_consumable` inside packages. |
+| `consumptionLimit` | `number\|null` | Both | Maximum consumption per session/period. Always `null` for standalone services; overridden by `package_services.consumption_limit` inside packages. |
+| `operatingHours` | `array` | Both | Weekly operating hours from `unit_availability`. Each entry: `{ dayOfWeek: 0-6, open: "HH:MM", close: "HH:MM" }`. 0=Sun, 6=Sat. Empty array if no availability windows configured. |
 | `category` | `{ id, name }` | Detail | Service category info. |
-| `amenities` | `array` | Detail | Category amenities list. |
+| `amenities` | `array` | Both | Service amenities. Each entry has `key`, `icon` (Material icon name), `label` (bilingual object), `group` (bilingual object with `key`). |
 | `cancellation_info` | `object` | Detail | Cancellation margin and exceptions. |
-| `termsAndConditions` | `{ en, ar }` | Detail | Terms and conditions text. |
+| `termsAndConditions` | `object` | Detail | Terms and conditions text. |
 | `formSchema` | `array` | Detail | Booking form fields for this service's category. Empty array if none configured. |
 | `formSchema[].key` | `string` | Detail | Machine-readable field key (e.g. `"full_name"`, `"meal_type"`). |
 | `formSchema[].label` | `string` | Detail | Human-readable field label. |
@@ -358,7 +388,7 @@ Fetches the landing feed, then individually fetches the detail for every package
 | Step | Tests | What it proves |
 |---|---|---|
 | 1: Fetch landing | 1 | Landing returns items (packages + services). |
-| 2: Landing shapes | ~72 | Every landing object has valid `name.en`, `images[]` (number array), `additional_attributes.tags[]` ({en,ar} pairs), `rating` (star breakdown + reviews array with title/description), `base_price`, `current_price`, `currency`. |
+| 2: Landing shapes | ~72 | Every landing object has valid `name.en`, `images[]` (number array), `additional_attributes.tags[]` (bilingual pairs), `rating` (star breakdown + reviews array with title/description), `base_price`, `current_price`, `currency`. |
 | 3: Package detail | ~100 | Every landing package fetched via `GET /guest/packages` with `{id}` in body returns a non-null detail with `services[]` line items, each having `id`, `name`, `packageServiceId`, `images`, `category`, `amenities`, `cancellation_info`, `termsAndConditions`. |
 | 4: Service detail | ~75 | Every landing service fetched via `GET /guest/services` with `{serviceId}` in body returns a non-null detail with `category`, `amenities`, `cancellation_info`, `termsAndConditions`. |
 | 5: Search consistency | 1 | Every landing item also appears in `GET /guest/search/filter` results — no filter divergence. |
@@ -372,7 +402,7 @@ Audits all published packages and services for required data fields. Seeds missi
 | Field | Config key | Seeded value |
 |---|---|---|
 | `images` | `media` | Reuses existing attachment IDs from other configs. |
-| `tags` | `keyword_tags` | Reuses existing tag from another config, or `{en:"Popular", ar:"شائع"}`. |
+| `tags` | `keyword_tags` | Reuses existing tag from another config, or a bilingual Popular/شائع tag. |
 | `base_price` | `base_price` | `{"en":"500"}` |
 | `currency` | `base_currency` | SAR currency ID reference. |
 | `rating/reviews` | `feedback` table | 3 sample reviews (5-star, 4-star, 5-star). |
@@ -409,6 +439,7 @@ node Services/SysScripts/TestScripts/sim/guestDataAuditAndSeed.js
 |---|---|
 | 2026-06-11 | Added `maxAdults`, `maxChildren`, `minAdults`, `minNights`, `maxNights`, `sessionDurationMinutes` to the detail response field reference. `maxAdults` and `maxChildren` use the new dedicated config keys, falling back to `max_persons_per_booking` and `max_children_per_guardian` respectively. |
 | 2026-06-10 | `formSchema` is now always `[]` (never undefined) on detail objects when a category has no form fields. Previously only attached when non-empty. |
-| 2026-06-10 | `fetchFormSchema` dropdown resolution now falls back to `hms_config_possible_values.config_id` FK when `hms_config_keys.possible_values` column is NULL or has no entries for the requested category. Also handles `{label:{en,ar}, key}` possible value shape. |
+| 2026-06-10 | `fetchFormSchema` dropdown resolution now falls back to `hms_config_possible_values.config_id` FK when `hms_config_keys.possible_values` column is NULL or has no entries for the requested category. Also handles bilingual label + key possible value shape. |
 | 2026-06-10 | Fixed publish date filter mismatch between detail SQL and searchQueries.js. Detail SQL now uses `COALESCE($.en, $[0])` to handle both config value shapes, matching the landing/search queries. Harmonized visibility subquery to `CAST(id AS JSON)`. Added consistency tests and data audit/seed script. |
+| 2026-06-14 | Added `isConsumable`, `consumptionLimit`, `operatingHours`, `maxQuantityPerBooking` to all service response modes. Added `icon` to amenity objects (Flutter Material icon name). |
 | 2026-06-12 | Changed `physical_dimension` response keys from abbreviated `L`/`W`/`H` to full `length`/`width`/`height`. Seed data updated accordingly. |

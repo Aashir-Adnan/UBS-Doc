@@ -152,8 +152,8 @@ If no availability exists within the 30-day scan window, `nextAvailable` is `nul
 | `checkIn` | `string` | Requested check-in date. |
 | `checkOut` | `string` | Requested check-out date. |
 | `nights` | `number` | Number of nights. |
-| `rooms` | `array` | Availability for each stay service (room type). |
-| `packages` | `array` | Availability for each package. |
+| `rooms` | `array\|object` | Availability for stay services. Array when listing all; single object when filtered by `serviceId`. Omitted when `packageId` is sent. |
+| `packages` | `array\|object` | Availability for packages. Array when listing all; single object when filtered by `packageId`. Omitted when `serviceId` is sent. |
 
 ### Room / Package Entry
 
