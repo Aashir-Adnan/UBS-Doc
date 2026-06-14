@@ -383,6 +383,7 @@ Two slugs deliberately exist twice — disambiguate by `id` / `category_id`:
 | 37 | `max_children_per_guardian` | Maximum Children Per Guardian | svc | booking | `[6]` | number | —/— | Max children per guardian in one Kids Center booking. Default: 4. |
 | — | `max_adults` | Maximum Adults | svc,pkg | viewing | `*` | number | —/— | Maximum number of adults allowed per booking for any service or package. |
 | — | `max_children` | Maximum Children | svc,pkg | viewing | `*` | number | —/— | Maximum number of children allowed per booking for any service or package. |
+| — | `max_quantity_per_booking` | Maximum Quantity Per Booking | svc | viewing | `*` | number | —/— | Maximum number of times this service can be booked in a single reservation. Default: 1. Controls `quantity` parameter in booking APIs. Exposed as `maxQuantityPerBooking` and `additional_attributes.maxQuantityPerBooking` in guest responses. |
 | 38 | `min_stay_nights` | Minimum Stay Nights | svc | booking | `[1]` | number | —/— | Minimum stay length in nights. Default: 1. |
 | 39 | `max_stay_nights` | Maximum Stay Nights | svc | booking | `[1]` | number | —/— | Maximum stay length in nights. Default: 30. |
 | 40 | `appointment_required` | Appointment Required | svc | booking | `[9]` | checkbox | —/— | Whether an appointment slot is required. |
@@ -587,6 +588,7 @@ See [config-keys.md](../config-keys.md) for the CRUD contract behind the first f
 
 | Date | Change |
 |---|---|
+| 2026-06-14 | Added `max_quantity_per_booking` config key (availability category, booking group, `applies_to = *`). Controls multi-quantity service bookings. Migration `20260614_1`. |
 | 2026-06-11 | Added `max_adults` and `max_children` config keys (Audience category, party group, `applies_to = *`). Migration `20260611_3`. |
 | 2026-06-11 | Synced keys `27`/`35`/`36` (rename + `applies_to` re-scope, `20260610_*`) and `63` `access_scope` (option order → default public, `20260611_1`) — originals only; tenant clones untouched (issue #229 B/D). |
 | 2026-06-10 | Documented the read-only Catalog API (List + View, dual-locale, tenancy-scoped). |

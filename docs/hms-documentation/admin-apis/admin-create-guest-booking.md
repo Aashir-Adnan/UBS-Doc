@@ -67,6 +67,7 @@ Each delegate runs the **exact same business logic** as the guest-facing endpoin
 | `checkOut` | `string` | Conditional | Check-out date (`YYYY-MM-DD`). Required for room bookings. |
 | `adults` | `number` | No | Number of adult guests (default: 1) |
 | `children` | `number` | No | Number of child guests (default: 0) |
+| `quantity` | `number` | No | Number of times to book the service (default: 1). Only for standalone service bookings. Capped by `max_quantity_per_booking` config. Price = unit price × quantity. |
 | `specialRequests` | `string` | No | Free-text special requests |
 
 ### Service Scheduling (for standalone service bookings)
@@ -87,7 +88,7 @@ Each delegate runs the **exact same business logic** as the guest-facing endpoin
 
 | Field | Type | Description |
 |---|---|---|
-| `addons` | `array` | Extra services beyond the primary booking. Each: `{ serviceId, sessions?, meals?, transport? }` |
+| `addons` | `array` | Extra services beyond the primary booking. Each: `{ serviceId, quantity?, sessions?, meals?, transport? }`. Optional `quantity` (default: 1) books multiple units; capped by `max_quantity_per_booking`. |
 
 ### Form Data
 
@@ -294,6 +295,7 @@ All existing booking validations apply — the admin does not bypass any busines
 |---|---|
 | Min/max stay nights | Room bookings |
 | Min/max persons per booking | Room, package, service bookings |
+| Max quantity per booking | Service bookings, addons (capped by `max_quantity_per_booking` config) |
 | Advance booking window (min/max days) | All booking types |
 | Blackout dates | All booking types |
 | Weekday arrival restriction | Package bookings |

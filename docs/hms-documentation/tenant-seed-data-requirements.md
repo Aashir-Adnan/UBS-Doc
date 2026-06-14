@@ -75,6 +75,7 @@ Almost every guest-facing response field comes from `hms_config` + `hms_config_k
 | `terms_and_conditions` | T&C text (bilingual JSON) | `termsAndConditions` |
 | `max_adults` | Maximum adult guests | `maxAdults` |
 | `max_children` | Maximum child guests | `maxChildren` |
+| `max_quantity_per_booking` | Max times service can be booked in one reservation (default: 1) | `maxQuantityPerBooking`, `additional_attributes.maxQuantityPerBooking` |
 | `advance_booking_min_days` | Minimum days ahead for booking | GuestServicesAvailability guard |
 | `advance_booking_max_days` | Maximum days ahead for booking | GuestServicesAvailability guard |
 | `blackout_dates` | Blocked date ranges (JSON array) | GuestServicesAvailability guard |
@@ -98,6 +99,7 @@ Almost every guest-facing response field comes from `hms_config` + `hms_config_k
 | `terms_and_conditions` | T&C (bilingual JSON) | `termsAndConditions` |
 | `max_adults` | Capacity | `maxAdults` |
 | `max_children` | Capacity | `maxChildren` |
+| `max_quantity_per_booking` | Max times package can be booked in one reservation (default: 1) | `additional_attributes.maxQuantityPerBooking` |
 | `weekday_arrival_restriction` | Allowed check-in days | `allowedCheckInDays` |
 
 #### Config Keys Needed Per Category (`base_table='service_categories'`)

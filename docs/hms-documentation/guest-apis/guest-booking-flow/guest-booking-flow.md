@@ -135,6 +135,8 @@ Each service object is a minimal landing-card shape with `id`, `name`, `category
 
 Each addon in the `addons` array carries the `serviceId` plus an **optional scheduling block** whose shape depends on the service's category. If scheduling is omitted, the slot is created as `unscheduled` and the guest can schedule later via `PUT /guest/booking/reschedule`.
 
+Addons also support an optional `quantity` field (integer, default: 1). When `quantity` exceeds the number of provided scheduling entries, the remaining slots are created as `unscheduled`. Price is calculated as `unitPrice × quantity`.
+
 | Category slug | Scheduling field | Shape | Example |
 |---------------|-----------------|-------|---------|
 | `dining`, `room-service` | `meals` | `[{ date, mealType }]` | `{ "date": "2026-07-14", "mealType": "breakfast" }` |

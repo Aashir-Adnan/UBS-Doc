@@ -20,6 +20,7 @@ Uses **AUTH_PLATFORM** — requires a valid guest JWT (`accessToken`). The guest
 |---|---|---|---|
 | `serviceId` | `number` | Yes | The service to book. Must not be a stay-category service. |
 | `hotelId` | `number` | No | Hotel/tenant ID. If omitted, derived from the service record. |
+| `quantity` | `number` | No | Number of times to book this service (default: 1). Capped by the service's `max_quantity_per_booking` config. Price = unit price × quantity. |
 | `sessions` | `array` | No | For session-based services (spa, barber, gym). Each entry: `{ date, slot }`. |
 | `meals` | `array` | No | For dining/room-service. Each entry: `{ date, mealType }`. |
 | `transport` | `object` | No | For transport services: `{ tripType, pickupDateTime, pickupLocation, dropoffLocation, passengers }`. |
@@ -107,6 +108,23 @@ Kids Center bookings require guardian details in `formData` and scheduling in `s
 }
 ```
 
+### Example: Multi-quantity booking (3 spa sessions)
+
+```json
+{
+  "actionPerformerURDD": 16,
+  "serviceId": 55,
+  "quantity": 3,
+  "sessions": [
+    { "date": "2026-07-02", "slot": "10:00-11:00" },
+    { "date": "2026-07-03", "slot": "10:00-11:00" }
+  ],
+  "adults": 1
+}
+```
+
+When `quantity` exceeds the number of provided scheduling entries, the remaining slots are created as `unscheduled`. In this example, 2 sessions are scheduled and 1 is unscheduled (to be scheduled later via reschedule). The total price = unit price × 3. The service must have `max_quantity_per_booking` ≥ 3 in its `hms_config` (default is 1).
+
 ### Example: Book now, schedule later
 
 ```json
@@ -157,6 +175,7 @@ A common mistake is placing `sessions`, `meals`, or `transport` inside `formData
 3. If `hotelId` is not provided, derives it from the service's `tenant_id`.
 4. Validates the service belongs to the specified hotel.
 5. Fetches booking-rule configs from `hms_config`:
+   - `max_quantity_per_booking` — validates quantity (default: 1). When set > 1, the service can be booked multiple times in a single reservation.
    - `min_persons_per_booking` / `max_persons_per_booking` — validates party size.
    - `advance_booking_min_days` / `advance_booking_max_days` — validates booking date window.
    - `blackout_dates` — rejects bookings during closure periods.
@@ -166,7 +185,7 @@ A common mistake is placing `sessions`, `meals`, or `transport` inside `formData
    - **Kids Center** (category_id=6): Guardian name/phone required if `guardian_rule` is set. Age bracket validation.
    - **Spa** (category_id=3): Guardian consent required for certain age brackets.
 8. Validates guest-supplied `formData` against category-12 required fields.
-9. Gets catalog price for the service.
+9. Gets catalog price for the service. Multiplies by `quantity` for the initial total.
 10. Inserts `bookings` row with `booking_type='individual_service'`.
 11. Inserts `booking_services` row + `booking_service_slots` rows for the primary service:
     - **Dining/room-service**: One slot per meal with `meal_type` form value.
@@ -307,6 +326,7 @@ Only services where `standaloneBookable: true` in the service catalog (`GET /gue
 | Status | Message | Condition |
 |---|---|---|
 | 400 | `serviceId is required` | No service ID provided. |
+| 400 | `Maximum N booking(s) allowed per reservation for this service` | Quantity exceeds `max_quantity_per_booking` config. |
 | 400 | `Minimum N person(s) required` | Party size below minimum. |
 | 400 | `Maximum N person(s) allowed` | Party size above maximum. |
 | 400 | `Booking requires at least N day(s) advance notice` | Date before advance booking minimum. |
@@ -416,6 +436,7 @@ node Services/SysScripts/TestScripts/sim/guestServiceBookingCheckInOut.js
 
 | Date | Change |
 |---|---|
+| 2026-06-14 | Added `quantity` parameter for multi-quantity service bookings. Price = unit price × quantity. Controlled by `max_quantity_per_booking` hms_config key (default: 1). Quantity > provided scheduling entries creates remaining slots as unscheduled. |
 | 2026-06-12 | Booking status defaults to `confirmed` (removed `confirmation_mode` dependency). Only `requires_approval: true` produces `pending`. Added Kids Center example. Added warning about scheduling fields vs formData. |
 | 2026-06-10 | Fixed #263: `checkIn`/`checkOut` now derived for all standalone service types (spa, barber, transport), not just dining. `summariseDates` handles mobile format (`sessions[].date`, `transport.pickupDateTime`). Explicit `checkIn`/`checkOut` in request body honored as fallback. Single-day bookings mirror `checkIn` → `checkOut`. |
 | 2026-06-07 | Fixed #238: Auto-derivation of formData identity/scheduling fields. |
