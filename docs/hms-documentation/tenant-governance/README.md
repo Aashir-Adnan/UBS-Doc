@@ -15,6 +15,7 @@ If you're new, read in this order — each builds on the last:
 3. **[Resource Assignments](./per-tenant-resource-assignment/resource-assignments.md)** — the API a Tenant Manager uses to hand framework resources to a hotel (assign / revoke / propagate).
 4. **[Config Keys](./config-keys/config-keys.md)** — the configuration system a Tenant Admin operates once a hotel has its resources.
 5. **[Config Keys Catalog](./config-keys/config-keys-catalog/config-keys-catalog.md)** — the full inventory of every config key, for lookup.
+6. **[Original-to-Clone Propagation](./original-to-clone-propagation/original-to-clone-propagation.md)** — how an edit to a global original is re-synced into its tenant clones (the engine behind `apply_on_all` and the `propagate` verb).
 
 ---
 
@@ -86,6 +87,7 @@ That single idea — *ownership by `created_by`, made tenant-visible by cloning*
 | [resource-assignments.md](./per-tenant-resource-assignment/resource-assignments.md) | The assign / revoke / propagate API — verbs, payloads, the two clone paths, bulk, dependency guards, permissions, worked examples. |
 | [config-keys.md](./config-keys/config-keys.md) | The configuration system (`hms_config_keys`, `enabled_for`, `possible_values`) and the dual-mode CRUD that manages it, with a full end-to-end example. |
 | [config-keys-catalog.md](./config-keys/config-keys-catalog/config-keys-catalog.md) | The full inventory of system-tenant config keys, grouped by admin-UI category — every active key's scope, value type, and meaning. Includes the read-only **Catalog API** (`GET /api/hms_config_keys_catalog`, dual-locale List + View). |
+| [original-to-clone-propagation.md](./original-to-clone-propagation/original-to-clone-propagation.md) | The `propagateAssignmentUpdates` engine — how an edited global original is re-synced into its clones (merge rules, edit-detection, conflicts left as-is, best-effort/notification). Shared by `apply_on_all` (config-keys) and the `propagate` verb (assignments). |
 
 ---
 
@@ -93,4 +95,5 @@ That single idea — *ownership by `created_by`, made tenant-visible by cloning*
 
 | Date | Change |
 |---|---|
+| 2026-06-12 | Added [original-to-clone-propagation.md](./original-to-clone-propagation/original-to-clone-propagation.md) (the shared re-sync engine); updated config-keys / resource-assignments to drop the obsolete `needs_review` flag — edited clones are now left as-is and reported as conflicts. |
 | 2026-06-10 | Initial tenant-governance documentation set; guides reshaped onto the `guest-apis` doc template (Authentication / Request Payload / Response / Database Changes / Change Log). |

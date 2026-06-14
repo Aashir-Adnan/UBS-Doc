@@ -45,7 +45,7 @@ The clone is a near-copy with three differences that matter: it's **owned by Hot
 
 | Class | Types | Lineage | Re-syncable? |
 |---|---|---|---|
-| **Source-tracked deep clone** | `config_key`, `service_category`, `scenario_config` | `source_*_id` column points to the global original | **Yes** — `propagate` can diff & re-sync |
+| **Source-tracked deep clone** | `config_key`, `service_category` | `source_*_id` column points to the global original | **Yes** — `propagate` can diff & re-sync |
 | **Simple clone** | `location_type` | none — tenancy is only `created_by = URDD-B′` | No |
 
 > Clones do **not** auto-update when the SaaS Admin edits the original. [Propagate](../per-tenant-resource-assignment/resource-assignments.md#8-propagate--re-sync-an-updated-original) is the explicit, diff-and-flag re-sync.
@@ -59,7 +59,7 @@ Cloning is triggered by three **distinct, separate** events. The most common new
 | # | Trigger | Driven by | What it clones |
 |---|---|---|---|
 | **A** | **Tenant is provisioned** (or an admin is assigned to a pre-existing tenant) | `TenantProvisioningGroupedCrud` / `TenantsGroupedCrud` | The **RBAC scaffold** — the org chart (§2.1). |
-| **B** | **A framework resource is assigned** to the tenant | [Resource Assignments](../per-tenant-resource-assignment/resource-assignments.md) | The **resource itself** — config keys (+ value tables), service categories (+ the eager Service-Manager RDD), scenario configs, location types, translations. |
+| **B** | **A framework resource is assigned** to the tenant | [Resource Assignments](../per-tenant-resource-assignment/resource-assignments.md) | The **resource itself** — service categories (+ their cascaded config keys & value tables + the eager Service-Manager RDD), scenario configs, location types, translations. **Config keys are not picked individually — they cascade from their service category.** |
 | **C** | **A Service Manager is provisioned** | `ServiceManagerProvisioning` | A per-tenant Service-Manager RDD (`Manager` / `<category>` / `TENANT_<code>`; lazy — dedups onto the eager one from B) + the SM user + URDD-D. |
 
 > **A and B are different events.** A new hotel after trigger A has staff personas but **zero** config keys, service categories, or location types. They appear one at a time as the Tenant Manager runs trigger B.
@@ -116,7 +116,7 @@ When a sweep clones a batch of rows, it builds an **old→new id map**. Self-ref
 
 ### 3.5 Regime 2 — Phase-8 assignment (Trigger B): an *explicitly picked* source
 
-Framework resources are **not** swept automatically. The Tenant Manager **picks** a `source_id`, and the system validates it is a genuine SaaS-global original (not already a clone) before deep-cloning it. See [resource-assignments.md](../per-tenant-resource-assignment/resource-assignments.md).
+Framework resources are **not** swept automatically. The Tenant Manager **picks** a `source_id` (a service category, scenario config, or location type) and the system validates it is a genuine SaaS-global original (not already a clone) before deep-cloning it. **Config keys are the exception:** they are not picked individually — assigning a `service_category` cascade-clones every SaaS-global key whose `applies_to` includes that category (or is `*`), and revoking the category cascade-revokes the keys it orphans. See [resource-assignments.md](../per-tenant-resource-assignment/resource-assignments.md#63-side-effects--assigning-a-service_category).
 
 ---
 
@@ -128,9 +128,8 @@ Framework resources are **not** swept automatically. The Tenant Manager **picks*
 | Mirrored roles / depts / designations / RDDs | ✓ | | |
 | Persona permission-group clones | ✓ | | |
 | Tenant-Admin RDD + admin user + URDD-C | ✓ | | |
-| `config_key` (+ value tables) | | ✓ | |
 | `service_category` (+ eager Service-Manager RDD) | | ✓ | |
-| `scenario_config` | | ✓ | |
+| `config_key` (+ value tables) | | (cascaded, via `service_category` assign) | |
 | `location_type` | | ✓ | |
 | Service-Manager RDD + SM user + URDD-D | | (RDD eagerly, via category assign) | ✓ (dedups onto B's RDD) |
 
@@ -143,8 +142,8 @@ Framework resources are **not** swept automatically. The Tenant Manager **picks*
 To see the triggers in sequence:
 
 1. **Provision Hotel 12** (Trigger A). The hotel now exists with: URDD-B′ (owner), a Tenant-Manager RDD, a mirrored org dictionary, persona permission-group clones, a Tenant-Admin RDD + admin user + URDD-C. **No config keys, no categories yet.**
-2. **Assign the Stay `service_category`** (Trigger B). The category is deep-cloned into Hotel 12 (new local id, owned by URDD-B′), **and** — as a side effect — the Stay Service-Manager RDD is eagerly cloned (`Manager`/`STAY`/`TENANT_<code>`). Now "Stay Manager" appears in pickers even though no one holds it yet.
-3. **Assign the `base_price` config_key** (Trigger B). Deep-cloned to clone id `412`; its `applies_to`/`enabled_for` are pruned/remapped to Hotel 12's owned categories; its possible-values are cloned for Stay and `possible_values` is rebuilt. (If Stay hadn't been assigned first, the **D5 guard** would have returned 409 — but assigning Stay *after* would back-fill it, so order doesn't matter.)
+2. **Assign the Stay `service_category`** (Trigger B). Three things happen in one transaction: (a) the category is deep-cloned into Hotel 12 (new local id, owned by URDD-B′); (b) **every SaaS-global config key that applies to Stay** (e.g. `base_price`) is cascade-cloned — each to a new clone id (say `412`), its `applies_to`/`enabled_for` pruned/remapped to Hotel 12's owned categories, its possible-values cloned for Stay and `possible_values` rebuilt; (c) the Stay Service-Manager RDD is eagerly cloned (`Manager`/`STAY`/`TENANT_<code>`). Now Stay, its config keys, and "Stay Manager" all appear in pickers even though no one holds the persona yet.
+3. **(No separate config-key step.)** Config keys arrive *with* their category in step 2 — there is no individual `config_key` assign. Assigning another category later cascade-clones *its* keys too (and back-fills any key shared with Stay), so the order categories are assigned never matters.
 4. **Provision a Stay Service Manager** (Trigger C). The SM user is created with URDD-D; the per-tenant Stay Service-Manager RDD **dedups onto the eager one** from step 2 rather than creating a duplicate.
 
 Hotel 12 is now a running hotel — and every row it owns traces back to a system original via either a mirror (step 1) or a `source_*_id` lineage link (steps 2–3).
@@ -160,7 +159,6 @@ Hotel 12 is now a running hotel — and every row it owns traces back to a syste
 | `user_roles_designations_department` | A (URDD-B′, URDD-C), C (URDD-D) | — |
 | `hms_config_keys` (+ `hms_config` / `hms_config_possible_values`) | B (`config_key`) | `source_hms_config_key_id` |
 | `service_categories` | B (`service_category`) | `source_service_category_id` |
-| `hms_scenario_config` | B (`scenario_config`) | `source_scenario_config_id` |
 | `location_type` | B (`location_type`) | — (simple clone) |
 
 Every cloned row is stamped `created_by = URDD-B′`. **Never cloned** (shared): `currencies`, `regions`, `countries`, `supported_payment_methods`, `hms_config_categories`, `hms_scope_types`, `catalog`.

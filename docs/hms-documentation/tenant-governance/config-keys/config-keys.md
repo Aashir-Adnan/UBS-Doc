@@ -156,10 +156,10 @@ Only meaningful when the **Tenant Manager** edits a **global original** (a SaaS-
 | `false` / omitted | **Original only.** Every tenant clone keeps its current values. |
 | `true` | After saving the original, push the change into every active clone, then email each affected tenant's admin(s). |
 
-When propagating:
+When propagating (full algorithm in [original-to-clone-propagation.md](../original-to-clone-propagation/original-to-clone-propagation.md)):
 
-- An **unedited** clone has the change merged in (category keys remapped to the tenant's own category ids; clone-only keys like `parent_id`/`user` preserved).
-- A clone the tenant **has already customised** is flagged `status='needs_review'` instead of being overwritten (conflict-safe) — and is **not** emailed (its value didn't change).
+- An **unedited** clone (not edited by a tenant Admin since creation — `updated_by` is NULL or equals the owning Tenant-Manager `created_by`) has the change merged in (category keys remapped to the tenant's own category ids; clone-only keys like `parent_id`/`user` preserved).
+- A clone the tenant **has already customised** is **left exactly as-is** — never overwritten, no status change — and reported in the propagation's `conflicts`; it is **not** emailed (its value didn't change).
 
 For each tenant whose clone was actually updated, the active **Tenant Admin(s)** (`designation_code='TENANT'`, role Admin) get a deliberately **non-technical** email: it names the config and the hotel, says the setting was updated and is active, and points them to *Service & Package Configurations*. No scope keys, JSON, or "clone" wording. Both propagation and the emails are **best-effort** — the original is already committed, so a failure in either is logged and never fails the save. Editing a **clone** never propagates (clones are leaves).
 
@@ -240,7 +240,7 @@ The acting tenant is resolved from `actionPerformerURDD` (the system-tenant SaaS
 
 **Goal:** a Tenant Admin at Hotel X wants the **Stay** category to offer two base-price presets, and to make sure the `base_price` key is switched on for Stay.
 
-Assume Hotel X already has a clone of the `base_price` key (cloned when the key was assigned — see [resource-assignments.md](../per-tenant-resource-assignment/resource-assignments.md)). Its clone `config_key_id` is `412`, and Hotel X's local Stay category id is `31`.
+Assume Hotel X already has a clone of the `base_price` key (cloned automatically when the **Stay service category** was assigned — config keys cascade from their category; see [resource-assignments.md](../per-tenant-resource-assignment/resource-assignments.md#63-side-effects--assigning-a-service_category)). Its clone `config_key_id` is `412`, and Hotel X's local Stay category id is `31`.
 
 **Step 1 — make sure the key is enabled for Stay.**
 
@@ -327,6 +327,7 @@ Values are stored as embedded JSON; there is **no** fan-out to `translated_entri
 
 | Date | Change |
 |---|---|
+| 2026-06-12 | `apply_on_all` propagation no longer writes `status='needs_review'` (the enum has no such value — the write threw under strict SQL mode and rolled back the whole propagation). Tenant-edited clones are now left as-is and reported as conflicts. Full algorithm extracted to [original-to-clone-propagation.md](../original-to-clone-propagation/original-to-clone-propagation.md). |
 | 2026-06-10 | Initial documentation of the config-key system and the dual-mode `enabled_for` CRUD. |
 | 2026-06-09 | Ownership guards extended to **all** `possible_values` writes (`assertKeyTenantMatch`), closing the cross-tenant write hole; List/View fail closed when no actor resolves; `apply_on_all` propagation + Tenant-Admin notification added. |
 
