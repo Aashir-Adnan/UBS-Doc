@@ -117,3 +117,12 @@ Window-gated responses include the check-in time window:
 | 401 | `Authenticated user required` | No `userId` in the session. |
 | 403 | `Invalid or expired URDD` | URDD validation failed. |
 | 404 | `Booking not found` | Booking doesn't exist, doesn't belong to the caller, or is inactive. |
+
+---
+
+## Related APIs
+
+| API | Purpose |
+|---|---|
+| [Guest Availability](../guest-availability/guest-availability.md) | Pre-booking probe: checks room/package availability for dates and suggests alternative dates when unavailable. |
+| [Guest Scheduler](../guest-scheduler/guest-scheduler.md) | Time-slot availability for non-stay services (spa, dining, etc.). |

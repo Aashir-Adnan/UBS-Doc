@@ -2,7 +2,7 @@
 
 **POST** `/api/admin/create/guest/user`
 
-Creates a guest user account on behalf of a walk-in guest. The desk clerk collects the guest's details, creates their user record, and provisions all necessary URDDs (global + per-tenant) so the guest can immediately be booked into services.
+Creates or resolves a guest user account on behalf of a walk-in guest. The desk clerk collects the guest's details; if the email already exists, the existing user is reused and any missing URDDs are reconciled. The response shape is identical regardless of whether the user was just created or already existed — the admin always gets back a valid `hotelUrddId` ready for booking.
 
 ---
 
@@ -31,9 +31,9 @@ The **role is no longer hardcoded** — authorization follows RBAC. Both a **Ten
 |---|---|---|---|
 | `actionPerformerURDD` | `number` | Yes | The admin/desk-clerk's URDD ID for this hotel |
 | `hotelId` | `number` | Yes | Hotel tenant ID where the guest is being registered |
-| `first_name` | `string` | Yes | Guest's first name |
+| `first_name` | `string` | Conditional | Guest's first name. Required when creating a new guest; ignored when email matches an existing user. |
 | `last_name` | `string` | No | Guest's last name |
-| `email` | `string` | Yes | Guest's email address (must be unique across the system) |
+| `email` | `string` | Yes | Guest's email address. If a user with this email already exists, their account is reused (no duplicate created). |
 | `phone` | `string` | No | Guest's phone number |
 | `nationality` | `string` | No | Guest's nationality |
 | `passport_number` | `string` | No | Passport number (uppercase alphanumeric, max 9 chars) |
@@ -72,14 +72,26 @@ The **role is no longer hardcoded** — authorization follows RBAC. Both a **Ten
 
 | Field | Type | Description |
 |---|---|---|
-| `user_id` | `number` | The newly created user's ID |
+| `user_id` | `number` | The user's ID (newly created or existing) |
 | `email` | `string` | The guest's email (normalized to lowercase) |
 | `hotelUrddId` | `number` | The guest's URDD for the requesting hotel — use this as `guestUrddId` when creating bookings |
 | `tenantUrddMap` | `object` | Map of all tenant URDDs: `"global"` key for the null-tenant URDD, string tenant IDs for per-hotel URDDs |
 
 ---
 
-## What Gets Created
+## Behavior
+
+The endpoint is **idempotent on email**. Three scenarios:
+
+| Scenario | What happens |
+|---|---|
+| **User does not exist** | Creates user record + global URDD + per-tenant URDDs + URDP. |
+| **User exists but URDDs are missing** | Reuses existing user. `reconcileGuestTenantUrdds` creates any missing per-tenant URDDs and syncs URDP. |
+| **User exists and all URDDs exist** | Reuses existing user. Reconcile is a no-op. Returns existing URDDs. |
+
+In all three cases, the **response shape is identical** — `user_id`, `email`, `hotelUrddId`, and `tenantUrddMap` are always returned.
+
+### What Gets Created (new user path)
 
 1. **User record** in the `users` table with `created_by` set to the admin's URDD.
 2. **Global URDD** (null-tenant) on the consolidated global guest RDD (`Guest / STANDARD / GENERAL`).
@@ -94,17 +106,16 @@ The **role is no longer hardcoded** — authorization follows RBAC. Both a **Ten
 
 | Status | Condition |
 |---|---|
-| 400 | Missing `first_name` or `email`, invalid email format, invalid passport format |
+| 400 | Missing `email`, missing `first_name` (new user only), invalid email format, invalid passport format |
 | 403 | `actionPerformerURDD` is not tenant staff (`TENANT` designation + `TENANT_<hotel_code>` department) for this hotel, or lacks the `add_users` permission |
 | 404 | Hotel (`hotelId`) not found |
-| 409 | Email already exists in the system |
 
 ---
 
 ## Typical Desk Clerk Flow
 
-1. Guest walks in without an existing account.
-2. Desk clerk calls **POST `/api/admin/create/guest/user`** with guest details.
+1. Guest walks in (with or without an existing account).
+2. Desk clerk calls **POST `/api/admin/create/guest/user`** with guest details. If the guest already has an account (same email), the existing user is reused — no error.
 3. Response includes `hotelUrddId` — the guest's URDD for this hotel.
 4. Desk clerk immediately calls **POST `/api/admin/create/guest/booking`** using that `hotelUrddId` as `guestUrddId` to create a booking.
 
