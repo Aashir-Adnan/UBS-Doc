@@ -109,8 +109,7 @@ All fields are optional and sent in the encrypted request body.
         ]
       },
       "isConsumable": false,
-      "consumptionLimit": null,
-      "operatingHours": [
+          "operatingHours": [
         { "dayOfWeek": 0, "open": "14:00", "close": "22:00" },
         { "dayOfWeek": 1, "open": "14:00", "close": "22:00" }
       ],
@@ -119,8 +118,7 @@ All fields are optional and sent in the encrypted request body.
       ],
       "additional_attributes": {
         "physical_dimension": { "length": 0, "width": 0, "height": 0 },
-        "tags": [{ "en": "luxury", "ar": "فاخر" }],
-        "maxQuantityPerBooking": 1
+        "tags": [{ "en": "luxury", "ar": "فاخر" }]
       }
     }
   ],
@@ -166,8 +164,7 @@ Returns a single service object with the same base fields as list items, plus ad
   },
   "additional_attributes": {
     "physical_dimension": { "length": 0, "width": 0, "height": 0 },
-    "tags": [{ "en": "premium", "ar": "متميز" }],
-    "maxQuantityPerBooking": 5
+    "tags": [{ "en": "premium", "ar": "متميز" }]
   },
   "maxAdults": 4,
   "maxChildren": 2,
@@ -177,7 +174,6 @@ Returns a single service object with the same base fields as list items, plus ad
   "maxQuantityPerBooking": 5,
   "sessionDurationMinutes": 120,
   "isConsumable": false,
-  "consumptionLimit": null,
   "operatingHours": [
     { "dayOfWeek": 0, "open": "09:00", "close": "21:00" },
     { "dayOfWeek": 1, "open": "09:00", "close": "21:00" },
@@ -321,7 +317,6 @@ Possible value JSON supports three shapes:
 | `sessionDurationMinutes` | `number\|null` | Detail | Session duration in minutes (from `slot_duration_minutes`). |
 | `maxQuantityPerBooking` | `number` | Both | Maximum times this service can be booked in a single reservation (default: 1). From `max_quantity_per_booking` config. |
 | `isConsumable` | `boolean` | Both | Whether consumption tracking is enabled. Always `false` for standalone services; overridden by `package_services.is_consumable` inside packages. |
-| `consumptionLimit` | `number\|null` | Both | Maximum consumption per session/period. Always `null` for standalone services; overridden by `package_services.consumption_limit` inside packages. |
 | `operatingHours` | `array` | Both | Weekly operating hours from `unit_availability`. Each entry: `{ dayOfWeek: 0-6, open: "HH:MM", close: "HH:MM" }`. 0=Sun, 6=Sat. Empty array if no availability windows configured. |
 | `category` | `{ id, name }` | Detail | Service category info. |
 | `amenities` | `array` | Both | Service amenities. Each entry has `key`, `icon` (Material icon name), `label` (bilingual object), `group` (bilingual object with `key`). |
@@ -441,5 +436,5 @@ node Services/SysScripts/TestScripts/sim/guestDataAuditAndSeed.js
 | 2026-06-10 | `formSchema` is now always `[]` (never undefined) on detail objects when a category has no form fields. Previously only attached when non-empty. |
 | 2026-06-10 | `fetchFormSchema` dropdown resolution now falls back to `hms_config_possible_values.config_id` FK when `hms_config_keys.possible_values` column is NULL or has no entries for the requested category. Also handles bilingual label + key possible value shape. |
 | 2026-06-10 | Fixed publish date filter mismatch between detail SQL and searchQueries.js. Detail SQL now uses `COALESCE($.en, $[0])` to handle both config value shapes, matching the landing/search queries. Harmonized visibility subquery to `CAST(id AS JSON)`. Added consistency tests and data audit/seed script. |
-| 2026-06-14 | Added `isConsumable`, `consumptionLimit`, `operatingHours`, `maxQuantityPerBooking` to all service response modes. Added `icon` to amenity objects (Flutter Material icon name). |
+| 2026-06-14 | Added `isConsumable`, `operatingHours`, `maxQuantityPerBooking` to all service response modes. Added `icon` to amenity objects (Flutter Material icon name). |
 | 2026-06-12 | Changed `physical_dimension` response keys from abbreviated `L`/`W`/`H` to full `length`/`width`/`height`. Seed data updated accordingly. |

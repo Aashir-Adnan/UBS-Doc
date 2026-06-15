@@ -57,25 +57,56 @@ The **role is no longer hardcoded** — authorization follows RBAC. Both a **Ten
 
 ## Response
 
+Returns the **same payload as guest login** — including access/refresh tokens, user profile, roles, permissions, and the tenant URDD map — plus `hotelUrddId` for the requesting hotel.
+
 ```json
 {
   "user_id": 25,
   "email": "john.doe@example.com",
   "hotelUrddId": 81,
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "accesstoken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "rfh_eyJhbGciOiJIUzI1NiIs...",
+  "expiresIn": 900,
   "tenantUrddMap": {
     "global": 79,
     "3": 81,
     "5": 82
-  }
+  },
+  "user": {
+    "user_id": 25,
+    "first_name": "John",
+    "last_name": "Doe",
+    "email": "john.doe@example.com",
+    "phone_no": "+971501234567",
+    "user_image": null
+  },
+  "user_roles": [],
+  "user_permissions": {},
+  "user_departments": [],
+  "user_designations": [],
+  "user_devices": [],
+  "user_roles_designations_departments": []
 }
 ```
 
 | Field | Type | Description |
 |---|---|---|
-| `user_id` | `number` | The user's ID (newly created or existing) |
-| `email` | `string` | The guest's email (normalized to lowercase) |
-| `hotelUrddId` | `number` | The guest's URDD for the requesting hotel — use this as `guestUrddId` when creating bookings |
-| `tenantUrddMap` | `object` | Map of all tenant URDDs: `"global"` key for the null-tenant URDD, string tenant IDs for per-hotel URDDs |
+| `user_id` | `number` | The user's ID (newly created or existing). |
+| `email` | `string` | The guest's email (normalized to lowercase). |
+| `hotelUrddId` | `number` | The guest's URDD for the requesting hotel — use this as `guestUrddId` when creating bookings. |
+| `access_token` | `string` | Short-lived JWT access token for the guest (same as guest login). |
+| `accesstoken` | `string` | Alias of `access_token` (for header compatibility). |
+| `refreshToken` | `string` | 24-hour refresh token (prefixed `rfh_`). |
+| `expiresIn` | `number` | Access token TTL in seconds. |
+| `tenantUrddMap` | `object` | Map of all tenant URDDs: `"global"` key for the null-tenant URDD, string tenant IDs for per-hotel URDDs. |
+| `user` | `object` | Full user profile row (name, email, phone, image, etc.). |
+| `user_roles` | `array` | Guest's role records. |
+| `user_permissions` | `object` | Permissions grouped by URDD ID. |
+| `user_departments` | `array` | Department records. |
+| `user_designations` | `array` | Designation records. |
+| `user_devices` | `array` | Device session records. |
+| `user_roles_designations_departments` | `array` | Compound URDD details (role + designation + department per URDD). |
 
 ---
 
