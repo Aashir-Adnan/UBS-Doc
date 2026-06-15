@@ -318,7 +318,7 @@ GET /api/guest/bookings/upcoming?page=1&pageSize=10
 
 | Field | Type | Description |
 |---|---|---|
-| `checkInFlag` | `string` | Check-in status indicator. One of: `"cancelled"` — booking was cancelled, `"checked_in"` — guest has already checked in, `"upcoming"` — awaiting check-in in the future. |
+| `checkInFlag` | `string` | Check-in status indicator. One of: `"cancelled"` — booking was cancelled, `"checked_in"` — guest has already checked in, `"completed"` — stay is finished (checked out), `"upcoming"` — awaiting check-in in the future. |
 
 ---
 

@@ -72,6 +72,20 @@ const sidebars = {
             'hms-documentation/guest-apis/guest-tenant-scoped-apis',
             {
               type: 'category',
+              label: 'Guest Search & Filter',
+              items: [
+                'hms-documentation/guest-apis/guest-search-filter/guest-search-filter',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Availability',
+              items: [
+                'hms-documentation/guest-apis/guest-availability/guest-availability',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Guest Booking Flow',
               items: [
                 'hms-documentation/guest-apis/guest-booking-flow/guest-booking-flow',
@@ -82,6 +96,13 @@ const sidebars = {
               label: 'Guest Upcoming Bookings',
               items: [
                 'hms-documentation/guest-apis/guest-bookings-upcoming/guest-bookings-upcoming',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Past Bookings',
+              items: [
+                'hms-documentation/guest-apis/guest-bookings-past/guest-bookings-past',
               ],
             },
             {

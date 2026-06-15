@@ -49,60 +49,34 @@ Uses **PUBLIC_ENCRYPTED_PLATFORM** — encrypted request/response using the plat
   "checkIn": "2026-07-01",
   "checkOut": "2026-07-04",
   "nights": 3,
-  "hotels": {
-    "3": {
-      "rooms": [
-        {
-          "serviceId": 71,
-          "hotelId": 3,
-          "available": true,
-          "nightlyPrice": 500,
-          "currency": "SAR",
-          "nextAvailable": null
-        },
-        {
-          "serviceId": 72,
-          "hotelId": 3,
-          "available": true,
-          "nightlyPrice": 1200,
-          "currency": "SAR",
-          "nextAvailable": null
-        }
-      ],
-      "packages": [
-        {
-          "packageId": 10,
-          "hotelId": 3,
-          "available": true,
-          "totalPrice": 2500,
-          "currency": "SAR",
-          "nextAvailable": null
-        }
-      ]
-    }
-  }
-}
-```
-
-### Multi-Hotel Request (200)
-
-When multiple hotel IDs are passed (e.g. `hotelId: "3,5"`), each hotel gets its own key. Hotels with no matching services return empty arrays:
-
-```json
-{
-  "checkIn": "2026-07-01",
-  "checkOut": "2026-07-04",
-  "nights": 3,
-  "hotels": {
-    "3": {
-      "rooms": [ ... ],
-      "packages": [ ... ]
+  "rooms": [
+    {
+      "serviceId": 71,
+      "hotelId": 3,
+      "available": true,
+      "nightlyPrice": 500,
+      "currency": "SAR",
+      "nextAvailable": null
     },
-    "5": {
-      "rooms": [],
-      "packages": []
+    {
+      "serviceId": 72,
+      "hotelId": 3,
+      "available": true,
+      "nightlyPrice": 1200,
+      "currency": "SAR",
+      "nextAvailable": null
     }
-  }
+  ],
+  "packages": [
+    {
+      "packageId": 10,
+      "hotelId": 3,
+      "available": true,
+      "totalPrice": 2500,
+      "currency": "SAR",
+      "nextAvailable": null
+    }
+  ]
 }
 ```
 
@@ -115,44 +89,40 @@ When a room or package is not available for the requested dates, `nextAvailable`
   "checkIn": "2026-07-01",
   "checkOut": "2026-07-04",
   "nights": 3,
-  "hotels": {
-    "3": {
-      "rooms": [
-        {
-          "serviceId": 71,
-          "hotelId": 3,
-          "available": false,
-          "nightlyPrice": 500,
-          "currency": "SAR",
-          "nextAvailable": {
-            "availableFrom": "2026-07-05",
-            "availableTo": "2026-07-08"
-          }
-        },
-        {
-          "serviceId": 72,
-          "hotelId": 3,
-          "available": true,
-          "nightlyPrice": 1200,
-          "currency": "SAR",
-          "nextAvailable": null
-        }
-      ],
-      "packages": [
-        {
-          "packageId": 10,
-          "hotelId": 3,
-          "available": false,
-          "totalPrice": 2500,
-          "currency": "SAR",
-          "nextAvailable": {
-            "availableFrom": "2026-07-05",
-            "availableTo": "2026-07-08"
-          }
-        }
-      ]
+  "rooms": [
+    {
+      "serviceId": 71,
+      "hotelId": 3,
+      "available": false,
+      "nightlyPrice": 500,
+      "currency": "SAR",
+      "nextAvailable": {
+        "availableFrom": "2026-07-05",
+        "availableTo": "2026-07-08"
+      }
+    },
+    {
+      "serviceId": 72,
+      "hotelId": 3,
+      "available": true,
+      "nightlyPrice": 1200,
+      "currency": "SAR",
+      "nextAvailable": null
     }
-  }
+  ],
+  "packages": [
+    {
+      "packageId": 10,
+      "hotelId": 3,
+      "available": false,
+      "totalPrice": 2500,
+      "currency": "SAR",
+      "nextAvailable": {
+        "availableFrom": "2026-07-05",
+        "availableTo": "2026-07-08"
+      }
+    }
+  ]
 }
 ```
 
@@ -165,17 +135,13 @@ When `serviceId` is provided, `rooms` is a single object (not an array) and `pac
   "checkIn": "2026-07-01",
   "checkOut": "2026-07-04",
   "nights": 3,
-  "hotels": {
-    "3": {
-      "rooms": {
-        "serviceId": 71,
-        "hotelId": 3,
-        "available": true,
-        "nightlyPrice": 500,
-        "currency": "SAR",
-        "nextAvailable": null
-      }
-    }
+  "rooms": {
+    "serviceId": 71,
+    "hotelId": 3,
+    "available": true,
+    "nightlyPrice": 500,
+    "currency": "SAR",
+    "nextAvailable": null
   }
 }
 ```
@@ -189,19 +155,15 @@ When `packageId` is provided, `packages` is a single object (not an array) and `
   "checkIn": "2026-07-01",
   "checkOut": "2026-07-04",
   "nights": 3,
-  "hotels": {
-    "3": {
-      "packages": {
-        "packageId": 10,
-        "hotelId": 3,
-        "available": false,
-        "totalPrice": 2500,
-        "currency": "SAR",
-        "nextAvailable": {
-          "availableFrom": "2026-07-05",
-          "availableTo": "2026-07-08"
-        }
-      }
+  "packages": {
+    "packageId": 10,
+    "hotelId": 3,
+    "available": false,
+    "totalPrice": 2500,
+    "currency": "SAR",
+    "nextAvailable": {
+      "availableFrom": "2026-07-05",
+      "availableTo": "2026-07-08"
     }
   }
 }
@@ -233,12 +195,6 @@ If no availability exists within the 30-day scan window, `nextAvailable` is `nul
 | `checkIn` | `string` | Requested check-in date. |
 | `checkOut` | `string` | Requested check-out date. |
 | `nights` | `number` | Number of nights. |
-| `hotels` | `object` | Keyed by hotel ID. Each value contains `rooms` and/or `packages`. |
-
-### hotels[hotelId]
-
-| Field | Type | Description |
-|---|---|---|
 | `rooms` | `array\|object` | Availability for stay services. Array when listing all; single object when filtered by `serviceId`. Omitted when `packageId` is sent. |
 | `packages` | `array\|object` | Availability for packages. Array when listing all; single object when filtered by `packageId`. Omitted when `serviceId` is sent. |
 
