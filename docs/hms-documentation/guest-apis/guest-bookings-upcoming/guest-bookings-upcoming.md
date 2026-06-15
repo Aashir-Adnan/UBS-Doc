@@ -2,7 +2,7 @@
 
 **GET** `/api/guest/bookings/upcoming`
 
-Returns a paginated list of the guest's upcoming bookings — bookings whose check-in date falls within the next 7 days and that have not been checked into yet. Only `confirmed` and `pending` bookings are included.
+Returns a paginated list of the guest's upcoming bookings — bookings whose check-in date is today or in the future and that are not cancelled. Includes `confirmed`, `pending`, and `checked_in` statuses.
 
 ---
 
@@ -39,8 +39,8 @@ GET /api/guest/bookings/upcoming?page=1&pageSize=10
 2. Queries `bookings` where:
    - `urdd_id` matches the authenticated guest.
    - `status` is `active` (not soft-deleted).
-   - `booking_status` is `confirmed` or `pending` (excludes `checked_in`, `cancelled`, `checked_out`).
-   - Check-in date is within the next 7 days: `DATE(check_in_date) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)`.
+   - `booking_status` is NOT `cancelled` or `checked_out`.
+   - Check-in date is today or in the future: `DATE(check_in_date) >= CURDATE()`.
 3. Results are ordered by `check_in_date ASC` (soonest first).
 4. Results are paginated using `page` and `pageSize` query params.
 5. For each booking in the current page, the full v2 booking bundle is built via `buildBookingsBundle`, which:
@@ -328,8 +328,8 @@ GET /api/guest/bookings/upcoming?page=1&pageSize=10
 |---|---|---|
 | `urdd_id` | From JWT | Only the authenticated guest's bookings. |
 | `status` | `active` | Excludes soft-deleted bookings. |
-| `booking_status` | `confirmed`, `pending` | Confirmed or pending bookings (not checked in). |
-| Date filter | `DATE(check_in_date) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)` | Check-in within the next 7 days. |
+| `booking_status` | NOT `cancelled`, `checked_out` | All non-cancelled, non-checked-out bookings. |
+| Date filter | `DATE(check_in_date) >= CURDATE()` | Check-in is today or in the future. |
 | Order | `check_in_date ASC` | Soonest upcoming booking first. |
 
 ---
