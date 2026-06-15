@@ -4,6 +4,8 @@
 
 Unified search and filter endpoint for discovering rooms, services, and packages. Returns paginated results in the same landing-card format as the GuestLanding endpoint. Supports free-text search, price range, rating, availability dates, occupancy, room/amenity/view type filters, stay duration buckets, and arbitrary config-based filters.
 
+The available filter options and their values are provided by `GET /api/guest/filterOptions`. Each filter option in that response includes a `param` field indicating which query parameter to use here.
+
 ---
 
 ## Authentication
