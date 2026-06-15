@@ -38,7 +38,7 @@ This endpoint takes no request parameters. Send an empty encrypted body.
    - Fetches the master booking record (dates, amounts, package info, currency).
    - Resolves the primary service from `booking_items` (unit assignment — room/table/seat). Only services from **active tenants** (`t.status = 'active' AND t.is_active = 1`) are included.
    - Fetches addon services from `booking_services` with per-slot scheduling from `booking_service_slots`.
-   - Enriches with category amenities, duration units, Arabic translations, ratings, form values, and cancellation metadata.
+   - Enriches with per-service amenities, keyword tags, duration units, Arabic translations, ratings, form values, and cancellation metadata.
    - Resolves currency codes from both direct config values (`{"en":"SAR"}`) and currency ID references (`[4]` → currencies table lookup).
    - For standalone-service bookings (no unit assignment), promotes the first `booking_services` row as the primary.
 5. Pagination is disabled — all matching bookings are returned.
@@ -87,12 +87,14 @@ This endpoint takes no request parameters. Send an empty encrypted body.
     "images": [12, 13, 14],
     "amenities": [
       {
-        "id": 42,
         "key": "wifi",
+        "icon": "wifi",
         "label": { "en": "Free WiFi", "ar": "واي فاي مجاني" },
-        "groupOrder": 1,
-        "keywordOrder": 1
+        "group": "room_features"
       }
+    ],
+    "tags": [
+      { "en": "City View", "ar": "إطلالة على المدينة" }
     ],
     "room": "Room 301",
     "rating": null,
@@ -113,6 +115,9 @@ This endpoint takes no request parameters. Send an empty encrypted body.
         "currency": "SAR",
         "images": [20],
         "amenities": [],
+        "tags": [],
+        "isConsumable": false,
+        "operatingHours": [],
         "status": "confirmed",
         "rating": null,
         "reviewCount": 0,
@@ -199,7 +204,8 @@ This endpoint takes no request parameters. Send an empty encrypted body.
 | `unit` | `string\|null` | Duration unit (e.g. `"night"`, `"session"`). |
 | `unitPrice` | `number` | Catalog price per unit. |
 | `images` | `number[]` | Array of attachment IDs for service images. |
-| `amenities` | `array` | Category amenities (same shape as service-categories endpoint). |
+| `amenities` | `array` | Per-service amenities from `amenities_tags` config. Each: `{ key, icon, label: { en, ar }, group }`. |
+| `tags` | `array` | Per-service keyword tags from `keyword_tags` config. Each: `{ en, ar }`. |
 | `room` | `string\|null` | Assigned delivery unit label (e.g. `"Room 301"`). |
 | `rating` | `object\|null` | Rating breakdown (stub — `null` until `service_reviews` table exists). |
 | `reviewCount` | `number` | Number of reviews (stub — `0`). |
@@ -219,6 +225,10 @@ This endpoint takes no request parameters. Send an empty encrypted body.
 | `services[].quantity` | `number` | Booked quantity. |
 | `services[].unitPrice` | `number` | Price per unit. |
 | `services[].totalPrice` | `number` | Total price for this addon. |
+| `services[].amenities` | `array` | Per-service amenities. Each: `{ key, icon, label: { en, ar }, group }`. |
+| `services[].tags` | `array` | Per-service keyword tags. Each: `{ en, ar }`. |
+| `services[].isConsumable` | `boolean` | Whether the service is consumable (from `is_consumable` config). |
+| `services[].operatingHours` | `array` | Operating hours for the service. |
 | `services[].status` | `string` | Addon status (e.g. `"confirmed"`, `"cancelled"`). |
 | `services[].meals` | `array` | Present when category is `dining` or `room-service`. |
 | `services[].sessions` | `array` | Present when category is not dining/transport. |

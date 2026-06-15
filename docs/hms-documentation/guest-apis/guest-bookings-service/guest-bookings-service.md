@@ -261,6 +261,7 @@ Returns the full v2 booking bundle — same shape as `/bookings/room` and `/book
   "unitPrice": 75,
   "images": [],
   "amenities": [],
+  "tags": [],
   "room": null,
   "rating": null,
   "reviewCount": 0,
