@@ -2,7 +2,7 @@
 
 **GET** `/api/guest/bookings/current`
 
-Returns the guest's active bookings where today falls within the check-in/check-out window. This is the primary endpoint for the "current stay" screen shown after check-in.
+Returns the guest's checked-in bookings where today falls within the check-in/check-out window. This is the primary endpoint for the "current stay" screen shown after check-in.
 
 ---
 
@@ -32,7 +32,8 @@ This endpoint takes no request parameters. Send an empty encrypted body.
 2. Queries `bookings` where:
    - `urdd_id` matches the authenticated guest.
    - `status` is `active` (not soft-deleted).
-   - **Either** `booking_status` is `checked_in` **and** `actual_check_out IS NULL` (active stay, regardless of scheduled dates), **or** `booking_status` is `confirmed` **and** today's date falls between `check_in_date` and `check_out_date` (scheduled window).
+   - `booking_status` is `checked_in`.
+   - Today's date falls between `check_in_date` and `check_out_date` (`CURDATE() BETWEEN DATE(check_in_date) AND DATE(check_out_date)`).
 3. Results are ordered by `check_in_date DESC` (most recent first).
 4. For each matching booking, the full v2 booking bundle is built via `buildBookingsBundle`, which:
    - Fetches the master booking record (dates, amounts, package info, currency).
@@ -268,10 +269,8 @@ This endpoint takes no request parameters. Send an empty encrypted body.
 |---|---|---|
 | `urdd_id` | From JWT | Only the authenticated guest's bookings. |
 | `status` | `active` | Excludes soft-deleted bookings. |
-| `booking_status` | `checked_in`, `confirmed` | Active or confirmed stays. |
-| Checked-in gate | `booking_status = 'checked_in' AND actual_check_out IS NULL` | Any active stay (no date constraint — covers early check-in). |
-| Confirmed gate | `booking_status = 'confirmed' AND CURDATE() BETWEEN check_in_date AND check_out_date` | Confirmed bookings whose scheduled window includes today. |
-| Tenant | `t.status = 'active' AND t.is_active = 1` | Only bookings from active tenants. |
+| `booking_status` | `checked_in` | Only checked-in bookings. |
+| Date filter | `CURDATE() BETWEEN DATE(check_in_date) AND DATE(check_out_date)` | Today must fall within the stay window. |
 
 ---
 

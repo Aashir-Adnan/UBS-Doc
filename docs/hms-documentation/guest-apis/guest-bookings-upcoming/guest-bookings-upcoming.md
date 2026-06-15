@@ -2,7 +2,7 @@
 
 **GET** `/api/guest/bookings/upcoming`
 
-Returns a paginated list of the guest's upcoming bookings — bookings that have not been checked into yet and whose stay window includes today or is in the future. Only `confirmed` and `pending` bookings are included.
+Returns a paginated list of the guest's upcoming bookings — bookings whose check-in date falls within the next 7 days and that have not been checked into yet. Only `confirmed` and `pending` bookings are included.
 
 ---
 
@@ -39,8 +39,8 @@ GET /api/guest/bookings/upcoming?page=1&pageSize=10
 2. Queries `bookings` where:
    - `urdd_id` matches the authenticated guest.
    - `status` is `active` (not soft-deleted).
-   - `booking_status` is `confirmed` or `pending`.
-   - Today is before check-in (`DATE(check_in_date) >= CURDATE()`) **or** today falls within the stay window (`DATE(check_in_date) <= CURDATE() AND DATE(check_out_date) >= CURDATE()`).
+   - `booking_status` is `confirmed` or `pending` (excludes `checked_in`, `cancelled`, `checked_out`).
+   - Check-in date is within the next 7 days: `DATE(check_in_date) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)`.
 3. Results are ordered by `check_in_date ASC` (soonest first).
 4. Results are paginated using `page` and `pageSize` query params.
 5. For each booking in the current page, the full v2 booking bundle is built via `buildBookingsBundle`, which:
@@ -169,8 +169,7 @@ GET /api/guest/bookings/upcoming?page=1&pageSize=10
             "freeCancellationUntil": null,
             "cancellationPolicy": null
           },
-          "eligibleForCheckin": true,
-          "checkinIneligibleReason": null
+          "checkInFlag": "upcoming"
         }
       ],
       "pagination": {
@@ -315,12 +314,11 @@ GET /api/guest/bookings/upcoming?page=1&pageSize=10
 | `cancellation.freeCancellationUntil` | `string\|null` | ISO 8601 deadline for free cancellation. |
 | `cancellation.cancellationPolicy` | `string\|null` | Human-readable policy summary. |
 
-#### Check-in Eligibility
+#### Check-in Flag
 
 | Field | Type | Description |
 |---|---|---|
-| `eligibleForCheckin` | `boolean` | Whether the guest can check in right now. `true` when `status` is `confirmed` or `pending` AND `checkIn` is within 1 day from today. |
-| `checkinIneligibleReason` | `string\|null` | `null` when eligible. Otherwise one of: `"already_checked_in"`, `"cancelled"`, `"completed"`, `"too_early"`. |
+| `checkInFlag` | `string` | Check-in status indicator. One of: `"cancelled"` — booking was cancelled, `"checked_in"` — guest has already checked in, `"upcoming"` — awaiting check-in in the future. |
 
 ---
 
@@ -330,8 +328,8 @@ GET /api/guest/bookings/upcoming?page=1&pageSize=10
 |---|---|---|
 | `urdd_id` | From JWT | Only the authenticated guest's bookings. |
 | `status` | `active` | Excludes soft-deleted bookings. |
-| `booking_status` | `confirmed`, `pending`, `cancelled` | Confirmed, pending, or cancelled bookings. |
-| Date filter | `DATE(check_in_date) > CURDATE()` | Only future bookings (check-in strictly after today). |
+| `booking_status` | `confirmed`, `pending` | Confirmed or pending bookings (not checked in). |
+| Date filter | `DATE(check_in_date) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)` | Check-in within the next 7 days. |
 | Order | `check_in_date ASC` | Soonest upcoming booking first. |
 
 ---
@@ -351,6 +349,6 @@ GET /api/guest/bookings/upcoming?page=1&pageSize=10
 |---|---|
 | 2026-06-08 | Changed from returning a single booking (LIMIT 1) to a paginated list of all upcoming bookings. Response shape changed from a single v2 booking object (or `null`) to `{ items, pagination }`. |
 | 2026-06-09 | Added `cancelled` to the `booking_status` filter so cancelled bookings remain visible after page reload (fixes [#250](https://github.com/UBS-Dev-Org/hms/issues/250)). |
-| 2026-06-09 | Added `eligibleForCheckin` and `checkinIneligibleReason` fields to every booking object in the bundle (implements [#254](https://github.com/UBS-Dev-Org/hms/issues/254)). |
+| 2026-06-09 | Added `eligibleForCheckin` and `checkinIneligibleReason` fields to every booking object in the bundle (implements [#254](https://github.com/UBS-Dev-Org/hms/issues/254)). Later replaced by `checkInFlag`. |
 | 2026-06-09 | Added `checked_out` and `completed` to the `booking_status` filter so completed bookings are visible in the Completed tab ([#253](https://github.com/UBS-Dev-Org/hms/issues/253)). |
 | 2026-06-12 | Upcoming now includes same-day and in-progress bookings (`>= CURDATE` + check_out window). Restricted `booking_status` filter to `confirmed` and `pending` only (removed `cancelled`, `checked_out`, `completed`). |
