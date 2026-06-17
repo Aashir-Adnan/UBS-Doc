@@ -74,6 +74,14 @@ When a hotel is provisioned, it gets an org chart but no resources:
 - The tenant-scoped **persona permission-group clones** (Tenant-Admin, Service-Manager, Standard-Guest groups).
 - The **Tenant-Admin RDD** + the admin user + **URDD-C**.
 
+> **Per-tenant seniority chain (2026-06-16).** Each tenant's **Tenant-Admin RDD** now reports up
+> (`senior_rdd_id`) to that same tenant's **Tenant-Manager RDD** (URDD-B′'s RDD) — previously the
+> cloned RDDs pointed at the global SaaS-Admin RDD, leaving the Tenant Manager and Tenant Admin as
+> siblings. The intended per-tenant chain is **`TENANT+Manager → TENANT+Admin → <category> Managers`**.
+> This is what lets the RDD role-picker compute each RDD's juniors correctly (a senior's juniors become
+> non-selectable once it's chosen). Fixed for existing tenants by a backfill migration; paired by
+> `tenant_id`, idempotent.
+
 ---
 
 ## 3. How the system decides what's "a default to clone"
@@ -110,13 +118,15 @@ That predicate **is** the definition of "a default to clone." The `created_by = 
 | **Platform-global** | `tenant_id IS NULL` (`is_global=1`) | **No** | Already exposed to every tenant via the filter's `created_by IS NULL` branch. Cloning would duplicate it in pickers (one global + one clone). |
 | **Governance persona** | persona designation codes; dept `HMS`; the `PG-*` groups | **Not by the sweep** | Persona roles/designations/depts/RDDs are reproduced only by the dedicated clone helpers, never by the dimension sweep. *(Exception: the three tenant-scoped persona permission groups ARE cloned — by their own helper, not the sweep.)* |
 
+> **Global template RDDs are "anchored" to the system tenant (2026-06-16).** The dedicated clone helpers (URDD-B′ resolve, Tenant-Admin / Guest / Service-Manager RDD clones) resolve the **global template RDD** they copy from. Those templates originally lived at `tenant_id IS NULL`; an "anchor" migration re-homed them onto the **system tenant**. Since `roles_designations_department` has no `is_global` column, the helpers now resolve them via the shared `globalRddScope('rdd')` predicate (`tenant_id IS NULL OR tenant_id = <system tenant>`), tolerant of both pre- and post-anchor states. (Operational dimension rows still carry `is_global`, so the §3.2 sweep — which keys on `tenant_id = systemTenantId AND created_by = saasAdminUrdd` — was unaffected.)
+
 ### 3.4 ID remapping during a clone
 
 When a sweep clones a batch of rows, it builds an **old→new id map**. Self-referential columns (`senior_role_id`, `senior_designation_id`, `parent_category_id`) and FK columns (a group's `role_id` / `designation_id`) are **rewritten through that map**. If a referenced row was *not* mirrored (it was global, or excluded), the column is **kept verbatim only if it still points at a valid global row, otherwise set NULL** — never left pointing across a tenant boundary. This is why a clone's category references match the *tenant's* ids, not the system tenant's (see the before/after in §1).
 
 ### 3.5 Regime 2 — Phase-8 assignment (Trigger B): an *explicitly picked* source
 
-Framework resources are **not** swept automatically. The Tenant Manager **picks** a `source_id` (a service category, scenario config, or location type) and the system validates it is a genuine SaaS-global original (not already a clone) before deep-cloning it. **Config keys are the exception:** they are not picked individually — assigning a `service_category` cascade-clones every SaaS-global key whose `applies_to` includes that category (or is `*`), and revoking the category cascade-revokes the keys it orphans. See [resource-assignments.md](../per-tenant-resource-assignment/resource-assignments.md#63-side-effects--assigning-a-service_category).
+Framework resources are **not** swept automatically. The Tenant Manager **picks** a `source_id` (a service category, scenario config, or location type) and the system validates it is a genuine SaaS-global original (not already a clone) before deep-cloning it. **Config keys are the exception:** they are not picked individually — assigning a `service_category` cascade-clones every SaaS-global key whose `applies_to` includes that category (or is `*`), **plus the package-only keys** (`applies_to = ["package"]`, which ride on owning any category), and revoking the category cascade-revokes the keys it orphans (package-only keys drop only when the **last** category is revoked). See [resource-assignments.md](../per-tenant-resource-assignment/resource-assignments.md#63-side-effects--assigning-a-service_category).
 
 ---
 
@@ -143,7 +153,7 @@ To see the triggers in sequence:
 
 1. **Provision Hotel 12** (Trigger A). The hotel now exists with: URDD-B′ (owner), a Tenant-Manager RDD, a mirrored org dictionary, persona permission-group clones, a Tenant-Admin RDD + admin user + URDD-C. **No config keys, no categories yet.**
 2. **Assign the Stay `service_category`** (Trigger B). Three things happen in one transaction: (a) the category is deep-cloned into Hotel 12 (new local id, owned by URDD-B′); (b) **every SaaS-global config key that applies to Stay** (e.g. `base_price`) is cascade-cloned — each to a new clone id (say `412`), its `applies_to`/`enabled_for` pruned/remapped to Hotel 12's owned categories, its possible-values cloned for Stay and `possible_values` rebuilt; (c) the Stay Service-Manager RDD is eagerly cloned (`Manager`/`STAY`/`TENANT_<code>`). Now Stay, its config keys, and "Stay Manager" all appear in pickers even though no one holds the persona yet.
-3. **(No separate config-key step.)** Config keys arrive *with* their category in step 2 — there is no individual `config_key` assign. Assigning another category later cascade-clones *its* keys too (and back-fills any key shared with Stay), so the order categories are assigned never matters.
+3. **(No separate config-key step.)** Config keys arrive *with* their category in step 2 — there is no individual `config_key` assign. The **package-only** keys (`applies_to = ["package"]`) are cloned here too, alongside this first category. Assigning another category later cascade-clones *its* keys too (and back-fills any key shared with Stay), so the order categories are assigned never matters.
 4. **Provision a Stay Service Manager** (Trigger C). The SM user is created with URDD-D; the per-tenant Stay Service-Manager RDD **dedups onto the eager one** from step 2 rather than creating a duplicate.
 
 Hotel 12 is now a running hotel — and every row it owns traces back to a system original via either a mirror (step 1) or a `source_*_id` lineage link (steps 2–3).
@@ -169,6 +179,7 @@ Every cloned row is stamped `created_by = URDD-B′`. **Never cloned** (shared):
 
 | Date | Change |
 |---|---|
+| 2026-06-16 | Global template RDDs **anchored** to the system tenant — clone helpers resolve them via `globalRddScope` (§3.3). Per-tenant **seniority chain** fixed: Tenant-Admin RDD reports to the tenant's Tenant-Manager RDD (`TENANT+Manager → TENANT+Admin → service managers`, §2.1). |
 | 2026-06-10 | Initial documentation of the per-tenant cloning model and the three triggers. |
 | 2026-06-09 | Service-category clones now carry an eager Service-Manager RDD on the tenant's hotel department (`TENANT_<code>`); category lives on the designation post re-model. |
 | 2026-06-05 | SaaS-Admin `created_by` back-filled onto system RBAC rows, making ownership the sole basis for the RBAC-mirror sweep; shared reference-data clones deactivated. |

@@ -227,6 +227,7 @@ Reads and writes are both tenant-scoped, but by **different mechanisms** — thi
 | Operation | Guard | What it does |
 |---|---|---|
 | **List / View** | Query-resolver tenancy filter (SELECT-only) | Scopes rows to the acting tenant. If tenancy is on but **no actor resolved**, the SQL is suffixed `AND (1 = 0)` → **zero rows** (fail-closed), so an actor-less read never leaks every tenant's rows. |
+| **List / View by a Service Manager** | Query-resolver category scope (SELECT-only) | On top of the tenant filter, a Service Manager's config-key reads are narrowed to keys that apply to **all** categories (`applies_to = '*'`) or **include his** category (even if they also apply to others). Keys scoped to *other* categories only — and **package-only keys** (`applies_to = ["package"]`) — are hidden. Applies to the resolver-routed config APIs **and** the direct-query [config-keys catalog](./config-keys-catalog/config-keys-catalog.md#service-manager-category-scope). |
 | **`enabled_for` Update** | `requireConfigKeyTenantMatch` | The acting tenant (from `actionPerformerURDD`) must own the key. The **system-tenant author** edits the global originals; a tenant-scoped manager edits only its own clones. |
 | **`possible_values` Add/Update/Delete** | `assertKeyTenantMatch` | Resolves the parent `config_key_id` and asserts the requester's tenant owns it. |
 
@@ -327,6 +328,7 @@ Values are stored as embedded JSON; there is **no** fan-out to `translated_entri
 
 | Date | Change |
 |---|---|
+| 2026-06-15 | **Service Manager config-key read scope.** A Service Manager's List/View is now narrowed to keys that apply to `*` or include his category (other-category-only and **package-only** `["package"]` keys hidden) — on the resolver-routed APIs and the direct-query [config-keys catalog](./config-keys-catalog/config-keys-catalog.md#service-manager-category-scope) (which reuses the exported `applyServiceManagerScope`). Packages themselves are also hidden from a Service Manager (`packages`/`package_services`/`package_pricing` → no rows). |
 | 2026-06-12 | `apply_on_all` propagation no longer writes `status='needs_review'` (the enum has no such value — the write threw under strict SQL mode and rolled back the whole propagation). Tenant-edited clones are now left as-is and reported as conflicts. Full algorithm extracted to [original-to-clone-propagation.md](../original-to-clone-propagation/original-to-clone-propagation.md). |
 | 2026-06-10 | Initial documentation of the config-key system and the dual-mode `enabled_for` CRUD. |
 | 2026-06-09 | Ownership guards extended to **all** `possible_values` writes (`assertKeyTenantMatch`), closing the cross-tenant write hole; List/View fail closed when no actor resolves; `apply_on_all` propagation + Tenant-Admin notification added. |
