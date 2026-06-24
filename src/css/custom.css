@@ -5634,6 +5634,36 @@ body.ubs-no-outlines .repo-row:hover {
   gap: 0.75rem;
 }
 
+.mw-markdown-rendered { display: block; line-height: 1.7; color: var(--ifm-font-color-base); }
+.mw-markdown-rendered h1,
+.mw-markdown-rendered h2,
+.mw-markdown-rendered h3 { margin: 1.25rem 0 0.5rem; font-weight: 700; color: var(--ifm-heading-color); }
+.mw-markdown-rendered h1 { font-size: 1.4rem; }
+.mw-markdown-rendered h2 { font-size: 1.15rem; border-bottom: 1px solid var(--ifm-color-emphasis-200); padding-bottom: 0.35rem; }
+.mw-markdown-rendered h3 { font-size: 1rem; }
+.mw-markdown-rendered p { margin: 0.5rem 0; }
+.mw-markdown-rendered ul,
+.mw-markdown-rendered ol { margin: 0.4rem 0 0.75rem 1.5rem; }
+.mw-markdown-rendered li { margin-bottom: 0.25rem; }
+.mw-markdown-rendered code {
+  font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  font-size: 0.85em;
+  background: var(--ifm-color-emphasis-100);
+  color: #c41a5e;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  border: 1px solid var(--ifm-color-emphasis-200);
+}
+.mw-markdown-rendered pre { background: var(--ifm-color-emphasis-100); padding: 0.85rem 1rem; border-radius: 6px; overflow-x: auto; margin: 0.5rem 0; }
+.mw-markdown-rendered pre code { background: none; border: none; padding: 0; color: inherit; }
+.mw-markdown-rendered strong { font-weight: 700; }
+.mw-markdown-rendered table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.9rem; }
+.mw-markdown-rendered th { background: var(--ifm-color-emphasis-100); font-weight: 700; text-align: left; padding: 0.5rem 0.75rem; border-bottom: 2px solid var(--ifm-color-emphasis-300); }
+.mw-markdown-rendered td { padding: 0.45rem 0.75rem; border-bottom: 1px solid var(--ifm-color-emphasis-200); }
+.mw-markdown-rendered tr:hover { background: var(--ifm-color-emphasis-100); }
+.mw-markdown-rendered hr { border: none; border-top: 1px solid var(--ifm-color-emphasis-200); margin: 1.25rem 0; }
+.mw-markdown-rendered blockquote { border-left: 3px solid var(--ifm-color-primary); margin: 0.75rem 0; padding: 0.5rem 1rem; background: var(--ifm-color-emphasis-100); border-radius: 0 6px 6px 0; }
+
 .mw-notes-textarea {
   width: 100%;
   padding: 0.6rem 0.75rem;

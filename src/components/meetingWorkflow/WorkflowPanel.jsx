@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { marked } from 'marked';
 import { mwGet, mwPost, mwPostForm } from './api';
 import NoteEditor from './NoteEditor';
 import LiveTranscribeStage from './LiveTranscribeStage';
@@ -265,9 +266,11 @@ function PreMeetingStage({ meeting, detail, onDone }) {
             <iframe srcDoc={html} title="Pre-Meeting Notes" className="mw-html-iframe" sandbox="allow-same-origin" />
           )}
           {view === 'md' && (
-            <div className="mw-notes-panel">
-              <pre className="mw-pre" style={{ maxHeight: '60vh', overflowY: 'auto', whiteSpace: 'pre-wrap' }}>{md}</pre>
-            </div>
+            <div
+              className="mw-notes-panel mw-markdown-rendered"
+              style={{ maxHeight: '60vh', overflowY: 'auto', padding: '1rem 1.25rem' }}
+              dangerouslySetInnerHTML={{ __html: marked.parse(md || '') }}
+            />
           )}
           {(keyTopics.length > 0 || openItems.length > 0) && (
             <div className="mw-premeeting-meta">
