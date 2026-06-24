@@ -188,6 +188,16 @@ Matching is **by the alias used in FROM/JOIN**. A custom alias bypasses the exem
 
 The tenancy filter only rewrites `SELECT`s. **INSERT/UPDATE/DELETE are not tenant-scoped by the resolver.** Anywhere that matters, an explicit **ownership guard** runs in the API's pre-process before the write — see the guards in [config-keys.md](../config-keys/config-keys.md#5-tenancy--ownership) and [resource-assignments.md](../per-tenant-resource-assignment/resource-assignments.md). This is a common source of "why is there a manual tenant check here?" — that's why.
 
+### 4.7 When the system tenant itself is `inactive` (governance-persona bypass)
+
+The **system tenant** (the home of the SaaS Admin, Tenant Manager, and any platform "general admin") can be intentionally left `status = 'inactive'` — e.g. once the legacy `tenant_id = 1` is retired. A tenant being inactive normally drops its users out of the **login** payload (the login queries require an *active* tenant), which would lock the platform's own operators out. To prevent that, the login flow (`otpVerif.js` / `lwp.js`, via `sqlFilters.js`) re-admits the **system-tenant governance personas** even when their tenant is inactive:
+
+- **SaaS Admin** (`SYSTEM` + `Admin`), **Tenant Manager** (`TENANT` + `Manager`), and **Tenant Admin** (`TENANT` + `Admin`) legs **scoped to the system tenant** still appear in the login response. (A **Service Manager** on the system tenant is *not* bypassed.)
+- Those system-tenant legs are reported with `tenant_id = "all"` / `tenant_name = "all"` (the global-scope sentinel) **only while the system tenant is inactive** — so the payload is unchanged until the flip, then signals "platform-wide" afterwards.
+- The bypass is **system-tenant-scoped**: a Tenant Admin (or any persona) on a genuinely deactivated *customer* tenant still correctly drops — only the platform's own operators are re-admitted.
+
+This is **not** a permission bypass (§3.4 still holds — every action is still checked against URDP). It only keeps the governance personas *visible at login* and lets them keep operating. The runtime resolvers (`getSystemTenantId`, `getSaasAdminUrddId`, `isTenantManager`, the tenancy filter, `permissionChecker`) never consult tenant-active status, so day-to-day operation is unaffected by the flip. The lifecycle cron is also taught to never reactivate/deactivate SaaS-Admin-owned tenants ([tenant-lifecycle-cron.md](../tenant-lifecycle-cron/tenant-lifecycle-cron.md) §4).
+
 ---
 
 ## 5. `is_global` vs cloning — share the global, clone the operational
@@ -200,6 +210,8 @@ A row is reusable across tenants in one of two ways, and they are **not** interc
 | **System-tenant operational** | owned by the SaaS Admin, `is_global = 0` | **Cloned** into the tenant — a copy stamped `created_by = URDD-B′`. | It is visible *only* to the system tenant by default, so each hotel needs its own **editable** copy. |
 
 > `is_global` is **a data marker only** — the tenancy filter does **not** consult it. Under the strict primary predicate, SaaS-Admin-authored rows are *not* visible to other tenants through the resolver; tenants see RBAC dimensions through their own **per-tenant mirrors**, not the system originals.
+
+> **Globals "anchored" to the system tenant (2026-06-16).** The SaaS-Admin-owned global template **RDDs** originally lived at `tenant_id IS NULL`; an "anchor" migration re-homed them onto the **system tenant** (`tenant_id = <system tenant>`). `roles_designations_department` has no `is_global` column, so any code that resolved a global template RDD by `tenant_id IS NULL` would break after the anchor. The shared helper **`globalRddScope('rdd')`** (→ `rdd.tenant_id IS NULL OR rdd.tenant_id = <system tenant>`) makes those lookups tolerant of **both** states; it's used everywhere a global RDD is resolved (tenant-admin assignment, provisioning, guest/Service-Manager RDD cloning, the default guest RDD). Non-RDD globals (designations/roles/departments/permission-groups) **do** carry `is_global`, so their resolvers key off that instead. Rule of thumb: **never resolve a SaaS-global RDD by `tenant_id IS NULL` — use `globalRddScope`.**
 
 This is the distinction that drives the whole [per-tenant-cloning](../per-tenant-cloning/per-tenant-cloning.md) guide: **share the global, clone the operational.**
 
@@ -250,6 +262,13 @@ To see how the pieces interact, trace one concrete request: **the Dining Service
 6. **Placeholders** substituted, query executed (with pagination if enabled).
 7. **Result:** only Hotel X's Dining services — isolated by tenant (step 4) *and* narrowed to one category (step 5).
 
+> **The category scope (step 5) does more than `services`.** It's a per-table predicate the resolver appends to every scoped SELECT a Service Manager makes:
+> - **Services / locations / delivery units / bookings** → narrowed to his category.
+> - **Packages are hidden entirely** — `packages`, `package_services`, `package_pricing` get a never-true predicate (a package bundles services across categories and is a tenant-level catalog construct, so a single-category manager has no package surface).
+> - **Config keys** → he sees only keys that apply to **all** categories (`applies_to = '*'`) or **include his** category (even if they also apply to others); keys scoped to *other* categories only, and **package-only keys** (`applies_to = ["package"]`), are hidden. The same scope is applied by direct-query config APIs that bypass the resolver (the `hms_config_keys` catalog), and per-package applied config values (`hms_config` `base_table='packages'`) are excluded too.
+>
+> Only **reads** are scoped; mutations stay gated by permissions.
+
 That request touched every concept on this page: the persona (an RDD/URDD), the permission check (URDP), tenant isolation (`created_by` filter), system-vs-tenant scope, and the designation-driven category scope from the re-model. The other guides zoom into the pieces:
 
 - [config-keys.md](../config-keys/config-keys.md) — the configuration system a Tenant Admin operates.
@@ -279,6 +298,7 @@ Every governed table also carries a `created_by` column holding a **URDD id** �
 
 | Date | Change |
 |---|---|
+| 2026-06-16 | **System tenant can be `inactive`** — governance-persona login bypass (SaaS Admin / Tenant Manager / Tenant Admin on the system tenant keep working; their legs render `tenant_id = "all"` while it's inactive). See §4.7. **Globals anchored** to the system tenant; global-RDD lookups now use `globalRddScope` (§5). RDD role-pickers hide platform/non-assignable RDDs per persona (§7-adjacent). |
 | 2026-06-10 | Initial documentation of the governance model and tenant isolation. |
 | 2026-06-09 | Persona codes re-modelled — codes are now non-unique (disambiguate by role); the Service-Manager dimension inverted (category → designation, department → hotel). See §6. |
 | 2026-06-05 | Tenant-Manager cross-tenant bypass removed — every actor is scoped to one tenant per request; system actors narrow via `target_tenant_id`. Primary-table tenancy predicate made strict. |

@@ -16,6 +16,8 @@ If you're new, read in this order — each builds on the last:
 4. **[Config Keys](./config-keys/config-keys.md)** — the configuration system a Tenant Admin operates once a hotel has its resources.
 5. **[Config Keys Catalog](./config-keys/config-keys-catalog/config-keys-catalog.md)** — the full inventory of every config key, for lookup.
 6. **[Original-to-Clone Propagation](./original-to-clone-propagation/original-to-clone-propagation.md)** — how an edit to a global original is re-synced into its tenant clones (the engine behind `apply_on_all` and the `propagate` verb).
+7. **[Tenant Lifecycle Cron](./tenant-lifecycle-cron/tenant-lifecycle-cron.md)** — what happens to a hotel when its trial/subscription runs out (or when it pays): the daily warn → grace → deactivate → reactivate job and the emails it sends.
+8. **[Permission Groups → Permissions Reference](./permission-groups-permissions/permission-groups-permissions.md)** — a lookup reference: exactly which permissions each governance permission group (`PG-FRAMEWORK`, `PG-TENANT-MGMT`, `PG-TENANT-ADMIN`, `PG-SERVICE-MGR`, `PG-STANDARD-GUEST`) grants, with per-group counts and the per-tenant clone mapping.
 
 ---
 
@@ -88,6 +90,8 @@ That single idea — *ownership by `created_by`, made tenant-visible by cloning*
 | [config-keys.md](./config-keys/config-keys.md) | The configuration system (`hms_config_keys`, `enabled_for`, `possible_values`) and the dual-mode CRUD that manages it, with a full end-to-end example. |
 | [config-keys-catalog.md](./config-keys/config-keys-catalog/config-keys-catalog.md) | The full inventory of system-tenant config keys, grouped by admin-UI category — every active key's scope, value type, and meaning. Includes the read-only **Catalog API** (`GET /api/hms_config_keys_catalog`, dual-locale List + View). |
 | [original-to-clone-propagation.md](./original-to-clone-propagation/original-to-clone-propagation.md) | The `propagateAssignmentUpdates` engine — how an edited global original is re-synced into its clones (merge rules, edit-detection, conflicts left as-is, best-effort/notification). Shared by `apply_on_all` (config-keys) and the `propagate` verb (assignments). |
+| [tenant-lifecycle-cron.md](./tenant-lifecycle-cron/tenant-lifecycle-cron.md) | The daily trial/subscription wind-down job — warn → grace window → deactivate (soft `status='inactive'`), plus reactivation of still-valid hotels. Grace lengths, Tenant-Admin emails, renewal behaviour, and a full worked run. |
+| [permission-groups-permissions.md](./permission-groups-permissions/permission-groups-permissions.md) | Reference: every permission assigned to each governance permission group (active mappings only), per-group totals, the global originals (9–12, 19) in full, the legacy/test groups, and the per-tenant clone id ranges that mirror them. Generated from `permission_groups` / `permission_groups_permissions` / `permissions`. |
 
 ---
 
@@ -95,5 +99,6 @@ That single idea — *ownership by `created_by`, made tenant-visible by cloning*
 
 | Date | Change |
 |---|---|
+| 2026-06-17 | Added [permission-groups-permissions.md](./permission-groups-permissions/permission-groups-permissions.md) — the per-group permission reference (governance originals + per-tenant clones), generated from the live `permission_groups_permissions` join. |
 | 2026-06-12 | Added [original-to-clone-propagation.md](./original-to-clone-propagation/original-to-clone-propagation.md) (the shared re-sync engine); updated config-keys / resource-assignments to drop the obsolete `needs_review` flag — edited clones are now left as-is and reported as conflicts. |
 | 2026-06-10 | Initial tenant-governance documentation set; guides reshaped onto the `guest-apis` doc template (Authentication / Request Payload / Response / Database Changes / Change Log). |

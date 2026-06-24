@@ -174,6 +174,22 @@ hms_config_keys.created_by IN (
 - **Fail closed** — tenancy on but no actor resolved → SQL suffixed `AND (1 = 0)` → zero rows (List) / `null` (View), never cross-tenant data.
 - Tenancy disabled → the filter is a no-op and the full catalog is returned.
 
+#### Service Manager category scope
+
+On top of the tenant filter, when the acting URDD is a **Service Manager** (its RDD designation is a service-category code), the catalog post-process applies the **same per-category predicate the main query resolver appends** — it reuses the resolver's exported `applyServiceManagerScope`, keyed on the catalog's `hms_config_keys` primary table:
+
+```sql
+hms_config_keys.applies_to = '*'
+  OR (JSON_VALID(hms_config_keys.applies_to)
+      AND JSON_CONTAINS(hms_config_keys.applies_to, '<his service_categories.category_id>'))
+```
+
+A Service Manager therefore sees only:
+- keys that apply to **all** categories (`applies_to = '*'`), and
+- keys whose `applies_to` **includes his category** — even if they also apply to other categories (e.g. `[47,"package"]`, `[47,48,…]`).
+
+He does **not** see keys scoped only to *other* categories, nor **package-only keys** (`applies_to = ["package"]` — neither `'*'` nor containing his category id, so he never browses configs that apply to packages alone — consistent with the package surface being hidden from him elsewhere). The predicate is a **no-op** for every other persona (Tenant Admin / Manager, SaaS Admin), and it applies to **both List and View** (a Service Manager Viewing a package-only or other-category key by id gets an empty result). *(Added 2026-06-15.)*
+
 ### Database Tables
 
 | Table | Read |
