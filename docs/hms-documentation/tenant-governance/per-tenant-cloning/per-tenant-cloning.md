@@ -60,7 +60,7 @@ Cloning is triggered by three **distinct, separate** events. The most common new
 |---|---|---|---|
 | **A** | **Tenant is provisioned** (or an admin is assigned to a pre-existing tenant) | `TenantProvisioningGroupedCrud` / `TenantsGroupedCrud` | The **RBAC scaffold** — the org chart (§2.1). |
 | **B** | **A framework resource is assigned** to the tenant | [Resource Assignments](../per-tenant-resource-assignment/resource-assignments.md) | The **resource itself** — service categories (+ their cascaded config keys & value tables + the eager Service-Manager RDD), scenario configs, location types, translations. **Config keys are not picked individually — they cascade from their service category.** |
-| **C** | **A Service Manager is provisioned** | `ServiceManagerProvisioning` | A per-tenant Service-Manager RDD (`Manager` / `<category>` / `TENANT_<code>`; lazy — dedups onto the eager one from B) + the SM user + URDD-D. |
+| **C** | **A Service Manager is provisioned** | `ServiceManagerProvisioning` | A per-tenant Service-Manager RDD (`Manager` / `<category>` / the tenant's staff dept; lazy — dedups onto the eager one from B) + the SM user + URDD-D. |
 
 > **A and B are different events.** A new hotel after trigger A has staff personas but **zero** config keys, service categories, or location types. They appear one at a time as the Tenant Manager runs trigger B.
 
@@ -70,7 +70,8 @@ When a hotel is provisioned, it gets an org chart but no resources:
 
 - **URDD-B′** — the Tenant Manager's per-tenant URDD. *The owner of everything later assigned* — this is the linchpin.
 - The per-tenant **Tenant-Manager RDD** (`TENANT` + `Manager`).
-- The mirrored **org dictionary** — roles, departments, designations, RDDs (`mirrorRbacDimensionsForTenant`).
+- The single **staff department**, named after the tenant (created by `resolveTenantManagerUrdd` — **not** mirrored; **one department per tenant**, no `TENANT_` prefix).
+- The mirrored **org dictionary** — roles and designations (`mirrorRbacDimensionsForTenant`; designations exclude `SYSTEM`/`TENANT`/`DEVELOPER`). Departments are **not** mirrored.
 - The tenant-scoped **persona permission-group clones** (Tenant-Admin, Service-Manager, Standard-Guest groups).
 - The **Tenant-Admin RDD** + the admin user + **URDD-C**.
 
@@ -152,7 +153,7 @@ Framework resources are **not** swept automatically. The Tenant Manager **picks*
 To see the triggers in sequence:
 
 1. **Provision Hotel 12** (Trigger A). The hotel now exists with: URDD-B′ (owner), a Tenant-Manager RDD, a mirrored org dictionary, persona permission-group clones, a Tenant-Admin RDD + admin user + URDD-C. **No config keys, no categories yet.**
-2. **Assign the Stay `service_category`** (Trigger B). Three things happen in one transaction: (a) the category is deep-cloned into Hotel 12 (new local id, owned by URDD-B′); (b) **every SaaS-global config key that applies to Stay** (e.g. `base_price`) is cascade-cloned — each to a new clone id (say `412`), its `applies_to`/`enabled_for` pruned/remapped to Hotel 12's owned categories, its possible-values cloned for Stay and `possible_values` rebuilt; (c) the Stay Service-Manager RDD is eagerly cloned (`Manager`/`STAY`/`TENANT_<code>`). Now Stay, its config keys, and "Stay Manager" all appear in pickers even though no one holds the persona yet.
+2. **Assign the Stay `service_category`** (Trigger B). Three things happen in one transaction: (a) the category is deep-cloned into Hotel 12 (new local id, owned by URDD-B′); (b) **every SaaS-global config key that applies to Stay** (e.g. `base_price`) is cascade-cloned — each to a new clone id (say `412`), its `applies_to`/`enabled_for` pruned/remapped to Hotel 12's owned categories, its possible-values cloned for Stay and `possible_values` rebuilt; (c) the Stay Service-Manager RDD is eagerly cloned (`Manager`/`STAY`/the tenant's staff dept). Now Stay, its config keys, and "Stay Manager" all appear in pickers even though no one holds the persona yet.
 3. **(No separate config-key step.)** Config keys arrive *with* their category in step 2 — there is no individual `config_key` assign. The **package-only** keys (`applies_to = ["package"]`) are cloned here too, alongside this first category. Assigning another category later cascade-clones *its* keys too (and back-fills any key shared with Stay), so the order categories are assigned never matters.
 4. **Provision a Stay Service Manager** (Trigger C). The SM user is created with URDD-D; the per-tenant Stay Service-Manager RDD **dedups onto the eager one** from step 2 rather than creating a duplicate.
 
@@ -164,7 +165,8 @@ Hotel 12 is now a running hotel — and every row it owns traces back to a syste
 
 | Table | Cloned at | Lineage column |
 |---|---|---|
-| `roles`, `departments`, `designations`, `roles_designations_department` | A (RBAC mirror) | — (id-remapped) |
+| `roles`, `designations`, `roles_designations_department` | A (RBAC mirror; designations exclude `SYSTEM`/`TENANT`/`DEVELOPER`) | — (id-remapped) |
+| `departments` (one **staff** dept per tenant, named after the tenant) | A — created by `resolveTenantManagerUrdd`, **not** mirrored | — (`tenant_id`) |
 | `permission_groups` (operational + persona groups) | A | — (id-remapped) |
 | `user_roles_designations_department` | A (URDD-B′, URDD-C), C (URDD-D) | — |
 | `hms_config_keys` (+ `hms_config` / `hms_config_possible_values`) | B (`config_key`) | `source_hms_config_key_id` |
@@ -179,9 +181,10 @@ Every cloned row is stamped `created_by = URDD-B′`. **Never cloned** (shared):
 
 | Date | Change |
 |---|---|
+| 2026-06-18 | **One department per tenant** — org-chart departments are no longer mirrored; each tenant has a single **staff department** named after the tenant (no `TENANT_` prefix), resolved via `resolveTenantStaffDepartmentId` (the Tenant-Manager RDD's department). The `DEVELOPER` designation is also excluded from the designation mirror. |
 | 2026-06-16 | Global template RDDs **anchored** to the system tenant — clone helpers resolve them via `globalRddScope` (§3.3). Per-tenant **seniority chain** fixed: Tenant-Admin RDD reports to the tenant's Tenant-Manager RDD (`TENANT+Manager → TENANT+Admin → service managers`, §2.1). |
 | 2026-06-10 | Initial documentation of the per-tenant cloning model and the three triggers. |
-| 2026-06-09 | Service-category clones now carry an eager Service-Manager RDD on the tenant's hotel department (`TENANT_<code>`); category lives on the designation post re-model. |
+| 2026-06-09 | Service-category clones now carry an eager Service-Manager RDD on the tenant's hotel department; category lives on the designation post re-model. |
 | 2026-06-05 | SaaS-Admin `created_by` back-filled onto system RBAC rows, making ownership the sole basis for the RBAC-mirror sweep; shared reference-data clones deactivated. |
 
 ---

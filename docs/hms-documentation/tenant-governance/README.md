@@ -17,7 +17,8 @@ If you're new, read in this order — each builds on the last:
 5. **[Config Keys Catalog](./config-keys/config-keys-catalog/config-keys-catalog.md)** — the full inventory of every config key, for lookup.
 6. **[Original-to-Clone Propagation](./original-to-clone-propagation/original-to-clone-propagation.md)** — how an edit to a global original is re-synced into its tenant clones (the engine behind `apply_on_all` and the `propagate` verb).
 7. **[Tenant Lifecycle Cron](./tenant-lifecycle-cron/tenant-lifecycle-cron.md)** — what happens to a hotel when its trial/subscription runs out (or when it pays): the daily warn → grace → deactivate → reactivate job and the emails it sends.
-8. **[Permission Groups → Permissions Reference](./permission-groups-permissions/permission-groups-permissions.md)** — a lookup reference: exactly which permissions each governance permission group (`PG-FRAMEWORK`, `PG-TENANT-MGMT`, `PG-TENANT-ADMIN`, `PG-SERVICE-MGR`, `PG-STANDARD-GUEST`) grants, with per-group counts and the per-tenant clone mapping.
+8. **[Deferred Delete (Probation)](./deferred-delete-probation/deferred-delete-probation.md)** — what happens when you delete something other things still depend on: the `active → probation → inactive` lifecycle, how a delete is hidden but reversible, and the daily finalizer cron that tidies it up once the dependencies clear.
+9. **[Permission Groups → Permissions Reference](./permission-groups-permissions/permission-groups-permissions.md)** — a lookup reference: exactly which permissions each governance permission group (`PG-FRAMEWORK`, `PG-TENANT-MGMT`, `PG-TENANT-ADMIN`, `PG-SERVICE-MGR`, `PG-STANDARD-GUEST`) grants, with per-group counts and the per-tenant clone mapping.
 
 ---
 

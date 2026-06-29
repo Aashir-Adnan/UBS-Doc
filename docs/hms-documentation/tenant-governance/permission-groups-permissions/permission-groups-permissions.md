@@ -5,11 +5,14 @@
 > **Generated from:** `permission_groups`, `permission_groups_permissions`, and `permissions` tables (active mappings + active permissions only).
 > **Update 2026-06-16 (URDP materialization fix):** assigning a permission group to a user (URDD) now fans out **only the group's ACTIVE mappings** into `user_role_designation_permissions`. The user-grouped-CRUD fan-out (`CustomUsersGroupedCrud/syncUserRddSet.js` → `syncUrdps`) previously selected `permission_groups_permissions` **without** a `status='active'` filter, so a user assigned e.g. `PG-TENANT-MGMT` inherited every permission the group **ever** had — including the **revoked (inactive)** ones — and got `count(all mappings)` URDP instead of `count(active)`. Net: a newly assigned/updated user's active URDP now equals the **active** counts listed here (e.g. `PG-TENANT-MGMT` → its active total, not the active+inactive total). Pre-existing URDDs created before this fix may still carry stale (revoked) perms until re-materialized.
 > **Update 2026-06-17 (staging↔local governance sync — regenerated from `hms_db_10.0`):** the counts and listings below now reflect the canonical dev DB `hms_db_10.0`. Migrations `20260617_4` (group matrix) + `20260617_5` (URDP materialization) bring dev/staging into line with it across the global originals **and** every per-tenant clone. Net governance changes vs. the prior `1.9` snapshot: the **`*_admin_code`** family (9 perms, tenant tier) is now granted to `PG-FRAMEWORK`, `PG-TENANT-MGMT`, `PG-TENANT-ADMIN`; **`update_users`** added to `PG-SERVICE-MGR`; `PG-TENANT-ADMIN` drops the `guest_booking_history` family; the system / QR-scan / user-device / user-activity log families stay **`PG-FRAMEWORK`-exclusive** (any dev drift onto the tenant personas is revoked). `PG-SERVICE-MGR` also reflects the booking-read grant / `booking_services`-write revoke already present in `hms_db_10.0`. New totals: `PG-FRAMEWORK` 246, `PG-TENANT-MGMT` 463, `PG-TENANT-ADMIN` 470, `PG-SERVICE-MGR` 159, `PG-STANDARD-GUEST` 0.
+> **Update 2026-06-18 (Tenant-Admin permission-governance grant):** `20260618_1` grants `PG-TENANT-ADMIN` the full permission-governance set — `*_permission_groups` (5), `*_permission_groups_permissions` (5), and the `permissions` reads `view_permissions` + `list_permissions` — across the global original and every clone, and materializes the same onto every active Tenant-Admin URDD. Net new vs. the prior state was just **`view_permissions`** (the other 11 were already granted); `PG-TENANT-ADMIN` total `470 → 471` (tenant tier `336 → 337`).
+> **Update 2026-06-22 (Booking Manager persona):** migration `20260622_3` adds a new persona **Booking Manager** (designation `BOOKING` + role `Manager`, RDD title "Manager of Bookings", per-tenant senior = the Tenant-Admin RDD) with a new permission group **`PG-BOOKING-MGR`** (global original + a per-tenant clone for every active tenant). It also creates the new permission **`booking_manager_dashboard`**. `PG-BOOKING-MGR` = **34** perms: full CRUD on `bookings` + `booking_services` (9 actions each) + `privacy_policy` + `account`; read-only (`view`/`list`) on `services` / `packages` / `package_services` / `service_categories` / `users` / `guest_profiles`; plus `dashboard` + `booking_manager_dashboard`. (Tenants without a Tenant-Admin RDD are skipped until one exists — see the migration note.)
+> **Update 2026-06-29 (`import_*` permission family):** migration `20260629_2_add_import_permissions_mirroring_export` adds an `import_<resource>` permission for **every active `export_<resource>`** (80 new perms in the catalog) and grants each to **every group that already holds the matching `export_*`** — the global originals **and** every per-tenant clone. So "import" tracks "export" 1:1 in both the catalog and group memberships. Per-persona increments (= that persona's active `export_*` count): `PG-FRAMEWORK` **+27**, `PG-TENANT-MGMT` **+49**, `PG-TENANT-ADMIN` **+51**, `PG-SERVICE-MGR` **+15**, `PG-BOOKING-MGR` **+2** (`PG-STANDARD-GUEST` unchanged). The per-group listings below show only the `export_*` half — for each `export_*` a group holds, read in the matching `import_*` (same tier/category). New `import_*` descriptions mirror the export wording (`Download (export) …` → `Upload (import) …`; the bespoke `import_admin_code` reads "Import admin codes").
 > **Context:** [governance-model.md](../tenant-governance-model/governance-model.md) (personas, the `created_by` isolation rule), [per-tenant-cloning.md](../per-tenant-cloning/per-tenant-cloning.md) (how per-tenant group clones are created), and [resource-assignments.md](../per-tenant-resource-assignment/resource-assignments.md). Backend design docs: `docs/strategies/superadmin_tenant_governance_strategy.md`, `docs/strategies/tenant_admin_assignment.md`, `docs/system_context/07_rbac.md`.
 
 This document lists **every permission assigned to each governance permission group**, taken directly from the `permission_groups_permissions` join table. Only rows with `status = 'active'` in the join table **and** an active `permissions` row are counted. Permissions are grouped by their `permission_category` tier and sorted alphabetically.
 
-> **Current governance totals:** `PG-FRAMEWORK` 246, `PG-TENANT-MGMT` 463, `PG-TENANT-ADMIN` 470, `PG-SERVICE-MGR` 159, `PG-STANDARD-GUEST` 0. *(PG-TENANT-MGMT/ADMIN each −1 vs. pre-2026-06-16: `add_roles_designations_department` revoked, see the RDD-write note above.)* System/QR logs remain SaaS-Admin-exclusive (`PG-FRAMEWORK`). `PG-SERVICE-MGR` now also carries 20 framework config-catalog reads + 3 `manage_config_*` perms (`20260611_4`). Persona codes shown are the re-modelled ones (`SYSTEM`/`TENANT`/`STANDARD`, role-disambiguated).
+> **Current governance totals:** `PG-FRAMEWORK` 246, `PG-TENANT-MGMT` 463, `PG-TENANT-ADMIN` 471, `PG-SERVICE-MGR` 159, `PG-STANDARD-GUEST` 0, `PG-BOOKING-MGR` 34. *(PG-TENANT-MGMT/ADMIN each −1 vs. pre-2026-06-16: `add_roles_designations_department` revoked, see the RDD-write note above; `PG-TENANT-ADMIN` +1 on 2026-06-18 = `view_permissions`.)* System/QR logs remain SaaS-Admin-exclusive (`PG-FRAMEWORK`). `PG-SERVICE-MGR` now also carries 20 framework config-catalog reads + 3 `manage_config_*` perms (`20260611_4`). Persona codes shown are the re-modelled ones (`SYSTEM`/`TENANT`/`STANDARD`, role-disambiguated).
 
 ## 1. Permission groups overview
 
@@ -19,11 +22,12 @@ This document lists **every permission assigned to each governance permission gr
 |---|---|---|---:|---|
 | 9 | `PG-FRAMEWORK` | active | 246 | SaaS Admin (`SYSTEM` + `Admin`) |
 | 10 | `PG-TENANT-MGMT` | active | 463 | Tenant Manager (`TENANT` + `Manager`) |
-| 11 | `PG-TENANT-ADMIN` | active | 470 | Tenant Admin (`TENANT` + `Admin`) |
+| 11 | `PG-TENANT-ADMIN` | active | 471 | Tenant Admin (`TENANT` + `Admin`) |
 | 12 | `PG-SERVICE-MGR` | active | 159 | Service Manager (`<service-category>` designation, e.g. `STAY`) |
 | 19 | `PG-STANDARD-GUEST` | active | 0 | Standard Guest (`STANDARD`) |
+| _(new, `20260622_3`)_ | `PG-BOOKING-MGR` | active | 34 | Booking Manager (`BOOKING` + `Manager`) |
 
-> **Governance groups** are the active global rows **9–12** plus **19** (`PG-STANDARD-GUEST`, guest persona — no permissions seeded yet). These five are the **only** active permission groups in the governance model.
+> **Governance groups** are the active global rows **9–12** plus **19** (`PG-STANDARD-GUEST`, guest persona — no permissions seeded yet) and **`PG-BOOKING-MGR`** (added 2026-06-22). These six are the active permission groups in the governance model.
 
 
 ### 1.2 Per-tenant cloned governance groups (ids 20–91)
@@ -34,7 +38,8 @@ Tenant onboarding clones a subset of the governance groups per tenant (`tenant_i
 |---|---:|---|---:|---|
 | `PG-SERVICE-MGR` | 24 | 21–90 | 159 | Group 12 |
 | `PG-STANDARD-GUEST` | 24 | 22–91 | 0 | Group 19 |
-| `PG-TENANT-ADMIN` | 24 | 20–89 | 470 | Group 11 |
+| `PG-TENANT-ADMIN` | 24 | 20–89 | 471 | Group 11 |
+| `PG-BOOKING-MGR` | per active tenant (`20260622_3`) | _(assigned at migration)_ | 34 | the global `PG-BOOKING-MGR` |
 
 ## 2. Permissions per group
 
@@ -820,7 +825,7 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 *Tenant Admin — all operational permissions within one tenant*
 
 - **Status:** `active`
-- **Total active permissions:** 470
+- **Total active permissions:** 471
 
 **By tier:** framework: 2, tenant: 336, service: 126, common: 6
 
@@ -1151,6 +1156,7 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `view_notifications`
 - `view_permission_groups`
 - `view_permission_groups_permissions`
+- `view_permissions`
 - `view_plans`
 - `view_plan_groups`
 - `view_qr_codes`
@@ -1516,4 +1522,17 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 
 - **Status:** `active`
 - **Total active permissions:** 0
+
+### `PG-BOOKING-MGR` (new — `20260622_3`)
+
+*Booking Manager (`BOOKING` + `Manager`) — owns check-in & booking handling. Global original + a per-tenant clone for every active tenant (mirrors this set).*
+
+- **Status:** `active`
+- **Total active permissions:** 34
+- **Full CRUD** (9 actions each — `add`/`delete`/`update`/`view`/`list`/`export`/`filter`/`search`/`sort`): `bookings`, `booking_services`
+- **Singletons (full):** `privacy_policy`, `account`
+- **Read-only** (`view` + `list`): `services`, `packages`, `package_services`, `service_categories`, `users`, `guest_profiles`
+- **Dashboards:** `dashboard`, `booking_manager_dashboard` *(the latter is created by the same migration)*
+
+> Not granted: `booking_items` / `booking_payments` / `guest_booking_history` (can be added if check-in needs them).
 
