@@ -327,6 +327,53 @@ rules to activate. When a key is absent, the rule is skipped (permissive default
 
 ---
 
+## 13. Date-Parsing Fix (Bug Found During Testing)
+
+### What Was Found
+
+`isBlackedOut()` in `serviceConfigs.js` crashed with `RangeError: Invalid time value`
+when `checkIn` contained a time component (e.g., `"2026-07-15 00:00:00"` from MySQL
+datetime). The concatenation `dateISO + "T00:00:00Z"` produced an invalid string.
+
+### What Was Fixed
+
+- `serviceConfigs.js` `isBlackedOut()`: added `.slice(0, 10)` on all date inputs
+- `createRoomBooking.js`: added `checkInStr = String(checkIn).slice(0, 10)` and used it
+  in date validation, advance-booking checks, and blackout checks
+- `createPackageBooking.js`: same `.slice(0, 10)` safety on date inputs
+
+### Files Changed
+
+- `Src/HelperFunctions/Guest/v2/serviceConfigs.js`
+- `Src/HelperFunctions/PreProcessingFunctions/Guest/createRoomBooking.js`
+- `Src/HelperFunctions/PreProcessingFunctions/Guest/createPackageBooking.js`
+
+---
+
+## 14. Idempotency Early-Return Fix (Bug Found During Testing)
+
+### What Was Found
+
+When `insertBookingRow` returned an existing booking via idempotency key match, the rest
+of the booking creation flow still attempted to insert `booking_services`, `booking_items`,
+and form data rows, causing duplicates or errors.
+
+### What Was Fixed
+
+- `insertBookingRow` now returns `{ ..., isExisting: true }` on idempotency match
+- Both `createRoomBooking` and `createPackageBooking` check `isExisting` and return early
+
+---
+
+## Integration Tests
+
+See the [Test Report](./booking-rules-test-report) for the full test suite covering all
+31 assertions across 10 test groups.
+
+**Run:** `node Services/SysScripts/TestScripts/sim/bookingRulesCheck.js`
+
+---
+
 ## What Is NOT Built Yet
 
 | Item | Reason |

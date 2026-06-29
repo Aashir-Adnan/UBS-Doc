@@ -75,6 +75,7 @@ const sidebars = {
               items: [
                 'hms-documentation/major-implementations/booking-rules/booking-rules-requirements',
                 'hms-documentation/major-implementations/booking-rules/booking-rules-implementation',
+                'hms-documentation/major-implementations/booking-rules/booking-rules-test-report',
               ],
             },
           ],
