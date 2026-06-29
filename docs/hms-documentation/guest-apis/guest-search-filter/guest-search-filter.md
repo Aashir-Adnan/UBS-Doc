@@ -79,6 +79,13 @@ All parameters are passed as query string values.
 | `8-14` | 8–14 nights |
 | `15+` | 15+ nights |
 
+### Exempt (Exclude) Items
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `exemptServiceId` | `number` | No | — | Service/room ID to exclude from results. Used in the pinned-item flow (Version A) where the frontend re-appends the selected item at the top. |
+| `exemptPackageId` | `number` | No | — | Package ID to exclude from results. Same purpose as `exemptServiceId` but for packages. |
+
 ### Config-Based Filters
 
 | Parameter | Type | Required | Default | Description |
@@ -130,6 +137,12 @@ GET /api/guest/search/filter?include=packages&hotelId=16&sort=priceAsc
 
 ```
 GET /api/guest/search/filter?include=rooms&hotelId=16&amenity=wifi,pool&roomType=suite&viewType=city-view
+```
+
+### Exclude a pinned package from results (Version A flow)
+
+```
+GET /api/guest/search/filter?include=rooms,packages&hotelId=16&checkIn=2026-07-01&checkOut=2026-07-04&exemptPackageId=10
 ```
 
 ### Config-based filter for featured items

@@ -252,6 +252,12 @@ Validation errors include a `details` array with per-field error codes:
 
 ---
 
+## Related Endpoints
+
+- **[Guest Unavailable Dates](../guest-unavailable-dates/guest-unavailable-dates.md)** — Returns all fully booked dates for a room/package from today to 1 year ahead. Use this to disable dates in the date picker before the guest selects a range.
+
+---
+
 ## Source Files
 
 | File | Purpose |

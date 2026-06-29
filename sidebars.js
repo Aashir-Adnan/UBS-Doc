@@ -67,6 +67,20 @@ const sidebars = {
       items: [
         {
           type: 'category',
+          label: 'Major Implementations',
+          items: [
+            {
+              type: 'category',
+              label: 'Booking Rules',
+              items: [
+                'hms-documentation/major-implementations/booking-rules/booking-rules-requirements',
+                'hms-documentation/major-implementations/booking-rules/booking-rules-implementation',
+              ],
+            },
+          ],
+        },
+        {
+          type: 'category',
           label: 'Guest APIs',
           items: [
             'hms-documentation/guest-apis/guest-tenant-scoped-apis',
@@ -152,6 +166,20 @@ const sidebars = {
               label: 'Guest Services',
               items: [
                 'hms-documentation/guest-apis/guest-services/guest-services',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Packages',
+              items: [
+                'hms-documentation/guest-apis/guest-packages/guest-packages',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Unavailable Dates',
+              items: [
+                'hms-documentation/guest-apis/guest-unavailable-dates/guest-unavailable-dates',
               ],
             },
             {
