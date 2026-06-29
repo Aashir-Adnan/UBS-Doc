@@ -130,8 +130,8 @@ multipliers to display the total:
    `[FRONTEND]`
    - Since there is no extension, the package's duration must be a **factor** of the total
      stay length. If the guest selected 10 nights and the pinned package is 3 nights
-     (10 is not divisible by 3), show a clear message: *"This package's {N}-night duration
-     doesn't fit your {X}-night stay."* Then **run the Search/Filter API** for the dates
+     (10 is not divisible by 3), show a clear message: *"This package's N-night duration
+     doesn't fit your X-night stay."* Then **run the Search/Filter API** for the dates
      and **list all other rooms/packages** that do fit.
    - If the package duration **is** a factor of the stay, still **run Search/Filter for the
      dates**, pass the **selected package's id to be excluded** from those results, and

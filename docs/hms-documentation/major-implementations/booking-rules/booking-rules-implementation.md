@@ -38,7 +38,7 @@ factor** of the total stay length when `checkIn` + `checkOut` dates are provided
   `serialCount = stayNights / pkg_duration`.
 - Display the multiplied price: `items_needed x serialCount x current_price`.
 - When the pinned package's duration is not a factor, show:
-  *"This package's {N}-night duration doesn't fit your {X}-night stay."*
+  *"This package's N-night duration doesn't fit your X-night stay."*
 
 ---
 
@@ -164,7 +164,7 @@ Modified `createPackageBooking.js` to accept an optional `entries` array:
 
 ### Frontend Requirements
 
-- Show remaining capacity: *"You can book up to {N} room-nights. Currently selected: {X}."*
+- Show remaining capacity: *"You can book up to N room-nights. Currently selected: X."*
 - Prevent submission when `items x nights > max_booking`.
 
 ---
