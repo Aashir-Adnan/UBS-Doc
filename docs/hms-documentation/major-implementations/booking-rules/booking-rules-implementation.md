@@ -1,7 +1,7 @@
 ---
 sidebar_position: 2
 title: "Booking Rules — Backend Implementation Guide"
-description: "What was implemented on the backend, how each feature works, and what frontend changes are required."
+description: "What was implemented on the backend, how each feature works, API endpoints affected, and what frontend changes are required."
 ---
 
 # Booking Rules — Backend Implementation Guide
@@ -16,21 +16,46 @@ and what frontend changes are required to use them.
 
 **Spec ref:** Version A rule 4, Version B rule 2
 
+### API Endpoint
+
+```
+GET /api/guest/search/filter
+```
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `include` | query | `"packages"` or `"rooms,packages"` |
+| `checkIn` | query | `YYYY-MM-DD` — start of stay |
+| `checkOut` | query | `YYYY-MM-DD` — end of stay |
+| `pageSize` | query | Number of results per page |
+
+When `checkIn` and `checkOut` are provided, the response only includes packages whose
+fixed duration (`pkg_duration`) evenly divides the total stay length.
+
 ### What Was Done
 
-Modified `searchQueries.js` → `searchPackages()` to add a post-SQL filter that removes
-packages whose fixed duration (`pkg_duration` from hms_config `duration` key) is **not a
-factor** of the total stay length when `checkIn` + `checkOut` dates are provided.
+Modified `searchQueries.js` `searchPackages()` to add a post-SQL filter that removes
+packages where `stayNights % pkg_duration !== 0`.
 
-- Example: 10-night stay → only packages with durations 1, 2, 5, or 10 are returned.
+- Example: 10-night stay only returns packages with durations 1, 2, 5, or 10 nights.
 - Packages with no fixed `duration` config are allowed through (permissive default).
-- The `pkg_duration` value is now included in search result objects so the frontend can
-  compute serial booking counts.
+- `pkg_duration` is now included in search result objects.
+
+### Response Change
+
+Each package in the response now includes:
+
+```json
+{
+  "id": 344,
+  "pkg_duration": 2,
+  "...": "..."
+}
+```
 
 ### Files Changed
 
-- `Src/HelperFunctions/Guest/v2/searchQueries.js` — added factor filter + `pkg_duration`
-  in returned objects
+- `Src/HelperFunctions/Guest/v2/searchQueries.js`
 
 ### Frontend Requirements
 
@@ -46,16 +71,30 @@ factor** of the total stay length when `checkIn` + `checkOut` dates are provided
 
 **Spec ref:** Version B rule 2 — multi-room packages
 
+### API Endpoint
+
+```
+GET /api/guest/search/filter
+```
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `include` | query | Must include `"packages"` |
+| `adults` | query | Number of adults in the party |
+| `children` | query | Number of children in the party |
+
+When party size is provided, packages whose combined stay-room capacity cannot accommodate
+the party are excluded from results.
+
 ### What Was Done
 
-Added `filterPackagesByRoomDistribution()` in `searchFilterHelper.js`. When party size is
-provided, this function queries the total capacity across all stay services in each package
-and excludes packages where `total_room_capacity < party_size`.
+Added `filterPackagesByRoomDistribution()` in `searchFilterHelper.js`. Queries the sum of
+`max_persons_per_booking` across all stay services in each package. Excludes packages where
+`total_room_capacity < party_size`.
 
 ### Files Changed
 
-- `Src/HelperFunctions/Guest/v2/searchFilterHelper.js` — new function integrated into
-  `searchAndFilter()`
+- `Src/HelperFunctions/Guest/v2/searchFilterHelper.js`
 
 ### Frontend Requirements
 
@@ -68,16 +107,32 @@ and excludes packages where `total_room_capacity < party_size`.
 
 **Spec ref:** Version B rule 2 — multi-unit same room
 
+### API Endpoint
+
+```
+GET /api/guest/search/filter
+```
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `include` | query | Must include `"rooms"` |
+| `adults` | query | Number of adults |
+| `children` | query | Number of children |
+| `checkIn` | query | `YYYY-MM-DD` |
+| `checkOut` | query | `YYYY-MM-DD` |
+
+When party size + dates are provided, rooms are checked for sufficient available units:
+`unitsNeeded = ceil(party / room_capacity)`. Rooms with fewer available units are excluded.
+
 ### What Was Done
 
-Added `filterRoomsByMultiUnitAvailability()` in `searchFilterHelper.js`. Calculates
-`unitsNeeded = ceil(party / room_capacity)` and verifies that many units are available
-(not booked) for the date range.
+Added `filterRoomsByMultiUnitAvailability()` in `searchFilterHelper.js`. Queries
+`max_persons_per_booking` config for each room, counts available delivery units for the
+date range, and compares.
 
 ### Files Changed
 
-- `Src/HelperFunctions/Guest/v2/searchFilterHelper.js` — new function integrated into
-  `searchAndFilter()`
+- `Src/HelperFunctions/Guest/v2/searchFilterHelper.js`
 
 ### Frontend Requirements
 
@@ -90,9 +145,28 @@ Added `filterRoomsByMultiUnitAvailability()` in `searchFilterHelper.js`. Calcula
 
 **Spec ref:** Booking Model section, Booking Validation Rules
 
-### What Was Done
+### API Endpoint
 
-Modified `createPackageBooking.js` to accept an optional `entries` array:
+```
+POST /api/guest/bookings/package
+```
+
+| Param | Location | Type | Required | Description |
+|-------|----------|------|----------|-------------|
+| `packageId` | body | number | yes | Package to book |
+| `hotelId` | body | number | no | Hotel (derived from URDD if omitted) |
+| `checkIn` | body | string | yes | Overall check-in date `YYYY-MM-DD` |
+| `checkOut` | body | string | no | Overall check-out (legacy single-entry) |
+| `entries` | body | array | no | Serial/parallel booking entries (new) |
+| `entries[].check_in_date` | body | string | yes | Entry check-in `YYYY-MM-DD` |
+| `entries[].check_out_date` | body | string | yes | Entry check-out `YYYY-MM-DD` |
+| `entries[].quantity` | body | number | no | Parallel copies (default 1) |
+| `adults` | body | number | no | Number of adults |
+| `children` | body | number | no | Number of children |
+| `idempotencyKey` | body | string | no | Deduplication key |
+| `services` | body | array | no | Optional scheduling data per package service |
+
+### Request Example (Serial + Parallel)
 
 ```json
 {
@@ -112,7 +186,7 @@ Modified `createPackageBooking.js` to accept an optional `entries` array:
 1. **Duration match** — each entry's nights must equal `pkg_duration` (from config)
 2. **Serial continuity** — check-out of entry N = check-in of entry N+1
 3. **Factor match** — total stay is divisible by duration
-4. **Max booking cap** — `sum(quantity) x duration <= max_booking` config
+4. **Max booking cap** — `sum(quantity) x duration` must not exceed `max_booking` config
 5. **Past-date / zero-night** — all entries validated
 6. **Availability** — `quantity` units picked per entry via `pickMultipleAvailableUnits()`
 
@@ -124,12 +198,22 @@ Modified `createPackageBooking.js` to accept an optional `entries` array:
 - **Backward compatible**: if `entries` is not provided, the legacy single check-in/out
   flow works exactly as before.
 
+### Error Responses
+
+| Status | Condition | Example Message |
+|--------|-----------|-----------------|
+| 400 | Duration mismatch | `"Entry 1: duration 3 nights does not match package duration of 2 nights"` |
+| 400 | Serial gap | `"Entry 2: check-in (2027-02-13) must equal previous entry's check-out (2027-02-12)"` |
+| 400 | Factor mismatch | `"Total stay of 7 nights is not divisible by package duration of 2 nights"` |
+| 400 | Cap exceeded | `"Booking exceeds max limit: 8 item-nights > 6 allowed"` |
+| 400 | Past date | `"Entry 1: check-in date cannot be in the past"` |
+| 409 | No rooms | `"Not enough available rooms for 2026-07-01 to 2026-07-03: need 2, found 1"` |
+
 ### Files Changed
 
 - `Src/HelperFunctions/PreProcessingFunctions/Guest/createPackageBooking.js`
-- `Src/HelperFunctions/Guest/v2/createBookingShared.js` — new
-  `pickMultipleAvailableUnits()`
-- `Src/Apis/.../GuestBookingsPackage/CRUD_parameters.js` — added `entries` param
+- `Src/HelperFunctions/Guest/v2/createBookingShared.js` — new `pickMultipleAvailableUnits()`
+- `Src/Apis/.../GuestBookingsPackage/CRUD_parameters.js` — added `entries`, `idempotencyKey`
 
 ### Frontend Requirements
 
@@ -144,18 +228,30 @@ Modified `createPackageBooking.js` to accept an optional `entries` array:
 
 **Spec ref:** Max booking cap section, Booking Validation Rules rule 4
 
-### What Was Done
+### API Endpoints
 
-- **Room bookings**: fetches `max_booking` config. Computes
-  `unitsNeeded x nights` and rejects if it exceeds `max_booking`.
-- **Package bookings**: validated in `validateEntries()` for multi-entry, and directly for
-  single-entry.
+```
+POST /api/guest/bookings/room
+POST /api/guest/bookings/package
+```
+
+Both endpoints now fetch the `max_booking` hms_config key and validate:
+
+- **Room bookings**: `unitsNeeded x nights` must not exceed `max_booking`
+- **Package bookings (entries)**: `sum(quantity) x duration` must not exceed `max_booking`
+- **Package bookings (legacy)**: `pkgDuration` must not exceed `max_booking`
 
 ### Config Key
 
 | Key | Base Table | Type | Description |
 |-----|-----------|------|-------------|
 | `max_booking` | `services` or `packages` | number | Maximum item-nights per booking |
+
+### Error Response
+
+| Status | Example Message |
+|--------|-----------------|
+| 400 | `"Booking exceeds max limit: 12 room-nights > 10 allowed"` |
 
 ### Files Changed
 
@@ -173,6 +269,13 @@ Modified `createPackageBooking.js` to accept an optional `entries` array:
 
 **Spec ref:** Add-ons rule 2
 
+### API Endpoint
+
+```
+POST /api/guest/booking/services   (add addon to existing booking)
+GET  /api/guest/services           (list add-on catalog)
+```
+
 ### Status: Already Enforced
 
 `addBookingServices.js` line 56 enforces `svc.tenant_id !== bookingTenantId` — addons from
@@ -180,7 +283,7 @@ a different hotel are rejected with a 422 error.
 
 ### Frontend Requirements
 
-- Always pass `hotelId` when fetching the add-on catalog via `GuestServices`.
+- Always pass `hotelId` when fetching the add-on catalog via `GET /api/guest/services`.
 
 ---
 
@@ -188,16 +291,40 @@ a different hotel are rejected with a 422 error.
 
 **Spec ref:** Add-ons rule 3
 
+### API Endpoint
+
+```
+GET /api/guest/services
+```
+
+| Param | Location | Type | Description |
+|-------|----------|------|-------------|
+| `hotelId` | query | number | Filter services by hotel |
+| `excludePackageId` | query | number | Exclude services bundled in this package |
+| `pageSize` | query | number | Results per page |
+
 ### What Was Done
 
-- `GuestServices.js` accepts `excludePackageId` in the request body.
-- `fetchBundledServiceIds(packageId)` queries `package_services` and filters out bundled
-  services from the add-on list.
+- `GuestServices.js` `postProcessList` reads `excludePackageId` from `req.query`.
+- `fetchBundledServiceIds(packageId)` queries `package_services` for active services.
+- Bundled service IDs are filtered out before pagination.
+
+### Example
+
+```
+GET /api/guest/services?hotelId=16&excludePackageId=344&pageSize=50
+```
+
+If package 344 bundles services 188, 191, 192 — those three will not appear in results.
+
+### Files Changed
+
+- `Src/Apis/.../GuestServices/GuestServices.js`
+- `Src/Apis/.../GuestServices/CRUD_parameters.js`
 
 ### Frontend Requirements
 
-- Send `excludePackageId = <selected_package_id>` when loading add-ons for a package
-  booking.
+- Send `excludePackageId` when loading add-ons for a package booking.
 - Display bundled services as "included / complimentary" (read-only).
 
 ---
@@ -206,14 +333,37 @@ a different hotel are rejected with a 422 error.
 
 **Spec ref:** Version A rule 4 — pinned-then-appended dedupe
 
+### API Endpoint
+
+```
+GET /api/guest/search/filter
+```
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `exemptServiceId` | query | Service ID to exclude from results |
+| `exemptPackageId` | query | Package ID to exclude from results |
+
 ### What Was Done
 
-- `GuestSearchFilter` accepts `exemptServiceId` and `exemptPackageId` query params.
+- `GuestSearchFilter` accepts both params.
 - `searchFilterHelper.js` filters these IDs from results before pagination.
+
+### Example
+
+```
+GET /api/guest/search/filter?include=rooms,packages&exemptServiceId=188&exemptPackageId=344
+```
+
+### Files Changed
+
+- `Src/Apis/.../GuestSearchFilter/GuestSearchFilter.js`
+- `Src/Apis/.../GuestSearchFilter/CRUD_parameters.js`
+- `Src/HelperFunctions/Guest/v2/searchFilterHelper.js`
 
 ### Frontend Requirements
 
-- Pass `exemptServiceId=<id>` or `exemptPackageId=<id>` with the search request.
+- Pass `exemptServiceId` or `exemptPackageId` when searching with a pinned item.
 - Manually prepend the pinned item at the top of the results list.
 - If the pinned item no longer matches, drop the pin.
 
@@ -223,11 +373,31 @@ a different hotel are rejected with a 422 error.
 
 **Spec ref:** Edge cases — zero-night, past dates
 
+### API Endpoints
+
+```
+POST /api/guest/bookings/room
+POST /api/guest/bookings/package
+```
+
 ### What Was Done
 
 - **Room bookings**: `checkIn >= checkOut` rejects with "zero-night stays are not allowed";
   `checkIn < today` rejects with "cannot be in the past".
 - **Package bookings**: same checks, plus per-entry validation in `validateEntries()`.
+
+### Error Responses
+
+| Status | Condition | Message |
+|--------|-----------|---------|
+| 400 | Same-day check-in/out | `"Check-out must be after check-in (zero-night stays are not allowed)"` |
+| 400 | Past check-in | `"Check-in date cannot be in the past"` |
+| 400 | Reversed dates | `"Check-out must be after check-in (zero-night stays are not allowed)"` |
+
+### Files Changed
+
+- `Src/HelperFunctions/PreProcessingFunctions/Guest/createRoomBooking.js`
+- `Src/HelperFunctions/PreProcessingFunctions/Guest/createPackageBooking.js`
 
 ### Frontend Requirements
 
@@ -241,17 +411,35 @@ a different hotel are rejected with a 422 error.
 
 **Spec ref:** Cross-cutting — idempotency
 
+### API Endpoints
+
+```
+POST /api/guest/bookings/room
+POST /api/guest/bookings/package
+```
+
+| Param | Location | Type | Required | Description |
+|-------|----------|------|----------|-------------|
+| `idempotencyKey` | body | string | no | Client-generated unique key for deduplication |
+
 ### What Was Done
 
-- Added `idempotencyKey` optional field to both booking endpoints.
 - `insertBookingRow()` checks for an existing booking with the same
   `urdd_id + idempotency_key` before creating a new one.
-- If a match is found, the existing booking is returned without duplicating.
+- If a match is found, returns `isExisting: true` and both booking flows return early
+  without re-inserting rows.
+
+### Behavior
+
+| Scenario | Result |
+|----------|--------|
+| First call with key `"abc-123"` | New booking created, returns `booking_id` |
+| Second call with same key `"abc-123"` | Returns same `booking_id`, no duplicate created |
+| Call without `idempotencyKey` | Normal booking (no deduplication) |
 
 ### Migration Required
 
 ```sql
--- data/migrations_completed/20260629_1_add_idempotency_key_to_bookings.sql
 ALTER TABLE bookings
   ADD COLUMN idempotency_key VARCHAR(255) DEFAULT NULL
   AFTER special_requests;
@@ -259,6 +447,15 @@ ALTER TABLE bookings
 CREATE UNIQUE INDEX uq_bookings_urdd_idempotency
   ON bookings (urdd_id, idempotency_key);
 ```
+
+### Files Changed
+
+- `Src/HelperFunctions/Guest/v2/createBookingShared.js`
+- `Src/HelperFunctions/PreProcessingFunctions/Guest/createRoomBooking.js`
+- `Src/HelperFunctions/PreProcessingFunctions/Guest/createPackageBooking.js`
+- `Src/Apis/.../GuestBookingsRoom/CRUD_parameters.js`
+- `Src/Apis/.../GuestBookingsPackage/CRUD_parameters.js`
+- `data/migrations_completed/20260629_1_add_idempotency_key_to_bookings.sql`
 
 ### Frontend Requirements
 
@@ -271,12 +468,44 @@ CREATE UNIQUE INDEX uq_bookings_urdd_idempotency
 
 **Spec ref:** Version A rule 1
 
+### API Endpoint
+
+```
+GET /api/guest/unavailable/dates
+```
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `serviceId` | query | one of | Room service ID |
+| `packageId` | query | one of | Package ID (resolves to its stay service) |
+
+**Platform:** `PUBLIC_ENCRYPTED_PLATFORM` (no auth required)
+
+### Response
+
+```json
+{
+  "serviceId": 188,
+  "packageId": null,
+  "rangeStart": "2026-06-29",
+  "rangeEnd": "2027-06-28",
+  "unavailableDates": ["2026-06-29", "2026-06-30", "2026-07-03"]
+}
+```
+
 ### What Was Done
 
-- New `GET /api/guest/unavailable/dates` endpoint.
-- Accepts `serviceId` or `packageId` query param.
-- Returns array of `YYYY-MM-DD` strings for the next 365 days where all delivery units
-  are fully booked.
+- New endpoint: `Src/Apis/.../GuestUnavailableDates/GuestUnavailableDates.js`
+- Business logic: `Src/HelperFunctions/PreProcessingFunctions/Guest/fetchUnavailableDates.js`
+- For each date in the next 365 days, checks if ALL delivery units for the service are
+  booked. Only fully-booked dates are returned.
+- When `packageId` is provided, resolves to the package's stay service first.
+
+### Files
+
+- `Src/Apis/.../GuestUnavailableDates/GuestUnavailableDates.js`
+- `Src/Apis/.../GuestUnavailableDates/CRUD_parameters.js`
+- `Src/HelperFunctions/PreProcessingFunctions/Guest/fetchUnavailableDates.js`
 
 ### Frontend Requirements
 
@@ -287,28 +516,62 @@ CREATE UNIQUE INDEX uq_bookings_urdd_idempotency
 
 ## 12. Hotel Info on Guest Cards
 
+### API Endpoints (response change only — no new params)
+
+```
+GET /api/guest/search/filter      (search results)
+GET /api/guest/landing             (landing page)
+GET /api/guest/services            (service list + detail)
+GET /api/guest/packages            (package detail)
+```
+
 ### What Was Done
 
 - New `fetchHotelInfoBatch()` in `serviceEnrichment.js`.
 - Included in all guest response builders (landing, detailed, minimal, package objects).
-- Each card now includes:
+
+### Response Change
+
+Each room/service/package card now includes:
 
 ```json
 {
+  "id": 188,
+  "hotelId": 16,
   "hotel": {
     "name": { "en": "Hotel Name", "ar": "..." },
     "logo": "attachment_id",
-    "address": "...",
-    "city": "...",
-    "country": "...",
+    "address": "123 Main St",
+    "city": "Riyadh",
+    "country": "Saudi Arabia",
     "coordinates": { "lat": 24.7, "lng": 46.6 }
   }
 }
 ```
 
+### Files Changed
+
+- `Src/HelperFunctions/Guest/v2/serviceEnrichment.js`
+- `Src/HelperFunctions/Guest/v2/landingObjects.js`
+- `Src/HelperFunctions/Guest/v2/packageObjects.js`
+
 ### Frontend Requirements
 
 - Use the `hotel` object on cards/detail pages to show hotel name, logo, location.
+
+---
+
+## API Endpoint Summary
+
+| Endpoint | Method | What Changed |
+|----------|--------|-------------|
+| `/api/guest/search/filter` | GET | Factor filtering, multi-room capacity, multi-unit availability, exempt IDs |
+| `/api/guest/bookings/package` | POST | Serial/parallel entries, max booking cap, zero-night/past-date, idempotency |
+| `/api/guest/bookings/room` | POST | Max booking cap, zero-night/past-date, idempotency |
+| `/api/guest/services` | GET | `excludePackageId` param to filter bundled services |
+| `/api/guest/unavailable/dates` | GET | New endpoint — returns fully-booked dates |
+| `/api/guest/landing` | GET | Hotel info added to response |
+| `/api/guest/packages` | GET | Hotel info added to response |
 
 ---
 
@@ -317,7 +580,7 @@ CREATE UNIQUE INDEX uq_bookings_urdd_idempotency
 | Config Key | Base Table | Purpose |
 |---|---|---|
 | `duration` | packages | Package's fixed night count (factor filtering + entry validation) |
-| `max_booking` | services / packages | Max item-nights per booking |
+| `max_booking` | services / packages | Maximum item-nights per booking |
 | `max_persons_per_booking` | services | Room capacity (for multi-unit calculation) |
 | `max_adults` | packages | Package adult capacity |
 | `max_children` | packages | Package children capacity |
@@ -360,7 +623,7 @@ and form data rows, causing duplicates or errors.
 
 ### What Was Fixed
 
-- `insertBookingRow` now returns `{ ..., isExisting: true }` on idempotency match
+- `insertBookingRow` now returns `isExisting: true` on idempotency match
 - Both `createRoomBooking` and `createPackageBooking` check `isExisting` and return early
 
 ---
