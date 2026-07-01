@@ -262,6 +262,13 @@ const sidebars = {
             },
             {
               type: 'category',
+              label: 'Guest Pricing Rules',
+              items: [
+                'hms-documentation/guest-apis/guest-pricing-rules/guest-pricing-rules',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Guest Auth Refresh Tokens',
               items: [
                 'api/guest-auth-refresh-tokens',
