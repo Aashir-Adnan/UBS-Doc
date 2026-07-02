@@ -8,11 +8,12 @@
 > **Update 2026-06-18 (Tenant-Admin permission-governance grant):** `20260618_1` grants `PG-TENANT-ADMIN` the full permission-governance set — `*_permission_groups` (5), `*_permission_groups_permissions` (5), and the `permissions` reads `view_permissions` + `list_permissions` — across the global original and every clone, and materializes the same onto every active Tenant-Admin URDD. Net new vs. the prior state was just **`view_permissions`** (the other 11 were already granted); `PG-TENANT-ADMIN` total `470 → 471` (tenant tier `336 → 337`).
 > **Update 2026-06-22 (Booking Manager persona):** migration `20260622_3` adds a new persona **Booking Manager** (designation `BOOKING` + role `Manager`, RDD title "Manager of Bookings", per-tenant senior = the Tenant-Admin RDD) with a new permission group **`PG-BOOKING-MGR`** (global original + a per-tenant clone for every active tenant). It also creates the new permission **`booking_manager_dashboard`**. `PG-BOOKING-MGR` = **34** perms: full CRUD on `bookings` + `booking_services` (9 actions each) + `privacy_policy` + `account`; read-only (`view`/`list`) on `services` / `packages` / `package_services` / `service_categories` / `users` / `guest_profiles`; plus `dashboard` + `booking_manager_dashboard`. (Tenants without a Tenant-Admin RDD are skipped until one exists — see the migration note.)
 > **Update 2026-06-29 (`import_*` permission family — gated on `add_`/create):** migration `20260629_2_add_import_permissions_mirroring_add_create` makes the `import_<resource>` family track the **CREATE** permission `add_<resource>`, **not** `export_`. Importing data creates records, so a group/user gets `import_X` **iff** it holds `add_X`; a read-only role that can `export_` but not `add_` does **not** get `import_`. Catalog: an `import_<resource>` for every active `add_<resource>` (**81** perms — the 80 CRUD resources **plus `frontpage_data`**, which has `add_` but no `export_`). The migration **grants** `import_X` to every group (global + every per-tenant clone) holding active `add_X`, **revokes** any `import_X` on a group lacking `add_X` (superseding an earlier export-based revision), and **materializes** the same into `user_role_designation_permissions` for existing users (so `permissionChecker` honours it now, not only for new assignees). Per-persona `import_*` counts (= that persona's active `add_*`): `PG-FRAMEWORK` **+28**, `PG-TENANT-MGMT` **+49**, `PG-TENANT-ADMIN` **+50**, `PG-SERVICE-MGR` **+13**, `PG-BOOKING-MGR` **+2** (`PG-STANDARD-GUEST` unchanged). For each `add_*` a group holds, read in the matching `import_*` (same tier/category); `import_*` descriptions read "Upload (import) …" (bespoke `import_admin_code` = "Import admin codes").
+> **Update 2026-07-01 (config-management revoke + Service-Manager booking scope):** migration `20260701_1` makes three changes at BOTH the group and URDP layers (matched by `group_name` / signature perm — global originals + every clone): **(1)** revokes the 3 config-management perms `manage_config_key_category_flags` / `manage_config_key_user_visibility` / `manage_config_possible_values` from **every group except `PG-FRAMEWORK` and `PG-TENANT-MGMT`** (so `PG-TENANT-ADMIN` and `PG-SERVICE-MGR` lose them); **(2)** grants **`PG-SERVICE-MGR`** the booking / service-operations management set — `add/delete/update/import_bookings`, `add/delete/update/import_booking_services`, `list/view_guest_profiles`, `list/view_users` (12 net-new; the read verbs + services/packages reads already existed); **(3)** revokes the package-write perms `add/update/delete_packages` + `add/update/delete_package_services` from `PG-SERVICE-MGR` (a Service Manager may read packages, not author them); **(4)** revokes **`update_users`** from `PG-SERVICE-MGR` (may read users, not edit); **(5)** revokes the `view/list/update/delete/import/export` verbs of `packages` / `package_services` / `package_pricing` from `PG-SERVICE-MGR` — and then **(6)** revokes the remaining `filter/search/sort` of those three + `add_package_pricing` too — so the Service-Manager persona ends with **no package/package_services/package_pricing permissions at all**. Net totals: `PG-TENANT-ADMIN` `521 → 518` (tenant `373 → 370`), `PG-SERVICE-MGR` `172 → 150` (tenant `10 → 14`, service `136 → 110`).
 > **Context:** [governance-model.md](../tenant-governance-model/governance-model.md) (personas, the `created_by` isolation rule), [per-tenant-cloning.md](../per-tenant-cloning/per-tenant-cloning.md) (how per-tenant group clones are created), and [resource-assignments.md](../per-tenant-resource-assignment/resource-assignments.md). Backend design docs: `docs/strategies/superadmin_tenant_governance_strategy.md`, `docs/strategies/tenant_admin_assignment.md`, `docs/system_context/07_rbac.md`.
 
 This document lists **every permission assigned to each governance permission group**, taken directly from the `permission_groups_permissions` join table. Only rows with `status = 'active'` in the join table **and** an active `permissions` row are counted. Permissions are grouped by their `permission_category` tier and sorted alphabetically.
 
-> **Current governance totals (regenerated 2026-06-30 from `hms_db_10.0`):** `PG-FRAMEWORK` 279, `PG-TENANT-MGMT` 512, `PG-TENANT-ADMIN` 521, `PG-SERVICE-MGR` 172, `PG-STANDARD-GUEST` 0, `PG-BOOKING-MGR` 36. Counts are active `permission_groups_permissions` rows with an active `permissions` row. The `import_*` family now mirrors `add_*` (create) — see the 2026-06-29 note above. Persona codes are the re-modelled `SYSTEM`/`TENANT`/`STANDARD` (role-disambiguated).
+> **Current governance totals (regenerated 2026-06-30 from `hms_db_10.0`):** `PG-FRAMEWORK` 279, `PG-TENANT-MGMT` 512, `PG-TENANT-ADMIN` 518, `PG-SERVICE-MGR` 150, `PG-STANDARD-GUEST` 0, `PG-BOOKING-MGR` 36. Counts are active `permission_groups_permissions` rows with an active `permissions` row. The `import_*` family now mirrors `add_*` (create) — see the 2026-06-29 note above. Persona codes are the re-modelled `SYSTEM`/`TENANT`/`STANDARD` (role-disambiguated).
 
 ## 1. Permission groups overview
 
@@ -22,8 +23,8 @@ This document lists **every permission assigned to each governance permission gr
 |---|---|---|---:|---|
 | 9 | `PG-FRAMEWORK` | active | 279 | SaaS Admin (`SYSTEM` + `Admin`) |
 | 10 | `PG-TENANT-MGMT` | active | 512 | Tenant Manager (`TENANT` + `Manager`) |
-| 11 | `PG-TENANT-ADMIN` | active | 521 | Tenant Admin (`TENANT` + `Admin`) |
-| 12 | `PG-SERVICE-MGR` | active | 172 | Service Manager (`<service-category>` designation, e.g. `STAY`) |
+| 11 | `PG-TENANT-ADMIN` | active | 518 | Tenant Admin (`TENANT` + `Admin`) |
+| 12 | `PG-SERVICE-MGR` | active | 150 | Service Manager (`<service-category>` designation, e.g. `STAY`) |
 | 19 | `PG-STANDARD-GUEST` | active | 0 | Standard Guest (`STANDARD`) |
 | 682 | `PG-BOOKING-MGR` | active | 36 | Booking Manager (`BOOKING` + `Manager`) |
 | 13 | `PG-FRAMEWORK` | inactive | 0 | — (inactive duplicate) |
@@ -40,10 +41,10 @@ Tenant onboarding clones a subset of the governance groups per tenant (`tenant_i
 | Cloned group | # tenant clones | id range | Active permissions each (mirrors original) |
 |---|---:|---|---:|
 | `PG-BOOKING-MGR` | 21 | 683–729 | 36 |
-| `PG-SERVICE-MGR` | 44 | 21–727 | 172 |
+| `PG-SERVICE-MGR` | 44 | 21–727 | 150 |
 | `PG-SPECIFIC-TENANT-Admin` | 1 | 656–656 | — |
 | `PG-STANDARD-GUEST` | 44 | 22–728 | 0 |
-| `PG-TENANT-ADMIN` | 44 | 20–726 | 521 |
+| `PG-TENANT-ADMIN` | 44 | 20–726 | 518 |
 
 ## 2. Permissions per group
 
@@ -905,9 +906,9 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 ### Group 11 — `PG-TENANT-ADMIN`
 
 - **Status:** `active`
-- **Total active permissions:** 521
+- **Total active permissions:** 518
 
-**By tier:** framework: 2, tenant: 373, service: 140, common: 6
+**By tier:** framework: 2, tenant: 370, service: 140, common: 6
 
 <details>
 <summary><b>framework</b> (2)</summary>
@@ -918,7 +919,7 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 </details>
 
 <details>
-<summary><b>tenant</b> (373)</summary>
+<summary><b>tenant</b> (370)</summary>
 
 - `add_admin_code`
 - `add_attachments`
@@ -1141,9 +1142,6 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `list_user_payment_methods`
 - `list_user_roles_designations_department`
 - `list_user_role_designation_permissions`
-- `manage_config_key_category_flags`
-- `manage_config_key_user_visibility`
-- `manage_config_possible_values`
 - `search_admin_code`
 - `search_attachments`
 - `search_bookings`
@@ -1457,9 +1455,9 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 ### Group 12 — `PG-SERVICE-MGR`
 
 - **Status:** `active`
-- **Total active permissions:** 172
+- **Total active permissions:** 150
 
-**By tier:** framework: 20, tenant: 10, service: 136, common: 6
+**By tier:** framework: 20, tenant: 14, service: 110, common: 6
 
 <details>
 <summary><b>framework</b> (20)</summary>
@@ -1488,44 +1486,44 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 </details>
 
 <details>
-<summary><b>tenant</b> (10)</summary>
+<summary><b>tenant</b> (14)</summary>
 
+- `add_bookings`
+- `delete_bookings`
 - `export_bookings`
 - `filter_bookings`
+- `import_bookings`
 - `list_bookings`
-- `manage_config_key_category_flags`
-- `manage_config_key_user_visibility`
-- `manage_config_possible_values`
+- `list_guest_profiles`
+- `list_users`
 - `search_bookings`
 - `sort_bookings`
-- `update_users`
+- `update_bookings`
 - `view_bookings`
+- `view_guest_profiles`
+- `view_users`
 
 </details>
 
 <details>
-<summary><b>service</b> (136)</summary>
+<summary><b>service</b> (110)</summary>
 
+- `add_booking_services`
 - `add_delivery_units`
 - `add_discounts`
 - `add_inventory_items`
 - `add_inventory_variants`
-- `add_packages`
-- `add_package_pricing`
-- `add_package_services`
 - `add_pricing_rules`
 - `add_services`
 - `add_service_locations`
 - `add_service_location_attributes`
 - `add_service_pricing`
 - `add_unit_availability`
+- `delete_booking_services`
 - `delete_delivery_units`
 - `delete_discounts`
 - `delete_inventory_items`
 - `delete_inventory_variants`
-- `delete_packages`
-- `delete_package_pricing`
-- `delete_package_services`
 - `delete_pricing_rules`
 - `delete_services`
 - `delete_service_locations`
@@ -1537,9 +1535,6 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `export_discounts`
 - `export_inventory_items`
 - `export_inventory_variants`
-- `export_packages`
-- `export_package_pricing`
-- `export_package_services`
 - `export_pricing_rules`
 - `export_services`
 - `export_service_locations`
@@ -1551,22 +1546,17 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `filter_discounts`
 - `filter_inventory_items`
 - `filter_inventory_variants`
-- `filter_packages`
-- `filter_package_pricing`
-- `filter_package_services`
 - `filter_pricing_rules`
 - `filter_services`
 - `filter_service_locations`
 - `filter_service_location_attributes`
 - `filter_service_pricing`
 - `filter_unit_availability`
+- `import_booking_services`
 - `import_delivery_units`
 - `import_discounts`
 - `import_inventory_items`
 - `import_inventory_variants`
-- `import_packages`
-- `import_package_pricing`
-- `import_package_services`
 - `import_pricing_rules`
 - `import_services`
 - `import_service_locations`
@@ -1578,9 +1568,6 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `list_discounts`
 - `list_inventory_items`
 - `list_inventory_variants`
-- `list_packages`
-- `list_package_pricing`
-- `list_package_services`
 - `list_pricing_rules`
 - `list_services`
 - `list_service_locations`
@@ -1592,9 +1579,6 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `search_discounts`
 - `search_inventory_items`
 - `search_inventory_variants`
-- `search_packages`
-- `search_package_pricing`
-- `search_package_services`
 - `search_pricing_rules`
 - `search_services`
 - `search_service_locations`
@@ -1606,22 +1590,17 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `sort_discounts`
 - `sort_inventory_items`
 - `sort_inventory_variants`
-- `sort_packages`
-- `sort_package_pricing`
-- `sort_package_services`
 - `sort_pricing_rules`
 - `sort_services`
 - `sort_service_locations`
 - `sort_service_location_attributes`
 - `sort_service_pricing`
 - `sort_unit_availability`
+- `update_booking_services`
 - `update_delivery_units`
 - `update_discounts`
 - `update_inventory_items`
 - `update_inventory_variants`
-- `update_packages`
-- `update_package_pricing`
-- `update_package_services`
 - `update_pricing_rules`
 - `update_services`
 - `update_service_locations`
@@ -1633,9 +1612,6 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `view_discounts`
 - `view_inventory_items`
 - `view_inventory_variants`
-- `view_packages`
-- `view_package_pricing`
-- `view_package_services`
 - `view_pricing_rules`
 - `view_services`
 - `view_service_locations`
