@@ -78,6 +78,13 @@ const sidebars = {
                 'hms-documentation/major-implementations/booking-rules/booking-rules-test-report',
               ],
             },
+            {
+              type: 'category',
+              label: 'Filter Options & Pricing Pipeline',
+              items: [
+                'hms-documentation/major-implementations/filter-options-and-pricing/filter-options-and-pricing',
+              ],
+            },
           ],
         },
         {
@@ -265,6 +272,20 @@ const sidebars = {
               label: 'Guest Pricing Rules',
               items: [
                 'hms-documentation/guest-apis/guest-pricing-rules/guest-pricing-rules',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Filter Options (Split)',
+              items: [
+                'hms-documentation/guest-apis/filter-options/filter-options',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Hotel Details',
+              items: [
+                'hms-documentation/guest-apis/guest-hotel-details/guest-hotel-details',
               ],
             },
             {
