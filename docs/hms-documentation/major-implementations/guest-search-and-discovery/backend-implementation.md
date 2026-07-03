@@ -1,31 +1,117 @@
 ---
 sidebar_position: 1
-title: "Backend — Search & Discovery APIs"
-description: "Backend implementation spec for guest search bar suggestions, landmarks table, hotel geolocation, and supporting the map-based discovery flow."
+title: "Backend — Search & Discovery Support"
+description: "How existing CRUD endpoints, executeQueryWithPagination, and the guest search/filter API support the map-based hotel discovery flow."
 ---
 
-# Backend — Search & Discovery APIs
+# Backend — Search & Discovery Support
 
 ## Overview
 
-This document specifies the backend work required to support the guest search-and-discovery flow: a search bar that suggests both **locations/landmarks** and **hotels**, a map view showing nearby hotels, and drill-down into a hotel's rooms and packages.
+The guest search-and-discovery flow is supported entirely by **existing infrastructure** plus one new table. No new API endpoints are needed.
 
-The backend provides:
+- **Hotel searching**: The existing **Tenants CRUD** (`GET /api/crud/tenants`) with `executeQueryWithPagination` already supports free-text search, filtering, sorting, and pagination.
+- **Landmark searching**: A new **`landmarks`** table + standard CRUD (following the same pattern as Tenants) provides the same capabilities for locations.
+- **Rooms & packages for a hotel**: The existing **`GET /api/guest/search/filter`** endpoint already supports `hotelId` scoping.
+- **Distance calculation**: Performed **client-side** using coordinates from the above endpoints.
 
-1. A new `landmarks` table for searchable locations (cities, holy sites, districts).
-2. A new `GET /api/guest/search/suggestions` endpoint that searches both landmarks and hotels concurrently.
-3. The existing `GET /api/guest/hotels` endpoint enhanced with `lat`/`lng` exposure (already present).
-4. The existing `GET /api/guest/search/filter` endpoint for rooms/packages within a hotel.
-
-Distance calculation between coordinates is performed **client-side** using an external API — the backend does not compute distances.
+The frontend fires the Tenants and Landmarks CRUD List endpoints **concurrently** to populate the search suggestion dropdown, then uses the coordinates from those responses for client-side distance filtering.
 
 ---
 
-## 1. New Table: `landmarks`
+## 1. How `executeQueryWithPagination` Works
+
+All standard CRUD List endpoints in the framework route through `executeQueryWithPagination` when `pagination` is configured in the API object's `requestMetaData`. This module appends filtering, sorting, and pagination clauses to the base SQL query using `req.query` parameters.
+
+### Supported Query Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `page_size` | `number\|"All"` | from API config | Items per page. `"All"` disables pagination. |
+| `page_no` | `number` | `1` | Page number (1-based). |
+| `sort_by` | `string` | — | Column name (or mapper alias) to sort by. |
+| `sort_order` | `string` | `"ASC"` | `"ASC"` or `"DESC"`. |
+| `filter_columns_and` | `JSON array` | `[]` | Column names for AND filtering. |
+| `filter_values_and` | `JSON array` | `[]` | Values for AND filters (URI-encoded). |
+| `filter_conditions_and` | `JSON array` | `[]` | Operators per AND column (default `"LIKE"`). |
+| `filter_columns_or` | `JSON array` | `[]` | Column names for OR filtering. Supports special value `"all"`. |
+| `filter_values_or` | `JSON array` | `[]` | Values for OR filters (URI-encoded). |
+| `filter_conditions_or` | `JSON array` | `[]` | Operators per OR column (default `"="`). |
+
+### Filter Value Types
+
+Values in `filter_values_and` / `filter_values_or` can be:
+
+| Value Shape | SQL Generated | Example |
+|---|---|---|
+| `"text"` (string) | `column LIKE '%text%'` (AND default) or `column = 'text'` (OR default) | `"Makkah"` |
+| `["a","b","c"]` (array) | `column IN ('a','b','c')` | `["hotel","branch"]` |
+| `{"min":10,"max":100}` (range) | `column BETWEEN 10 AND 100` | `{"min":0,"max":50}` |
+| `{"min":10}` (open range) | `column >= 10` | `{"min":21}` |
+
+### Special `"all"` Filter
+
+When `filter_columns_or` includes `"all"`, the module searches across **every column** in every table referenced in the query's top-level FROM/JOIN. This is how full-text search works:
+
+```
+?filter_columns_or=["all"]&filter_values_or=["Makkah"]
+```
+
+This generates `OR table.column1 LIKE '%Makkah%' OR table.column2 LIKE '%Makkah%' ...` for every column in every joined table.
+
+### How It Integrates
+
+The `queryResolver` middleware checks `apiConfig.features.pagination` (set via `requestMetaData.pagination` in the API object). When enabled, it calls `executeQueryWithPagination(req, query, ...)` instead of `executeQuery(query, ...)`, which appends the filter/sort/pagination clauses to the base List SQL before execution.
+
+---
+
+## 2. Existing: Tenants CRUD (Hotel Search)
+
+### Endpoint
+
+```
+GET /api/crud/tenants
+```
+
+This is the existing admin CRUD for tenants. Its List query selects all tenant columns including `tenant_name`, `city`, `country`, `latitude`, `longitude`, `tenant_logo`, `tenant_slug`, and has `pagination: { pageSize: 10 }` enabled — so all `executeQueryWithPagination` filter/sort/pagination keys are available.
+
+### How the Frontend Searches Hotels
+
+To search hotels by name (for the suggestion dropdown):
+
+```
+GET /api/crud/tenants
+  ?filter_columns_or=["all"]
+  &filter_values_or=["Dar Al"]
+  &filter_columns_and=["tenants.tenant_type","tenants.status","tenants.is_active"]
+  &filter_values_and=[["hotel","branch"],"active","1"]
+  &page_size=5
+```
+
+This searches all columns for "Dar Al" while AND-filtering to only active hotel/branch tenants, returning at most 5 results.
+
+### Response Fields Available
+
+The Tenants List query already returns (among others):
+
+| Field | Column Alias | Description |
+|---|---|---|
+| Hotel name | `tenants_tenantName` | Resolved via `translated_entries` for the requested `language_code` |
+| City | `tenants_city` | City name |
+| Country | `tenants_country` | Country name |
+| Latitude | `tenants_latitude` | DECIMAL(10,7) — used for map pins |
+| Longitude | `tenants_longitude` | DECIMAL(10,7) — used for map pins |
+| Logo | `tenants_tenantLogo` | Attachment ID |
+| Slug | `tenants_tenantSlug` | URL-safe identifier |
+| Status | `tenants_status` | `active` / `inactive` |
+
+---
+
+## 3. New Table: `landmarks`
 
 ### Purpose
 
-Stores searchable locations that guests can use as starting points for hotel discovery. Examples: "Makkah", "Madinah", "Al-Masjid Al-Haram", "Mina", "Arafat".
+Stores searchable locations (cities, holy sites, districts, airports) that guests can use as starting points for hotel discovery.
 
 ### Schema
 
@@ -43,6 +129,8 @@ CREATE TABLE landmarks (
   radius_km       INT             DEFAULT 50 COMMENT 'Suggested search radius for this landmark',
   sort_order      INT             DEFAULT 0,
   status          VARCHAR(20)     DEFAULT 'active',
+  created_by      INT             DEFAULT NULL,
+  updated_by      INT             DEFAULT NULL,
   created_at      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -50,7 +138,7 @@ CREATE TABLE landmarks (
 
 ### Arabic Translations
 
-Landmark names are bilingual. Arabic translations are stored in the existing `translated_entries` table:
+Bilingual names use the existing `translated_entries` table (same pattern as tenants):
 
 ```
 table_name   = 'landmarks'
@@ -58,9 +146,34 @@ column_name  = 'landmark_name'
 record_id    = landmark_id
 ```
 
-### Seed Data
+### CRUD API
 
-The seed script (`seedTenant.js`) and/or a standalone migration should insert the core landmarks:
+A standard CRUD API object is created following the same pattern as Tenants:
+
+```
+Src/Apis/GeneratedApis/Default/Landmarks/Crud_Objects/
+  Landmarks.js
+  CRUD_parameters.js
+```
+
+The API object must set `pagination: { pageSize: 10 }` in `requestMetaData` to enable `executeQueryWithPagination`. The List query should select all landmark columns with `COUNT(*) OVER () AS table_count`.
+
+### How the Frontend Searches Landmarks
+
+```
+GET /api/crud/landmarks
+  ?filter_columns_or=["all"]
+  &filter_values_or=["Makk"]
+  &filter_columns_and=["landmarks.status"]
+  &filter_values_and=["active"]
+  &sort_by=sort_order
+  &sort_order=ASC
+  &page_size=5
+```
+
+This searches all columns for "Makk", filters to active landmarks, and returns at most 5 results sorted by `sort_order`.
+
+### Seed Data
 
 | landmark_name | landmark_type | latitude | longitude | radius_km |
 |---|---|---|---|---|
@@ -76,254 +189,91 @@ The seed script (`seedTenant.js`) and/or a standalone migration should insert th
 
 ---
 
-## 2. New Endpoint: `GET /api/guest/search/suggestions`
+## 4. Existing: `GET /api/guest/hotels`
 
-### Purpose
+### No Changes Needed
 
-Powers the search bar autocomplete dropdown. Returns matching **landmarks** and **hotels** as two separate arrays so the frontend can prioritize displaying locations first.
-
-### Authentication
-
-**PUBLIC_ENCRYPTED_PLATFORM** — encrypted request/response, no guest JWT required.
-
-### Query Parameters
-
-| Parameter | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `q` | `string` | Yes | — | Search text (minimum 1 character). Matched via `LIKE '%q%'` against names. |
-| `limit` | `number` | No | `5` | Max results per category (landmarks and hotels each return up to this many). |
-
-### Implementation
-
-The endpoint handler runs two queries **concurrently** and returns both result sets:
-
-#### Query 1: Landmarks
-
-```sql
-SELECT l.landmark_id, l.landmark_name, l.landmark_slug,
-       l.landmark_type, l.latitude, l.longitude, l.radius_km
-  FROM landmarks l
- WHERE l.status = 'active'
-   AND l.landmark_name LIKE CONCAT('%', ?, '%')
- ORDER BY l.sort_order ASC, l.landmark_name ASC
- LIMIT ?
-```
-
-Arabic translations are fetched from `translated_entries` (same pattern as tenant names) and merged into bilingual `{ en, ar }` objects.
-
-#### Query 2: Hotels (tenants)
-
-```sql
-SELECT t.tenant_id, t.tenant_name, t.tenant_slug,
-       t.city, t.country, t.latitude, t.longitude, t.tenant_logo
-  FROM tenants t
- WHERE t.status = 'active' AND t.is_active = 1
-   AND t.tenant_type IN ('hotel', 'branch')
-   AND t.tenant_name LIKE CONCAT('%', ?, '%')
- ORDER BY t.tenant_name ASC
- LIMIT ?
-```
-
-Arabic translations for `tenant_name` and `city` are fetched from `translated_entries`.
-
-### Response Shape
+This endpoint already returns all hotels with coordinates for map pins:
 
 ```json
 {
-  "landmarks": [
-    {
-      "id": 1,
-      "type": "landmark",
-      "name": { "en": "Makkah", "ar": "مكة المكرمة" },
-      "landmarkType": "city",
-      "coordinates": { "lat": 21.4225, "lng": 39.8262 },
-      "suggestedRadiusKm": 50
-    }
-  ],
-  "hotels": [
-    {
-      "id": 56,
-      "type": "hotel",
-      "name": { "en": "Dar Al-Taqwa Hotel", "ar": "فندق دار التقوى" },
-      "slug": "dar-al-taqwa-hotel",
-      "city": { "en": "Makkah", "ar": "مكة المكرمة" },
-      "coordinates": { "lat": 21.4225, "lng": 39.8262 },
-      "logo": "581"
-    }
-  ]
+  "id": 56,
+  "key": "dar-al-taqwa-hotel",
+  "label": { "en": "Dar Al-Taqwa Hotel", "ar": "فندق دار التقوى" },
+  "city": { "en": "Makkah", "ar": "مكة المكرمة" },
+  "images": ["581"],
+  "rating": 4.5,
+  "reviewCount": 128,
+  "coordinates": { "lat": 21.4225, "lng": 39.8262 }
 }
 ```
 
-### Response Fields
-
-#### Landmark Object
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | `number` | Landmark ID. |
-| `type` | `string` | Always `"landmark"`. Helps frontend distinguish from hotels. |
-| `name` | `object` | Bilingual name `{ en, ar }`. |
-| `landmarkType` | `string` | One of: `city`, `district`, `site`, `airport`, `transit`. |
-| `coordinates` | `object` | `{ lat, lng }`. |
-| `suggestedRadiusKm` | `number` | Default radius for "nearby hotels" search around this landmark. |
-
-#### Hotel Object
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | `number` | Tenant/hotel ID. |
-| `type` | `string` | Always `"hotel"`. |
-| `name` | `object` | Bilingual name `{ en, ar }`. |
-| `slug` | `string` | URL-safe slug. |
-| `city` | `object` | Bilingual city `{ en, ar }`. |
-| `coordinates` | `object` | `{ lat, lng }` or `null`. |
-| `logo` | `string\|null` | Attachment ID for the hotel logo. |
-
-### API Object Registration
-
-Create a new directory and API object:
-
-```
-Src/Apis/ProjectSpecificApis/GuestSpecificApis/
-  GuestSearchSuggestions/
-    GuestSearchSuggestions.js
-    CRUD_parameters.js
-```
-
-The API object uses `PUBLIC_ENCRYPTED_PLATFORM`, `GET` method, no permissions. The `preProcessList` function runs both queries and returns the combined response.
-
-### `executeQueryWithPagination` Support
-
-The `landmarks` table queries use the standard `executeQuery` helper (not `executeQueryWithPagination`) since the response is a small suggestion list (max 5+5 items). The pagination module is not needed here.
-
-For the **existing** endpoints that already support `executeQueryWithPagination`, the supported filter/sort keys remain:
-
-| Key | Module | Description |
-|---|---|---|
-| `filter_columns_and` | Pagination | Array of column names for AND filtering |
-| `filter_values_and` | Pagination | Array of values (supports arrays for IN, range objects for BETWEEN) |
-| `filter_columns_or` | Pagination | Array of column names for OR filtering (supports `"all"` for full-text) |
-| `filter_values_or` | Pagination | Array of values for OR filtering |
-| `filter_conditions_and` | Pagination | Operators per AND column (default `LIKE`) |
-| `filter_conditions_or` | Pagination | Operators per OR column (default `=`) |
-| `sort_by` | Pagination | Column name to sort by |
-| `sort_order` | Pagination | `ASC` or `DESC` |
-| `page_size` | Pagination | Items per page (or `"All"`) |
-| `page_no` | Pagination | Page number (1-based) |
+Source: `guestDiscoveryData.js` → `listGuestHotels()` reads `tenants.latitude` and `tenants.longitude` (DECIMAL(10,7)).
 
 ---
 
-## 3. Existing Endpoint: `GET /api/guest/hotels`
+## 5. Existing: `GET /api/guest/search/filter`
 
-### Current Behavior (No Changes Needed)
+### No Changes Needed
 
-This endpoint already returns all the data the frontend needs for map pins:
-
-```json
-[
-  {
-    "id": 56,
-    "key": "dar-al-taqwa-hotel",
-    "label": { "en": "Dar Al-Taqwa Hotel", "ar": "فندق دار التقوى" },
-    "city": { "en": "Makkah", "ar": "مكة المكرمة" },
-    "country": { "en": "Saudi Arabia", "ar": "المملكة العربية السعودية" },
-    "address": { "en": "Ibrahim Al-Khalil Road", "ar": "طريق إبراهيم الخليل" },
-    "images": ["581"],
-    "rating": 4.5,
-    "reviewCount": 128,
-    "coordinates": { "lat": 21.4225, "lng": 39.8262 }
-  }
-]
-```
-
-Each hotel object includes `coordinates` with `lat` and `lng`. The frontend uses these coordinates with an external distance API to filter hotels within a radius.
-
-### Source
-
-- Handler: `Src/HelperFunctions/Guest/v2/guestDiscoveryData.js` → `listGuestHotels()`
-- Reads from `tenants` table: `latitude`, `longitude` columns (DECIMAL(10,7))
-- Coordinates are only included when both `latitude` and `longitude` are non-null and finite numbers.
-
----
-
-## 4. Existing Endpoint: `GET /api/guest/search/filter`
-
-### Current Behavior (No Changes Needed)
-
-This endpoint already supports the `hotelId` parameter to scope results to a specific hotel:
+Already supports `hotelId` scoping for rooms and packages within a hotel:
 
 ```
 GET /api/guest/search/filter?hotelId=56&include=rooms,packages&pageSize=20
 ```
 
-This returns rooms and packages for hotel 56 with pagination. The frontend uses this when a user selects a hotel from the map.
-
-For the "Other Hotels Nearby" section, the frontend can pass multiple hotel IDs:
+Supports CSV hotel IDs for multi-hotel queries:
 
 ```
-GET /api/guest/search/filter?hotelId=56,57,58&include=rooms,packages&pageSize=10
+GET /api/guest/search/filter?hotelId=56,57,58&include=rooms,packages
 ```
-
-### Supported Parameters (Relevant to This Flow)
-
-| Parameter | Usage in This Flow |
-|---|---|
-| `hotelId` | CSV of hotel IDs — scope to selected hotel or nearby hotels |
-| `include` | `rooms,packages` — show both rooms and packages |
-| `q` | Free-text search within results |
-| `minPrice` / `maxPrice` | Price range filter |
-| `sort` | `recommended`, `priceAsc`, `priceDesc`, `highestRated`, `newest` |
-| `checkIn` / `checkOut` | Availability date filter |
-| `adults` / `children` | Capacity filter |
-| `page` / `pageSize` | Pagination |
 
 See the full [Guest Search & Filter documentation](../../guest-apis/guest-search-filter/guest-search-filter.md) for all parameters.
 
 ---
 
-## 5. Existing Endpoint: `GET /api/guest/hotel/details`
+## 6. Existing: `GET /api/guest/hotel/details`
 
-### Current Behavior (No Changes Needed)
+### No Changes Needed
 
-When a user taps a hotel pin on the map, the frontend can fetch full details:
+Returns full hotel detail when user selects a hotel:
 
 ```
 GET /api/guest/hotel/details?hotelId=56
 ```
 
-Returns name, logo, contact, location with coordinates, currency, rating, and review count. See the full [Guest Hotel Details documentation](../../guest-apis/guest-hotel-details/guest-hotel-details.md).
+Includes name, logo, contact, location with coordinates, currency, rating, review count. See [Guest Hotel Details documentation](../../guest-apis/guest-hotel-details/guest-hotel-details.md).
 
 ---
 
-## 6. Distance Calculation
+## 7. Distance Calculation
 
-Distance between two geographic coordinates is **not computed by the backend**. The frontend uses an external API to calculate distances client-side.
+Distance between coordinates is **not computed by the backend**. The frontend handles this client-side.
 
 ### Why Client-Side?
 
-- The backend would need to compute distances for every hotel on every request, which is expensive.
-- The frontend already has both coordinate sets (landmark/hotel origin + all hotel coordinates from `GET /api/guest/hotels`).
-- External APIs provide accurate road/travel distance, not just straight-line — more useful for guests.
-- Client-side computation avoids adding an external API dependency (and cost) to the backend.
+- The frontend already has both coordinate sets (from CRUD responses + guest hotels list).
+- Avoids adding external API cost/dependency to the backend.
+- External APIs provide road/travel distance — more useful than DB-computed straight-line.
 
 ### Recommended External Distance APIs
 
 | API | Type | Free Tier | Notes |
 |---|---|---|---|
-| **Haversine formula (in-app)** | Great-circle (straight-line) | Unlimited (pure math) | No API call needed. ~5 lines of code. Sufficient for radius filtering. Not road distance. |
-| **Google Maps Distance Matrix API** | Road/travel distance | 10,000 elements/month free | Most accurate. Returns driving/walking distance and duration. Requires API key. |
-| **Mapbox Directions API** | Road distance | 100,000 requests/month free | Good alternative to Google. Returns route geometry + distance. |
-| **OpenRouteService** | Road distance | 2,000 requests/day free | Open-source. Self-hostable. Good for Hajj-season traffic estimates. |
-| **HERE Routing API** | Road distance | 250,000 transactions/month free | Enterprise-grade. Good coverage in Saudi Arabia. |
-| **OSRM (Open Source Routing Machine)** | Road distance | Unlimited (self-hosted) | Free, self-hosted. Uses OpenStreetMap data. No API key needed if self-hosted. |
+| **Haversine formula (in-app)** | Great-circle (straight-line) | Unlimited (pure math) | No API call needed. Sufficient for radius filtering. |
+| **Google Maps Distance Matrix API** | Road/travel distance | 10,000 elements/month free | Most accurate. Returns driving/walking distance and duration. |
+| **Mapbox Directions API** | Road distance | 100,000 requests/month free | Good alternative to Google. |
+| **OpenRouteService** | Road distance | 2,000 requests/day free | Open-source. Self-hostable. |
+| **HERE Routing API** | Road distance | 250,000 transactions/month free | Good Saudi Arabia coverage. |
+| **OSRM (Open Source Routing Machine)** | Road distance | Unlimited (self-hosted) | Free, uses OpenStreetMap data. |
 
 ### Recommended Approach
 
-For **radius filtering** (is hotel within X km?), use the **Haversine formula** directly in the app — no API call needed:
+Use **Haversine** for radius filtering (no API call), optionally add Google/Mapbox for road-distance display on visible hotels only.
 
 ```javascript
 function haversineKm(lat1, lng1, lat2, lng2) {
-  const R = 6371; // Earth radius in km
+  const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLng = (lng2 - lng1) * Math.PI / 180;
   const a = Math.sin(dLat/2) ** 2 +
@@ -334,44 +284,38 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 }
 ```
 
-For **displaying travel time** on hotel cards, optionally call Google Maps Distance Matrix or Mapbox for the visible hotels only (not all hotels — just the ones already filtered by Haversine).
-
 ---
 
-## 7. Data Requirements Summary
+## 8. Summary
 
 ### New Table
 
 | Table | Purpose |
 |---|---|
-| `landmarks` | Searchable locations (cities, holy sites, districts, airports) |
+| `landmarks` | Searchable locations with coordinates and suggested radius |
 
-### New API
+### New CRUD
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/guest/search/suggestions?q=...` | Search bar autocomplete — returns landmarks + hotels |
+| `GET /api/crud/landmarks` | Standard CRUD with `executeQueryWithPagination` for landmark search |
 
 ### Existing APIs (No Changes)
 
-| Endpoint | Purpose in This Flow |
+| Endpoint | Role in This Flow |
 |---|---|
+| `GET /api/crud/tenants` | Hotel search via `executeQueryWithPagination` filter keys |
 | `GET /api/guest/hotels` | Full hotel list with coordinates for map pins |
-| `GET /api/guest/hotel/details?hotelId=N` | Hotel detail when user taps a pin |
+| `GET /api/guest/hotel/details?hotelId=N` | Hotel detail on pin tap |
 | `GET /api/guest/search/filter?hotelId=N&include=rooms,packages` | Rooms and packages for selected hotel |
 | `GET /api/filter/options/*` | Filter metadata (price range, amenities, etc.) |
 
-### Seed Script Updates
-
-The `seedTenant.js` script should be updated to:
-
-1. Insert seed landmarks (Makkah, Madinah, holy sites, Jeddah, airport).
-2. Ensure all seeded tenants have `latitude` and `longitude` populated (already done for Dar Al-Taqwa: 21.4225, 39.8262).
-
 ### Migration
-
-A new migration file should create the `landmarks` table and seed the initial rows:
 
 ```
 data/migrations_completed/YYYYMMDD_1_create_landmarks_table.sql
 ```
+
+### Coordinate Precision Fix
+
+The `tenants.latitude` and `tenants.longitude` columns were originally `DECIMAL(10,0)` (zero decimal places, truncating coordinates). This has been fixed to `DECIMAL(10,7)` via migration `20260703_1_fix_tenant_coordinate_precision.sql`. The `landmarks` table uses `DECIMAL(10,7)` from the start.
