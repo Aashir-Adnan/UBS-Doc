@@ -85,6 +85,14 @@ const sidebars = {
                 'hms-documentation/major-implementations/filter-options-and-pricing/filter-options-and-pricing',
               ],
             },
+            {
+              type: 'category',
+              label: 'Guest Search & Discovery',
+              items: [
+                'hms-documentation/major-implementations/guest-search-and-discovery/backend-implementation',
+                'hms-documentation/major-implementations/guest-search-and-discovery/frontend-implementation',
+              ],
+            },
           ],
         },
         {
