@@ -1,0 +1,126 @@
+================================================================================
+           CSAAS BACKEND SETUP GUIDE — MySQL via XAMPP / MAMP
+================================================================================
+
+This guide walks you through setting up the backend for the Granjur Dev Portal.
+The backend lives at: Clones/Csaas/Backend
+
+
+================================================================================
+ STEP 1: INSTALL XAMPP (Windows/Linux) OR MAMP (macOS)
+================================================================================
+
+WINDOWS / LINUX — XAMPP:
+  1. Download XAMPP from https://www.apachefriends.org/download.html
+  2. Run the installer. Default install path:
+       Windows: C:\xampp
+       Linux:   /opt/lampp
+  3. During installation, ensure "MySQL" and "Apache" are selected
+  4. Open XAMPP Control Panel after installation
+  5. Click "Start" next to Apache and MySQL
+  6. Verify MySQL is running (port 3306 by default)
+
+macOS — MAMP:
+  1. Download MAMP from https://www.mamp.info/en/downloads/
+  2. Install MAMP (the free version is sufficient)
+  3. Open MAMP and click "Start Servers"
+  4. Default MySQL port: 8889 (MAMP) or 3306 (MAMP PRO)
+  5. Verify both Apache and MySQL show green indicators
+
+
+================================================================================
+ STEP 2: ACCESS phpMyAdmin
+================================================================================
+
+XAMPP:
+  - Open browser and go to: http://localhost/phpmyadmin
+
+MAMP:
+  - Open browser and go to: http://localhost:8888/phpMyAdmin
+  - Or click "Open WebStart page" in MAMP, then click phpMyAdmin
+
+
+================================================================================
+ STEP 3: CREATE THE DATABASE
+================================================================================
+
+  1. In phpMyAdmin, click "New" in the left sidebar
+  2. Enter the database name: csaas
+     (or whatever name is specified in the backend .env — default is csaas)
+  3. Set collation to: utf8mb4_general_ci
+  4. Click "Create"
+
+
+================================================================================
+ STEP 4: IMPORT THE SCHEMA (if a .sql file is provided)
+================================================================================
+
+  1. Select the "csaas" database in the left sidebar
+  2. Click the "Import" tab at the top
+  3. Click "Choose File" and select the .sql schema file from the backend repo
+  4. Leave defaults (Format: SQL, Character set: utf8)
+  5. Click "Go" at the bottom
+  6. Verify tables appear in the left sidebar under "csaas"
+
+
+================================================================================
+ STEP 5: CONFIGURE THE BACKEND .env
+================================================================================
+
+Navigate to Clones/Csaas/Backend and create a .env file.
+See the companion file "Env_Setup_Guide.txt" for the full .env template.
+
+Key MySQL settings:
+
+  DB_HOST=localhost
+  DB_PORT=3306          <-- Use 8889 if on MAMP (not MAMP PRO)
+  DB_USER=root
+  DB_PASSWORD=          <-- XAMPP default is empty; MAMP default is "root"
+  DB_NAME=csaas
+
+
+================================================================================
+ STEP 6: INSTALL BACKEND DEPENDENCIES & RUN
+================================================================================
+
+  1. Open a terminal in Clones/Csaas/Backend
+  2. Run:
+       npm install
+  3. Start the backend:
+       npm start
+     or if a dev script exists:
+       npm run dev
+  4. The server should start on http://localhost:3000 (default)
+  5. Test by visiting http://localhost:3000 in your browser — you should see
+     a response or at minimum no connection error
+
+
+================================================================================
+ TROUBLESHOOTING
+================================================================================
+
+"MySQL port 3306 already in use":
+  - Another MySQL instance may be running. Stop it or change the port in
+    XAMPP/MAMP settings and update DB_PORT in .env accordingly.
+
+"Access denied for user 'root'@'localhost'":
+  - XAMPP: password is empty by default. Ensure DB_PASSWORD= (blank)
+  - MAMP: password is "root" by default. Set DB_PASSWORD=root
+
+"Can't connect to MySQL server":
+  - Ensure MySQL is running in XAMPP Control Panel / MAMP
+  - Check that the port matches your .env DB_PORT
+
+phpMyAdmin won't load:
+  - Ensure Apache is running (phpMyAdmin is served via Apache)
+  - XAMPP: check port 80 isn't taken (Skype, IIS, etc.)
+  - MAMP: default Apache port is 8888
+
+"ER_NOT_SUPPORTED_AUTH_MODE" (MySQL 8+):
+  - Run in phpMyAdmin SQL tab:
+    ALTER USER 'root'@'localhost' IDENTIFIED WITH
+    mysql_native_password BY '';
+  - Then restart MySQL
+
+
+================================================================================

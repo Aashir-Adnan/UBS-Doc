@@ -7,8 +7,12 @@ import LucidSanitize from '../../components/portal/LucidSanitize';
 import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
 
 function LucidToolContent() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading } = useAuth();
   const canAccessPortal = !!user && isGranjurEmail(user?.email);
+
+  if (loading) {
+    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+  }
 
   if (!user) {
     return (

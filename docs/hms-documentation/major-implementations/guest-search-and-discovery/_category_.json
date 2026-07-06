@@ -1,0 +1,9 @@
+{
+  "label": "Guest Search & Discovery",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "title": "Guest Search & Discovery",
+    "description": "Implementation documents for the guest search bar, location/hotel suggestion dropdown, map-based hotel discovery, and nearby-hotel browsing flow."
+  }
+}

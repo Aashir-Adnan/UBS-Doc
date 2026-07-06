@@ -7,8 +7,12 @@ import FileUpload from '../../components/portal/FileUpload';
 import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
 
 function DatabaseToolsContent() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading } = useAuth();
   const canAccessPortal = !!user && isGranjurEmail(user?.email);
+
+  if (loading) {
+    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+  }
 
   if (!user) {
     return (

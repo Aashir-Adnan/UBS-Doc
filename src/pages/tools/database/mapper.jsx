@@ -6,8 +6,12 @@ import SQLERDVisualizer from '../../../components/portal/SQLERDVisualizer';
 import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
 
 function MapperContent() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const canAccessPortal = !!user && isGranjurEmail(user?.email);
+
+  if (loading) {
+    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+  }
 
   if (!user) {
     return (

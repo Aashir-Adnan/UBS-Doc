@@ -78,6 +78,21 @@ const sidebars = {
                 'hms-documentation/major-implementations/booking-rules/booking-rules-test-report',
               ],
             },
+            {
+              type: 'category',
+              label: 'Filter Options & Pricing Pipeline',
+              items: [
+                'hms-documentation/major-implementations/filter-options-and-pricing/filter-options-and-pricing',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Search & Discovery',
+              items: [
+                'hms-documentation/major-implementations/guest-search-and-discovery/backend-implementation',
+                'hms-documentation/major-implementations/guest-search-and-discovery/frontend-implementation',
+              ],
+            },
           ],
         },
         {
@@ -265,6 +280,34 @@ const sidebars = {
               label: 'Guest Pricing Rules',
               items: [
                 'hms-documentation/guest-apis/guest-pricing-rules/guest-pricing-rules',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Filter Options (Split)',
+              items: [
+                'hms-documentation/guest-apis/filter-options/filter-options',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Hotels',
+              items: [
+                'hms-documentation/guest-apis/guest-hotels/guest-hotels',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Hotel Details',
+              items: [
+                'hms-documentation/guest-apis/guest-hotel-details/guest-hotel-details',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Review',
+              items: [
+                'hms-documentation/guest-apis/guest-review/guest-review',
               ],
             },
             {
