@@ -181,7 +181,7 @@ function buildOutput(state) {
 }
 
 function ApiObjectBuilderContent() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading } = useAuth();
   const canAccessPortal = !!user && isGranjurEmail(user?.email);
   const [state, setState] = useState(DEFAULT_STATE);
   const [activeTab, setActiveTab] = useState('form');
@@ -198,6 +198,10 @@ function ApiObjectBuilderContent() {
       () => alert('Failed to copy.')
     );
   };
+
+  if (loading) {
+    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+  }
 
   if (!user) {
     return (

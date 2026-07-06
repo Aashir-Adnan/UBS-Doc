@@ -742,8 +742,12 @@ function ReposManager() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function ReposContent() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading } = useAuth();
   const canAccess = !!user && isGranjurEmail(user?.email);
+
+  if (loading) {
+    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+  }
 
   if (!user) {
     return (

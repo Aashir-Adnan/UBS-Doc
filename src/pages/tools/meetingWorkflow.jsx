@@ -10,7 +10,7 @@ import WorkflowPanel from '@site/src/components/meetingWorkflow/WorkflowPanel';
 
 // Three views: 'list' | 'create' | 'meeting'
 function MeetingWorkflowContent() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading } = useAuth();
   const canAccess = !!user && isGranjurEmail(user?.email);
   const [view, setView] = useState('list');          // 'list' | 'create' | 'meeting'
   const [selectedMeeting, setSelectedMeeting] = useState(null);
@@ -29,6 +29,10 @@ function MeetingWorkflowContent() {
   const handleStageComplete = useCallback(() => {
     setListKey((k) => k + 1);
   }, []);
+
+  if (loading) {
+    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+  }
 
   if (!user) {
     return (
