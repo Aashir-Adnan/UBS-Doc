@@ -291,6 +291,13 @@ const sidebars = {
             },
             {
               type: 'category',
+              label: 'Guest Hotels',
+              items: [
+                'hms-documentation/guest-apis/guest-hotels/guest-hotels',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Guest Hotel Details',
               items: [
                 'hms-documentation/guest-apis/guest-hotel-details/guest-hotel-details',

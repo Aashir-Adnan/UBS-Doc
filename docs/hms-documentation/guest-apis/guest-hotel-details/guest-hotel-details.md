@@ -53,7 +53,8 @@ GET /api/guest/hotel/details?hotelId=56
   },
   "currency": "SAR",
   "rating": 4.5,
-  "reviewCount": 128
+  "reviewCount": 128,
+  "minStayCostPerNight": 350.00
 }
 ```
 
@@ -76,8 +77,9 @@ GET /api/guest/hotel/details?hotelId=56
 | `location.postalCode` | `string\|null` | Postal/ZIP code. |
 | `location.coordinates` | `object\|null` | `{ lat, lng }` if latitude and longitude are set, otherwise `null`. |
 | `currency` | `string\|null` | ISO 4217 currency code for this hotel. |
-| `rating` | `number` | Average guest rating (0-5, one decimal). `0` if no reviews. |
-| `reviewCount` | `number` | Total number of guest reviews/feedback. |
+| `rating` | `number` | Average star rating across all services **and** packages for this hotel (0–5, one decimal). `0` if no reviews. |
+| `reviewCount` | `number` | Total number of guest reviews/feedback across all services and packages. |
+| `minStayCostPerNight` | `number\|null` | Cheapest stay-category service price per night (`catalog_pricing.price / duration`). `null` if no stay services with pricing exist. |
 
 ---
 
@@ -109,7 +111,8 @@ Returned when the `hotelId` does not match an active hotel tenant.
 
 - Only returns tenants with `tenant_type` of `'hotel'` or `'branch'`, `status = 'active'`, and `is_active = 1`.
 - Bilingual fields attempt to parse JSON `{ en, ar }` from the database value. If the value is plain text, both `en` and `ar` will contain the same string.
-- Rating is computed as `AVG(feedback.rating)` for the tenant, rounded to 1 decimal place.
+- Rating is computed as `AVG(feedback.star_rating)` across all active services **and** packages for the tenant, rounded to 1 decimal place.
+- `minStayCostPerNight` is `MIN(catalog_pricing.price / GREATEST(duration, 1))` across all active stay-category services. Duration is read from the service's `hms_config` (`config_key = 'duration'`), defaulting to 1 if unset.
 
 ---
 
@@ -134,3 +137,4 @@ Returned when the `hotelId` does not match an active hotel tenant.
 | Date | Change |
 |---|---|
 | 2026-07-02 | Initial creation |
+| 2026-07-06 | Added `minStayCostPerNight`. Rating now averages across both services and packages. |

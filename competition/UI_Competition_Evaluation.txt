@@ -1,0 +1,389 @@
+================================================================================
+              GRANJUR DEV PORTAL — UI REDESIGN COMPETITION
+                       EVALUATION CRITERIA
+================================================================================
+
+Platform Requirement: React Native (Expo)
+- Must be fully responsive across web, iOS, and Android
+- Single codebase via Expo (React Native for Web included)
+- Navigation must feel native on mobile and SPA-like on web
+
+Total Score: 100 points (10 points per category)
+
+Data Requirement: All data must be data-driven, not hardcoded.
+- Use stubs that mimic API responses where a backend endpoint is not yet available
+- All user-facing lists, permissions, and configurations must come from a store
+  (local state, context, or equivalent) populated by stub/API responses
+- No hardcoded arrays of users, projects, permissions, or repos in components
+- See "Permission Model" section at the bottom for the required structure
+
+
+================================================================================
+ CATEGORY 1: AUTHENTICATION & USER MANAGEMENT (10 pts)
+================================================================================
+
+EXISTING (must persist):
+- Google Sign-In via Firebase
+- Domain-gated access (@granjur.com emails + hardcoded allowlist)
+- Three auth states: unauthenticated -> wrong account -> authorized content
+- User context (name, email, photo, signOut) available throughout the app
+- Auth state persisted via Firebase session
+
+NEW:
+- User profile screen showing name, email, photo, role, and permissions
+- Ability to view which projects/repos the current user has access to
+- Admin users can view a list of all collaborators from the DB
+- Admin users can manage other users' project access (with permission)
+
+Scoring:
+  2 pts — Sign-in flow works, domain gating enforced
+  2 pts — Auth states handled gracefully on every screen
+  2 pts — User profile screen with permissions visible
+  2 pts — Admin collaborator list and access management (data-driven)
+  2 pts — Smooth UX transitions, loading states, error handling
+
+
+================================================================================
+ CATEGORY 2: DOCUMENTATION VIEWER (10 pts)
+================================================================================
+
+EXISTING (must persist):
+- Render Markdown (.md / .mdx) documentation pages
+- Sidebar navigation with nested categories:
+    Framework Introduction, Database, Backend (incl. GitHub Workflows,
+    Integrations), Frontend, Agents, HMS Documentation (Guest APIs,
+    Payment Gateways, Tenant Governance, Admin APIs), Projects
+- Search across documentation
+- Light/dark theme support
+- Code blocks with syntax highlighting
+- Flowcharts / Mermaid diagrams rendered inline
+- DB diagrams / ERD rendered inline
+
+NEW:
+- Must replicate the full sidebar hierarchy from the existing Docusaurus setup
+- Documentation must remain browsable offline once loaded
+
+Scoring:
+  2 pts — Markdown/MDX rendering with code highlighting
+  2 pts — Full sidebar navigation with nested categories
+  2 pts — Flowcharts and Mermaid diagram rendering
+  2 pts — DB/ERD diagram rendering
+  2 pts — Search, theming, overall reading experience on mobile and web
+
+
+================================================================================
+ CATEGORY 3: TOOLS HUB / HOME SCREEN (10 pts)
+================================================================================
+
+EXISTING (must persist):
+- Grid of tool cards with icon, label, and description
+- Cards link to: Database Tools, Lucid Sanitize, Notify Maintainer,
+  API Object Builder, Projects, GitHub Dev Workflow, Meeting Workflow,
+  Tracked Repositories
+- Hover/press reveals description
+- Breadcrumb navigation from any tool back to hub
+- Signed-in user info and sign-out button in header
+
+NEW:
+- Dashboard-style landing with quick stats (open issues, active meetings,
+  tracked repo count, etc.) — data-driven from stubs
+- Recently visited tools section
+
+Scoring:
+  2 pts — All 8 tool cards present and navigable
+  2 pts — Card design, hover/press interaction quality
+  2 pts — Breadcrumb / back navigation from every tool
+  2 pts — Dashboard stats and recently-visited section
+  2 pts — Responsive layout (grid adapts to mobile single column)
+
+
+================================================================================
+ CATEGORY 4: DATABASE TOOLS (10 pts)
+================================================================================
+
+EXISTING (must persist):
+- SQL schema file upload
+- Generate internal resources from uploaded SQL
+- Project DB -> Base DB Mapper tool (sub-page)
+  - ERD visualization (SQLERDVisualizer component)
+  - Orthogonal layout for table relationships
+  - Table mapping and user->URDD FK rewrites
+
+NEW:
+- (No new features required — focus on UI quality)
+
+Scoring:
+  3 pts — File upload flow works, clear feedback on success/error
+  3 pts — ERD visualizer renders correctly, panning/zooming on mobile
+  2 pts — Mapper sub-page accessible and functional
+  2 pts — Visual polish and responsive layout
+
+
+================================================================================
+ CATEGORY 5: LUCID SANITIZE & API OBJECT BUILDER (10 pts)
+================================================================================
+
+EXISTING (must persist):
+
+Lucid Sanitize:
+- Upload Lucid chart export files
+- Sanitize and output cleaned diagram data
+
+API Object Builder:
+- Form with configurable fields:
+    URL path (auto-generates object name e.g. /test/api -> TestApi_object)
+    Features: multistep, parameters, pagination (checkboxes)
+    Communication: encryption with sub-options (accessToken, platformEncryption)
+    Verification: otp, accessToken
+    Request metadata: method (POST/GET/PUT/PATCH/DELETE), permission, pageSize
+    Response messages: success and error messages
+    Pre-process function definitions (multi-function, names auto-extracted)
+    Post-process function definition (single function, name auto-extracted)
+    Query identifier
+    Fields JSON array input
+- Two tabs: Configure and Output (JS)
+- Output: generated JS code with copy-to-clipboard
+- Help tooltips on each field
+
+NEW:
+- (No new features required — focus on UI quality)
+
+Scoring:
+  2 pts — Lucid upload and sanitize works correctly
+  3 pts — API Object Builder form renders all fields with correct behavior
+  2 pts — Configure/Output tab switching, copy-to-clipboard works
+  1 pt  — Help tooltips and inline hints (e.g. object name preview)
+  2 pts — Mobile-friendly forms (scrollable, touch-friendly inputs)
+
+
+================================================================================
+ CATEGORY 6: GITHUB DEV WORKFLOW (10 pts)
+================================================================================
+
+EXISTING (must persist):
+- Repo selector dropdown (fetches tracked repos from backend API)
+- Issue creator formatted to [Agent Call] spec
+- Issue status panel with:
+    List of issues for selected repo
+    Bot-detection blink-light indicators (robot/warning/check emojis)
+    Comment count tracking
+- File explorer (GitHub tree API, browse repo files)
+- Frontend notification system:
+    Polls every 60s
+    Diffs comment counts
+    Fires notifications when NotifyEmail: in issue body matches current user
+
+NEW:
+- Issue development status tracker (Phase 2):
+    After an issue is created, show its lifecycle stages
+    (e.g. Assigned -> In Progress -> In Review -> Merged -> Closed)
+    Visual pipeline/kanban-style status view — data-driven from stubs
+
+Scoring:
+  2 pts — Repo selector loads from API, issue creator works
+  2 pts — Issue status panel with bot indicators
+  2 pts — File explorer browses repo tree
+  2 pts — Notification polling and matching works
+  2 pts — NEW: Issue development status tracker (pipeline view)
+
+
+================================================================================
+ CATEGORY 7: MEETING WORKFLOW (10 pts)
+================================================================================
+
+EXISTING (must persist):
+- Three views: Meeting List, Create Meeting, Meeting Workflow Panel
+- Meeting List:
+    Lists existing meetings
+    Select a meeting to open its workflow
+    Create new meeting button
+- Create Meeting:
+    Form with title and attendee email
+    On creation, returns to list
+- Workflow Panel:
+    Stage-based workflow for a selected meeting
+    Upload audio recordings for transcription
+    AI-powered note generation
+    Sync meeting output to GitHub
+- User pill showing avatar and name in header
+- Back navigation (to list, to dev tools)
+
+NEW:
+- (No new features required — focus on UI quality)
+
+Scoring:
+  2 pts — Meeting list displays and selects meetings
+  2 pts — Create meeting form works end-to-end
+  2 pts — Workflow panel stages render and progress
+  2 pts — Audio upload and transcription UI
+  2 pts — Navigation, header, responsive layout quality
+
+
+================================================================================
+ CATEGORY 8: TRACKED REPOSITORIES & FEATURES (10 pts)
+================================================================================
+
+EXISTING (must persist):
+- Two tabs: Repositories and Features (sliding tab bar)
+- Repositories tab:
+    List of tracked repos with expand/collapse
+    Each repo shows: name, GitHub URL, branch, date added, framework flags
+    Framework flags: toggle "Framework Node" and "Framework React"
+    Remove repo button with confirmation
+    Pull all repos button
+    Add repo form (name, clone URL, branch)
+- Expandable features panel per repo:
+    Add/edit/remove features
+    Feature fields: name, platforms (tag input), framework features (tag input),
+    status (In Progress / Functional / Down), file paths (tag input), notes
+    Status badges with color coding
+    Sub-tabs per feature: Details, Platforms, Projects
+    File path links to GitHub blob view
+- Features tab (cross-repo summary):
+    Aggregated feature registry with search
+    Shows total implementations and multi-repo features
+    Expand to see per-repo breakdown with status, platforms, paths
+
+NEW:
+- (No new features required — focus on UI quality)
+
+Scoring:
+  2 pts — Repo list with expand/collapse, framework flags
+  2 pts — Add/remove repos, pull all
+  2 pts — Feature CRUD within a repo (add, edit, remove)
+  2 pts — Cross-repo feature summary with search
+  2 pts — Tag inputs, status badges, sliding tabs, responsive
+
+
+================================================================================
+ CATEGORY 9: PROJECTS BROWSER (10 pts)
+================================================================================
+
+EXISTING (must persist):
+- Projects grid showing all registered projects
+- Each project card: icon, name, hover for description
+- Actions: link to documentation, link to custom view (if hasCustomView)
+- Custom project views (e.g. BadarHMSView, QuranFlowMigrationView)
+- Breadcrumb navigation: Dev Tools / Projects / Project Name
+- Project not found / no custom view fallback screens
+
+NEW:
+- Project access management:
+    Admin can assign/revoke user access to specific projects
+    Users see only projects they have permission to view
+    All driven by the permission model (see bottom section)
+- Collaborator management per project:
+    View list of collaborators assigned to a project
+    Add/remove collaborators (with manage_projects permission)
+
+Scoring:
+  2 pts — Project grid renders all accessible projects
+  2 pts — Custom views load correctly (BadarHMS, QuranFlow, etc.)
+  2 pts — Breadcrumbs and fallback screens
+  2 pts — NEW: Access-gated project visibility (permission-driven)
+  2 pts — NEW: Collaborator management UI per project
+
+
+================================================================================
+ CATEGORY 10: NEW FEATURES (10 pts)
+================================================================================
+
+These are entirely new features not present in the current system.
+
+A) Notify Maintainer / Bug Report (existing — must persist):
+   - Send bug reports or feature requests to maintainer
+   - Form-based submission
+
+B) Group Chat System (NEW):
+   - Per-project group chat where team members can discuss issues informally
+     without creating a GitHub issue
+   - Messages stored and retrieved from stubs mimicking API
+   - Shows sender name, avatar, timestamp
+   - Real-time feel (polling or stub-simulated)
+   - Ability to escalate a chat message into a GitHub issue
+
+C) Issue Development Status Tracker (NEW — Phase 2 of Dev Workflow):
+   - After an issue is dispatched via the GitHub Dev Workflow, track its
+     development lifecycle
+   - Visual pipeline: Created -> Assigned -> In Progress -> In Review -> Done
+   - Show which agent/developer is handling it
+   - Timeline of status changes
+   - Data-driven from stubs
+
+Scoring:
+  2 pts — Notify/Bug report tool works
+  3 pts — Group chat: messages display, send, per-project scoping
+  2 pts — Group chat: escalate to GitHub issue flow
+  3 pts — Issue development tracker: pipeline view with status progression
+
+
+================================================================================
+ PERMISSION MODEL (Required Data Structure)
+================================================================================
+
+All permission checks must be data-driven. The user object in the store must
+include a permissions structure. Example:
+
+{
+  "user_id": "u_123",
+  "email": "john@granjur.com",
+  "name": "John Doe",
+  "permissions": {
+    "manage_users": {
+      "included": ["*"]
+    },
+    "manage_projects": {
+      "included": ["proj_badar_hms", "proj_quranflow"]
+    },
+    "view_projects": {
+      "included": ["*"]
+    },
+    "manage_repos": {
+      "included": ["*"]
+    },
+    "manage_user_projects": {
+      "included": ["u_456", "u_789"]
+    }
+  }
+}
+
+Rules:
+- Each permission key (e.g. "manage_projects") maps to an object
+- The "included" array contains IDs this permission applies to
+- Use "*" to indicate the permission applies to ALL IDs
+- To check if a user can manage project "proj_badar_hms":
+    user.permissions.manage_projects.included includes "proj_badar_hms" OR "*"
+- To check if a user can manage another user's projects:
+    user.permissions.manage_user_projects.included includes that user's ID OR "*"
+    AND user.permissions.manage_projects.included includes the project ID OR "*"
+
+This structure must be populated from a stub (simulating an API response) and
+used throughout the app to gate features. It must NOT be hardcoded in components.
+
+Permission keys required:
+  manage_users          — can view/edit collaborator list
+  manage_projects       — can add/remove/edit specific projects
+  view_projects         — can view specific projects
+  manage_repos          — can add/remove tracked repositories
+  manage_user_projects  — can assign projects to other users (by user ID)
+  create_issues         — can create GitHub issues
+  view_meetings         — can view meetings
+  create_meetings       — can create meetings
+
+
+================================================================================
+ GENERAL NOTES
+================================================================================
+
+- The app must be built with React Native (Expo) to support web + mobile
+- Responsive design is mandatory — every screen must work on both platforms
+- Dark/light theme support must be maintained
+- Navigation: use a tab bar or drawer on mobile, sidebar/breadcrumbs on web
+- All stub data should be isolated in a /stubs or /data directory
+- Stubs should return Promises to simulate async API calls
+- No feature should require a live backend to demo — stubs must be sufficient
+  for the evaluation
+- The competition evaluates UI/UX quality, not backend integration
+
+
+================================================================================
