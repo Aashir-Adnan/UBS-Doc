@@ -13,6 +13,8 @@
 
 This document lists **every permission assigned to each governance permission group**, taken directly from the `permission_groups_permissions` join table. Only rows with `status = 'active'` in the join table **and** an active `permissions` row are counted. Permissions are grouped by their `permission_category` tier and sorted alphabetically.
 
+> **Note (2026-07-02, migration `20260702_1`).** The persona **signature dashboard** permissions were retiered by `permission_category`: `saas_admin_dashboard`→`framework`, `tenant_manager_dashboard`→`tenant_mgmt`, `tenant_admin_dashboard`→`tenant`, `service_manager_dashboard`→`service`, `booking_manager_dashboard`→`service` (was uncategorized); the generic `dashboard` stays `common`. The per-group **category buckets** below were generated before that migration, so those five rows may still appear under a `common`/uncategorized bucket — **the grants and per-group totals are unaffected** (only the display tier changed). Buckets will correct on the next full regeneration.
+
 > **Current governance totals (regenerated 2026-06-30 from `hms_db_10.0`):** `PG-FRAMEWORK` 279, `PG-TENANT-MGMT` 512, `PG-TENANT-ADMIN` 518, `PG-SERVICE-MGR` 150, `PG-STANDARD-GUEST` 0, `PG-BOOKING-MGR` 36. Counts are active `permission_groups_permissions` rows with an active `permissions` row. The `import_*` family now mirrors `add_*` (create) — see the 2026-06-29 note above. Persona codes are the re-modelled `SYSTEM`/`TENANT`/`STANDARD` (role-disambiguated).
 
 ## 1. Permission groups overview

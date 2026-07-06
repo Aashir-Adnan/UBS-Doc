@@ -36,6 +36,16 @@
 > (`Add new …` → `Upload (import) …`; the bespoke `import_admin_code` = *"Import admin
 > codes"*). The `import` verb is in the §2.1 phrase-prefix table below; everything else
 > in this guide (resource labels, idempotency, verification) applies unchanged.
+>
+> **Update 2026-07-02 (signature-dashboard `permission_category` retier).** Migration
+> `20260702_1_set_signature_dashboard_permission_categories` gives each persona **signature
+> dashboard** permission a tier-accurate `permission_category` (so an actor's tier is derived
+> from `permissions.permission_category`, never from group names): `saas_admin_dashboard`→
+> `framework`, `tenant_manager_dashboard`→`tenant_mgmt`, `tenant_admin_dashboard`→`tenant`,
+> `service_manager_dashboard`→`service`, `booking_manager_dashboard`→`service` (was
+> uncategorized/NULL); the generic `dashboard` stays `common`. This moves **only**
+> `permission_category` — descriptions are untouched. Live active category breakdown refreshed
+> in §1.1.
 
 ---
 
@@ -86,8 +96,11 @@ remain to describe.
 | Rows with a non-empty `permission_description` | **837** |
 | Rows with `NULL`/empty description | **1** |
 
-Category breakdown (active): `tenant` 433 · `framework` 206 · `service` 140 ·
-`tenant_mgmt` 38 · `common` 9 (+1 uncategorized).
+Category breakdown (active, refreshed 2026-07-02 after `20260702_1`): `tenant` 434 ·
+`framework` 207 · `service` 142 · `tenant_mgmt` 39 · `common` 5 — **no uncategorized rows**
+(that migration categorized `booking_manager_dashboard`). The four persona signature dashboards
+left `common` for their tier; the generic `dashboard` remains `common`. *(Prior to `20260702_1`:
+`tenant` 433 · `framework` 206 · `service` 140 · `tenant_mgmt` 38 · `common` 9 + 1 uncategorized.)*
 
 **Verbs (active).** The 9 original verbs now sit at **81** each (resource set grew), and a
 **10th** standard verb — **`import`** (81) — was added 2026-06-29 (gated on `add_`/create;
