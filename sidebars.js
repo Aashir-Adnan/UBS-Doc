@@ -305,6 +305,13 @@ const sidebars = {
             },
             {
               type: 'category',
+              label: 'Guest Review',
+              items: [
+                'hms-documentation/guest-apis/guest-review/guest-review',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Guest Auth Refresh Tokens',
               items: [
                 'api/guest-auth-refresh-tokens',
