@@ -10,7 +10,7 @@ description: "How existing CRUD endpoints, executeQueryWithPagination, and the g
 
 The guest search-and-discovery flow is supported entirely by **existing infrastructure** plus one new table. No new API endpoints are needed.
 
-- **Hotel searching**: The existing **Tenants CRUD** (`GET /api/crud/tenants`) with `executeQueryWithPagination` already supports free-text search, filtering, sorting, and pagination.
+- **Hotel searching**: The existing **Tenants CRUD** (`GET /api/guest/crud/tenants`) with `executeQueryWithPagination` already supports free-text search, filtering, sorting, and pagination.
 - **Landmark searching**: A new **`landmarks`** table + standard CRUD (following the same pattern as Tenants) provides the same capabilities for locations.
 - **Rooms & packages for a hotel**: The existing **`GET /api/guest/search/filter`** endpoint already supports `hotelId` scoping.
 - **Distance calculation**: Performed **client-side** using coordinates from the above endpoints.
@@ -70,7 +70,7 @@ The `queryResolver` middleware checks `apiConfig.features.pagination` (set via `
 ### Endpoint
 
 ```
-GET /api/crud/tenants
+GET /api/guest/crud/tenants
 ```
 
 This is the existing admin CRUD for tenants. Its List query selects all tenant columns including `tenant_name`, `city`, `country`, `latitude`, `longitude`, `tenant_logo`, `tenant_slug`, and has `pagination: { pageSize: 10 }` enabled — so all `executeQueryWithPagination` filter/sort/pagination keys are available.
@@ -80,7 +80,7 @@ This is the existing admin CRUD for tenants. Its List query selects all tenant c
 To search hotels by name (for the suggestion dropdown):
 
 ```
-GET /api/crud/tenants
+GET /api/guest/crud/tenants
   ?filter_columns_or=["all"]
   &filter_values_or=["Dar Al"]
   &filter_columns_and=["tenants.tenant_type","tenants.status","tenants.is_active"]
@@ -161,7 +161,7 @@ The API object must set `pagination: { pageSize: 10 }` in `requestMetaData` to e
 ### How the Frontend Searches Landmarks
 
 ```
-GET /api/crud/landmarks
+GET /api/guest/crud/landmarks
   ?filter_columns_or=["all"]
   &filter_values_or=["Makk"]
   &filter_columns_and=["landmarks.status"]
@@ -298,13 +298,13 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/crud/landmarks` | Standard CRUD with `executeQueryWithPagination` for landmark search |
+| `GET /api/guest/crud/landmarks` | Standard CRUD with `executeQueryWithPagination` for landmark search |
 
 ### Existing APIs (No Changes)
 
 | Endpoint | Role in This Flow |
 |---|---|
-| `GET /api/crud/tenants` | Hotel search via `executeQueryWithPagination` filter keys |
+| `GET /api/guest/crud/tenants` | Hotel search via `executeQueryWithPagination` filter keys |
 | `GET /api/guest/hotels` | Full hotel list with coordinates for map pins |
 | `GET /api/guest/hotel/details?hotelId=N` | Hotel detail on pin tap |
 | `GET /api/guest/search/filter?hotelId=N&include=rooms,packages` | Rooms and packages for selected hotel |

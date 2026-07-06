@@ -32,7 +32,7 @@ Fire **two CRUD List calls concurrently** on every keystroke (debounced to ~300m
 #### Call 1: Search landmarks
 
 ```
-GET /api/crud/landmarks
+GET /api/guest/crud/landmarks
   ?filter_columns_or=["all"]
   &filter_values_or=["{searchText}"]
   &filter_columns_and=["landmarks.status"]
@@ -47,7 +47,7 @@ The `filter_columns_or=["all"]` tells `executeQueryWithPagination` to search acr
 #### Call 2: Search hotels (tenants)
 
 ```
-GET /api/crud/tenants
+GET /api/guest/crud/tenants
   ?filter_columns_or=["all"]
   &filter_values_or=["{searchText}"]
   &filter_columns_and=["tenants.tenant_type","tenants.status","tenants.is_active"]
@@ -368,8 +368,8 @@ Tapping a nearby hotel card navigates to Stage 3 for that hotel (full cycle).
 
 | Stage | Endpoint | Purpose | When to Call |
 |---|---|---|---|
-| 1 | `GET /api/crud/landmarks?filter_columns_or=["all"]&filter_values_or=["..."]&page_size=5` | Search landmarks by name | On keystroke (debounced) |
-| 1 | `GET /api/crud/tenants?filter_columns_or=["all"]&filter_values_or=["..."]&page_size=5` | Search hotels by name | On keystroke (debounced, concurrent with landmarks) |
+| 1 | `GET /api/guest/crud/landmarks?filter_columns_or=["all"]&filter_values_or=["..."]&page_size=5` | Search landmarks by name | On keystroke (debounced) |
+| 1 | `GET /api/guest/crud/tenants?filter_columns_or=["all"]&filter_values_or=["..."]&page_size=5` | Search hotels by name | On keystroke (debounced, concurrent with landmarks) |
 | 1 | `GET /api/guest/hotels` | Full hotel list with coordinates | Once (cache it) |
 | 2 | *(no API call — use cached data)* | Filter hotels by Haversine distance | On landmark selection |
 | 3 | `GET /api/guest/hotel/details?hotelId=N` | Hotel detail for header | On hotel selection |
