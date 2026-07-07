@@ -93,6 +93,14 @@ const sidebars = {
                 'hms-documentation/major-implementations/guest-search-and-discovery/frontend-implementation',
               ],
             },
+            {
+              type: 'category',
+              label: 'Review Categories',
+              items: [
+                'hms-documentation/major-implementations/review-categories/backend-implementation',
+                'hms-documentation/major-implementations/review-categories/frontend-implementation',
+              ],
+            },
           ],
         },
         {
