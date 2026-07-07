@@ -143,13 +143,39 @@ A unit's **real location** and its **assigned service** are both read through th
 |---|---|---|
 | **Create unit** (this API) | Reuse an active, unused, same-tenant `(NULL, location)` anchor — else mint one; store its id in `location_id`. | untouched (`available`) |
 | **Move unit** (this API, different `locationId`) | Reuse-or-mint a `(NULL, newLocation)` anchor; plain edits keep the current anchor. | untouched |
-| **Assign service** (Services CRUD `deliver_unit`) | Mint `(serviceId, location)` and **repoint** the unit to it; old anchor left as a reusable orphan. | **stays `available`** |
-| **Unassign service** (Services CRUD) | Null the `service_id` on the unit's **own** anchor in place; **inactivate** orphaned `NULL`-service anchors at that location (same tenant, referenced by no unit). | stays `available` |
+| **Assign service** (Services CRUD `deliver_unit`) — **Rule 1** | Reuse an orphan `NULL`-service anchor at the unit's location if one exists, else mint a fresh `(service, location)` anchor; then repoint. Nothing is inactivated. | **stays `available`** |
+| **Unassign service** (Services CRUD) — **Rule 2** | Null the `service_id` on the unit's **own** anchor in place; then keep the **oldest** orphan `NULL`-service anchor at that location and inactivate the newer duplicates. | stays `available` |
+
+#### ⭐ The two anchor rules
+
+> **Rule 1 — Assign service `S` to unit `D`:**
+> **(a)** if an orphan row exists at `D`'s location (`active`, referenced by no unit, same tenant,
+> `service_id` **`NULL` or already `S`** — preferring an existing `(S, location)` row) → point `D`
+> at it (set `service_id = S` only if it was `NULL`); **(b)** otherwise INSERT a fresh
+> `(S, location)` anchor and repoint `D`. Recycles leftovers and **never duplicates** an existing
+> `(S, location)` row; the service's offered-location replace likewise skips a `(S, location)`
+> already covered. **`current_status` never changes and nothing is inactivated on assign.**
+>
+> **Rule 2 — Unassign the service from unit `D`:** **(a)** set `service_id = NULL` on `D`'s **own**
+> anchor in place (`D` keeps pointing at it); then among the **other** orphan `NULL`-service
+> anchors at that location, **keep the oldest active** and inactivate the newer duplicates.
+>
+> **Fixed 2026-07-06:** the service's `serviceLocations` full-replace no longer sweeps unit anchors
+> (it excludes any row a delivery unit points at), so editing a service can never deactivate a
+> unit's assigned anchor.
+>
+> **Deleting the SERVICE applies Rule 2** (`unassignUnitsFromService`) — on immediate archive and on
+> probation→finalize (the cron), the service's anchor rows are **nulled but kept active** (units
+> become unassigned-but-located) and only its non-anchor offered rows are inactivated. **Exception:**
+> whole-tenant deletion inactivates the delivery units *and* their anchors together (Rule 2 is not
+> applied there).
+
 | **Delete unit** (this API) | Anchor untouched; the unit row goes `probation`/`inactive` per the delete guard. | — |
+| **Delete the service** (Services CRUD / cron) | Rule 2 across all its units — anchors nulled + kept active, offered rows inactivated. | units stay `available` |
 
 > **API impact:** you still send/receive `locationId` as a real location. Responses add `serviceLocationId` (the anchor id) and `assignedServiceId` (the anchor's `service_id`, `null` when the unit has no service). Assignment/unassignment happens through the **Services CRUD** `deliver_unit` config, not here.
 
-> **In progress:** the admin Bookings / Booking_rooms / Unit_availability / dropdown APIs and the **guest booking/availability engine** are being migrated to the anchor join separately; until then those surfaces resolve unit locations through a future update.
+> **Migration status:** the admin Bookings / Booking_rooms / Unit_availability / dropdown / `Grouped_*` APIs were migrated to the anchor lookup on 2026-07-06. The **guest booking/availability engine** (`Guest/v2/*`, `GuestSpecificApis`) is still being migrated separately.
 
 ---
 
@@ -173,4 +199,6 @@ A unit's **real location** and its **assigned service** are both read through th
 
 | Date | Change |
 |---|---|
-| 2026-07-06 | **Anchor model.** `delivery_units.location_id` repointed to `service_locations.id`; `service_locations.service_id` made nullable + unique key dropped; per-unit backfill (migration `20260706_2`). Create/move now reuse-or-mint a `NULL`-service anchor; Services assign/unassign repoint the anchor and clean orphans; **`current_status` decoupled from assignment** (stays `available`). Responses add `serviceLocationId` + `assignedServiceId`. Admin/Default + guest surfaces to be migrated to the anchor join in a follow-up. |
+| 2026-07-06 | **Anchor model.** `delivery_units.location_id` repointed to `service_locations.id`; `service_locations.service_id` made nullable + unique key dropped; per-unit backfill (migration `20260706_2`). Create/move now reuse-or-mint a `NULL`-service anchor; Services assign/unassign repoint the anchor and clean orphans; **`current_status` decoupled from assignment** (stays `available`). Responses add `serviceLocationId` + `assignedServiceId`. Admin/Default surfaces migrated to the anchor lookup; guest side follow-up. |
+| 2026-07-06 | **Assign/unassign rules + anchor-sweep fix.** **Rule 1 (assign):** reuse an orphan `NULL`-service anchor at the unit's location (oldest first) else duplicate a fresh `(service, location)` anchor, then repoint — never inactivates. **Rule 2 (unassign):** null the unit's own anchor in place, then keep the oldest orphan `NULL` anchor at the location and inactivate the newer duplicates. **Bug fixed:** the service's `serviceLocations` full-replace no longer sweeps unit anchors (excludes any row a delivery unit points at), so editing a service can't deactivate a unit's anchor. Corrupted anchors reactivated. |
+| 2026-07-06 | **Service delete applies Rule 2.** Deleting a service — immediate archive (`enforceDeleteGuard`) or probation→finalize (`probationFinalizerCron`) — now unassigns its delivery units (nulls their anchors, keeps them active; inactivates offered rows) via `serviceAnchors.unassignUnitsFromService`, instead of inactivating the anchors. Whole-tenant deletion is the exception (units + anchors inactivated together). |
