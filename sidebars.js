@@ -408,6 +408,7 @@ const sidebars = {
                 'hms-documentation/admin-apis/delivery-units-crud',
                 'hms-documentation/admin-apis/location-types-crud',
                 'hms-documentation/admin-apis/region-countries-crud',
+                'hms-documentation/admin-apis/landmarks-crud',
                 'hms-documentation/admin-apis/service-location-facets',
               ],
             },
@@ -438,6 +439,9 @@ const sidebars = {
               items: [
                 'hms-documentation/admin-apis/users-grouped-crud',
                 'hms-documentation/admin-apis/permission-groups-grouped-crud',
+                'hms-documentation/admin-apis/permission-manager',
+                'hms-documentation/admin-apis/permissions-dropdown',
+                'hms-documentation/admin-apis/user-role-permission-array',
                 'hms-documentation/admin-apis/urdd-dropdown',
               ],
             },

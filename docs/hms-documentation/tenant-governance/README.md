@@ -102,6 +102,7 @@ That single idea — *ownership by `created_by`, made tenant-visible by cloning*
 
 | Date | Change |
 |---|---|
+| 2026-07-03 | [resource-assignments.md](./per-tenant-resource-assignment/resource-assignments.md) + [deferred-delete-probation.md](./deferred-delete-probation/deferred-delete-probation.md): revoke is deferred-delete (**probation**, 200 with `deferred/status_set/dependents` — not a 409 block); re-assigning a `probation` clone is **rejected (409)**; **restore** is a new grouped-CRUD verb — `PUT { resource_type, clone_id, status:"active" }` (cross-tenant, status-only, same actor as revoke). |
 | 2026-06-30 | Added [permission-descriptions.md](./permission-descriptions/permission-descriptions.md) — the plain-language permission-description convention + backfill. Regenerated [permission-groups-permissions.md](./permission-groups-permissions/permission-groups-permissions.md) from `hms_db_10.0` (current totals, `import_*` family gated on `add_`/create, legacy/test groups dropped). |
 | 2026-06-17 | Added [permission-groups-permissions.md](./permission-groups-permissions/permission-groups-permissions.md) — the per-group permission reference (governance originals + per-tenant clones), generated from the live `permission_groups_permissions` join. |
 | 2026-06-12 | Added [original-to-clone-propagation.md](./original-to-clone-propagation/original-to-clone-propagation.md) (the shared re-sync engine); updated config-keys / resource-assignments to drop the obsolete `needs_review` flag — edited clones are now left as-is and reported as conflicts. |

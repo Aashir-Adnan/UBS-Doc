@@ -17,6 +17,19 @@ active ──delete, live deps──►  probation  ──cron: deps cleared─�
 active ──delete, NO deps──►  inactive            (immediate — unchanged)
 ```
 
+> **Services & packages finalize to `archived`, not `inactive`.** These two resources keep
+> their publishing state and their delete-lifecycle in one `status` enum, so a finalized
+> delete lands on `archived` (retired but preserved, still shown in admin lists) rather than
+> `inactive` (which stays reserved for genuinely dead rows). And because status is one
+> column, **leaving `active` via an Update is gated like a delete**: any admin change moving a
+> service/package **off `active`** (to inactive/archived/draft/scheduled) is checked against
+> the same active-booking probe — **booked → held in `probation`** (winds down to `archived`);
+> **not booked → the admin's intended status is applied verbatim**. Non-`active`-origin changes
+> and republish (`→active`) pass through, and the FE **reactivates** a parked row by sending
+> `status = archived` directly. The gate never blocks a change — only a booked row is held in
+> probation first. Every other resource keeps the plain `inactive` terminal and is guarded on
+> DELETE only.
+
 ---
 
 ## 2. What counts as "still in use"
@@ -25,8 +38,8 @@ The dependency check is per resource. The recurring primitive is the **active bo
 
 | Resource | Parked in `probation` while… |
 |---|---|
-| **service** | a booking_service ties it to an active booking |
-| **package** | the package — or any service it includes — has an active booking |
+| **service** | a booking_service ties it to an active booking *(finalizes to `archived`; deactivation-guarded)* |
+| **package** | the package — or any service it includes — has an active booking *(finalizes to `archived`; deactivation-guarded)* |
 | **delivery unit** (room/table/…) | its `current_status` is `reserved` or `occupied` |
 | **service category** | it still has active `services` / `packages` / `delivery_units` |
 | **location / location_type** | a location of that type (or a descendant in the building › floor › zone tree) still has an **active service link to a live service** (status `active` / `probation` / `archived`) |
@@ -68,7 +81,7 @@ What "hidden" means in practice (the visibility split):
 
 ## 4. Reactivation — cancelling a pending delete
 
-A `probation` row is **not gone** — it is a delete you can still call off. Reactivation is just the resource's **normal Update** (`probation → active`), gated by its existing `update_*` permission — no new permission, no special endpoint. For assigned resources it is the **re-assign** verb (assign is idempotent, so re-assigning a revoked clone reactivates the same row in place). Because children stayed active during probation, reactivation needs **no restore step**; and the finalizer cron only ever touches rows *still* in `probation`, so a reactivated row is automatically out of its scope.
+A `probation` row is **not gone** — it is a delete you can still call off. For a standalone entity, reactivation is just its **normal Update** (`probation → active`), gated by its existing `update_*` permission — no new permission, no special endpoint. For **assigned resources** it is a dedicated **restore verb** on the grouped CRUD: `PUT { resource_type, clone_id, status:"active", actionPerformerURDD }`. That verb is cross-tenant and status-only (a direct `UPDATE … WHERE <pk>=? AND status='probation'`, like revoke), so the admin sends the *same actor it used to revoke* — no per-tenant URDD to resolve, no full-row payload. **Re-assigning a `probation` clone is instead rejected with a 409** ("restore it explicitly before re-assigning"), so a restore can never be a silent side effect of a re-assign; the re-assign reactivation path applies only to an already-**`inactive`** clone. Because children stayed active during probation, reactivation needs **no restore step**; and the finalizer cron only ever touches rows *still* in `probation`, so a reactivated row is automatically out of its scope.
 
 ---
 
@@ -101,10 +114,12 @@ Because it re-uses the *same* predicate the delete used, a reactivated row (now 
 | Piece | Location |
 |---|---|
 | Dependency probes (the registry) | `Src/HelperFunctions/PreProcessingFunctions/DeleteGuards/deleteGuards.js` |
-| The guard that soft-deletes (probation vs inactive) | `.../DeleteGuards/enforceDeleteGuard.js` (+ `deleteGuardResponse.js`) |
+| The guard that soft-deletes (probation vs terminal) | `.../DeleteGuards/enforceDeleteGuard.js` (+ `deleteGuardResponse.js`) |
+| The deactivation guard (Update off `active` → probation/archived; service & package) | `.../DeleteGuards/enforceDeactivationGuard.js` |
 | Booking / booking_service gate + child cascade (leaf, not probation) | `.../DeleteGuards/enforceBookingDeleteGuard.js` |
 | Location instance guard + sub-tree cascade-down | `.../DeleteGuards/enforceLocationDeleteGuard.js` + `cascadeSoftDeleteLocation.js` |
 | Assignment revoke (service_category / location_type → probation) | `Src/HelperFunctions/PreProcessingFunctions/TenantAssignmentsGroupedCrud/revokeResource.js` |
+| Assignment restore (probation → active, cross-tenant PUT `status:"active"`) | `Src/HelperFunctions/PreProcessingFunctions/TenantAssignmentsGroupedCrud/restoreResource.js` |
 | The finalizer cron | `Services/Integrations/CronJobs/probationFinalizerCron.js` |
 | `probation` enum added to every participating table | migration `20260619_1_add_probation_status_enum.sql` |
 | `service_locations.service_id` foreign key (backs the location probe) | migration `20260623_4_add_service_locations_service_fk.sql` |
