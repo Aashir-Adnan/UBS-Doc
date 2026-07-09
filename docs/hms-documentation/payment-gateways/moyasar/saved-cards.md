@@ -209,7 +209,7 @@ Extend `POST /api/guest/payments/initiate` with `savedCardId` to charge an exist
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `savedCardId` | `number` | No | Charge this saved card (HMS `SavedCard.id`) instead of showing the form. Mutually exclusive with `saveCard`. All other rules are unchanged (amount >= 20% first payment, <= balance due, currency match). |
+| `savedCardId` | `number` | No | Charge this saved card (HMS `SavedCard.id`) instead of showing the form. Mutually exclusive with `saveCard`. All other rules are unchanged (amount ≥ 20% first payment, ≤ balance due, currency match). |
 
 ```json
 {
