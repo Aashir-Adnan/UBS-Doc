@@ -60,6 +60,8 @@ POST /api/guest/payments/initiate
 | `supportedNetworks` | `string[]` | No | Card networks to accept. Options: `"mada"`, `"visa"`, `"mastercard"`, `"amex"`. |
 | `successUrl` | `string` | No | Deep link URL for Moyasar to redirect to on success (useful for web). |
 | `failureUrl` | `string` | No | Deep link URL for Moyasar to redirect to on failure. |
+| `saveCard` | `boolean` | No | Tokenize the card and save it for future use. Mutually exclusive with `savedCardId`. Default `false`. |
+| `savedCardId` | `number` | No | Charge a saved card instead of showing the form. See [Saved Cards](./saved-cards.md) for the different response shape and 3DS WebView flow. |
 
 ### Response
 
@@ -524,9 +526,50 @@ Use any future expiry (e.g., `12/2028`) and any 3-digit CVV (e.g., `123`).
 
 ---
 
+## Saved Cards
+
+The payment flow supports saving cards for future use and charging saved cards. See [Saved Cards](./saved-cards.md) for the full API reference.
+
+### Quick Integration Checklist
+
+1. **Payment method selector:** Before showing the payment form, call `GET /api/guest/payments/methods` to list saved cards. Show them alongside "Add new card".
+2. **Save toggle:** When the guest chooses "Add new card", show a "Save this card" checkbox. If checked, send `saveCard: true` in the initiate request.
+3. **Saved card charge:** When the guest selects a saved card, send `savedCardId` in the initiate request instead. Handle two response cases:
+   - `savedCardPayment.status === "paid"` — call `/confirm` immediately
+   - `savedCardPayment.status === "initiated"` — open `threeDSecureUrl` in a WebView, then `/confirm` after redirect
+4. **Card management:** Add a "Payment Methods" screen in Profile where guests can view and delete saved cards (`DELETE /api/guest/payments/methods?id={id}`).
+5. **Confirm response:** When `saveCard` was used, the confirm response may include a `savedCard` object — use it to update the saved cards list without a re-fetch.
+
+```js
+// Saved card payment flow (pseudocode)
+async function payWithSavedCard(booking, savedCardId, amount) {
+  const key = generateUUIDv4();
+  const result = await api.post('/guest/payments/initiate', {
+    actionPerformerURDD: userUrdd,
+    bookingId: booking.bookingId,
+    amount,
+    currency: booking.currency,
+    savedCardId,
+  }, { headers: { 'Idempotency-Key': key } });
+
+  const { transactionId, savedCardPayment } = result;
+
+  if (savedCardPayment.status === 'paid') {
+    // Direct charge succeeded — confirm immediately
+    return await confirmPayment(transactionId, savedCardPayment.moyasarPaymentId);
+  }
+
+  // 3DS required — open WebView
+  const moyasarPaymentId = await open3DSWebView(savedCardPayment.threeDSecureUrl);
+  return await confirmPayment(transactionId, moyasarPaymentId);
+}
+```
+
+---
+
 ## Change Log
 
 | Date | Change |
 |---|---|
-| 2026-07-09 | Added partial payment support with 20% minimum downpayment, amount input UI, 3DS flow details, formAssets-based asset loading |
+| 2026-07-09 | Added saved cards integration guide, partial payment support with 20% minimum downpayment, amount input UI, 3DS flow details, formAssets-based asset loading |
 | 2026-07-08 | Initial document |

@@ -20,6 +20,7 @@ This URL is automatically included as `callbackUrl` in the Moyasar form config r
 4. If verified as `paid`/`completed`/`captured`:
    - Updates `transactions.payment_status` to `completed`
    - Increments `bookings.paid_amount`
+   - If `saveCard` was flagged on the original initiation, persists the card token to `user_payment_methods` (see [Saved Cards](./saved-cards.md))
 5. Always returns HTTP 200 to Moyasar (to prevent retries)
 
 ---

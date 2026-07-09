@@ -57,6 +57,8 @@ Client                      HMS Backend                   Moyasar API
 | `supportedNetworks` | `string[]` | No | Card networks: `mada`, `visa`, `mastercard`, `amex`. |
 | `successUrl` | `string` | No | Deep link for post-payment redirect. |
 | `failureUrl` | `string` | No | Deep link for failure redirect. |
+| `saveCard` | `boolean` | No | Tokenize the card and save it for future payments. Mutually exclusive with `savedCardId`. Default `false`. See [Saved Cards](./saved-cards.md). |
+| `savedCardId` | `number` | No | Charge a previously saved card by its HMS ID instead of rendering a form. The response shape changes — see [Saved Cards](./saved-cards.md). |
 
 **Headers:**
 - `Idempotency-Key: <UUID v4>` (required)
@@ -170,3 +172,7 @@ This protects against duplicate charges from network retries.
 | 404 | `Payment transaction not found` | Transaction doesn't exist or doesn't belong to caller. |
 | 409 | `idempotency_replay_conflict` | Same key, different body. |
 | 503 | `Payments unavailable (missing Moyasar secret key)` | Secret key not configured. |
+| 404 | `Saved card not found` | Invalid `savedCardId` or not owned by guest. |
+| 422 | `Saved card has expired` | Card past expiry when using `savedCardId`. |
+| 402 | `Card was declined` | Bank declined the saved card token charge. |
+| 422 | `saveCard and savedCardId are mutually exclusive` | Cannot use both flags. |

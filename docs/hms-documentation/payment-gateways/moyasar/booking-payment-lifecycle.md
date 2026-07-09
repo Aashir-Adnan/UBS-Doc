@@ -143,6 +143,7 @@ The system supports partial payments across multiple transactions against the sa
 | `payment_providers` | Lookup table for provider ID (Moyasar). Referenced by `transactions.provider_id`. |
 | `currencies` | Maps `currency_id` to `currency_code` (SAR, BHD, etc.) for minor unit conversion. |
 | `catalog_pricing` | Source of truth for service/package prices. Used during booking creation to calculate `total_amount`. |
+| `user_payment_methods` | Saved card tokens. Stores Moyasar token + safe metadata (brand, last4, exp). Used when charging a saved card via `savedCardId`. See [Saved Cards](./saved-cards.md). |
 
 ---
 
@@ -182,6 +183,8 @@ No double-increment occurs because both check `payment_status` before updating.
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/createServiceBooking.js` | Service booking creation |
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/createPackageBooking.js` | Package booking creation |
 | `Services/Helpers/idempotency.js` | In-process idempotency store |
+| `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestPaymentsMethods/` | Saved cards list + delete endpoint |
+| `Services/Integrations/CronJobs/paymentReconciliationCron.js` | Reconciliation cron (also persists saved cards) |
 
 ---
 

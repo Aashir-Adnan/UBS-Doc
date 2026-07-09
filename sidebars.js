@@ -388,6 +388,7 @@ const sidebars = {
           items: [
             'api/admin-code',
             'hms-documentation/admin-apis/admin-code-verify',
+            'hms-documentation/admin-apis/admin-code-reset',
             'hms-documentation/admin-apis/profile',
             {
               type: 'category',
