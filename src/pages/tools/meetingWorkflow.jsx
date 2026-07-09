@@ -7,11 +7,15 @@ import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
 import MeetingList from '@site/src/components/meetingWorkflow/MeetingList';
 import CreateMeeting from '@site/src/components/meetingWorkflow/CreateMeeting';
 import WorkflowPanel from '@site/src/components/meetingWorkflow/WorkflowPanel';
+import { useActingUrdd } from '@site/src/components/portal/tenantProjects/useActingUrdd';
+import PendingAccess from '@site/src/components/portal/tenantProjects/PendingAccess';
 
 // Three views: 'list' | 'create' | 'meeting'
 function MeetingWorkflowContent() {
   const { user, signOut } = useAuth();
   const canAccess = !!user && isGranjurEmail(user?.email);
+  // Tenant scoping: resolve the acting URDD once and thread it to the children.
+  const { status: idStatus, urdd: actingUrdd, me, error: idError } = useActingUrdd();
   const [view, setView] = useState('list');          // 'list' | 'create' | 'meeting'
   const [selectedMeeting, setSelectedMeeting] = useState(null);
   const [listKey, setListKey] = useState(0);
@@ -57,6 +61,29 @@ function MeetingWorkflowContent() {
     );
   }
 
+  // Tenant gate: resolve identity before showing the (now tenant-scoped) tool.
+  if (idStatus === 'loading' || idStatus === 'idle') {
+    return (
+      <section className="portal-section">
+        <p className="tenant-muted">Resolving your access…</p>
+      </section>
+    );
+  }
+  if (idStatus === 'error') {
+    return (
+      <section className="portal-section">
+        <p className="tenant-error">Could not resolve your access: {idError}</p>
+      </section>
+    );
+  }
+  if (idStatus === 'pending') {
+    return (
+      <section className="portal-section">
+        <PendingAccess email={me?.email} />
+      </section>
+    );
+  }
+
   return (
     <>
       {/* ── Header bar ── */}
@@ -93,6 +120,7 @@ function MeetingWorkflowContent() {
         {view === 'list' && (
           <MeetingList
             key={listKey}
+            actingUrdd={actingUrdd}
             onSelectMeeting={handleSelectMeeting}
             selectedId={selectedMeeting?.meeting_id}
             onCreateClick={() => setView('create')}
@@ -101,6 +129,7 @@ function MeetingWorkflowContent() {
 
         {view === 'create' && (
           <CreateMeeting
+            actingUrdd={actingUrdd}
             onCreated={handleCreated}
             onCancel={() => setView('list')}
             userEmail={user.email}
@@ -110,6 +139,7 @@ function MeetingWorkflowContent() {
         {view === 'meeting' && selectedMeeting && (
           <WorkflowPanel
             meeting={selectedMeeting}
+            actingUrdd={actingUrdd}
             onStageComplete={handleStageComplete}
           />
         )}

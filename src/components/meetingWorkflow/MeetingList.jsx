@@ -14,7 +14,7 @@ const STATUS_LABEL = {
 
 const STAGE_LABELS = ['Pre-Meeting', 'Transcribe', 'Analyze', 'Tasks', 'Report'];
 
-export default function MeetingList({ onSelectMeeting, selectedId, onCreateClick }) {
+export default function MeetingList({ actingUrdd, onSelectMeeting, selectedId, onCreateClick }) {
   const [meetings, setMeetings] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -23,7 +23,7 @@ export default function MeetingList({ onSelectMeeting, selectedId, onCreateClick
   async function refresh() {
     setLoading(true); setError(null);
     try {
-      const data = await mwGet('/meeting/workflow/list');
+      const data = await mwGet(`/meeting/workflow/list?actionPerformerURDD=${actingUrdd}`);
       const list = data.meetings || (Array.isArray(data) ? data : data.return || []);
       setMeetings(list);
     } catch (e) {

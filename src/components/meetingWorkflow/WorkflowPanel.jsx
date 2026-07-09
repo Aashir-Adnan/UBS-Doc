@@ -756,11 +756,31 @@ function ReportStage({ meeting, detail, onDone }) {
 }
 
 // ─── Main Panel ───────────────────────────────────────────────────────────────
-export default function WorkflowPanel({ meeting, onStageComplete }) {
+// A meeting the actor may not open (outside their tenant, or referencing repos
+// they don't have access to) returns HTTP 403; mwGet surfaces the response body
+// as the error message. Detect the 403 and pull out the server's reason so the
+// block message reflects why (tenant vs. repo access).
+function readBlock(err) {
+  const msg = err?.message || '';
+  let reason = null;
+  let is403 = /not in your tenant/i.test(msg);
+  try {
+    const parsed = JSON.parse(msg);
+    if (parsed?.statusCode === 403) is403 = true;
+    if (parsed?.message) reason = parsed.message;
+  } catch {
+    if (is403) reason = msg;
+  }
+  return { blocked: is403, reason };
+}
+
+export default function WorkflowPanel({ meeting, actingUrdd, onStageComplete }) {
   const [activeStage, setActiveStage] = useState(meeting?.current_stage ?? 0);
   const [completedStage, setCompletedStage] = useState(meeting?.current_stage ?? 0);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [blockReason, setBlockReason] = useState(null);
 
   useEffect(() => {
     setCompletedStage(meeting?.current_stage ?? 0);
@@ -769,24 +789,43 @@ export default function WorkflowPanel({ meeting, onStageComplete }) {
   useEffect(() => {
     if (!meeting?.meeting_id) return;
     setDetail(null);
+    setBlocked(false);
+    setBlockReason(null);
     setDetailLoading(true);
-    mwGet(`/meeting/workflow/meeting?meeting_id=${meeting.meeting_id}`)
+    mwGet(`/meeting/workflow/meeting?meeting_id=${meeting.meeting_id}&actionPerformerURDD=${actingUrdd}`)
       .then((data) => setDetail(data))
-      .catch(() => setDetail({}))
+      .catch((e) => {
+        const { blocked: isBlocked, reason } = readBlock(e);
+        if (isBlocked) { setBlocked(true); setBlockReason(reason); }
+        setDetail({});
+      })
       .finally(() => setDetailLoading(false));
-  }, [meeting?.meeting_id]);
+  }, [meeting?.meeting_id, actingUrdd]);
 
   const handleDone = useCallback(() => {
     setCompletedStage((s) => s + 1);
     onStageComplete?.();
     if (meeting?.meeting_id) {
-      mwGet(`/meeting/workflow/meeting?meeting_id=${meeting.meeting_id}`)
+      mwGet(`/meeting/workflow/meeting?meeting_id=${meeting.meeting_id}&actionPerformerURDD=${actingUrdd}`)
         .then((data) => setDetail(data))
         .catch(() => {});
     }
-  }, [onStageComplete, meeting?.meeting_id]);
+  }, [onStageComplete, meeting?.meeting_id, actingUrdd]);
 
   if (!meeting) return null;
+
+  if (blocked) {
+    return (
+      <div className="mw-panel">
+        <div className="portal-card tenant-blocked-card">
+          <div className="portal-section-header">
+            <h3>Access blocked</h3>
+            <p>{blockReason || "You don't have access to this meeting."}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const stageComponents = {
     0: <PreMeetingStage  meeting={meeting} detail={detail} onDone={handleDone} />,

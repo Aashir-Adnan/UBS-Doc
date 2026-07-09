@@ -6555,3 +6555,192 @@ body.ubs-no-outlines .repo-row:hover {
   font-style: italic;
   margin: 0;
 }
+
+/* ========== Tenant-Based Project Access ========== */
+
+.tenant-muted {
+  color: var(--ifm-color-emphasis-600);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.tenant-error {
+  color: var(--ifm-color-danger);
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0;
+}
+
+.tenant-success {
+  color: var(--ifm-color-success);
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0;
+}
+
+/* My Projects list */
+.tenant-project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.tenant-project-card {
+  display: block;
+  border-radius: 1rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: var(--ifm-background-surface-color);
+  padding: 1.1rem 1.25rem;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.tenant-project-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  text-decoration: none;
+}
+
+.tenant-project-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.tenant-project-card-head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.tenant-status-pill {
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  background: var(--ifm-color-emphasis-200);
+  color: var(--ifm-color-emphasis-800);
+  white-space: nowrap;
+}
+
+.tenant-status-deployed {
+  background: rgba(46, 160, 67, 0.15);
+  color: var(--ifm-color-success);
+}
+
+.tenant-status-pending {
+  background: rgba(219, 154, 4, 0.15);
+  color: var(--ifm-color-warning);
+}
+
+.tenant-empty-card,
+.tenant-pending-card,
+.tenant-blocked-card {
+  max-width: 640px;
+}
+
+/* Admin surface */
+.tenant-admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tenant-tab {
+  border-radius: 999px;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: var(--ifm-background-surface-color);
+  padding: 0.45rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+
+.tenant-tab-active {
+  border-color: var(--ifm-color-primary);
+  background: var(--ifm-color-primary);
+  color: white;
+}
+
+.tenant-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tenant-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.tenant-field select,
+.tenant-field input {
+  border-radius: 0.5rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: var(--ifm-background-surface-color);
+  padding: 0.55rem 0.8rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.tenant-field select:focus,
+.tenant-field input:focus {
+  outline: none;
+  border-color: var(--ifm-color-primary);
+}
+
+.tenant-checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 0.6rem;
+  padding: 0.75rem;
+}
+
+.tenant-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tenant-checkbox-row input {
+  margin-top: 0.15rem;
+}
+
+.tenant-restrict-toggle {
+  font-weight: 500;
+}
+
+.tenant-submit {
+  align-self: flex-start;
+  border-radius: 999px;
+  border: 1px solid var(--ifm-color-primary);
+  padding: 0.55rem 1.3rem;
+  background: var(--ifm-color-primary);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+.tenant-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  opacity: 0.95;
+}
+
+.tenant-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}

@@ -75,6 +75,8 @@ function ToolsHub() {
             { to: '/tools/github', icon: '🐙', label: 'GitHub Dev Workflow', desc: 'Browse repositories and dispatch agent tasks as GitHub issues.' },
             { to: '/tools/meetingWorkflow', icon: '🎙️', label: 'Meeting Workflow', desc: 'Create meetings, transcribe recordings, generate AI-powered notes and sync to GitHub.' },
             { to: '/tools/repos', icon: '📂', label: 'Tracked Repositories', desc: 'Add, remove, and pull GitHub repos monitored by the agent pipeline.' },
+            { to: '/tools/myProjects', icon: '📌', label: 'My Projects', desc: 'View the projects available to your account under your tenant.' },
+            { to: '/tools/tenantAdmin', icon: '🛡️', label: 'Tenant Admin', desc: 'Provision users and manage tenant and project access (admin only).' },
           ].map(({ to, icon, label, desc }) => (
             <Link key={to} to={to} className="tool-card">
               <div className="tool-card-face">
