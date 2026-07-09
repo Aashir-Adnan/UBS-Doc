@@ -54,7 +54,7 @@ POST /api/guest/payments/initiate
 |---|---|---|---|
 | `actionPerformerURDD` | `number` | Yes | The guest's tenant-specific URDD. |
 | `bookingId` | `number` | Yes | The booking to pay for. |
-| `amount` | `number` | Yes | Amount in major units (e.g., `540.00` not `54000`). Must equal the booking's current balance due (`total_amount - paid_amount`). |
+| `amount` | `number` | Yes | Amount in major units (e.g., `540.00` not `54000`). Must be ≤ the balance due. **First payment** must be ≥ 20% of `total_amount` (minimum downpayment). Subsequent payments can be any amount up to the remaining balance. |
 | `currency` | `string` | Yes | ISO 4217 currency code matching the booking's currency (e.g., `"SAR"`). |
 | `methods` | `string[]` | No | Payment methods to offer. Defaults to `["creditcard"]`. Options: `"creditcard"`, `"applepay"`, `"stcpay"`. |
 | `supportedNetworks` | `string[]` | No | Card networks to accept. Options: `"mada"`, `"visa"`, `"mastercard"`, `"amex"`. |
@@ -71,7 +71,7 @@ POST /api/guest/payments/initiate
     "currency": "SAR",
     "description": "[HMS:88421] Hotel Name · 3 nights",
     "publishableApiKey": "pk_test_xxxxxxxxxxxxxxxxx",
-    "callbackUrl": "https://api.dev-hms.gobizzi.com/api/payments/webhook/callback/moyasar?txId=88421",
+    "callbackUrl": "https://api.dev-hms.gobizzi.com/webhooks/payments/callback/moyasar?txId=88421",
     "methods": ["creditcard"],
     "supportedNetworks": ["mada", "visa", "mastercard"],
     "metadata": { "hmsTransactionId": 88421 },
@@ -92,7 +92,8 @@ POST /api/guest/payments/initiate
 | HTTP Status | `error.details` | What to show the guest |
 |---|---|---|
 | 422 | `Idempotency-Key header (UUID v4) is required` | Bug — generate a UUID before calling. |
-| 422 | `amount must equal the booking balance due (300)` | Show the correct balance due and let the guest retry. |
+| 422 | `amount cannot exceed the booking balance due (300)` | Show the correct balance due and let the guest retry with a lower amount. |
+| 422 | `First payment must be at least 20% of the total (300 SAR)` | Show the minimum downpayment amount. The first payment on a booking must be ≥ 20% of the total. |
 | 422 | `currency does not match the booking currency` | Bug — use the currency from the booking object. |
 | 409 | `This booking is already fully paid` | Show "Already paid" and refresh booking details. |
 | 503 | `Payments are temporarily unavailable` | Show a retry message. Backend Moyasar keys are not configured. |
@@ -103,37 +104,64 @@ POST /api/guest/payments/initiate
 
 Use the `moyasarForm` config from Step 1 to render Moyasar's hosted payment form. The guest enters their card details directly into Moyasar's form — **no card data should touch your app or HMS servers**.
 
+### Loading Moyasar Assets
+
+**Always use the URLs from `moyasarForm.formAssets`** returned by the API — never hardcode version numbers.
+
+```js
+// Load CSS
+const link = document.createElement('link');
+link.rel = 'stylesheet';
+link.href = moyasarForm.formAssets.css;
+document.head.appendChild(link);
+
+// Load JS
+const script = document.createElement('script');
+script.src = moyasarForm.formAssets.script;
+script.onload = () => initMoyasarForm();
+script.onerror = () => showError('Payment form failed to load');
+document.body.appendChild(script);
+```
+
 ### Web (JavaScript)
 
 ```html
-<!-- Load Moyasar assets from the response -->
-<link rel="stylesheet" href="https://cdn.moyasar.com/mpf/1.15.8/moyasar.css" />
-<script src="https://cdn.moyasar.com/mpf/1.15.8/moyasar.js"></script>
-
 <div id="moyasar-form"></div>
 
 <script>
-  Moyasar.init({
-    element: '#moyasar-form',
-    amount: 54000,                    // from moyasarForm.amount (minor units!)
-    currency: 'SAR',                  // from moyasarForm.currency
-    description: '[HMS:88421] ...',   // from moyasarForm.description
-    publishable_api_key: 'pk_test_...', // from moyasarForm.publishableApiKey
-    callback_url: '...',              // from moyasarForm.callbackUrl
-    methods: ['creditcard'],          // from moyasarForm.methods
-    supported_networks: ['mada', 'visa', 'mastercard'],
-    metadata: { hmsTransactionId: 88421 },
-    on_completed: function(payment) {
-      // payment.id is the moyasarPaymentId — send to Step 3
-      confirmPayment(transactionId, payment.id);
-    },
-    on_failure: function(error) {
-      // Show error to guest, offer retry
-      showPaymentError(error);
-    }
-  });
+  function initMoyasarForm() {
+    // Get a reference to the container element
+    const container = document.getElementById('moyasar-form');
+
+    Moyasar.init({
+      element: container,                  // DOM element (not a selector string)
+      amount: moyasarForm.amount,          // minor units (e.g. 54000 halalas)
+      currency: moyasarForm.currency,      // e.g. "SAR"
+      description: moyasarForm.description,
+      publishable_api_key: moyasarForm.publishableApiKey,
+      callback_url: moyasarForm.callbackUrl,
+      methods: moyasarForm.methods,        // e.g. ["creditcard"]
+      supported_networks: moyasarForm.supportedNetworks,
+      metadata: moyasarForm.metadata,
+      on_completed: function(payment) {
+        // payment.id is the moyasarPaymentId — send to Step 3
+        confirmPayment(transactionId, payment.id);
+      },
+      on_failure: function(error) {
+        // Show error to guest, offer retry
+        showPaymentError(error);
+      }
+    });
+  }
 </script>
 ```
+
+:::tip Important notes on rendering
+- **Pass a DOM element** to `element`, not a CSS selector string — Moyasar may fail with `Element: null is not a valid element` if the selector doesn't resolve.
+- **Ensure the container is visible** (`display: block`) before calling `Moyasar.init()`.
+- **Add a small delay** (50ms) between loading the script and calling init to let the DOM settle.
+- The form includes a **3D Secure step** — after the guest submits their card, Moyasar redirects to a 3DS authentication page (or an emulator in sandbox mode). After completing 3DS, Moyasar calls `on_completed` or redirects to `callback_url`.
+:::
 
 ### Mobile (React Native / Flutter)
 
@@ -152,7 +180,27 @@ const moyasarConfig = {
 };
 ```
 
-After the guest completes payment (including 3DS verification), Moyasar returns a **payment object** with an `id` field (UUID). This is the `moyasarPaymentId` you need for Step 3.
+### 3D Secure Flow
+
+After the guest submits card details, Moyasar may redirect to a **3D Secure authentication page**:
+
+1. **Sandbox:** Shows an ACS emulator page at `api.moyasar.com/.../acs_emulator` — click "Complete" to simulate authentication
+2. **Production:** Shows the real bank's 3DS page (OTP or biometric)
+
+After 3DS completes:
+- **If `on_completed` fires:** You receive `payment.id` directly in JavaScript — proceed to Step 3
+- **If the browser redirects to `callback_url`:** Extract the `id` and `status` from the URL query parameters and call Step 3
+
+```js
+// Handle callback_url redirect (web apps)
+const params = new URLSearchParams(window.location.search);
+const moyasarPaymentId = params.get('id');
+const status = params.get('status');
+
+if (moyasarPaymentId && status === 'paid') {
+  confirmPayment(transactionId, moyasarPaymentId);
+}
+```
 
 ---
 
@@ -228,44 +276,26 @@ After a successful confirm:
 
 ---
 
-## Partial Payments (Two-Part Payment)
+## Partial Payments
 
-The system supports paying a booking in multiple installments. Here's the full user journey:
+The system supports paying a booking in multiple installments. The guest can choose how much to pay each time, subject to these rules:
 
-### First Payment (Before Check-in)
+### Payment Amount Rules
 
-```
-Guest views booking
-  -> total: 600 SAR, paid: 0, balance: 600
-  -> Guest taps "Pay"
-  -> Frontend calls initiate with amount: 600
-     (amount MUST equal balance due — the backend enforces this)
-  -> Guest pays via Moyasar form
-  -> Frontend calls confirm
-  -> Response: { balanceDueRemaining: 300 }
-     (if partial payment was processed for 300 by the payment provider)
-```
+| Rule | Details |
+|---|---|
+| **First payment** | Must be **at least 20%** of `total_amount` (minimum downpayment). |
+| **Subsequent payments** | Any amount from `0.01` up to the remaining balance. |
+| **Maximum** | Cannot exceed the current balance due (`total_amount - paid_amount`). |
 
-Wait — **the initiate amount must equal the full balance due.** How does a partial payment happen?
+### Example: 1500 SAR booking paid in three installments
 
-Partial payments occur when:
-- The hotel applies a partial charge policy (e.g., "charge 50% at booking, 50% at checkout")
-- The booking's `total_amount` is adjusted after a partial charge
-
-For the frontend, the flow is the same each time — always pass the current `balance due` as the `amount`. The backend calculates `balance due = total_amount - paid_amount` and only accepts that exact value.
-
-### Second Payment (After Check-out)
-
-```
-Guest views booking after checkout
-  -> total: 600 SAR, paid: 300, balance: 300
-  -> Guest taps "Pay remaining"
-  -> Frontend calls initiate with amount: 300
-  -> Guest enters card details (can be same or different card)
-  -> Frontend calls confirm
-  -> Response: { balanceDueRemaining: 0 }
-  -> Show "Fully paid" status
-```
+| Step | Action | Amount | `paid_amount` | Balance |
+|---|---|---|---|---|
+| 1 | Booking created | — | 0 | 1500 |
+| 2 | First payment (20% minimum = 300) | 300 | 300 | 1200 |
+| 3 | Second payment (any amount) | 600 | 900 | 600 |
+| 4 | Final payment (remaining balance) | 600 | 1500 | 0 |
 
 ### Frontend Logic
 
@@ -278,12 +308,43 @@ function getPaymentAction(booking) {
     return { action: 'none', label: 'Fully Paid' };
   }
 
-  if (booking.paidAmount === 0) {
-    return { action: 'pay', label: `Pay ${balance} ${booking.currency}` };
-  }
+  const isFirstPayment = booking.paidAmount === 0;
+  const minAmount = isFirstPayment
+    ? Math.ceil(booking.totalAmount * 0.20 * 100) / 100  // 20% minimum
+    : 0.01;
 
-  return { action: 'pay', label: `Pay remaining ${balance} ${booking.currency}` };
+  return {
+    action: 'pay',
+    label: isFirstPayment
+      ? `Pay (min ${minAmount} ${booking.currency})`
+      : `Pay remaining ${balance} ${booking.currency}`,
+    minAmount,
+    maxAmount: balance,
+    defaultAmount: balance,  // default to full balance
+  };
 }
+```
+
+### Amount Input UI
+
+Show the guest an amount input field with:
+- **Default value:** full balance due
+- **Minimum:** 20% of total (first payment) or any amount (subsequent)
+- **Maximum:** current balance due
+- **Quick buttons:** "Full Balance", "50%", "20% (min)" for convenience
+
+```
+┌─────────────────────────────────┐
+│  Payment Amount (SAR)           │
+│  ┌───────────────────────────┐  │
+│  │ 300.00                    │  │  ← editable input
+│  └───────────────────────────┘  │
+│  [Full Balance] [50%] [20% min] │  ← quick-select buttons
+│                                 │
+│  Min downpayment: 300 SAR       │  ← hint (first payment only)
+│                                 │
+│  [Pay 300.00 SAR]               │  ← submit button
+└─────────────────────────────────┘
 ```
 
 ---
@@ -343,26 +404,38 @@ Or if not eligible:
 ## Complete Frontend Flow (Pseudocode)
 
 ```
-function onPayButtonTapped(booking) {
-  // 1. Calculate balance
+function onPayButtonTapped(booking, chosenAmount) {
+  // 1. Validate amount
   const balance = booking.totalAmount - booking.paidAmount;
   if (balance <= 0) return showAlreadyPaid();
 
-  // 2. Initiate
+  const isFirstPayment = booking.paidAmount === 0;
+  const minAmount = isFirstPayment
+    ? Math.ceil(booking.totalAmount * 0.20 * 100) / 100
+    : 0.01;
+
+  if (chosenAmount < minAmount) {
+    return showError(`Minimum payment is ${minAmount} ${booking.currency}`);
+  }
+  if (chosenAmount > balance) {
+    return showError(`Cannot exceed balance of ${balance} ${booking.currency}`);
+  }
+
+  // 2. Initiate with chosen amount
   const idempotencyKey = generateUUIDv4();
   const { transactionId, moyasarForm } = await api.post('/guest/payments/initiate', {
     actionPerformerURDD: userUrdd,
     bookingId: booking.bookingId,
-    amount: balance,
+    amount: chosenAmount,
     currency: booking.currency,
     methods: ['creditcard'],
   }, { headers: { 'Idempotency-Key': idempotencyKey } });
 
-  // 3. Show Moyasar form
+  // 3. Show Moyasar form (renders card input)
   const moyasarPaymentId = await showMoyasarForm(moyasarForm);
   if (!moyasarPaymentId) return showPaymentCancelled();
 
-  // 4. Confirm
+  // 4. Confirm payment with Moyasar payment ID
   const confirmKey = generateUUIDv4();
   const result = await api.post('/guest/payments/confirm', {
     actionPerformerURDD: userUrdd,
@@ -370,9 +443,10 @@ function onPayButtonTapped(booking) {
     moyasarPaymentId: moyasarPaymentId,
   }, { headers: { 'Idempotency-Key': confirmKey } });
 
-  // 5. Update UI
+  // 5. Update UI based on remaining balance
   if (result.balanceDueRemaining > 0) {
     showPartialPaymentSuccess(result);
+    // Show "Pay remaining X" button for next payment
   } else {
     showFullPaymentSuccess(result);
   }
@@ -441,4 +515,5 @@ Use any future expiry (e.g., `12/2028`) and any 3-digit CVV (e.g., `123`).
 
 | Date | Change |
 |---|---|
+| 2026-07-09 | Added partial payment support with 20% minimum downpayment, amount input UI, 3DS flow details, formAssets-based asset loading |
 | 2026-07-08 | Initial document |

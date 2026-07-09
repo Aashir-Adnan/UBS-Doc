@@ -111,21 +111,22 @@ How a guest booking goes from creation to fully paid, who triggers each step, an
 
 The system supports partial payments across multiple transactions against the same booking.
 
-### Example: 600 SAR booking paid in two installments
+### Example: 1500 SAR booking paid in three installments
 
-| Step | Action | `paid_amount` | `total_amount` | Balance due |
+| Step | Action | Amount | `paid_amount` | Balance |
 |---|---|---|---|---|
-| 1 | Booking created | 0 | 600 | 600 |
-| 2 | Initiate payment for 300 | 0 | 600 | 600 |
-| 3 | Guest pays, confirm succeeds | 300 | 600 | 300 |
-| 4 | Guest checks in (eligible: paid > 0) | 300 | 600 | 300 |
-| 5 | Guest checks out | 300 | 600 | 300 |
-| 6 | Initiate payment for remaining 300 | 300 | 600 | 300 |
-| 7 | Guest pays, confirm succeeds | 600 | 600 | 0 |
+| 1 | Booking created | — | 0 | 1500 |
+| 2 | First payment (≥ 20% of 1500 = 300 min) | 300 | 300 | 1200 |
+| 3 | Guest checks in (eligible: paid > 0) | — | 300 | 1200 |
+| 4 | Second payment (any amount ≤ balance) | 600 | 900 | 600 |
+| 5 | Guest checks out | — | 900 | 600 |
+| 6 | Final payment (remaining balance) | 600 | 1500 | 0 |
 
 **Key rules:**
 
-- The `amount` in the initiate call must equal the current balance due (`total_amount - paid_amount`). The backend enforces this.
+- **First payment:** must be at least **20% of `total_amount`** (minimum downpayment). The backend enforces this.
+- **Subsequent payments:** any amount from `0.01` up to the remaining balance (`total_amount - paid_amount`).
+- **Cannot overpay:** the `amount` must be ≤ the current balance due.
 - Each payment creates a separate `transactions` row. A booking can have multiple completed transactions.
 - Check-in requires `paid_amount > 0` (at least some payment made). It does NOT require full payment.
 - Payments can be taken after check-out for any remaining balance.
