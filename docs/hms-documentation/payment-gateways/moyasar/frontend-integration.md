@@ -389,10 +389,23 @@ Or if not eligible:
 }
 ```
 
+When `reason` is `before_window` or `after_window`, the response also includes the check-in time window:
+
+```json
+{
+  "eligible": false,
+  "reason": "before_window",
+  "balanceDue": 0,
+  "currency": "SAR",
+  "windowOpensAt": "2026-06-10T07:00:00.000Z",
+  "windowClosesAt": "2026-06-10T20:00:00.000Z"
+}
+```
+
 | `reason` | Meaning | What to show |
 |---|---|---|
 | `not_paid` | `paid_amount` is 0. At least one payment required. | "Please make a payment before checking in." + Pay button |
-| `before_window` | Too early. Check-in window is 7:00–20:00 UTC on check-in day. | "Check-in opens at {windowOpensAt}" |
+| `before_window` | Too early. Check-in window is 7:00–20:00 UTC on check-in day. | "Check-in opens at {response.windowOpensAt}" |
 | `after_window` | Too late. Past the check-in window. | "Check-in window has closed" |
 | `already_checked_in` | Guest already checked in. | Show check-in confirmation |
 | `cancelled` | Booking was cancelled. | "This booking has been cancelled" |
