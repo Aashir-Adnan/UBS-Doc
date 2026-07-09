@@ -192,4 +192,5 @@ No double-increment occurs because both check `payment_status` before updating.
 
 | Date | Change |
 |---|---|
+| 2026-07-09 | Added saved cards table, reconciliation cron, GuestPaymentsMethods endpoint to source files |
 | 2026-07-08 | Initial document |

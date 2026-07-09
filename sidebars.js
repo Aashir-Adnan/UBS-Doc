@@ -353,6 +353,7 @@ const sidebars = {
                 'hms-documentation/payment-gateways/moyasar/payment-flow',
                 'hms-documentation/payment-gateways/moyasar/webhook',
                 'hms-documentation/payment-gateways/moyasar/booking-payment-lifecycle',
+                'hms-documentation/payment-gateways/moyasar/saved-cards',
                 'hms-documentation/payment-gateways/moyasar/frontend-integration',
               ],
             },
