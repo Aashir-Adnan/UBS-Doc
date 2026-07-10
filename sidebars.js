@@ -101,6 +101,27 @@ const sidebars = {
                 'hms-documentation/major-implementations/review-categories/frontend-implementation',
               ],
             },
+            {
+              type: 'category',
+              label: 'Payment & Refund Flow',
+              items: [
+                'hms-documentation/major-implementations/payment-and-refund/payment-and-refund',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Front Desk Checkout',
+              items: [
+                'hms-documentation/major-implementations/front-desk-checkout/front-desk-checkout',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Email Branding & Templates',
+              items: [
+                'hms-documentation/major-implementations/email-branding/email-branding',
+              ],
+            },
           ],
         },
         {
