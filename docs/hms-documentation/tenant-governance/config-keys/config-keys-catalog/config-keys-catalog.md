@@ -337,7 +337,7 @@ Two slugs deliberately exist twice — disambiguate by `id` / `category_id`:
 | 5 | `short_description` | Short Description | svc,pkg | viewing | `*` | text_area | —/— | Localized short description shown on listing cards. |
 | 6 | `long_description` | Long Description | svc,pkg | viewing | `*` | text_area | —/— | Localized rich-text long description shown on the detail page. |
 | 7 | `media` | Media | svc,pkg | viewing | `*` | attachment | —/✓ | Ordered array of media assets (cover + gallery images/videos). |
-| 9 | `visibility` | Visibility | svc,pkg | viewing | `*` | dropdown | ✓/— | Record lifecycle / publication state. Default: draft. |
+| 9 | `visibility` | Visibility | svc,pkg | viewing | `*` | dropdown | ✓/— | Record lifecycle / publication state. Options `draft` + `published` — `published` was added by `20260709_2` to every `visibility` key (SaaS-global `"all"` + all clones), which also backfilled a `visibility = published` config for every active hotel/branch service & package that had none (so an unset item reads as *published*, not *draft*). |
 | 93 | `consumption_type` | Consumption Type | svc,pkg | consumption | `[2,3,4,5,6,7,8,9,"package"]` | dropdown | —/— | How the service is consumed when bundled or used. |
 | 94 | `consumption_reset_cadence` | Consumption Reset Cadence | pkg | consumption | `["package"]` | dropdown | —/— | When included-capped counters reset within the package. |
 | 110 | `services_list` | Services List | svc_cat | viewing | `*` | dropdown | —/✓ | The list of service types. |
