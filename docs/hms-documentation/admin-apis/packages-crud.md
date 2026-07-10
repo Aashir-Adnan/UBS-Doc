@@ -121,8 +121,9 @@ Multilingual fields arrive as `{ "en": "...", "ar": "..." }`; `en` is stored on 
 
 ## Behavior
 
-- **Soft delete.** Delete never removes the row. The `enforceDeleteGuard("package")` pre-process probes for live dependents: a **clean delete** (no dependents) sets `packages.status = 'inactive'`; a delete with **live dependents** sets `status = 'probation'`, finalized later by a cron once dependents clear. The ID is preserved so a future Update can reactivate it. Side-tables (translations, attachments, pricing, package-services, configs) are intentionally left attached — Delete does not cascade.
-- **Delete response.** Reports `status_set` (`inactive` or `probation`), `deferred`, and the `dependents` list.
+- **Soft delete.** Delete never removes the row. The `enforceDeleteGuard("package")` pre-process probes for live dependents: a **clean delete** (no dependents) sets `packages.status = 'archived'` (retired but **kept visible** in admin lists, which filter `status != 'inactive'`); a delete with **live dependents** sets `status = 'probation'`, finalized later by a cron to `archived` once dependents clear. The ID is preserved so a future Update can reactivate it. Side-tables (translations, attachments, pricing, package-services, configs) are intentionally left attached — Delete does not cascade.
+- **Second delete → `inactive`.** Deleting a package that is **already `archived`** finalizes it the rest of the way to `inactive` — the fully-removed state that drops out of List/View. It skips the probation probe (an archived row is already past the booking gate). Full lifecycle: `active` → *(delete)* → `archived` → *(delete again)* → `inactive`.
+- **Delete response.** Reports `status_set` (`archived`, `probation`, or `inactive`), `deferred`, and the `dependents` list.
 - **Status on Update** uses `status = COALESCE({{packageStatus}}, status)`, so a partial Update that omits `packageStatus` keeps the existing status.
 - **Tenancy.** Update/Delete are blocked across tenants (`TENANT_MISMATCH`).
 - **Multilingual.** Three fields (name, code, description) round-trip as `{ en, ar }`; `en` on the base row, other languages in `translated_entries`.

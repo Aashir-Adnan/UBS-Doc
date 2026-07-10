@@ -133,8 +133,9 @@ Multilingual fields arrive as `{ "en": "...", "ar": "..." }` objects; the `en` v
 
 ## Behavior
 
-- **Soft delete.** Delete never removes the row. The `enforceDeleteGuard("service")` pre-process probes for live dependents: a **clean delete** (no dependents) sets `services.status = 'inactive'`; a delete with **live dependents** sets `status = 'probation'` and is finalized later by a cron once the dependents clear. The row's ID is preserved so a future Update can reactivate it. Side-tables (translations, attachments, locations, pricing, configs) are intentionally left attached — Delete does not cascade.
-- **Delete response.** Reports `status_set` (`inactive` or `probation`), `deferred`, and the `dependents` list.
+- **Soft delete.** Delete never removes the row. The `enforceDeleteGuard("service")` pre-process probes for live dependents: a **clean delete** (no dependents) sets `services.status = 'archived'` (retired but **kept visible** in admin lists, which filter `status != 'inactive'`); a delete with **live dependents** sets `status = 'probation'`, finalized later by a cron to `archived` once the dependents clear. The row's ID is preserved so a future Update can reactivate it. Side-tables (translations, attachments, locations, pricing, configs) are intentionally left attached — Delete does not cascade.
+- **Second delete → `inactive`.** Deleting a service that is **already `archived`** finalizes it the rest of the way to `inactive` — the fully-removed state that drops out of List/View. It skips the probation probe (an archived row is already past the booking gate) and runs the terminal unassign hook (Rule 2). Full lifecycle: `active` → *(delete)* → `archived` → *(delete again)* → `inactive`.
+- **Delete response.** Reports `status_set` (`archived`, `probation`, or `inactive`), `deferred`, and the `dependents` list.
 - **Status on Update** uses `status = COALESCE({{serviceStatus}}, status)`, so a partial Update that omits `serviceStatus` keeps the existing status.
 - **Tenancy.** Update/Delete are blocked across tenants (`TENANT_MISMATCH`); List/View return rows scoped to the caller's tenant context.
 - **Multilingual.** Six fields (name, code, slug, description, short description, common attributes) round-trip as `{ en, ar }`; `en` lives on the base row, other languages in `translated_entries`.

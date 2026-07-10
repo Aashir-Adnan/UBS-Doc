@@ -29,6 +29,13 @@ active ──delete, NO deps──►  inactive            (immediate — unchan
 > `status = archived` directly. The gate never blocks a change — only a booked row is held in
 > probation first. Every other resource keeps the plain `inactive` terminal and is guarded on
 > DELETE only.
+>
+> **Second delete → `inactive`.** Because `archived` keeps a retired service/package **visible**
+> in admin lists, deleting it again finishes the job: a **DELETE on a row already `archived`**
+> finalizes it to **`inactive`** (it then drops out of List/View). This transition skips the
+> probation probe — an archived row is already past the booking gate — but still runs the terminal
+> Rule-2 hook for a service (idempotent, keeps its unit anchors / `deliver_unit` config clean). So
+> the full lifecycle is `active` → *(delete)* → `archived` → *(delete again)* → `inactive`.
 
 ---
 
@@ -38,8 +45,9 @@ The dependency check is per resource. The recurring primitive is the **active bo
 
 | Resource | Parked in `probation` while… |
 |---|---|
-| **service** | a booking_service ties it to an active booking *(finalizes to `archived`; deactivation-guarded)* |
+| **service** | a booking_service ties it to an active booking — **or**, for a **Stay** service, one of its **rooms** is on an active booking (a stay holds a `delivery_unit` via `booking_items`, *not* a booking_service). A room belongs to the service when the unit's `service_locations` **anchor** — the row `delivery_units.location_id` points at — carries this `service_id` (`du.location_id = sl.id AND sl.service_id = <service>`), **not** merely because it shares a physical location. *(finalizes to `archived`; deactivation-guarded)* |
 | **package** | the package — or any service it includes — has an active booking *(finalizes to `archived`; deactivation-guarded)* |
+| **config value** (a possible value of a config key) | a **service** (per the service check above, incl. the Stay-room path) **or** **package** that is configured with this value **by id** (`hms_config.config_value` holds the value's id) has an active booking. Hidden from new-consumer pickers while parked; finalizes to `inactive` once those bookings close. Only the exact id reference counts — the mutable `services.common_attributes` value-label case is **not** guarded |
 | **delivery unit** (room/table/…) | its `current_status` is `reserved` or `occupied` |
 | **service category** | it still has active `services` / `packages` / `delivery_units` |
 | **location / location_type** | a location of that type (or a descendant in the building › floor › zone tree) still has an **active service link to a live service** (status `active` / `probation` / `archived`) |

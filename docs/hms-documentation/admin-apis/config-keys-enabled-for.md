@@ -128,6 +128,13 @@ Return the query-resolver metadata. When an `apply_on_all` propagation ran, the 
 
 **`apply_on_all` propagation.** When a Tenant Manager edits a **global original** (`source_hms_config_key_id IS NULL`) with `apply_on_all = true`, the change is pushed to each unedited tenant clone (`propagateAssignmentUpdates` / `propagateConfigValueUpdates`); tenant-customised clones are left as-is and reported as conflicts. Each updated tenant's active Tenant Admin(s) then get a plain-language email. Both steps are best-effort — the original save is already committed.
 
+### Booked-dependency guards
+
+Both modes check whether a **booked** service/package still depends on the config before letting it change. The recurring primitive is the **active booking** (`booking_status` NOT IN `checked_out` / `no_show` / `cancelled`). A service is "booked" when it is a `booking_services` line **or** — for a **Stay** service — one of its **rooms** is on an active booking. A room belongs to the service when the unit's `service_locations` **anchor** (the row `delivery_units.location_id` points at) carries this `service_id` — `du.location_id = sl.id AND sl.service_id = <service>`, **not** merely a shared physical location. (See [Deferred delete & probation](../tenant-governance/deferred-delete-probation/deferred-delete-probation.md).)
+
+- **enabled_for Update — turning a scope OFF is a hard 409.** If a scope currently ON is being set to `0`/omitted while a booked service (in that `service_category`) or package still uses the key, the Update is **refused** with `CONFIG_KEY_SCOPE_IN_USE` (`409`) — an `enabled_for` flag is a JSON map with no status row to defer, so it can't be parked. Turning a scope **on** (`0 → 1`) is always allowed. Only the exact id-based dependency is considered.
+- **possible_values Delete — deferred (probation), not blocked.** Deleting a value that a booked service/package still references **by id** parks it in `probation` instead of `inactive`: it drops out of new-consumer pickers (`syncPossibleValues` rebuilds the map from `active` rows only) but stays resolvable for the live reservation, the finalizer cron flips it to `inactive` once those bookings close, and it can be **restored** meanwhile (Update `status: 'active'` with no value). With no booked reference it inactivates immediately. The response carries `status_set` (`probation`/`inactive`), `deferred`, and a `dependents` array.
+
 ---
 
 ## Source Files
