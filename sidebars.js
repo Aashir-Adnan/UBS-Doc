@@ -122,6 +122,13 @@ const sidebars = {
                 'hms-documentation/major-implementations/email-branding/email-branding',
               ],
             },
+            {
+              type: 'category',
+              label: 'Access Token Security',
+              items: [
+                'hms-documentation/major-implementations/access-token-security/access-token-security',
+              ],
+            },
           ],
         },
         {
