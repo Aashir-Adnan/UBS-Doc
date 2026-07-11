@@ -157,7 +157,9 @@ In service/package search queries, `t.search_text LIKE ?` is added to the free-t
 
 ## 3. Database Views
 
-### `v_hotel_search`
+### Search Views (Migration 1)
+
+#### `v_hotel_search`
 
 Pre-joins tenants with cities for fast hotel directory queries:
 
@@ -173,7 +175,7 @@ WHERE t.status = 'active' AND t.is_active = 1
   AND t.tenant_type IN ('hotel', 'branch');
 ```
 
-### `v_landmark_search`
+#### `v_landmark_search`
 
 Pre-joins landmarks with cities:
 
@@ -188,7 +190,7 @@ LEFT JOIN cities c ON l.city_id = c.city_id
 WHERE l.status != 'inactive';
 ```
 
-### `v_service_search`
+#### `v_service_search`
 
 Pre-joins services with tenant/city for the search pipeline:
 
@@ -203,6 +205,98 @@ INNER JOIN tenants t ON s.tenant_id = t.tenant_id
 LEFT JOIN cities c ON t.city_id = c.city_id
 LEFT JOIN service_categories sc ON s.category_id = sc.category_id
 WHERE s.status = 'active' AND t.status = 'active' AND t.is_active = 1;
+```
+
+### Performance Views (Migration 2)
+
+These views eliminate expensive repeated subqueries from the hotel listing and search pipelines.
+
+#### `v_hotel_ratings`
+
+Pre-aggregates star ratings per hotel by combining feedback from both services and packages. This UNION ALL + GROUP BY was previously inlined in both `listGuestHotels` and `GuestHotelDetails`, running on every request.
+
+```sql
+CREATE OR REPLACE VIEW v_hotel_ratings AS
+SELECT
+    combined.tenant_id,
+    ROUND(AVG(combined.star_rating), 1) AS avg_rating,
+    COUNT(*) AS review_count
+FROM (
+    SELECT s.tenant_id, f.star_rating
+      FROM services s
+      INNER JOIN feedback f
+        ON f.base_table = 'services' AND f.record_id = s.service_id AND f.status = 'active'
+     WHERE s.status = 'active'
+    UNION ALL
+    SELECT p.tenant_id, f.star_rating
+      FROM packages p
+      INNER JOIN feedback f
+        ON f.base_table = 'packages' AND f.record_id = p.package_id AND f.status = 'active'
+     WHERE p.status = 'active'
+) combined
+GROUP BY combined.tenant_id;
+```
+
+**Used by**: `listGuestHotels()`, `GuestHotelDetails.preProcessList()`
+
+#### `v_hotel_stay_pricing`
+
+Computes the minimum stay cost per night for each hotel. Normalizes catalog pricing by the service's `duration` config. Previously an inline subquery with nested hms_config lookups.
+
+```sql
+CREATE OR REPLACE VIEW v_hotel_stay_pricing AS
+SELECT s.tenant_id,
+       MIN(cp.price / GREATEST(COALESCE(
+         (SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(hc.config_value, '$.en')) AS UNSIGNED)
+            FROM hms_config hc
+            INNER JOIN hms_config_keys hck ON hc.config_key_id = hck.config_key_id
+           WHERE hc.base_table = 'services' AND hc.record_id = s.service_id
+             AND hck.config_key = 'duration' AND hc.status = 'active'
+             AND JSON_VALID(hc.config_value)
+           LIMIT 1), 1), 1)) AS min_cost_per_night
+FROM services s
+INNER JOIN service_categories sc ON s.category_id = sc.category_id
+INNER JOIN catalog_pricing cp
+  ON cp.base_table = 'services' AND cp.record_id = s.service_id
+  AND cp.status = 'active'
+  AND (cp.customer_segment = 'regular' OR cp.customer_segment IS NULL)
+  AND (cp.valid_from IS NULL OR cp.valid_from <= NOW())
+  AND (cp.valid_to IS NULL OR cp.valid_to >= NOW())
+WHERE s.status = 'active' AND sc.slug = 'stay'
+GROUP BY s.tenant_id;
+```
+
+**Used by**: `listGuestHotels()`, `GuestHotelDetails.preProcessList()`
+
+#### `v_active_catalog_pricing`
+
+Pre-filters `catalog_pricing` to only active rows within their validity window for the `regular` customer segment. Replaces the 6-condition WHERE clause that was repeated in every search query, price bounds calculation, and the centralized `getCatalogPrices()` function.
+
+```sql
+CREATE OR REPLACE VIEW v_active_catalog_pricing AS
+SELECT cp.pricing_id, cp.base_table, cp.record_id,
+       cp.price, cp.currency_id, cp.customer_segment, cp.created_at
+FROM catalog_pricing cp
+WHERE cp.status = 'active'
+  AND (cp.customer_segment = 'regular' OR cp.customer_segment IS NULL)
+  AND (cp.valid_from IS NULL OR cp.valid_from <= NOW())
+  AND (cp.valid_to IS NULL OR cp.valid_to >= NOW());
+```
+
+**Used by**: `searchServices()`, `searchPackages()`, `getCatalogPrices()`, `fetchPriceBoundsForServices()`, `fetchPriceBoundsForPackages()`
+
+### Supporting Indexes
+
+```sql
+-- Feedback: core access pattern for rating aggregation
+CREATE INDEX idx_feedback_base_record_status ON feedback (base_table, record_id, status);
+
+-- Catalog pricing: full predicate coverage
+CREATE INDEX idx_catalog_pricing_active_lookup
+  ON catalog_pricing (base_table, record_id, status, customer_segment, created_at DESC);
+
+-- hms_config: config lookups by entity
+CREATE INDEX idx_hms_config_base_record_status ON hms_config (base_table, record_id, status);
 ```
 
 ---
@@ -254,6 +348,43 @@ Response now includes `landmarks_cityId` and `landmarks_cityName` fields.
 Same as guest: supports `?q=` and `?cityId=` parameters. Uses `v_landmark_search` view.
 
 Response now includes `cityId` and `cityName` fields.
+
+### `GET /api/guest/cities` — NEW Endpoint
+
+Public encrypted endpoint for fetching the cities reference table. Used by the frontend city picker.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `q` | `string` | Text search (name, code, Arabic translations) |
+| `countryId` | `number` | Filter by country FK |
+
+**Response**:
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "name": { "en": "Makkah", "ar": "مكة المكرمة" },
+      "code": "MKH",
+      "countryId": 1,
+      "countryName": "Saudi Arabia"
+    }
+  ]
+}
+```
+
+**Source files**:
+- `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestCities/GuestCities.js`
+- `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestCities/CRUD_parameters.js`
+
+### `GET /api/crud/cities` — Admin Cities CRUD
+
+Full CRUD for managing the `cities` reference table (Add/Update/List/View/Delete). Supports multilingual city names via `translated_entries`.
+
+**Source files**:
+- `Src/Apis/ProjectSpecificApis/CrudCities/CrudCities.js`
+- `Src/Apis/ProjectSpecificApis/CrudCities/CRUD_parameters.js`
 
 ---
 
@@ -313,7 +444,8 @@ CREATE TABLE landmarks (
 | File | Purpose |
 |------|---------|
 | `20260707_1_create_cities_table_and_link_tenants.sql` | Create `cities` table, seed 8 Saudi cities, add `city_id` FK to tenants |
-| `20260711_1_expand_cities_add_search_text_and_views.sql` | Expand to 28 Saudi cities, add `search_text` + FULLTEXT indexes, add `city_id` to landmarks, create views |
+| `20260711_1_expand_cities_add_search_text_and_views.sql` | Expand to 28 Saudi cities, add `search_text` + FULLTEXT indexes, add `city_id` to landmarks, create search views |
+| `20260711_2_create_hotel_ratings_pricing_views.sql` | Create `v_hotel_ratings`, `v_hotel_stay_pricing`, `v_active_catalog_pricing` views + supporting indexes |
 
 ---
 
@@ -341,17 +473,24 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 ### Architecture
 
 ```
-Guest types "Makkah" →
-  ┌─ GET /api/guest/hotels?q=makkah
-  │    → tenants WHERE search_text LIKE '%makkah%'
-  │    → FULLTEXT index hit, ~20ms
+Guest opens city picker →
+  GET /api/guest/cities
+    → cities WHERE status = 'active' + translated_entries
+    → Returns bilingual city list
+
+Guest selects "Makkah" (cityId=1), types "Dar" →
+  ┌─ GET /api/guest/hotels?q=dar&cityId=1
+  │    → tenants WHERE search_text LIKE '%dar%' AND city_id = 1
+  │    → LEFT JOIN v_hotel_ratings, v_hotel_stay_pricing
+  │    → FULLTEXT index + FK index, ~20ms
   │
-  ├─ GET /api/guest/crud/landmarks?q=makkah
-  │    → v_landmark_search WHERE search_text LIKE '%makkah%'
+  ├─ GET /api/guest/crud/landmarks?q=dar&cityId=1
+  │    → v_landmark_search WHERE search_text LIKE '%dar%' AND city_id = 1
   │    → FULLTEXT index hit, ~15ms
   │
   └─ GET /api/guest/search/filter?cityId=1
        → services/packages WHERE t.city_id = 1
+       → Pricing via v_active_catalog_pricing view
        → Simple indexed FK lookup
 ```
 
@@ -359,10 +498,15 @@ Guest types "Makkah" →
 
 | Path | Role |
 |------|------|
-| `Src/HelperFunctions/Guest/v2/searchQueries.js` | Service/package search with `search_text` + `cityId` |
+| `Src/HelperFunctions/Guest/v2/searchQueries.js` | Service/package search with `search_text` + `cityId` + `v_active_catalog_pricing` |
 | `Src/HelperFunctions/Guest/v2/searchFilterHelper.js` | Unified search orchestrator (passes `cityId`) |
-| `Src/HelperFunctions/Guest/v2/guestDiscoveryData.js` | Hotel listing with `q` and `cityId` support |
+| `Src/HelperFunctions/Guest/v2/guestDiscoveryData.js` | Hotel listing with `v_hotel_ratings` + `v_hotel_stay_pricing` views |
+| `Src/HelperFunctions/Guest/v2/catalogPricing.js` | Centralized pricing using `v_active_catalog_pricing` |
 | `Src/HelperFunctions/PreProcessingFunctions/CustomServices/refreshSearchText.js` | Keeps `search_text` in sync |
 | `Src/Apis/ProjectSpecificApis/CrudLandmarks/CrudLandmarks.js` | Admin landmarks CRUD (uses `v_landmark_search`) |
 | `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestCrudLandmarks/CrudLandmarks.js` | Guest landmarks (uses view) |
-| `data/migrations_completed/20260711_1_expand_cities_add_search_text_and_views.sql` | Full migration |
+| `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestCities/GuestCities.js` | Guest cities list endpoint |
+| `Src/Apis/ProjectSpecificApis/CrudCities/CrudCities.js` | Admin cities CRUD |
+| `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestHotelDetails/GuestHotelDetails.js` | Hotel details using `v_hotel_ratings` + `v_hotel_stay_pricing` |
+| `data/migrations_completed/20260711_1_expand_cities_add_search_text_and_views.sql` | Search text + search views migration |
+| `data/migrations_completed/20260711_2_create_hotel_ratings_pricing_views.sql` | Performance views + indexes migration |

@@ -1,21 +1,101 @@
 ---
 sidebar_position: 2
 title: "Frontend — Search & Discovery Flow"
-description: "Frontend implementation spec for the guest search bar, suggestion dropdown, map-based hotel discovery, and nearby-hotel browsing."
+description: "Frontend implementation spec for the guest city picker, search bar, suggestion dropdown, map-based hotel discovery, and nearby-hotel browsing."
 ---
 
 # Frontend — Search & Discovery Flow
 
 ## Overview
 
-This document specifies the frontend implementation for the guest search-and-discovery experience. The flow has four stages:
+This document specifies the frontend implementation for the guest search-and-discovery experience. The flow has five stages:
 
-1. **Search bar** — User types in a search bar. A suggestion dropdown shows matching locations and hotels.
+0. **City picker** — User selects a city from a dropdown or search. All subsequent results are scoped to that city.
+1. **Search bar** — User types in a search bar. A suggestion dropdown shows matching locations and hotels (optionally filtered by city).
 2. **Map view (location selected)** — When a location is selected, a map displays hotel pins within a 500 km radius.
 3. **Hotel detail (hotel selected)** — When a hotel is selected, the app shows that hotel's rooms and packages.
 4. **Nearby hotels** — Below the selected hotel's listings, an "Other Hotels Nearby" section shows hotels within 100 km.
 
-No custom search endpoints are needed. The frontend uses the existing **Tenants CRUD** and future **Landmarks CRUD** (both powered by `executeQueryWithPagination`) to search, plus the existing guest APIs for hotel details, rooms, and packages.
+The flow uses the **Guest Cities**, **Guest Hotels**, **Guest Search & Filter**, **Landmarks CRUD**, and **Tenants CRUD** endpoints. City selection is optional — all stages work with or without a `cityId` filter.
+
+---
+
+## Stage 0: City Picker
+
+### Purpose
+
+Before searching, users can optionally select a city. This scopes all subsequent API calls (hotels, search/filter, landmarks) to that city via the `?cityId=N` query parameter.
+
+### API Call
+
+```
+GET /api/guest/cities
+```
+
+**Platform**: `PUBLIC_ENCRYPTED_PLATFORM` (no JWT required)
+
+Returns all active cities with bilingual names:
+
+```json
+{
+  "items": [
+    { "id": 1, "name": { "en": "Makkah", "ar": "مكة المكرمة" }, "code": "MKH", "countryId": 1, "countryName": "Saudi Arabia" },
+    { "id": 2, "name": { "en": "Madinah", "ar": "المدينة المنورة" }, "code": "MDN", "countryId": 1, "countryName": "Saudi Arabia" },
+    { "id": 3, "name": { "en": "Jeddah", "ar": "جدة" }, "code": "JED", "countryId": 1, "countryName": "Saudi Arabia" }
+  ]
+}
+```
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `q` | `string` | Text search — matches city name (English), code, and Arabic translations |
+| `countryId` | `number` | Filter cities by country FK |
+
+### With Text Search (City Autocomplete)
+
+```
+GET /api/guest/cities?q=Mak
+```
+
+Returns cities matching "Mak" (e.g., Makkah). Use this for a city autocomplete/search input.
+
+### UI Layout
+
+```
++-------------------------------------------+
+|  Select City                          v    |
+|  +--------------------------------------+ |
+|  | search  Search cities...             | |
+|  +--------------------------------------+ |
+|  | pin  Makkah                     MKH  | |
+|  | pin  Madinah                    MDN  | |
+|  | pin  Jeddah                     JED  | |
+|  | pin  Riyadh                     RUH  | |
+|  | pin  Dammam                     DMM  | |
+|  | pin  ...                              | |
+|  +--------------------------------------+ |
+|  [ All Cities ]    [ Clear Filter ]       |
++-------------------------------------------+
+```
+
+### Selection Behavior
+
+| Action | Effect |
+|--------|--------|
+| User selects a city | Store `cityId` in state. All subsequent API calls include `?cityId=N`. |
+| User selects "All Cities" or clears | Remove `cityId` from state. API calls return unfiltered results. |
+
+### How `cityId` Flows Through the Stages
+
+Once a city is selected, append `cityId` to every API call:
+
+| Stage | Endpoint | With City Filter |
+|-------|----------|-----------------|
+| 1 | `GET /api/guest/hotels` | `?cityId=1` |
+| 1 | `GET /api/guest/crud/landmarks` | `?cityId=1` added to AND filter |
+| 3 | `GET /api/guest/search/filter` | `?cityId=1&hotelId=56&include=rooms,packages` |
 
 ---
 
@@ -27,7 +107,7 @@ User begins typing in the search bar (e.g., "Makk", "Dar Al", "Jeddah").
 
 ### API Calls (Concurrent)
 
-Fire **two CRUD List calls concurrently** on every keystroke (debounced to ~300ms), plus cache the guest hotels list:
+Fire **three calls concurrently** on every keystroke (debounced to ~300ms):
 
 #### Call 1: Search landmarks
 
@@ -40,6 +120,13 @@ GET /api/guest/crud/landmarks
   &sort_by=sort_order
   &sort_order=ASC
   &page_size=5
+```
+
+If a city is selected, add the city filter:
+
+```
+  &filter_columns_and=["landmarks.status","landmarks.city_id"]
+  &filter_values_and=["active","{cityId}"]
 ```
 
 The `filter_columns_or=["all"]` tells `executeQueryWithPagination` to search across **all columns** in the landmarks table using `LIKE '%searchText%'`. The AND filter restricts to active landmarks.
@@ -55,15 +142,23 @@ GET /api/guest/crud/tenants
   &page_size=5
 ```
 
+If a city is selected, add `cityId` to the AND filters:
+
+```
+  &filter_columns_and=["tenants.tenant_type","tenants.status","tenants.is_active","tenants.city_id"]
+  &filter_values_and=[["hotel","branch"],"active","1","{cityId}"]
+```
+
 The `["hotel","branch"]` array value generates an `IN ('hotel','branch')` clause. Combined with the `"all"` OR filter, this searches all tenant columns for the text while restricting to active hotel/branch tenants.
 
 #### Call 3: (Once, cached) Full hotel list for map
 
 ```
 GET /api/guest/hotels
+GET /api/guest/hotels?cityId=1    # if city selected
 ```
 
-Returns all hotels with coordinates. Cache this response — it rarely changes and is needed for map rendering and distance calculations later.
+Returns all hotels with coordinates. Cache this response — it rarely changes and is needed for map rendering and distance calculations later. When the selected city changes, re-fetch with the new `cityId`.
 
 ### Dropdown Display
 
@@ -93,6 +188,8 @@ Display the suggestion dropdown with **two sections**, prioritizing locations fi
 | `landmarks_landmarkType` | Badge: "city", "site", "airport", etc. |
 | `landmarks_latitude` / `landmarks_longitude` | Stored for map use on selection |
 | `landmarks_radiusKm` | Stored for radius filtering on selection |
+| `landmarks_cityId` | City FK (for matching to selected city) |
+| `landmarks_cityName` | City name (for display) |
 
 #### Hotel Row Fields (from CRUD response)
 
@@ -125,7 +222,7 @@ From the landmarks CRUD response:
 - `landmarks_latitude` / `landmarks_longitude` — the center point
 - `landmarks_radiusKm` — suggested radius (e.g., 50 km for a city, 10 km for a site)
 
-From the cached hotel list (`GET /api/guest/hotels`):
+From the cached hotel list (`GET /api/guest/hotels` or `GET /api/guest/hotels?cityId=N`):
 - All hotels with their `coordinates`
 
 ### Distance Calculation (Client-Side)
@@ -232,6 +329,12 @@ Returns full hotel information: name, logo, contact, address, coordinates, curre
 
 ```
 GET /api/guest/search/filter?hotelId={hotelId}&include=rooms,packages&pageSize=20&sort=recommended
+```
+
+If a city is selected, include it (though `hotelId` already scopes results):
+
+```
+GET /api/guest/search/filter?hotelId={hotelId}&cityId={cityId}&include=rooms,packages&pageSize=20&sort=recommended
 ```
 
 Returns paginated rooms and packages. Each item includes:
@@ -368,15 +471,112 @@ Tapping a nearby hotel card navigates to Stage 3 for that hotel (full cycle).
 
 | Stage | Endpoint | Purpose | When to Call |
 |---|---|---|---|
+| 0 | `GET /api/guest/cities` | City list for picker/autocomplete | On app load or city picker open |
+| 0 | `GET /api/guest/cities?q=Mak` | City autocomplete search | On keystroke in city search (debounced) |
 | 1 | `GET /api/guest/crud/landmarks?filter_columns_or=["all"]&filter_values_or=["..."]&page_size=5` | Search landmarks by name | On keystroke (debounced) |
 | 1 | `GET /api/guest/crud/tenants?filter_columns_or=["all"]&filter_values_or=["..."]&page_size=5` | Search hotels by name | On keystroke (debounced, concurrent with landmarks) |
-| 1 | `GET /api/guest/hotels` | Full hotel list with coordinates | Once (cache it) |
+| 1 | `GET /api/guest/hotels` or `GET /api/guest/hotels?cityId=N` | Full hotel list with coordinates | Once per city selection (cache it) |
 | 2 | *(no API call — use cached data)* | Filter hotels by Haversine distance | On landmark selection |
 | 3 | `GET /api/guest/hotel/details?hotelId=N` | Hotel detail for header | On hotel selection |
 | 3 | `GET /api/guest/search/filter?hotelId=N&include=rooms,packages` | Rooms & packages listing | On hotel selection + filter changes |
 | 3 | `GET /api/filter/options/*?hotelId=N` | Filter metadata for UI | On hotel selection |
 | 4 | *(no API call — use cached data)* | Filter hotels by Haversine distance | On hotel selection |
 | Optional | External distance API (Google/Mapbox/ORS) | Road distance & travel time | For visible hotel cards only |
+
+---
+
+## `cityId` Parameter Integration
+
+The `cityId` parameter is supported on all major search/discovery endpoints:
+
+| Endpoint | Parameter | Effect |
+|----------|-----------|--------|
+| `GET /api/guest/hotels` | `?cityId=N` | Only return hotels with `tenants.city_id = N` |
+| `GET /api/guest/search/filter` | `?cityId=N` | Only return services/packages belonging to hotels in city N |
+| `GET /api/guest/crud/landmarks` | `filter_columns_and` includes `landmarks.city_id` | Only return landmarks in city N |
+| `GET /api/guest/crud/tenants` | `filter_columns_and` includes `tenants.city_id` | Only return hotels in city N |
+
+When no `cityId` is provided, all endpoints return unfiltered results (all cities).
+
+### Frontend State Management
+
+```javascript
+// City selection state
+const [selectedCityId, setSelectedCityId] = useState(null);
+
+// Helper: append cityId to any API call params
+function withCityFilter(params) {
+  if (selectedCityId) {
+    return { ...params, cityId: selectedCityId };
+  }
+  return params;
+}
+
+// When city changes:
+// 1. Invalidate cached hotel list
+// 2. Re-fetch hotels with new cityId
+// 3. Clear current search results
+// 4. Update landmark/hotel search filters
+function onCityChange(cityId) {
+  setSelectedCityId(cityId);
+  invalidateHotelCache();
+  clearSearchResults();
+}
+```
+
+---
+
+## Guest Cities API — Full Reference
+
+### Endpoint
+
+```
+GET /api/guest/cities
+```
+
+### Platform
+
+`PUBLIC_ENCRYPTED_PLATFORM` — encrypted but no JWT required.
+
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `q` | `string` | No | Text search (matches English name, Arabic translation, city code) |
+| `countryId` | `number` | No | Filter by `countries.country_id` FK |
+
+### Response
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "name": { "en": "Makkah", "ar": "مكة المكرمة" },
+      "code": "MKH",
+      "countryId": 1,
+      "countryName": "Saudi Arabia"
+    }
+  ]
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `number` | City primary key (`cities.city_id`) |
+| `name` | `{ en, ar }` | Bilingual city name (English from `cities.name`, Arabic from `translated_entries`) |
+| `code` | `string` | IATA-style city code (e.g., `MKH`, `JED`) |
+| `countryId` | `number` | FK to `countries.country_id` |
+| `countryName` | `string\|null` | Country name from `countries.country_name` |
+
+### Source Files
+
+| File | Role |
+|------|------|
+| `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestCities/GuestCities.js` | API object |
+| `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestCities/CRUD_parameters.js` | Parameter schema |
 
 ---
 
@@ -429,7 +629,9 @@ For optional road-distance display on hotel cards:
 
 ## State Management Notes
 
-- **Cache the hotel list**: `GET /api/guest/hotels` should be called once and cached. It contains all hotels with coordinates needed for both map rendering and "nearby" calculations.
+- **Cache the hotel list**: `GET /api/guest/hotels` should be called once per city selection and cached. It contains all hotels with coordinates needed for both map rendering and "nearby" calculations.
+- **Cache cities**: `GET /api/guest/cities` should be called once on app load and cached — city data rarely changes.
 - **Cache suggestions**: Debounce and cache the last few search results to avoid redundant API calls when the user is typing/backspacing.
 - **Persist selected hotel**: When navigating from Stage 3 to Stage 4 and back (user taps a nearby hotel), maintain a navigation stack so the back button returns to the previous hotel.
+- **Persist selected city**: The city selection should persist across navigation within the search flow. Clearing it resets all results to show all cities.
 - **Coordinate availability**: Hotels without `coordinates` (null) should be excluded from map rendering and distance calculations but can still appear in non-geographic lists.
