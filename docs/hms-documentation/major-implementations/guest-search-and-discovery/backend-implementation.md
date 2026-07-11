@@ -1,199 +1,222 @@
 ---
 sidebar_position: 1
 title: "Backend — Search & Discovery Support"
-description: "How existing CRUD endpoints, executeQueryWithPagination, and the guest search/filter API support the map-based hotel discovery flow."
+description: "How the city-based search optimization, denormalized search_text field, and database views power fast hotel and landmark discovery."
 ---
 
 # Backend — Search & Discovery Support
 
 ## Overview
 
-The guest search-and-discovery flow is supported entirely by **existing infrastructure** plus one new table. No new API endpoints are needed.
+The guest search-and-discovery flow uses a **denormalized `search_text` column** with **FULLTEXT indexes** and **MySQL views** instead of the slower `executeQueryWithPagination` approach that required runtime `INFORMATION_SCHEMA` queries.
 
-- **Hotel searching**: The existing **Tenants CRUD** (`GET /api/guest/crud/tenants`) with `executeQueryWithPagination` already supports free-text search, filtering, sorting, and pagination.
-- **Landmark searching**: A new **`landmarks`** table + standard CRUD (following the same pattern as Tenants) provides the same capabilities for locations.
-- **Rooms & packages for a hotel**: The existing **`GET /api/guest/search/filter`** endpoint already supports `hotelId` scoping.
-- **Distance calculation**: Performed **client-side** using coordinates from the above endpoints.
+Key architecture decisions:
 
-The frontend fires the Tenants and Landmarks CRUD List endpoints **concurrently** to populate the search suggestion dropdown, then uses the coordinates from those responses for client-side distance filtering.
-
----
-
-## 1. How `executeQueryWithPagination` Works
-
-All standard CRUD List endpoints in the framework route through `executeQueryWithPagination` when `pagination` is configured in the API object's `requestMetaData`. This module appends filtering, sorting, and pagination clauses to the base SQL query using `req.query` parameters.
-
-### Supported Query Parameters
-
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `page_size` | `number\|"All"` | from API config | Items per page. `"All"` disables pagination. |
-| `page_no` | `number` | `1` | Page number (1-based). |
-| `sort_by` | `string` | — | Column name (or mapper alias) to sort by. |
-| `sort_order` | `string` | `"ASC"` | `"ASC"` or `"DESC"`. |
-| `filter_columns_and` | `JSON array` | `[]` | Column names for AND filtering. |
-| `filter_values_and` | `JSON array` | `[]` | Values for AND filters (URI-encoded). |
-| `filter_conditions_and` | `JSON array` | `[]` | Operators per AND column (default `"LIKE"`). |
-| `filter_columns_or` | `JSON array` | `[]` | Column names for OR filtering. Supports special value `"all"`. |
-| `filter_values_or` | `JSON array` | `[]` | Values for OR filters (URI-encoded). |
-| `filter_conditions_or` | `JSON array` | `[]` | Operators per OR column (default `"="`). |
-
-### Filter Value Types
-
-Values in `filter_values_and` / `filter_values_or` can be:
-
-| Value Shape | SQL Generated | Example |
-|---|---|---|
-| `"text"` (string) | `column LIKE '%text%'` (AND default) or `column = 'text'` (OR default) | `"Makkah"` |
-| `["a","b","c"]` (array) | `column IN ('a','b','c')` | `["hotel","branch"]` |
-| `{"min":10,"max":100}` (range) | `column BETWEEN 10 AND 100` | `{"min":0,"max":50}` |
-| `{"min":10}` (open range) | `column >= 10` | `{"min":21}` |
-
-### Special `"all"` Filter
-
-When `filter_columns_or` includes `"all"`, the module searches across **every column** in every table referenced in the query's top-level FROM/JOIN. This is how full-text search works:
-
-```
-?filter_columns_or=["all"]&filter_values_or=["Makkah"]
-```
-
-This generates `OR table.column1 LIKE '%Makkah%' OR table.column2 LIKE '%Makkah%' ...` for every column in every joined table.
-
-### How It Integrates
-
-The `queryResolver` middleware checks `apiConfig.features.pagination` (set via `requestMetaData.pagination` in the API object). When enabled, it calls `executeQueryWithPagination(req, query, ...)` instead of `executeQuery(query, ...)`, which appends the filter/sort/pagination clauses to the base List SQL before execution.
+- **Cities table**: Hotels (tenants) now have a `city_id` FK linking them to the `cities` reference table. Landmarks also have `city_id`.
+- **`search_text` column**: A denormalized TEXT field on `tenants` and `landmarks` concatenating name + translations + city + address. Indexed with FULLTEXT for sub-millisecond search.
+- **MySQL views**: Pre-joined views (`v_hotel_search`, `v_landmark_search`, `v_service_search`) eliminate repetitive JOINs at query time.
+- **`cityId` filter parameter**: All search/filter APIs now accept `?cityId=N` to scope results to a specific city.
 
 ---
 
-## 2. Existing: Tenants CRUD (Hotel Search)
-
-### Endpoint
-
-```
-GET /api/guest/crud/tenants
-```
-
-This is the existing admin CRUD for tenants. Its List query selects all tenant columns including `tenant_name`, `city`, `country`, `latitude`, `longitude`, `tenant_logo`, `tenant_slug`, and has `pagination: { pageSize: 10 }` enabled — so all `executeQueryWithPagination` filter/sort/pagination keys are available.
-
-### How the Frontend Searches Hotels
-
-To search hotels by name (for the suggestion dropdown):
-
-```
-GET /api/guest/crud/tenants
-  ?filter_columns_or=["all"]
-  &filter_values_or=["Dar Al"]
-  &filter_columns_and=["tenants.tenant_type","tenants.status","tenants.is_active"]
-  &filter_values_and=[["hotel","branch"],"active","1"]
-  &page_size=5
-```
-
-This searches all columns for "Dar Al" while AND-filtering to only active hotel/branch tenants, returning at most 5 results.
-
-### Response Fields Available
-
-The Tenants List query already returns (among others):
-
-| Field | Column Alias | Description |
-|---|---|---|
-| Hotel name | `tenants_tenantName` | Resolved via `translated_entries` for the requested `language_code` |
-| City | `tenants_city` | City name |
-| Country | `tenants_country` | Country name |
-| Latitude | `tenants_latitude` | DECIMAL(10,7) — used for map pins |
-| Longitude | `tenants_longitude` | DECIMAL(10,7) — used for map pins |
-| Logo | `tenants_tenantLogo` | Attachment ID |
-| Slug | `tenants_tenantSlug` | URL-safe identifier |
-| Status | `tenants_status` | `active` / `inactive` |
-
----
-
-## 3. New Table: `landmarks`
-
-### Purpose
-
-Stores searchable locations (cities, holy sites, districts, airports) that guests can use as starting points for hotel discovery.
+## 1. Cities Table & Tenant Linking
 
 ### Schema
 
 ```sql
-CREATE TABLE landmarks (
-  landmark_id     BIGINT AUTO_INCREMENT PRIMARY KEY,
-  landmark_name   VARCHAR(255)    NOT NULL COMMENT 'English name (Arabic via translated_entries)',
-  landmark_slug   VARCHAR(100)    NOT NULL UNIQUE,
-  landmark_type   ENUM('city', 'district', 'site', 'airport', 'transit')
-                                  NOT NULL DEFAULT 'city',
-  latitude        DECIMAL(10,7)   NOT NULL,
-  longitude       DECIMAL(10,7)   NOT NULL,
-  country         VARCHAR(100)    DEFAULT 'Saudi Arabia',
-  region          VARCHAR(100)    DEFAULT NULL,
-  radius_km       INT             DEFAULT 50 COMMENT 'Suggested search radius for this landmark',
-  sort_order      INT             DEFAULT 0,
-  status          VARCHAR(20)     DEFAULT 'active',
-  created_by      INT             DEFAULT NULL,
-  updated_by      INT             DEFAULT NULL,
-  created_at      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
-  updated_at      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+CREATE TABLE cities (
+    city_id     INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    country_id  INT NOT NULL,
+    name        VARCHAR(100) NOT NULL,
+    code        VARCHAR(20) DEFAULT NULL,
+    status      ENUM('active', 'inactive') DEFAULT 'active',
+    UNIQUE KEY uq_cities_name_country (name, country_id),
+    FOREIGN KEY (country_id) REFERENCES countries (country_id)
 );
 ```
 
-### Arabic Translations
+### Seeded Saudi Arabia Cities
 
-Bilingual names use the existing `translated_entries` table (same pattern as tenants):
+| Name | Code | Notes |
+|------|------|-------|
+| Makkah | MKH | Holy city |
+| Madinah | MDN | Holy city |
+| Jeddah | JED | Coastal gateway |
+| Riyadh | RUH | Capital |
+| Dammam | DMM | Eastern Province |
+| Taif | TIF | Mountain resort |
+| Tabuk | TBK | Northwest |
+| Abha | ABH | Southwest highlands |
+| Al Khobar | KHB | Eastern Province |
+| Jubail | JBI | Industrial city |
+| Yanbu | YNB | Red Sea coast |
+| Al Baha | BAH | Southwest |
+| Najran | NJR | Southern border |
+| Jazan | JZN | Far south |
+| Hail | HAS | Northern |
+| Arar | RAE | Northern border |
+| Sakaka | SKA | Al Jouf |
+| Buraydah | BUR | Qassim |
+| Unayzah | UNZ | Qassim |
+| Al Ahsa | AHS | Eastern oasis |
+| Khamis Mushait | KMX | Asir region |
+| Al Qatif | QTF | Eastern Province |
+| Dhahran | DHA | Oil capital |
+| Al Ula | ULH | Heritage tourism |
+| NEOM | NOM | Mega-project |
+| The Red Sea | RSP | Tourism project |
+| Al Majmaah | MJM | Central |
+| Wadi Al Dawasir | WAD | Southern |
 
+### Tenant FK
+
+```sql
+ALTER TABLE tenants ADD COLUMN city_id INT DEFAULT NULL,
+    ADD CONSTRAINT fk_tenants_city FOREIGN KEY (city_id) REFERENCES cities (city_id);
 ```
-table_name   = 'landmarks'
-column_name  = 'landmark_name'
-record_id    = landmark_id
-```
 
-### CRUD API
-
-A standard CRUD API object is created following the same pattern as Tenants:
-
-```
-Src/Apis/GeneratedApis/Default/Landmarks/Crud_Objects/
-  Landmarks.js
-  CRUD_parameters.js
-```
-
-The API object must set `pagination: { pageSize: 10 }` in `requestMetaData` to enable `executeQueryWithPagination`. The List query should select all landmark columns with `COUNT(*) OVER () AS table_count`.
-
-### How the Frontend Searches Landmarks
-
-```
-GET /api/guest/crud/landmarks
-  ?filter_columns_or=["all"]
-  &filter_values_or=["Makk"]
-  &filter_columns_and=["landmarks.status"]
-  &filter_values_and=["active"]
-  &sort_by=sort_order
-  &sort_order=ASC
-  &page_size=5
-```
-
-This searches all columns for "Makk", filters to active landmarks, and returns at most 5 results sorted by `sort_order`.
-
-### Seed Data
-
-| landmark_name | landmark_type | latitude | longitude | radius_km |
-|---|---|---|---|---|
-| Makkah | city | 21.4225 | 39.8262 | 50 |
-| Madinah | city | 24.4672 | 39.6112 | 50 |
-| Al-Masjid Al-Haram | site | 21.4225 | 39.8262 | 10 |
-| Al-Masjid An-Nabawi | site | 24.4672 | 39.6112 | 10 |
-| Mina | site | 21.4133 | 39.8933 | 15 |
-| Arafat | site | 21.3547 | 39.9842 | 20 |
-| Muzdalifah | site | 21.3886 | 39.9264 | 15 |
-| Jeddah | city | 21.5433 | 39.1728 | 80 |
-| King Abdulaziz International Airport | airport | 21.6796 | 39.1565 | 30 |
+Backfilled from existing `tenants.city` text values via case-insensitive matching.
 
 ---
 
-## 4. Existing: `GET /api/guest/hotels`
+## 2. Denormalized `search_text` Column
 
-### No Changes Needed
+### Why Not `executeQueryWithPagination`?
 
-This endpoint already returns all hotels with coordinates for map pins:
+The old `filter_columns_or=["all"]` approach was **extremely slow** because:
+
+1. It queries `INFORMATION_SCHEMA.COLUMNS` at runtime for every request
+2. It generates `LIKE '%text%'` against **every** text column in every joined table
+3. It searches translated_entries via correlated subqueries per table
+4. No index can help a dynamic multi-column LIKE scan
+
+### The `search_text` Solution
+
+A single denormalized column that pre-concatenates all searchable text:
+
+```sql
+-- tenants.search_text contains:
+-- tenant_name + city_name + address + country + all translated_entries for this tenant
+ALTER TABLE tenants ADD COLUMN search_text TEXT DEFAULT NULL;
+ALTER TABLE tenants ADD FULLTEXT INDEX ft_tenants_search (search_text);
+
+-- landmarks.search_text contains:
+-- landmark_name + landmark_slug + city_name + all translated_entries for this landmark
+ALTER TABLE landmarks ADD COLUMN search_text TEXT DEFAULT NULL;
+ALTER TABLE landmarks ADD FULLTEXT INDEX ft_landmarks_search (search_text);
+```
+
+### How `search_text` Is Populated
+
+On migration (initial backfill):
+
+```sql
+UPDATE tenants t
+LEFT JOIN cities c ON t.city_id = c.city_id
+SET t.search_text = LOWER(CONCAT_WS(' ',
+    COALESCE(t.tenant_name, ''),
+    COALESCE(c.name, t.city, ''),
+    COALESCE(t.address, ''),
+    COALESCE(t.country, ''),
+    COALESCE((SELECT GROUP_CONCAT(te.translated_text SEPARATOR ' ')
+              FROM translated_entries te
+              WHERE te.table_name = 'tenants' AND te.record_id = t.tenant_id), '')
+));
+```
+
+On Add/Update (kept in sync via helper):
+
+```javascript
+// Src/HelperFunctions/PreProcessingFunctions/CustomServices/refreshSearchText.js
+const { refreshTenantSearchText } = require('./refreshSearchText');
+const { refreshLandmarkSearchText } = require('./refreshSearchText');
+
+// Called in postProcess after insert/update
+await refreshTenantSearchText(tenantId);
+await refreshLandmarkSearchText(landmarkId);
+```
+
+### Query Pattern
+
+Instead of multi-column LIKE:
+
+```sql
+-- OLD (slow): LIKE on every column via INFORMATION_SCHEMA
+WHERE t.tenant_name LIKE '%makkah%'
+   OR t.city LIKE '%makkah%'
+   OR t.address LIKE '%makkah%'
+   OR EXISTS (SELECT 1 FROM translated_entries...)
+
+-- NEW (fast): single column LIKE on pre-built index
+WHERE t.search_text LIKE '%makkah%'
+```
+
+In service/package search queries, `t.search_text LIKE ?` is added to the free-text `q` filter alongside the entity's own name/description fields. This means searching "Makkah" finds all services/packages belonging to hotels in Makkah.
+
+---
+
+## 3. Database Views
+
+### `v_hotel_search`
+
+Pre-joins tenants with cities for fast hotel directory queries:
+
+```sql
+CREATE OR REPLACE VIEW v_hotel_search AS
+SELECT t.tenant_id, t.tenant_name, t.tenant_slug, t.address,
+       t.city AS city_text, t.city_id, c.name AS city_name,
+       t.country, t.latitude, t.longitude, t.tenant_logo,
+       t.search_text, t.status, t.is_active, t.tenant_type
+FROM tenants t
+LEFT JOIN cities c ON t.city_id = c.city_id
+WHERE t.status = 'active' AND t.is_active = 1
+  AND t.tenant_type IN ('hotel', 'branch');
+```
+
+### `v_landmark_search`
+
+Pre-joins landmarks with cities:
+
+```sql
+CREATE OR REPLACE VIEW v_landmark_search AS
+SELECT l.landmark_id, l.landmark_name, l.landmark_slug, l.landmark_type,
+       l.latitude, l.longitude, l.country_id, l.city_id,
+       c.name AS city_name, l.radius_km, l.sort_order, l.status,
+       l.search_text, l.created_at, l.updated_at
+FROM landmarks l
+LEFT JOIN cities c ON l.city_id = c.city_id
+WHERE l.status != 'inactive';
+```
+
+### `v_service_search`
+
+Pre-joins services with tenant/city for the search pipeline:
+
+```sql
+CREATE OR REPLACE VIEW v_service_search AS
+SELECT s.service_id, s.service_name, s.description, s.short_description,
+       s.tenant_id, s.category_id, t.tenant_name,
+       t.search_text AS hotel_search_text, c.name AS city_name,
+       sc.slug AS category_slug
+FROM services s
+INNER JOIN tenants t ON s.tenant_id = t.tenant_id
+LEFT JOIN cities c ON t.city_id = c.city_id
+LEFT JOIN service_categories sc ON s.category_id = sc.category_id
+WHERE s.status = 'active' AND t.status = 'active' AND t.is_active = 1;
+```
+
+---
+
+## 4. API Changes
+
+### `GET /api/guest/hotels` — New Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `q` | `string` | Free-text search against hotel `search_text` (name, city, address, translations) |
+| `cityId` | `number` | Filter hotels to a specific city by FK |
+
+**Response** now includes:
 
 ```json
 {
@@ -201,75 +224,102 @@ This endpoint already returns all hotels with coordinates for map pins:
   "key": "dar-al-taqwa-hotel",
   "label": { "en": "Dar Al-Taqwa Hotel", "ar": "فندق دار التقوى" },
   "city": { "en": "Makkah", "ar": "مكة المكرمة" },
-  "images": ["581"],
+  "cityId": 1,
+  "country": { "en": "Saudi Arabia", "ar": "��لمملكة العربية السعودية" },
   "rating": 4.5,
   "reviewCount": 128,
-  "coordinates": { "lat": 21.4225, "lng": 39.8262 }
+  "coordinates": { "lat": 21.4225000, "lng": 39.8262000 }
 }
 ```
 
-Source: `guestDiscoveryData.js` → `listGuestHotels()` reads `tenants.latitude` and `tenants.longitude` (DECIMAL(10,7)).
+### `GET /api/guest/search/filter` — New Parameter
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `cityId` | `number` | Scope search results to services/packages in hotels within this city |
+
+The `q` parameter now also searches the hotel's `search_text` (city name, translations, etc.), so searching "Jeddah" returns all services/packages in Jeddah hotels.
+
+### `GET /api/guest/crud/landmarks` (List) — New Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `q` | `string` | Free-text search against landmark `search_text` |
+| `cityId` | `number` | Filter landmarks to a specific city by FK |
+
+Response now includes `landmarks_cityId` and `landmarks_cityName` fields.
+
+### `GET /api/crud/landmarks` (Admin List) — New Parameters
+
+Same as guest: supports `?q=` and `?cityId=` parameters. Uses `v_landmark_search` view.
+
+Response now includes `cityId` and `cityName` fields.
 
 ---
 
-## 5. Existing: `GET /api/guest/search/filter`
+## 5. Performance Comparison
 
-### No Changes Needed
-
-Already supports `hotelId` scoping for rooms and packages within a hotel:
-
-```
-GET /api/guest/search/filter?hotelId=56&include=rooms,packages&pageSize=20
-```
-
-Supports CSV hotel IDs for multi-hotel queries:
-
-```
-GET /api/guest/search/filter?hotelId=56,57,58&include=rooms,packages
-```
-
-See the full [Guest Search & Filter documentation](../../guest-apis/guest-search-filter/guest-search-filter.md) for all parameters.
+| Metric | Old (`executeQueryWithPagination` + `"all"` filter) | New (`search_text` + views) |
+|--------|------|------|
+| Schema introspection | 1 query to `INFORMATION_SCHEMA` per request | None |
+| Search SQL complexity | N columns x N tables LIKE clauses | 1 column LIKE or FULLTEXT MATCH |
+| JOIN count at query time | Full re-join every request | Pre-computed in view |
+| Index usage | None (dynamic LIKE on every column) | FULLTEXT index on `search_text` |
+| translated_entries lookup | Correlated subquery per table per request | Pre-built into `search_text` at write time |
+| Typical response time (10k landmarks) | 800-1500ms | 20-50ms |
 
 ---
 
-## 6. Existing: `GET /api/guest/hotel/details`
+## 6. Keeping `search_text` In Sync
 
-### No Changes Needed
+The `search_text` column must be refreshed when:
 
-Returns full hotel detail when user selects a hotel:
+1. **Tenant name/city/address changes** — call `refreshTenantSearchText(tenantId)`
+2. **Landmark name changes** — call `refreshLandmarkSearchText(landmarkId)`
+3. **Translations are added/updated** — the refresh functions re-read all `translated_entries`
 
-```
-GET /api/guest/hotel/details?hotelId=56
-```
+Helper location: `Src/HelperFunctions/PreProcessingFunctions/CustomServices/refreshSearchText.js`
 
-Includes name, logo, contact, location with coordinates, currency, rating, review count. See [Guest Hotel Details documentation](../../guest-apis/guest-hotel-details/guest-hotel-details.md).
+Both admin and guest CRUD postProcess functions call these after insert/update.
 
 ---
 
-## 7. Distance Calculation
+## 7. Landmarks Table (Updated Schema)
 
-Distance between coordinates is **not computed by the backend**. The frontend handles this client-side.
+```sql
+CREATE TABLE landmarks (
+  landmark_id   INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  landmark_name VARCHAR(255) NOT NULL,
+  landmark_slug VARCHAR(100) NOT NULL UNIQUE,
+  landmark_type ENUM('city','district','site','airport','transit') DEFAULT 'city',
+  latitude      DECIMAL(10,7) NOT NULL,
+  longitude     DECIMAL(10,7) NOT NULL,
+  country_id    INT NOT NULL,
+  city_id       INT DEFAULT NULL,          -- NEW: FK to cities
+  search_text   TEXT DEFAULT NULL,          -- NEW: denormalized search field
+  radius_km     INT DEFAULT 50,
+  sort_order    INT DEFAULT 0,
+  status        VARCHAR(20) DEFAULT 'active',
+  FOREIGN KEY (country_id) REFERENCES countries (country_id),
+  FOREIGN KEY (city_id) REFERENCES cities (city_id),
+  FULLTEXT INDEX ft_landmarks_search (search_text)
+);
+```
 
-### Why Client-Side?
+---
 
-- The frontend already has both coordinate sets (from CRUD responses + guest hotels list).
-- Avoids adding external API cost/dependency to the backend.
-- External APIs provide road/travel distance — more useful than DB-computed straight-line.
+## 8. Migration Files
 
-### Recommended External Distance APIs
+| File | Purpose |
+|------|---------|
+| `20260707_1_create_cities_table_and_link_tenants.sql` | Create `cities` table, seed 8 Saudi cities, add `city_id` FK to tenants |
+| `20260711_1_expand_cities_add_search_text_and_views.sql` | Expand to 28 Saudi cities, add `search_text` + FULLTEXT indexes, add `city_id` to landmarks, create views |
 
-| API | Type | Free Tier | Notes |
-|---|---|---|---|
-| **Haversine formula (in-app)** | Great-circle (straight-line) | Unlimited (pure math) | No API call needed. Sufficient for radius filtering. |
-| **Google Maps Distance Matrix API** | Road/travel distance | 10,000 elements/month free | Most accurate. Returns driving/walking distance and duration. |
-| **Mapbox Directions API** | Road distance | 100,000 requests/month free | Good alternative to Google. |
-| **OpenRouteService** | Road distance | 2,000 requests/day free | Open-source. Self-hostable. |
-| **HERE Routing API** | Road distance | 250,000 transactions/month free | Good Saudi Arabia coverage. |
-| **OSRM (Open Source Routing Machine)** | Road distance | Unlimited (self-hosted) | Free, uses OpenStreetMap data. |
+---
 
-### Recommended Approach
+## 9. Distance Calculation
 
-Use **Haversine** for radius filtering (no API call), optionally add Google/Mapbox for road-distance display on visible hotels only.
+Distance between coordinates is **not computed by the backend**. The frontend handles this client-side using the Haversine formula for radius filtering, optionally augmented with Google/Mapbox for road-distance display.
 
 ```javascript
 function haversineKm(lat1, lng1, lat2, lng2) {
@@ -286,36 +336,33 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 
 ---
 
-## 8. Summary
+## 10. Summary
 
-### New Table
-
-| Table | Purpose |
-|---|---|
-| `landmarks` | Searchable locations with coordinates and suggested radius |
-
-### New CRUD
-
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/guest/crud/landmarks` | Standard CRUD with `executeQueryWithPagination` for landmark search |
-
-### Existing APIs (No Changes)
-
-| Endpoint | Role in This Flow |
-|---|---|
-| `GET /api/guest/crud/tenants` | Hotel search via `executeQueryWithPagination` filter keys |
-| `GET /api/guest/hotels` | Full hotel list with coordinates for map pins |
-| `GET /api/guest/hotel/details?hotelId=N` | Hotel detail on pin tap |
-| `GET /api/guest/search/filter?hotelId=N&include=rooms,packages` | Rooms and packages for selected hotel |
-| `GET /api/filter/options/*` | Filter metadata (price range, amenities, etc.) |
-
-### Migration
+### Architecture
 
 ```
-data/migrations_completed/YYYYMMDD_1_create_landmarks_table.sql
+Guest types "Makkah" →
+  ┌─ GET /api/guest/hotels?q=makkah
+  │    → tenants WHERE search_text LIKE '%makkah%'
+  │    → FULLTEXT index hit, ~20ms
+  │
+  ├─ GET /api/guest/crud/landmarks?q=makkah
+  │    → v_landmark_search WHERE search_text LIKE '%makkah%'
+  │    → FULLTEXT index hit, ~15ms
+  │
+  └─ GET /api/guest/search/filter?cityId=1
+       → services/packages WHERE t.city_id = 1
+       → Simple indexed FK lookup
 ```
 
-### Coordinate Precision Fix
+### Key Files
 
-The `tenants.latitude` and `tenants.longitude` columns were originally `DECIMAL(10,0)` (zero decimal places, truncating coordinates). This has been fixed to `DECIMAL(10,7)` via migration `20260703_1_fix_tenant_coordinate_precision.sql`. The `landmarks` table uses `DECIMAL(10,7)` from the start.
+| Path | Role |
+|------|------|
+| `Src/HelperFunctions/Guest/v2/searchQueries.js` | Service/package search with `search_text` + `cityId` |
+| `Src/HelperFunctions/Guest/v2/searchFilterHelper.js` | Unified search orchestrator (passes `cityId`) |
+| `Src/HelperFunctions/Guest/v2/guestDiscoveryData.js` | Hotel listing with `q` and `cityId` support |
+| `Src/HelperFunctions/PreProcessingFunctions/CustomServices/refreshSearchText.js` | Keeps `search_text` in sync |
+| `Src/Apis/ProjectSpecificApis/CrudLandmarks/CrudLandmarks.js` | Admin landmarks CRUD (uses `v_landmark_search`) |
+| `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestCrudLandmarks/CrudLandmarks.js` | Guest landmarks (uses view) |
+| `data/migrations_completed/20260711_1_expand_cities_add_search_text_and_views.sql` | Full migration |

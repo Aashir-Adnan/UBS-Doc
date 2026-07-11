@@ -5,13 +5,13 @@ sidebar_position: 1
 
 # Access Token Security & Session Management
 
-HMS uses a dual-token authentication system (access token + refresh token) with DB-backed validation and automatic session invalidation on login and permission changes.
+HMS uses a dual-token authentication system (access token + refresh token) with a `needs_refresh` signalling mechanism that tells clients when to rebuild their local session state after RBAC or user changes.
 
 ## Token Types
 
 | Token | Lifetime | Storage | Purpose |
 |-------|----------|---------|---------|
-| **Access token** | ~15 min (staff) / ~24 h (guest, configurable) | `user_devices.device_token` | Authenticates every API request |
+| **Access token** | ~60 min (staff) / ~24 h (guest, configurable) | `user_devices.device_token` | Authenticates every API request |
 | **Refresh token** | 24 hours | `user_devices.guest_refresh_token` | Issues new access tokens without re-login (guests only) |
 
 ### Token Lifetimes (configurable)
@@ -34,30 +34,122 @@ Request → deviceHeadersValidator → execReqProcessFuncs → accessTokenValida
 
 1. Calls `validateToken()` which:
    - **JWT decode**: Verifies signature and checks expiry via `checkExpiration()`
-   - **DB validation**: Queries `user_devices` to confirm the presented token matches the stored `device_token`
+   - **needs_refresh check**: Queries `user_devices.needs_refresh` — if `1`, sets `decryptedPayload._needsRefresh = true`
 2. If the token is near expiry (within `TOKEN_RENEWAL_THRESHOLD_SECONDS`), auto-generates a new token via `generateToken()` and returns it in the `x-new-accesstoken` response header
+3. The response sender injects `needs_refresh: true` into the response payload when the flag is set
 
-### DB-Backed Token Validation (validateToken.js)
+### needs_refresh Check (validateToken.js)
 
-After JWT decode succeeds, the middleware performs a database check:
+After JWT decode succeeds, the middleware checks the flag:
 
 ```js
-// 1. Look up the device row
-SELECT device_token FROM user_devices
+SELECT needs_refresh FROM user_devices
 WHERE user_device_id = ? AND user_id = ? AND status = 'active'
 
-// 2. Compare stored token against presented token
-if (!storedToken || storedToken !== req.headers["accesstoken"]) {
-  throw new Error("Session invalidated");
+if (Number(deviceRows[0].needs_refresh) === 1) {
+  decryptedPayload._needsRefresh = true;
 }
 ```
 
-This ensures that:
-- Tokens cleared by `InvalidateAccessTokens` are immediately rejected
-- A token that was valid (not expired) but has been superseded by a new login is rejected
-- Manually deactivated device rows (`status = 'inactive'`) reject all tokens
+The response sender (config.js) then includes this in the API response:
 
-**Key file**: `Services/Middlewares/TokenValidation/validateToken.js`
+```js
+if (decryptedPayload._needsRefresh) {
+  payload.needs_refresh = true;
+}
+```
+
+**Key files**: `Services/Middlewares/TokenValidation/validateToken.js`, `Services/Middlewares/config.js`
+
+---
+
+## The `needs_refresh` Flow
+
+Instead of invalidating tokens and forcing re-login, HMS uses a cooperative refresh mechanism:
+
+1. **Server-side change** (e.g., permission update) sets `needs_refresh = 1` on all the affected user's devices
+2. **Next API response** includes `needs_refresh: true` alongside the normal response data
+3. **Client** detects the flag and calls `POST /api/auth/session/refresh` to rebuild its local state
+4. **Session refresh API** returns the full login payload (same shape) and clears the flag
+
+This approach avoids session disruption — the user's current request still succeeds, but the client knows to update its cached permissions/roles.
+
+---
+
+## Session Refresh API
+
+### `POST /api/auth/session/refresh`
+
+**Platform**: AUTH_PLATFORM (encrypted, requires valid access token)
+
+**Purpose**: Rebuilds the full login payload for the authenticated user and clears the `needs_refresh` flag.
+
+**Request**: No body required — the user is identified from the access token.
+
+**Response** (same shape as login):
+
+```json
+{
+  "user_id": 42,
+  "user": { "user_id": 42, "email": "...", "first_name": "...", ... },
+  "user_roles_designations_departments": [
+    {
+      "user_role_designation_department_id": 5,
+      "tenant_id": 1,
+      "tenant_name": "Grand Plaza Hotel",
+      "role_name": "Admin",
+      "designation_name": "...",
+      "designation_code": "TENANT",
+      "department_name": "...",
+      "service_category_id": null
+    }
+  ],
+  "user_devices": [...],
+  "user_devices_notifications": [...],
+  "user_roles": [...],
+  "user_permissions": {
+    "5": ["list_bookings", "add_bookings", "update_bookings", ...]
+  },
+  "collective_user_permissions": [...],
+  "user_departments": [...],
+  "user_designations": [...]
+}
+```
+
+**Key files**:
+- `Src/Apis/ProjectSpecificApis/AuthSessionRefresh/AuthSessionRefresh.js`
+- `Src/HelperFunctions/PreProcessingFunctions/buildSessionPayload.js`
+
+---
+
+## `flagNeedsRefresh` and `clearNeedsRefresh`
+
+**File**: `Src/HelperFunctions/NeedsRefresh.js`
+
+### `flagNeedsRefresh(userId, options)`
+
+Sets `needs_refresh = 1` on all active devices for a user.
+
+```js
+await flagNeedsRefresh(userId);
+// or inside a transaction:
+await flagNeedsRefresh(userId, { connection });
+```
+
+### `clearNeedsRefresh(userId, deviceId, options)`
+
+Clears the flag for a specific device after the client has refreshed.
+
+```js
+await clearNeedsRefresh(userId, deviceId);
+```
+
+### Trigger Points
+
+| Event | Action |
+|-------|--------|
+| **Permission assign/revoke** | `flagNeedsRefresh(targetUserId)` — all devices flagged |
+| **Session refresh API called** | `clearNeedsRefresh(userId, deviceId)` — calling device cleared |
 
 ---
 
@@ -70,10 +162,9 @@ This ensures that:
 
 ```
 1. Verify OTP code against device_otp table
-2. InvalidateAccessTokens(userId, { excludeDeviceId })  ← kills all other sessions
-3. Generate new access token (signGuestAccessToken)
-4. Generate new refresh token (signGuestRefreshToken) with JTI + family ID
-5. Store both in user_devices row
+2. Generate new access token (signGuestAccessToken)
+3. Generate new refresh token (signGuestRefreshToken) with JTI + family ID
+4. Store both in user_devices row
 ```
 
 ### Admin/Staff Login (Password-based)
@@ -83,9 +174,8 @@ This ensures that:
 
 ```
 1. Verify password
-2. InvalidateAccessTokens(userId, { excludeDeviceId, clearRefreshTokens: false })
-3. Generate new access token (generateToken)
-4. Store in user_devices.device_token
+2. Generate new access token (generateToken)
+3. Store in user_devices.device_token
 ```
 
 ### Token Renewal (Middleware Auto-Renewal)
@@ -99,7 +189,7 @@ generateToken(decodedToken, SECRET_KEY)
 // 1. Strips exp/iat, sets new expiry
 // 2. Signs new JWT
 // 3. UPDATE user_devices SET device_token = ? WHERE user_id = ? AND user_device_id = ?
-// 4. Returns new token → sent via x-new-accesstoken header
+// 4. Returns new token via x-new-accesstoken header
 ```
 
 ---
@@ -113,9 +203,9 @@ The refresh flow uses JTI (JWT ID) rotation with family-based replay detection:
 
 ```
 1. Decode refresh token, extract userId, deviceId, jti, familyId
-2. SELECT ... FROM user_devices WHERE user_device_id = ? FOR UPDATE  ← row lock
+2. SELECT ... FROM user_devices WHERE user_device_id = ? FOR UPDATE  (row lock)
 3. Compare stored JTI against presented JTI
-   - Mismatch → "Refresh token was already used" (409) — replay detected
+   - Mismatch -> "Refresh token was already used" (409) -- replay detected
 4. Generate new JTI, new access token, new refresh token
 5. UPDATE user_devices SET device_token, guest_refresh_token, guest_refresh_token_jti
 ```
@@ -126,58 +216,14 @@ If a refresh token is used twice (e.g., stolen token replay), the second use fin
 
 ---
 
-## Session Invalidation
-
-### `InvalidateAccessTokens(userId, options)`
-
-**File**: `Src/HelperFunctions/InvalidateAccessTokens.js`
-
-Central helper that clears tokens from `user_devices`, forcing re-authentication.
-
-```js
-InvalidateAccessTokens(userId, {
-  excludeDeviceId,    // keep this device active (login flows)
-  clearRefreshTokens, // also clear refresh tokens (default: true)
-  connection,         // use existing DB connection (for transactions)
-})
-```
-
-**What it clears**:
-
-| Column | Cleared | Effect |
-|--------|---------|--------|
-| `device_token` | Always | Access token rejected by DB validation |
-| `guest_refresh_token` | When `clearRefreshTokens: true` | Refresh flow fails |
-| `guest_refresh_token_jti` | When `clearRefreshTokens: true` | JTI comparison fails |
-| `guest_refresh_family_id` | When `clearRefreshTokens: true` | Family chain broken |
-
-### Trigger Points
-
-| Event | What happens | `excludeDeviceId` | `clearRefreshTokens` |
-|-------|-------------|-------------------|---------------------|
-| **Guest login** (OTP verify) | All other devices invalidated | Current device excluded | `true` |
-| **Admin login** (password) | All other devices invalidated | Current device excluded | `false` |
-| **Permission change** | ALL devices invalidated | None (all killed) | `true` (default) |
-
-### Permission Change Integration
-
-**File**: `Src/HelperFunctions/PayloadFunctions/AssignPermissions/assignPermissionsToUser.js`
-
-After permissions are assigned or revoked (COMMIT), the system:
-
-1. Resolves `user_id` from the target URDD
-2. Calls `InvalidateAccessTokens(targetUserId)` — no device exclusion, all sessions killed
-3. User must re-authenticate, at which point the permission check middleware reads fresh permissions from `user_role_designation_permissions`
-
----
-
 ## `user_devices` Table Schema
 
 ```sql
 user_device_id              INT PRIMARY KEY AUTO_INCREMENT
-user_id                     INT (FK → users)
-tenant_id                   INT (FK → tenants)
-device_token                VARCHAR(255)    -- current access JWT (NULL = invalidated)
+user_id                     INT (FK -> users)
+tenant_id                   INT (FK -> tenants)
+device_token                VARCHAR(255)    -- current access JWT
+needs_refresh               TINYINT(1)      -- 1 = client should call session refresh
 guest_refresh_token         TEXT            -- current refresh JWT
 guest_refresh_token_jti     VARCHAR(64)     -- current JTI for replay detection
 guest_refresh_family_id     VARCHAR(64)     -- family chain ID
@@ -194,69 +240,82 @@ KEY idx_user_devices_device_token (device_token)
 KEY idx_user_devices_token_device_user (device_token, device_name, user_id)
 ```
 
+**Migration**: `data/migrations_completed/20260710_1_add_needs_refresh_to_user_devices.sql`
+
 ---
 
-## Security Flow Diagrams
-
-### Login Flow (Guest)
-
-```
-Guest enters OTP
-    │
-    ▼
-verifyGuestOtp()
-    │
-    ├── Verify OTP against device_otp
-    │
-    ├── InvalidateAccessTokens(userId, { excludeDeviceId })
-    │   └── SET device_token = NULL, refresh tokens = NULL
-    │       WHERE user_id = ? AND user_device_id != current
-    │
-    ├── Sign new access token + refresh token
-    │
-    └── UPDATE user_devices SET device_token = newToken
-        WHERE user_device_id = current
-```
+## Flow Diagrams
 
 ### Authenticated Request Flow
 
 ```
 Request with accesstoken header
-    │
-    ▼
+    |
+    v
 JWT decode + expiry check
-    │ (fail → 401)
-    ▼
-DB validation: user_devices.device_token == presented token?
-    │ (mismatch → "Session invalidated")
-    ▼
+    | (fail -> 401)
+    v
+Check needs_refresh flag from user_devices
+    | (if 1 -> set _needsRefresh on payload)
+    v
 Log activity to user_activity
-    │
-    ▼
-Auto-renew if near expiry → x-new-accesstoken header
-    │
-    ▼
-Continue to permission check → business logic
+    |
+    v
+Auto-renew if near expiry -> x-new-accesstoken header
+    |
+    v
+Permission check -> business logic -> response
+    |
+    v
+Response sender: if _needsRefresh -> add needs_refresh: true to payload
 ```
 
 ### Permission Change Flow
 
 ```
 Admin assigns/revokes permissions for target URDD
-    │
-    ▼
+    |
+    v
 UPDATE user_role_designation_permissions (COMMIT)
-    │
-    ▼
+    |
+    v
 Resolve user_id from target URDD
-    │
-    ▼
-InvalidateAccessTokens(userId)  ← all devices
-    │
-    ▼
-Next request from that user:
-    DB check fails → "Session invalidated" → must re-login
-    → Fresh login → fresh permissions loaded
+    |
+    v
+flagNeedsRefresh(userId) -> SET needs_refresh = 1 on all devices
+    |
+    v
+Affected user's next API call:
+    Response includes needs_refresh: true
+    |
+    v
+Client calls POST /api/auth/session/refresh
+    |
+    v
+Server returns fresh login payload + clears needs_refresh flag
+```
+
+### Session Refresh Flow
+
+```
+Client detects needs_refresh: true in any API response
+    |
+    v
+POST /api/auth/session/refresh (with valid access token)
+    |
+    v
+buildSessionPayload(userId)
+    |-- user profile, devices, notifications
+    |-- roles, URDDs (compound legs)
+    |-- permissions (grouped by URDD + collective)
+    |-- designations, departments
+    |
+    v
+clearNeedsRefresh(userId, deviceId)
+    |
+    v
+Return full login-shaped payload to client
+    -> Client replaces its cached session state
 ```
 
 ---
@@ -265,14 +324,16 @@ Next request from that user:
 
 | File | Purpose |
 |------|---------|
-| `Services/Middlewares/config.js` | `accessTokenValidator()` — orchestrates JWT check + renewal |
-| `Services/Middlewares/TokenValidation/validateToken.js` | JWT decode + **DB validation** + activity logging |
+| `Services/Middlewares/config.js` | `accessTokenValidator()` + response sender injects `needs_refresh` |
+| `Services/Middlewares/TokenValidation/validateToken.js` | JWT decode + `needs_refresh` flag check + activity logging |
 | `Services/SysFunctions/auth.js` | `verifyToken()` — JWT signature verification |
 | `Services/SysFunctions/jwtUtils.js` | `generateToken()` — signs new JWT + stores in DB |
 | `Services/SysFunctions/checkExpiration.js` | `checkExpiration()` — decode + expiry wrapper |
 | `Src/HelperFunctions/Guest/guestJwt.js` | `signGuestAccessToken()`, `signGuestRefreshToken()` |
-| `Src/HelperFunctions/InvalidateAccessTokens.js` | `InvalidateAccessTokens()` — central session killer |
-| `Src/HelperFunctions/PreProcessingFunctions/Guest/verifyGuestOtp.js` | Guest OTP login (triggers invalidation) |
-| `Src/HelperFunctions/PostProcessingFunctions/LoginWithPassword/lwp.js` | Admin login (triggers invalidation) |
-| `Src/HelperFunctions/PreProcessingFunctions/Guest/refreshGuestTokens.js` | Refresh token rotation with JTI replay detection |
-| `Src/HelperFunctions/PayloadFunctions/AssignPermissions/assignPermissionsToUser.js` | Permission changes (triggers invalidation) |
+| `Src/HelperFunctions/NeedsRefresh.js` | `flagNeedsRefresh()`, `clearNeedsRefresh()` |
+| `Src/HelperFunctions/PreProcessingFunctions/buildSessionPayload.js` | Builds full login payload from userId |
+| `Src/Apis/ProjectSpecificApis/AuthSessionRefresh/AuthSessionRefresh.js` | Session refresh endpoint |
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/verifyGuestOtp.js` | Guest OTP login |
+| `Src/HelperFunctions/PostProcessingFunctions/LoginWithPassword/lwp.js` | Admin password login |
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/refreshGuestTokens.js` | Refresh token rotation |
+| `Src/HelperFunctions/PayloadFunctions/AssignPermissions/assignPermissionsToUser.js` | Permission changes (triggers `flagNeedsRefresh`) |
