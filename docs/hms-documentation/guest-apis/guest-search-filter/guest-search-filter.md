@@ -79,6 +79,13 @@ All parameters are passed as query string values.
 | `8-14` | 8–14 nights |
 | `15+` | 15+ nights |
 
+### Exempt (Exclude) Items
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `exemptServiceId` | `number` | No | — | Service/room ID to exclude from results. Used in the pinned-item flow (Version A) where the frontend re-appends the selected item at the top. |
+| `exemptPackageId` | `number` | No | — | Package ID to exclude from results. Same purpose as `exemptServiceId` but for packages. |
+
 ### Config-Based Filters
 
 | Parameter | Type | Required | Default | Description |
@@ -130,6 +137,12 @@ GET /api/guest/search/filter?include=packages&hotelId=16&sort=priceAsc
 
 ```
 GET /api/guest/search/filter?include=rooms&hotelId=16&amenity=wifi,pool&roomType=suite&viewType=city-view
+```
+
+### Exclude a pinned package from results (Version A flow)
+
+```
+GET /api/guest/search/filter?include=rooms,packages&hotelId=16&checkIn=2026-07-01&checkOut=2026-07-04&exemptPackageId=10
 ```
 
 ### Config-based filter for featured items
@@ -253,9 +266,35 @@ For packages, additional fields include `nights`, `duration_units`, `maxAdults`,
 
 Only services/packages that are published are returned:
 - If no `visibility` config exists, the item is included (default visible).
-- If `visibility` config exists, it must contain the `published` possible value.
+- If `visibility` config exists, it must resolve to the `published` value (see below).
 - If `publish_start_datetime` is set, it must be in the past.
 - If `publish_end_datetime` is set, it must be in the future.
+
+#### How `published` is matched
+
+A `visibility` value can be stored in two forms, and the filter accepts **either**:
+
+1. **By id (canonical model)** — `config_value` is an array containing the id of
+   the `published` option. The option is **scope-specific**, so the id is resolved
+   from a different source per entity type:
+   - **Services** → the per-category `published` option in the **service scope**:
+     `hms_config` where `base_table = 'service_categories'`, `config_key_id` = the
+     service's `visibility` key, and `record_id` = the **service's own `category_id`**.
+     A stay service in category 58 therefore stores that category's published option
+     id (e.g. `[178544]`), typically against the tenant's own visibility key (clone).
+   - **Packages** → the `published` option in the **package scope**:
+     `hms_config_possible_values` where `config_id` = the package's `visibility` key.
+2. **Inline object (transitional)** — `config_value` is `[{"en":"published","ar":"منشور"}]`.
+   Matched directly by object containment. This form exists for rows that were
+   seeded with the label embedded rather than referenced by id.
+
+:::note
+Because the published option is per-category in the service scope, the service
+filter must key the lookup on the service's `category_id`. Resolving a service's
+published id from the package scope (`hms_config_possible_values`) is incorrect —
+the ids differ, so a correctly-stored `[<serviceCategoryOptionId>]` value would
+never match.
+:::
 
 ### Price Filtering
 

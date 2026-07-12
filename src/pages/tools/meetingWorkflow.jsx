@@ -12,7 +12,7 @@ import PendingAccess from '@site/src/components/portal/tenantProjects/PendingAcc
 
 // Three views: 'list' | 'create' | 'meeting'
 function MeetingWorkflowContent() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading } = useAuth();
   const canAccess = !!user && isGranjurEmail(user?.email);
   // Tenant scoping: resolve the acting URDD once and thread it to the children.
   const { status: idStatus, urdd: actingUrdd, me, error: idError } = useActingUrdd();
@@ -33,6 +33,10 @@ function MeetingWorkflowContent() {
   const handleStageComplete = useCallback(() => {
     setListKey((k) => k + 1);
   }, []);
+
+  if (loading) {
+    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+  }
 
   if (!user) {
     return (

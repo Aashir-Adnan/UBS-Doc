@@ -225,10 +225,15 @@ This is the distinction that drives the whole [per-tenant-cloning](../per-tenant
 |---|---|---|---|
 | SaaS Admin | `SYSTEM` | `Admin` | `HMS` |
 | Platform owner | `SYSTEM` | `system` | `system` |
-| Tenant Manager | `TENANT` | `Manager` | `GENERAL` / `TENANT_<code>` |
-| Tenant Admin | `TENANT` | `Admin` | `GENERAL` / `TENANT_<code>` |
-| Service Manager | `<category code>` (`STAY`, `DINE`, `SPA`, `BARB`, `GYM`, `KIDS`, `TRANS`, `NET`, `RMSVC`) | `Manager` | `TENANT_<code>` (hotel) |
-| Guest | `STANDARD` | `Guest` | `GENERAL` (global) / `<Tenant>` (per tenant) |
+| Tenant Manager | `TENANT` | `Manager` | the tenant's **staff dept** (named after the tenant) |
+| Tenant Admin | `TENANT` | `Admin` | the tenant's **staff dept** |
+| Service Manager | `<category code>` (`STAY`, `DINE`, `SPA`, `BARB`, `GYM`, `KIDS`, `TRANS`, `NET`, `RMSVC`) | `Manager` | the tenant's **staff dept** |
+| Guest | `STANDARD` | `Guest` | `GENERAL` (global) / the tenant's **staff dept** (per tenant) |
+
+> **One department per tenant (2026-06-18).** A tenant has exactly one department — its **staff
+> department**, named after the tenant (`department_code = tenant_code`, **no `TENANT_`
+> prefix**). Org-chart departments are no longer mirrored. Resolve it via
+> `resolveTenantStaffDepartmentId` (the Tenant-Manager RDD's department), never by a code pattern.
 
 Notice `SYSTEM` appears twice (SaaS Admin vs platform owner) and `TENANT` appears twice (Manager vs Admin). That is why **role is mandatory** for disambiguation — e.g. `getSystemTenantId()` resolves the SaaS Admin specifically as *designation `SYSTEM` **and** role `Admin`*.
 
@@ -241,9 +246,9 @@ Notice `SYSTEM` appears twice (SaaS Admin vs platform owner) and `TENANT` appear
 | `GUEST` designation | `STANDARD` | Guest persona consolidated into one `Guest / STANDARD / GENERAL` RDD, cloned per tenant. |
 | single `SVCMGR` designation | **one designation per service category** | **Dimension inversion** — see below. |
 | depts `HMSSYS` → `HMS`, `TENANTS` → `GENERAL` | rename | |
-| Service Manager dept `DEPT_<category>` | hotel dept `TENANT_<code>` | The category moved off the department onto the designation. |
+| Service Manager dept `DEPT_<category>` | the tenant's single **staff dept** (named after the tenant; was `TENANT_<code>`, prefix dropped 2026-06-18) | The category moved off the department onto the designation. |
 
-> **The Service-Manager dimension inverted — the most important code change to understand.** Previously **service category = department** (`DEPT_STAY`, …) and a Service Manager's category was read from its *department*. Now **service category = designation** and the SM's **department is the hotel** (`TENANT_<code>`). Any code that scoped a Service Manager by department must now read the **designation** instead. The query resolver already does this (§7).
+> **The Service-Manager dimension inverted — the most important code change to understand.** Previously **service category = department** (`DEPT_STAY`, …) and a Service Manager's category was read from its *department*. Now **service category = designation** and the SM's **department is the tenant's staff dept** (named after the tenant, no `TENANT_` prefix). Any code that scoped a Service Manager by department must now read the **designation** instead. The query resolver already does this (§7).
 
 The **platform-owner tier** (role `system`, RDDs 593/594) sits outside the governance re-model and is kept exactly as-is.
 

@@ -18,8 +18,12 @@ function useProjectSlug() {
 
 function ProjectViewContent() {
   const projectSlug = useProjectSlug();
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading } = useAuth();
   const canAccessPortal = !!user && isGranjurEmail(user?.email);
+
+  if (loading) {
+    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+  }
 
   const project = projectSlug
     ? projects.find((p) => p.slug === projectSlug)

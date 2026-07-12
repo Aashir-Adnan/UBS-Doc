@@ -7,8 +7,12 @@ import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
 import GithubWorkflow from '@site/src/components/portal/GithubWorkflow';
 
 function GithubContent() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading } = useAuth();
   const canAccess = !!user && isGranjurEmail(user?.email);
+
+  if (loading) {
+    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+  }
 
   if (!user) {
     return (

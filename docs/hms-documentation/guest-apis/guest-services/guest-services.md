@@ -44,6 +44,7 @@ All fields are optional and sent in the encrypted request body.
 | `hotelId` | `number` | No | Filter by hotel/tenant ID. |
 | `categoryId` | `number` | No | Filter by service category ID. |
 | `tag` | `string` | No | Filter by category slug (e.g. `"stay"`, `"dining"`, `"spa"`). |
+| `excludePackageId` | `number` | No | When set, excludes all services that are bundled in the specified package. Used for the add-ons flow so guests don't see services already included in their selected package. |
 | `standaloneOnly` | `boolean` | No | If `true`, excludes stay-category services (which are only bookable as part of a package). |
 | `page` | `number` | No | Page number (default: 1). |
 | `pageSize` | `number` | No | Items per page (default: 20). |
@@ -61,6 +62,16 @@ All fields are optional and sent in the encrypted request body.
   "tag": "stay",
   "page": 1,
   "pageSize": 10
+}
+```
+
+### Example: Add-ons for a package (exclude bundled services)
+
+```json
+{
+  "hotelId": 3,
+  "excludePackageId": 10,
+  "standaloneOnly": true
 }
 ```
 
@@ -296,6 +307,13 @@ Possible value JSON supports three shapes:
 |---|---|---|---|
 | `id` | `number` | Both | Service ID. |
 | `hotelId` | `number` | Both | Hotel/tenant ID. |
+| `hotel` | `object\|null` | Both | Hotel info object (see below). |
+| `hotel.name` | `{ en, ar }` | Both | Hotel name (bilingual). |
+| `hotel.logo` | `string\|null` | Both | Hotel logo attachment ID. |
+| `hotel.address` | `string` | Both | Hotel address. |
+| `hotel.city` | `string` | Both | Hotel city. |
+| `hotel.country` | `string` | Both | Hotel country. |
+| `hotel.coordinates` | `{ lat, lng }\|null` | Both | Hotel GPS coordinates. |
 | `name` | `object` | Both | Localized service name. |
 | `description` | `object` | Both | Localized description. |
 | `base_price` | `number` | Both | Original price before pricing rules. |
@@ -436,5 +454,6 @@ node Services/SysScripts/TestScripts/sim/guestDataAuditAndSeed.js
 | 2026-06-10 | `formSchema` is now always `[]` (never undefined) on detail objects when a category has no form fields. Previously only attached when non-empty. |
 | 2026-06-10 | `fetchFormSchema` dropdown resolution now falls back to `hms_config_possible_values.config_id` FK when `hms_config_keys.possible_values` column is NULL or has no entries for the requested category. Also handles bilingual label + key possible value shape. |
 | 2026-06-10 | Fixed publish date filter mismatch between detail SQL and searchQueries.js. Detail SQL now uses `COALESCE($.en, $[0])` to handle both config value shapes, matching the landing/search queries. Harmonized visibility subquery to `CAST(id AS JSON)`. Added consistency tests and data audit/seed script. |
+| 2026-06-24 | Added `hotel` object (name en/ar, logo, address, city, country, coordinates) to all service/room response modes. Added `excludePackageId` parameter to filter out services bundled in a package (for add-ons flow). |
 | 2026-06-14 | Added `isConsumable`, `operatingHours`, `maxQuantityPerBooking` to all service response modes. Added `icon` to amenity objects (Flutter Material icon name). |
 | 2026-06-12 | Changed `physical_dimension` response keys from abbreviated `L`/`W`/`H` to full `length`/`width`/`height`. Seed data updated accordingly. |

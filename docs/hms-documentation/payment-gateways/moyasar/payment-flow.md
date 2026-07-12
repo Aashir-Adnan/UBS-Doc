@@ -51,12 +51,14 @@ Client                      HMS Backend                   Moyasar API
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `bookingId` | `number` | Yes | Booking to pay for. |
-| `amount` | `number` | Yes | Amount in major units (e.g. `540.00` SAR). |
+| `amount` | `number` | Yes | Amount in major units (e.g. `540.00` SAR). Must be ≤ balance due. First payment must be ≥ 20% of `total_amount`. |
 | `currency` | `string` | No | ISO 4217 code. Default: `"SAR"`. |
 | `methods` | `string[]` | No | Payment methods. Default: `["creditcard"]`. |
 | `supportedNetworks` | `string[]` | No | Card networks: `mada`, `visa`, `mastercard`, `amex`. |
 | `successUrl` | `string` | No | Deep link for post-payment redirect. |
 | `failureUrl` | `string` | No | Deep link for failure redirect. |
+| `saveCard` | `boolean` | No | Tokenize the card and save it for future payments. Mutually exclusive with `savedCardId`. Default `false`. See [Saved Cards](./saved-cards.md). |
+| `savedCardId` | `number` | No | Charge a previously saved card by its HMS ID instead of rendering a form. The response shape changes — see [Saved Cards](./saved-cards.md). |
 
 **Headers:**
 - `Idempotency-Key: <UUID v4>` (required)
@@ -72,7 +74,7 @@ Client                      HMS Backend                   Moyasar API
     "currency": "SAR",
     "description": "[HMS:88421] Hotel Name - 3 nights",
     "publishableApiKey": "pk_test_...",
-    "callbackUrl": "https://api.dev-hms.gobizzi.com/api/payments/webhook/callback/moyasar?txId=88421",
+    "callbackUrl": "https://api.dev-hms.gobizzi.com/webhooks/payments/callback/moyasar?txId=88421",
     "methods": ["creditcard"],
     "supportedNetworks": ["mada", "visa", "mastercard", "amex"],
     "metadata": { "hmsTransactionId": 88421 },
@@ -161,10 +163,16 @@ This protects against duplicate charges from network retries.
 |---|---|---|
 | 422 | `Idempotency-Key header (UUID v4) is required` | Missing or invalid idempotency key. |
 | 422 | `bookingId is required` | Missing booking ID in initiate. |
-| 422 | `amount must be a positive number` | Invalid amount. |
+| 422 | `amount must be greater than zero` | Invalid amount. |
+| 422 | `amount cannot exceed the booking balance due (X)` | Amount exceeds remaining balance. |
+| 422 | `First payment must be at least 20% of the total (X SAR)` | First payment below minimum downpayment. |
 | 422 | `Could not verify payment with Moyasar` | Moyasar API call failed during confirm. |
 | 422 | `Payment is not in a succeeded state yet` | Payment not yet paid/captured. |
 | 422 | `Payment amount does not match` | Minor units don't match. |
 | 404 | `Payment transaction not found` | Transaction doesn't exist or doesn't belong to caller. |
 | 409 | `idempotency_replay_conflict` | Same key, different body. |
 | 503 | `Payments unavailable (missing Moyasar secret key)` | Secret key not configured. |
+| 404 | `Saved card not found` | Invalid `savedCardId` or not owned by guest. |
+| 422 | `Saved card has expired` | Card past expiry when using `savedCardId`. |
+| 402 | `Card was declined` | Bank declined the saved card token charge. |
+| 422 | `saveCard and savedCardId are mutually exclusive` | Cannot use both flags. |

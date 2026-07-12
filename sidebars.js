@@ -74,6 +74,72 @@ const sidebars = {
       items: [
         {
           type: 'category',
+          label: 'Major Implementations',
+          items: [
+            {
+              type: 'category',
+              label: 'Booking Rules',
+              items: [
+                'hms-documentation/major-implementations/booking-rules/booking-rules-requirements',
+                'hms-documentation/major-implementations/booking-rules/booking-rules-implementation',
+                'hms-documentation/major-implementations/booking-rules/booking-rules-test-report',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Filter Options & Pricing Pipeline',
+              items: [
+                'hms-documentation/major-implementations/filter-options-and-pricing/filter-options-and-pricing',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Search & Discovery',
+              items: [
+                'hms-documentation/major-implementations/guest-search-and-discovery/backend-implementation',
+                'hms-documentation/major-implementations/guest-search-and-discovery/frontend-implementation',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Review Categories',
+              items: [
+                'hms-documentation/major-implementations/review-categories/backend-implementation',
+                'hms-documentation/major-implementations/review-categories/frontend-implementation',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Payment & Refund Flow',
+              items: [
+                'hms-documentation/major-implementations/payment-and-refund/payment-and-refund',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Front Desk Checkout',
+              items: [
+                'hms-documentation/major-implementations/front-desk-checkout/front-desk-checkout',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Email Branding & Templates',
+              items: [
+                'hms-documentation/major-implementations/email-branding/email-branding',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Access Token Security',
+              items: [
+                'hms-documentation/major-implementations/access-token-security/access-token-security',
+              ],
+            },
+          ],
+        },
+        {
+          type: 'category',
           label: 'Guest APIs',
           items: [
             'hms-documentation/guest-apis/guest-tenant-scoped-apis',
@@ -163,6 +229,20 @@ const sidebars = {
             },
             {
               type: 'category',
+              label: 'Guest Packages',
+              items: [
+                'hms-documentation/guest-apis/guest-packages/guest-packages',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Unavailable Dates',
+              items: [
+                'hms-documentation/guest-apis/guest-unavailable-dates/guest-unavailable-dates',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Guest Onboarding KYC',
               items: [
                 'hms-documentation/guest-apis/guest-onboarding-kyc/guest-onboarding-kyc',
@@ -240,6 +320,41 @@ const sidebars = {
             },
             {
               type: 'category',
+              label: 'Guest Pricing Rules',
+              items: [
+                'hms-documentation/guest-apis/guest-pricing-rules/guest-pricing-rules',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Filter Options (Split)',
+              items: [
+                'hms-documentation/guest-apis/filter-options/filter-options',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Hotels',
+              items: [
+                'hms-documentation/guest-apis/guest-hotels/guest-hotels',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Hotel Details',
+              items: [
+                'hms-documentation/guest-apis/guest-hotel-details/guest-hotel-details',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Guest Review',
+              items: [
+                'hms-documentation/guest-apis/guest-review/guest-review',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Guest Auth Refresh Tokens',
               items: [
                 'api/guest-auth-refresh-tokens',
@@ -272,6 +387,9 @@ const sidebars = {
                 'hms-documentation/payment-gateways/moyasar/setup',
                 'hms-documentation/payment-gateways/moyasar/payment-flow',
                 'hms-documentation/payment-gateways/moyasar/webhook',
+                'hms-documentation/payment-gateways/moyasar/booking-payment-lifecycle',
+                'hms-documentation/payment-gateways/moyasar/saved-cards',
+                'hms-documentation/payment-gateways/moyasar/frontend-integration',
               ],
             },
           ],
@@ -293,7 +411,9 @@ const sidebars = {
               ],
             },
             'hms-documentation/tenant-governance/permission-groups-permissions/permission-groups-permissions',
+            'hms-documentation/tenant-governance/permission-descriptions/permission-descriptions',
             'hms-documentation/tenant-governance/original-to-clone-propagation/original-to-clone-propagation',
+            'hms-documentation/tenant-governance/deferred-delete-probation/deferred-delete-probation',
             'hms-documentation/tenant-governance/tenant-lifecycle-cron/tenant-lifecycle-cron',
           ],
         },
@@ -303,8 +423,67 @@ const sidebars = {
           label: 'Admin APIs',
           items: [
             'api/admin-code',
-            'hms-documentation/admin-apis/admin-create-guest-user',
-            'hms-documentation/admin-apis/admin-create-guest-booking',
+            'hms-documentation/admin-apis/admin-code-verify',
+            'hms-documentation/admin-apis/admin-code-reset',
+            'hms-documentation/admin-apis/profile',
+            {
+              type: 'category',
+              label: 'Guest Management',
+              items: [
+                'hms-documentation/admin-apis/admin-create-guest-user',
+                'hms-documentation/admin-apis/admin-create-guest-booking',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Catalog & Pricing',
+              items: [
+                'hms-documentation/admin-apis/catalog-crud',
+                'hms-documentation/admin-apis/catalog-pricing-crud',
+                'hms-documentation/admin-apis/pricing-rules-crud',
+                'hms-documentation/admin-apis/packages-crud',
+                'hms-documentation/admin-apis/plan-groups-crud',
+                'hms-documentation/admin-apis/services-crud',
+                'hms-documentation/admin-apis/delivery-units-crud',
+                'hms-documentation/admin-apis/location-types-crud',
+                'hms-documentation/admin-apis/region-countries-crud',
+                'hms-documentation/admin-apis/landmarks-crud',
+                'hms-documentation/admin-apis/service-location-facets',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Configuration',
+              items: [
+                'hms-documentation/admin-apis/config-keys-enabled-for',
+                'hms-documentation/admin-apis/config-possible-values',
+                'hms-documentation/admin-apis/config-possible-values-crud',
+                'hms-documentation/admin-apis/frontpage-data',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Tenant Provisioning',
+              items: [
+                'hms-documentation/admin-apis/tenant-provisioning-grouped-crud',
+                'hms-documentation/admin-apis/tenant-assignments-grouped-crud',
+                'hms-documentation/admin-apis/service-manager-provisioning',
+                'hms-documentation/admin-apis/tenant-admin-candidates-dropdown',
+                'hms-documentation/admin-apis/dev-seed-tenant',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Users & Permissions',
+              items: [
+                'hms-documentation/admin-apis/users-grouped-crud',
+                'hms-documentation/admin-apis/permission-groups-grouped-crud',
+                'hms-documentation/admin-apis/permission-manager',
+                'hms-documentation/admin-apis/permissions-dropdown',
+                'hms-documentation/admin-apis/user-role-permission-array',
+                'hms-documentation/admin-apis/urdd-dropdown',
+              ],
+            },
           ],
         },
       ],

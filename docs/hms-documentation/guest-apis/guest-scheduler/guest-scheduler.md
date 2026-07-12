@@ -21,6 +21,7 @@ Uses **AUTH_PLATFORM** — requires a valid guest JWT (`accessToken`). The guest
 | `from` | `string` | No | Start of date range (YYYY-MM-DD). Defaults to today. |
 | `to` | `string` | No | End of date range (YYYY-MM-DD, inclusive). Defaults to `from + 6 days`. Maximum range: 14 days. |
 | `categoryId` | `number` | No | Filter to a single service category. If omitted, all schedulable categories are returned. |
+| `serviceId` | `number` | No | Filter to a single service within the category. Use this when the guest has already selected a specific service (e.g. Breakfast Buffet) and you only need that service's availability. |
 
 ### Example: Week-long range
 
@@ -50,6 +51,19 @@ Uses **AUTH_PLATFORM** — requires a valid guest JWT (`accessToken`). The guest
 }
 ```
 
+### Example: Specific service (standalone booking flow)
+
+```json
+{
+  "from": "2026-07-01",
+  "to": "2026-07-01",
+  "categoryId": 5,
+  "serviceId": 76
+}
+```
+
+When `serviceId` is provided, only that service's availability is returned within the category tree. This is used when the guest has already picked a service and is selecting a date/time slot.
+
 ---
 
 ## Behavior
@@ -58,7 +72,7 @@ Uses **AUTH_PLATFORM** — requires a valid guest JWT (`accessToken`). The guest
 2. Validates and expands the date range (`from` to `to`, inclusive). If `to` is omitted, defaults to `from + 6 days`. Maximum range is 14 days.
 3. Fetches all active service categories, excluding non-schedulable categories (`stay`, `amenities`, `networking`, `room-service`). Stay is booked through the room/package flow; amenities are non-schedulable add-ons. Deduplicates by slug.
 4. If `categoryId` is provided, filters to that single category.
-5. For each category, finds all active services in that category and joins through `service_locations` → `locations` to build the location tree. Only services linked to at least one active location appear.
+5. For each category, finds all active services in that category and joins through `service_locations` → `locations` to build the location tree. Only services linked to at least one active location appear. If `serviceId` is provided, narrows further to only that specific service.
 6. For each service, computes time slot availability **for every date in the range** using `computeServiceAvailability`, which:
    - Queries `unit_availability` windows for the service's delivery units and locations.
    - Breaks windows into discrete slots based on `slot_duration_min`.

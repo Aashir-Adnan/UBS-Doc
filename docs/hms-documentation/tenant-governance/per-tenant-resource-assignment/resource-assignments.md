@@ -41,7 +41,7 @@ SaaS-global ───────────► tenant clone ──────
 | Hand the resource to a hotel | **assign** (POST) | Tenant Manager | Deep-clone the global original into the hotel, owned by URDD-B′. |
 | Hotel adjusts it | (normal CRUD) | Tenant Admin | Edits the clone — diverges from the original. |
 | Roll out an updated original | **propagate** (PUT) | SaaS Admin | Diff the original vs each clone; auto-update untouched clones, flag customised ones. |
-| Take the resource away | **revoke** (DELETE) | Tenant Manager | Soft-delete the clone (after a dependency check). Re-assigning later reactivates the same row. |
+| Take the resource away | **revoke** (DELETE) | Tenant Manager | Soft-delete the clone. Live dependents park it in `probation` (deferred), else `inactive`. An `inactive` clone reactivates on re-assign; a `probation` clone is **restored** via the restore verb — `PUT status:"active"` (§7). |
 
 ---
 
@@ -50,14 +50,14 @@ SaaS-global ───────────► tenant clone ──────
 | Method | Action | Returns (single) |
 |---|---|---|
 | **POST** (`Add`) | **assign** — clone a global row into a tenant | `{ success, clone_id, resource_type, source_id, target_tenant_id, already_existed }` (+ `reactivated: true` on re-assign-after-revoke) |
-| **DELETE** (`Delete`) | **revoke** — soft-delete a clone after a dependency check | `{ success, revoked, clone_id, resource_type, already_inactive }` (+ `reparented_children` for `location_type` — see §7) |
-| **PUT** (`Update`) | **dispatched by `resource_type`**: `location_type` → **re-parent** (edit the hierarchy); every other type → **propagate** | re-parent → `{ success, reparented, clone_id, parent_id, resource_type }`; propagate → `{ success, resource_type, source_id, updated[], conflicts[], notification }` |
+| **DELETE** (`Delete`) | **revoke** — soft-delete a clone (deferred-delete / probation) | no deps → `{ success, revoked: true, clone_id, resource_type }` (+ `reparented_children` for `location_type`); live deps → `{ success, revoked: false, deferred: true, status_set: "probation", clone_id, resource_type, dependents[] }` — see §7 |
+| **PUT** (`Update`) | **dispatched**: `status:"active"` → **restore** (un-park a `probation` clone); else `location_type` → **re-parent**; else → **propagate** | restore → `{ success, restored, clone_id, resource_type, status_set:"active" }`; re-parent → `{ success, reparented, clone_id, parent_id, resource_type }`; propagate → `{ success, resource_type, source_id, updated[], conflicts[], notification }` |
 | **GET** (`View`, `?id=`) | read one clone | the clone row |
 | **GET** (`List`) | list a tenant's active clones for one `resource_type` | rows, each with its match field + clone-id field |
 
 > `assign` and `revoke` are **not** separate routes — they are POST and DELETE on the *same* object. The "verb" is the HTTP method.
 
-> **PUT does two different things depending on `resource_type`.** For `location_type` it **re-parents** a clone within the hotel's building > floor > zone hierarchy (§6.5); for every other type it **propagates** an updated original (§8). A single `updateAssignment` dispatcher routes the request.
+> **PUT does three different things.** A single `updateAssignment` dispatcher routes on the body: **`status:"active"`** → **restore** a `probation` clone (§7); otherwise `location_type` → **re-parent** within the hotel's building > floor > zone hierarchy (§6.5); every other type → **propagate** an updated original (§8).
 
 > **`config_key` is cascade-only for assign/revoke.** POST/DELETE reject it with a **400** — config keys clone/soft-delete only as a side effect of their `service_category` (§5, §6.3, §7). PUT (**propagate**), GET (**View**), and GET (**List**) still accept `config_key`.
 
@@ -167,7 +167,7 @@ Immediately after, the same transaction also clones the **package-only** config 
 
 Because the category clone exists before the cascade runs, every cloned key has at least one in-scope owned category, so the [D5 guard](#64-config-key-clone-specifics) never trips on this path.
 
-**(b) Eager Service-Manager RDD.** The per-category **Service Manager RDD** (`Manager` / `<category>` designation / the hotel's department `TENANT_<code>`, owned by URDD-B′) is cloned so the Service Manager persona shows up in RDD pickers **immediately**, before any Service Manager is provisioned. (The lazy provisioning path later dedups onto this same RDD.)
+**(b) Eager Service-Manager RDD.** The per-category **Service Manager RDD** (`Manager` / `<category>` designation / the tenant's single **staff department** — named after the tenant, no `TENANT_` prefix; resolved via `resolveTenantStaffDepartmentId`, owned by URDD-B′) is cloned so the Service Manager persona shows up in RDD pickers **immediately**, before any Service Manager is provisioned. (The lazy provisioning path later dedups onto this same RDD.)
 
 > This is the re-modelled shape: the category lives on the **designation**, and the SM's department is the hotel. There is no longer a per-category `DEPT_<code>` department.
 
@@ -205,15 +205,30 @@ PUT /api/tenantAssignmentsGroupedCrud
 
 ## 7. Revoke — take a resource away
 
-Revoke is a **soft-delete** (`status = 'inactive'`) gated by a **dependency check** so you can't pull a resource still in use:
+Revoke is a **soft-delete** run through the **deferred-delete (probation) model** (see [Deferred Delete (Probation)](../deferred-delete-probation/deferred-delete-probation.md)). It first runs a **dependency check**:
 
-| Type | Blocked by active… |
+| Type | Live dependents probed |
 |---|---|
-| `service_category` | `services` / `packages` / `delivery_units` |
-| `location_type` | `service_locations` |
+| `service_category` | active `services` / `packages` / `delivery_units` |
+| `location_type` | a location of that type (or a descendant) with an active `service_locations` link to an active/probation/archived service |
 | `config_key` | not directly revocable — cascades from its `service_category` (no dependency check) |
 
-A blocked revoke returns **409** with a `dependents` array listing what's in the way. Source-tracked types also require a non-null `source_*_id` (it refuses to revoke a row that isn't actually a clone).
+- **No live dependents → immediate `inactive`** (the child cascade runs now), returning `{ revoked: true, clone_id, resource_type, … }` (+ `reparented_children` for `location_type`).
+- **Live dependents → parked in `probation`** (the child cascade is **deferred** to the finalizer cron), returning **HTTP 200** with the deferred shape — **not** a 409 block:
+
+```json
+{
+  "success": true,
+  "revoked": false,
+  "deferred": true,
+  "status_set": "probation",
+  "clone_id": 123,
+  "resource_type": "service_category",
+  "dependents": [ { "table": "services", "count": 3, "sample_ids": [11, 12, 13] } ]
+}
+```
+
+The clone stays visible (in the assigned List, `status = 'probation'`) with a **Restore** affordance until either the admin restores it or the [probation-finalizer cron](../deferred-delete-probation/deferred-delete-probation.md#6-the-probation-finalizer-cron) confirms the dependents have cleared and flips it to `inactive` (running the deferred cascade then). Bulk revoke carries the same per-item shape in each `results[]` entry. Source-tracked types also require a non-null `source_*_id` (it refuses to revoke a row that isn't actually a clone).
 
 **Revoking a `service_category` cascades to its config keys.** First (`cascadeCategoryRevoke`) the category's value rows are soft-deleted and the category is pruned from every clone key's `possible_values` / `enabled_for` / `applies_to`. Then (`cascadeRevokeOrphanedConfigKeys`) the key clones this **orphans** are soft-deleted — but **only** those with no owning category left:
 
@@ -221,7 +236,18 @@ A blocked revoke returns **409** with a `dependents` array listing what's in the
 
 **Revoking a `location_type` promotes/splices its children.** In the same transaction, the revoked node's direct **active** children are re-parented to the revoked node's **parent** (their grandparent) — so a child is never left under an inactive parent. Revoking a **root** makes its children roots (`parent_id = null`). The response carries `reparented_children: <n>`. (The node's own active `service_locations` still block the revoke as before — that dependency check runs first.)
 
-Revoking is reversible: a later assign of the same resource **reactivates** the inactive clone in place (§6 step 3), preserving its id and the tenant's edits — including the cascade-revoked config keys, which reactivate when their category is re-assigned. For `location_type` the parent pointer is healed on reactivation (§6.5). `config_key` itself **cannot** be revoked directly (it is cascade-only — a direct `config_key` DELETE is rejected with a **400**).
+**Reversing a revoke — two distinct cases:**
+
+- **A finalized (`inactive`) clone** is reactivated by **re-assigning** the same resource (§6 step 3): the inactive clone flips back to `active` in place, preserving its id and the tenant's edits — including the cascade-revoked config keys, which reactivate when their category is re-assigned. For `location_type` the parent pointer is healed on reactivation (§6.5).
+- **A `probation` clone (revoke not yet finalized)** is **restored** by a dedicated grouped-CRUD verb — a distinct action, **not** a re-assign. Re-assigning a resource still in `probation` is **rejected with a 409** ("in probation — restore it explicitly before re-assigning"), so the two lifecycles never conflate. Restore is a **`PUT` carrying `status:"active"`**:
+  ```jsonc
+  PUT /tenant/assignments/grouped/crud?version=1.0
+  { "resource_type": "service_category" | "location_type", "clone_id": <id>, "status": "active", "actionPerformerURDD": <acting URDD> }
+  → { "success": true, "restored": true, "clone_id": <id>, "resource_type": "<type>", "status_set": "active" }
+  ```
+  Like revoke, it is a **direct `UPDATE … WHERE <pk>=? AND status='probation'`** — so it is **cross-tenant** (no tenancy filter) and **status-only** (no full-row payload), and the FE sends the **same actor it sends for revoke** (no per-tenant URDD to resolve). No new permission. Only `probation` is un-parked — `active` → `already_active` no-op, `inactive` (finalized) → 409 (re-assign to reactivate). The finalizer cron then skips the row (it only touches rows still `probation`); because the child cascade was deferred, nothing else needs undoing (the config keys / the `location_type` subtree were never touched). Bulk restore mirrors bulk revoke (`results[]`).
+
+`config_key` itself **cannot** be revoked directly (it is cascade-only — a direct `config_key` DELETE is rejected with a **400**).
 
 ---
 
@@ -271,8 +297,11 @@ All responses use the standard envelope: `{ success, data, meta, error }`. The p
 | Verb | `data` shape |
 |---|---|
 | assign | `{ success, clone_id, resource_type, source_id, target_tenant_id, already_existed }` (+ `reactivated: true` on re-assign-after-revoke). |
-| revoke | `{ success, revoked, clone_id, resource_type, already_inactive }` (+ `reparented_children` for `location_type`). |
+| revoke (no deps) | `{ success, revoked: true, clone_id, resource_type }` (+ `reparented_children` for `location_type`). |
+| revoke (live deps → deferred) | `{ success, revoked: false, deferred: true, status_set: "probation", clone_id, resource_type, dependents: [{ table, count, sample_ids }] }`. |
+| revoke (already gone) | `{ success, revoked: false, already_inactive: true, clone_id, resource_type }`. |
 | propagate (PUT, non-`location_type`) | `{ success, resource_type, source_id, updated[], conflicts[], notification }`. |
+| restore (PUT, `status:"active"`) | `{ success, restored: true, clone_id, resource_type, status_set: "active" }` (probation → active). `active` → `already_active: true`; `inactive` → **409**. |
 | re-parent (PUT, `location_type`) | `{ success, reparented, clone_id, parent_id, resource_type }`. |
 | assign/revoke/propagate (bulk) | `{ success, bulk: true, resource_type, total, succeeded, failed, results[] }`. |
 
@@ -310,11 +339,13 @@ All clones are stamped `created_by = URDD-B′`.
 
 | Date | Change |
 |---|---|
+| 2026-07-03 | **Revoke is deferred-delete (probation); a grouped-CRUD restore verb was added.** Revoke no longer 409-blocks on dependents — live deps park the clone in **`probation`** (deferred cascade) and return a 200 `{ revoked:false, deferred:true, status_set:"probation", dependents[] }`; no deps → immediate `inactive`. `postProcessRevoke` fixed to surface these on **single** revokes (bulk already did). **Restore** = new `PUT { resource_type, clone_id, status:"active", actionPerformerURDD }` (`restoreResource.js`) — cross-tenant, status-only, same actor as revoke, no new permission; only un-parks `probation` (`active` → no-op, `inactive` → 409). **Re-assigning a `probation` clone is rejected (409)** so restore is never a silent side effect. Updated §3, §7, §10. |
 | 2026-06-17 | **`location_type` hierarchy.** `parent_id` (building > floor > zone) is now first-class: assign accepts a tenant-local `parent_id` override; with no override the clone lands at root and `reconcileLocationTypeHierarchy` mirrors the global shape (migration `20260617_1` backfilled existing tenants). **PUT is now dispatched** — `location_type` → **re-parent** (`reparentLocationType`, tenant-local + cycle guards), every other type → propagate (via the `updateAssignment` dispatcher). **Revoke** promotes/splices a node's children to their grandparent and returns `reparented_children`; re-assign-after-revoke heals the parent pointer. |
 | 2026-06-15 | **Package-only config keys now cascade with any service category.** Keys scoped only to packages (`applies_to = ["package"]`) are cloned by `assignPackageScopedConfigKeys` alongside the **first** service category a tenant is assigned (they carry no category id, so the per-category cascade never matched them), and revoked only when the **last** category is revoked (the orphaning rule treats them like a `*` clone). Existing tenants were backfilled by migration `20260615_2_backfill_tenant_package_scoped_config_keys` (idempotent, runs on start). |
 | 2026-06-12 | **`config_key` is now cascade-only.** Config keys are no longer assigned/revoked individually — assigning a `service_category` cascade-clones every in-scope key (`applies_to` ⊇ the category, or `*`); revoking it cascade-revokes the keys it orphans (a key shared across categories survives until its last owning category is revoked). Direct `config_key` assign/revoke → **400**; propagate / View / List unchanged. (`assignConfigKeysForCategory` / `cascadeRevokeOrphanedConfigKeys`.) |
+| 2026-06-18 | **One department per tenant** — the eager SM RDD now uses the tenant's single **staff department** (named after the tenant, **no `TENANT_` prefix**; resolved via `resolveTenantStaffDepartmentId`). Org-chart departments are no longer mirrored. |
 | 2026-06-10 | Initial documentation of the assign / revoke / propagate API. |
-| 2026-06-09 | Persona re-model — the Service-Manager category moved onto the **designation**; the eager SM RDD now uses the tenant's hotel department `TENANT_<code>` (the per-category `DEPT_<code>` department is no longer created). |
+| 2026-06-09 | Persona re-model — the Service-Manager category moved onto the **designation**; the eager SM RDD now uses the tenant's hotel department (the per-category `DEPT_<code>` department is no longer created). |
 | 2026-06-05 | `currency` / `region` / `country` / `supported_payment_method` reclassified as shared reference data (no longer assignable); pre-existing clones deactivated by migration `20260605_6`. |
 
 ---

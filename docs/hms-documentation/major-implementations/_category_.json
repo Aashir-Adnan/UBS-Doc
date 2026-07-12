@@ -1,0 +1,9 @@
+{
+  "label": "Major Implementations",
+  "position": 2,
+  "link": {
+    "type": "generated-index",
+    "title": "Major Implementations",
+    "description": "Specifications and implementation guides for major HMS features — booking rules, serial/parallel packages, and more."
+  }
+}

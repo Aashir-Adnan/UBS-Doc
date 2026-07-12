@@ -8,5 +8,6 @@ export function isGranjurEmail(email) {
     e === 'hamzawaqar924@gmail.com' ||
     e === 'nauraiz.haider@gmail.com' ||
     e === 'bsse23047@itu.edu.pk'
+    e === 'codes.raza@gmail.com'
   );
 }

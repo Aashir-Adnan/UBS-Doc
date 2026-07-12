@@ -1,0 +1,9 @@
+{
+  "label": "Booking Rules",
+  "position": 1,
+  "link": {
+    "type": "generated-index",
+    "title": "Booking Rules",
+    "description": "Requirements specification and backend implementation guide for the booking rules system — serial/parallel packages, factor filtering, max booking cap, and more."
+  }
+}

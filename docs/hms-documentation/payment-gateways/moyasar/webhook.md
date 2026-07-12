@@ -6,7 +6,7 @@ Handles asynchronous payment confirmations from Moyasar — a safety net for cas
 
 ## Endpoint
 
-**POST** `/api/payments/webhook/callback/moyasar?txId={transactionId}`
+**POST** `/webhooks/payments/callback/moyasar?txId={transactionId}`
 
 This URL is automatically included as `callbackUrl` in the Moyasar form config returned by the initiate endpoint.
 
@@ -20,6 +20,7 @@ This URL is automatically included as `callbackUrl` in the Moyasar form config r
 4. If verified as `paid`/`completed`/`captured`:
    - Updates `transactions.payment_status` to `completed`
    - Increments `bookings.paid_amount`
+   - If `saveCard` was flagged on the original initiation, persists the card token to `user_payment_methods` (see [Saved Cards](./saved-cards.md))
 5. Always returns HTTP 200 to Moyasar (to prevent retries)
 
 ---
@@ -45,7 +46,7 @@ Moyasar sends the full payment object:
     "name": "John Doe",
     "number": "XXXX-XXXX-XXXX-1111"
   },
-  "callback_url": "https://api.dev-hms.gobizzi.com/api/payments/webhook/callback/moyasar?txId=88421",
+  "callback_url": "https://api.dev-hms.gobizzi.com/webhooks/payments/callback/moyasar?txId=88421",
   "created_at": "2026-06-05T12:00:00.000Z",
   "updated_at": "2026-06-05T12:00:05.000Z"
 }
@@ -121,7 +122,7 @@ For local development, Moyasar can't reach `localhost`. Options:
 2. **Use ngrok** — `ngrok http 3000` gives you a public URL, set `HMS_PUBLIC_API_BASE` to that URL
 3. **Simulate manually** — after an initiate, call the webhook yourself:
    ```bash
-   curl -X POST "http://localhost:3000/api/payments/webhook/callback/moyasar?txId=88421" \
+   curl -X POST "http://localhost:3000/webhooks/payments/callback/moyasar?txId=88421" \
      -H "Content-Type: application/json" \
      -d '{"id": "<moyasar_payment_id>", "status": "paid", "amount": 54000}'
    ```
