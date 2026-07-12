@@ -5,6 +5,7 @@ import { useAuth } from '@site/src/components/portal/authStore';
 import GoogleSignIn from '@site/src/components/portal/GoogleSignIn';
 import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
 import { API_BASE_URL } from '@site/src/components/portal/config';
+import { useActingUrdd } from '@site/src/components/portal/tenantProjects/useActingUrdd';
 
 const BASE = `${API_BASE_URL}/api/tracked/repos`;
 
@@ -501,13 +502,18 @@ function AddRepoForm({ onAdded }) {
   const [branch, setBranch] = useState('main');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  // Reuse the shared identity hook. When resolved, stamp the new repo to the
+  // creator's tenant; when pending (urdd null) omit it → legacy global add (§5).
+  const { urdd: actingUrdd } = useActingUrdd();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim() || !url.trim()) return;
     setSubmitting(true); setError(null);
     try {
-      await apiPost('/add', { name: name.trim(), url: url.trim(), branch: branch.trim() || 'main' });
+      const body = { name: name.trim(), url: url.trim(), branch: branch.trim() || 'main' };
+      if (actingUrdd != null) body.actionPerformerURDD = actingUrdd;
+      await apiPost('/add', body);
       setName(''); setUrl(''); setBranch('main'); onAdded();
     } catch (err) { setError(err.message); } finally { setSubmitting(false); }
   };

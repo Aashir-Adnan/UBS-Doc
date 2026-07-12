@@ -28,6 +28,8 @@ const TOOLS_NAV_ITEMS = [
   { icon: '🐙', label: 'GitHub', to: '/tools/github' },
   { icon: '🎙️', label: 'Meetings', to: '/tools/meetingWorkflow' },
   { icon: '📂', label: 'Repositories', to: '/tools/repos' },
+  { icon: '📌', label: 'My Projects', to: '/tools/myProjects' },
+  { icon: '🛡️', label: 'Tenant Admin', to: '/tools/tenantAdmin' },
 ];
 
 const TRANSITION_MS = 320;

@@ -1,17 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { mwPost } from './api';
+import { listTenantRepos } from './tenantRepos';
 import { API_BASE_URL } from '@site/src/components/portal/config';
 
 const REPOS_BASE = `${API_BASE_URL}/api/tracked`;
 const USERS_BASE = `${API_BASE_URL}/api/portal/users`;
-
-async function fetchRepos() {
-  const r = await fetch(`${REPOS_BASE}/repos/list?version=1`);
-  if (!r.ok) throw new Error(`Repos fetch failed: ${r.status}`);
-  const json = await r.json();
-  const data = json.payload?.return ?? json.payload ?? json;
-  return data.repos || [];
-}
 
 async function fetchAllFeatures() {
   const r = await fetch(`${REPOS_BASE}/repos/features/list?version=1`);
@@ -186,7 +179,7 @@ function CheckList({ items, selectedIds, onToggle, getLabel, getId, getSubLabel,
   );
 }
 
-function ScopePicker({ selectedRepoIds, onRepoToggle, selectedFeatureIds, onFeatureToggle }) {
+function ScopePicker({ actingUrdd, selectedRepoIds, onRepoToggle, selectedFeatureIds, onFeatureToggle }) {
   const [repos, setRepos] = useState([]);
   const [features, setFeatures] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -195,11 +188,12 @@ function ScopePicker({ selectedRepoIds, onRepoToggle, selectedFeatureIds, onFeat
   const [featSearch, setFeatSearch] = useState('');
 
   useEffect(() => {
-    Promise.all([fetchRepos(), fetchAllFeatures()])
+    // Tenant-scoped repo list — the user can only pick repos in their tenant.
+    Promise.all([listTenantRepos(actingUrdd), fetchAllFeatures()])
       .then(([r, f]) => { setRepos(r); setFeatures(f); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [actingUrdd]);
 
   if (loading) return <div className="mw-scope-loading">Loading…</div>;
   if (error) return <div className="mw-field-error">{error}</div>;
@@ -309,7 +303,7 @@ function ScopePicker({ selectedRepoIds, onRepoToggle, selectedFeatureIds, onFeat
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function CreateMeeting({ onCreated, onCancel, userEmail }) {
+export default function CreateMeeting({ actingUrdd, onCreated, onCancel, userEmail }) {
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [hours, setHours] = useState('09');
@@ -320,6 +314,8 @@ export default function CreateMeeting({ onCreated, onCancel, userEmail }) {
   const [selectedParticipants, setSelectedParticipants] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [done, setDone] = useState(false);
 
   // Auto-include current user as participant
   useEffect(() => {
@@ -347,7 +343,7 @@ export default function CreateMeeting({ onCreated, onCancel, userEmail }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); setNotice(null);
     try {
       let scheduled_at = null;
       if (date) {
@@ -356,7 +352,8 @@ export default function CreateMeeting({ onCreated, onCancel, userEmail }) {
         scheduled_at = `${date} ${h}:${m}:00`;
       }
 
-      await mwPost('/meeting/workflow/create', {
+      const res = await mwPost('/meeting/workflow/create', {
+        actionPerformerURDD: actingUrdd,
         title,
         scheduled_at,
         participants: selectedParticipants,
@@ -365,6 +362,21 @@ export default function CreateMeeting({ onCreated, onCancel, userEmail }) {
         scope_repo_ids: selectedRepoIds,
         scope_feature_ids: selectedFeatureIds,
       });
+
+      // The returned scope_repo_ids are the SURVIVING set after tenant filtering;
+      // if fewer came back, some repos were cross-tenant and were dropped.
+      const survived = Array.isArray(res?.scope_repo_ids) ? res.scope_repo_ids : null;
+      if (survived && survived.length < selectedRepoIds.length) {
+        const dropped = selectedRepoIds.length - survived.length;
+        setNotice(
+          `Meeting created, but ${dropped} repo(s) were outside your tenant and ` +
+          `were not attached.`,
+        );
+        // Meeting already exists — mark done so the form can't re-submit it.
+        setDone(true);
+        setBusy(false);
+        return;
+      }
 
       onCreated?.();
     } catch (err) {
@@ -415,15 +427,24 @@ export default function CreateMeeting({ onCreated, onCancel, userEmail }) {
           />
 
           {error && <p className="mw-field-error">{error}</p>}
+          {notice && <p className="tenant-success">{notice}</p>}
 
           <div className="mw-btn-row" style={{ marginTop: '0.5rem' }}>
-            <button className="mw-btn mw-btn--primary" type="submit" disabled={busy}>
-              {busy ? 'Creating…' : 'Create Meeting'}
-            </button>
-            {onCancel && (
-              <button className="mw-btn mw-btn--ghost" type="button" onClick={onCancel}>
-                Cancel
+            {done ? (
+              <button className="mw-btn mw-btn--primary" type="button" onClick={() => onCreated?.()}>
+                Go to meetings
               </button>
+            ) : (
+              <>
+                <button className="mw-btn mw-btn--primary" type="submit" disabled={busy}>
+                  {busy ? 'Creating…' : 'Create Meeting'}
+                </button>
+                {onCancel && (
+                  <button className="mw-btn mw-btn--ghost" type="button" onClick={onCancel}>
+                    Cancel
+                  </button>
+                )}
+              </>
             )}
           </div>
         </form>
@@ -436,6 +457,7 @@ export default function CreateMeeting({ onCreated, onCancel, userEmail }) {
           <small className="mw-scope-hint"> — repos &amp; features for this meeting</small>
         </p>
         <ScopePicker
+          actingUrdd={actingUrdd}
           selectedRepoIds={selectedRepoIds}
           onRepoToggle={toggleRepo}
           selectedFeatureIds={selectedFeatureIds}

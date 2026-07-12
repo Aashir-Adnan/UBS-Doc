@@ -54,7 +54,14 @@ const sidebars = {
     {
       type: 'category',
       label: 'Framework Frontend',
-      items: ['frontend/UBS-intro', 'frontend/intro', 'frontend/FAQs'],
+      items: [
+        'frontend/UBS-intro',
+        'frontend/intro',
+        'frontend/FAQs',
+        'frontend/tenant-scoping-frontend',
+        'FRONTEND_TENANT_PROJECT_ACCESS',
+        'FRONTEND_REPOS_MEETINGS_TENANCY',
+      ],
     },
     {
       type: 'category',
