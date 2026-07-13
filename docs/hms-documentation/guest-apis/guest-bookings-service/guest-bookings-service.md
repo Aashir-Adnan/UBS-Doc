@@ -291,6 +291,34 @@ Returns the full v2 booking bundle — same shape as `/bookings/room` and `/book
 }
 ```
 
+### `downPayment` Object
+
+The response includes a `downPayment` object indicating the required down payment:
+
+```json
+{
+  "downPayment": {
+    "required": true,
+    "amount": 15,
+    "total": 75,
+    "currency": "SAR"
+  }
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `required` | `boolean` | `true` if the guest must pay before the booking is confirmed. |
+| `amount` | `number` | 20% of the booking total. |
+| `total` | `number` | The full booking total. |
+| `currency` | `string` | Currency code. |
+
+After creating the booking, the frontend should prompt the guest to pay the down payment via `POST /guest/payments/initiate`. See [Add Services to Booking](./add-services-to-booking.md) for the full payment flow diagram.
+
+:::info Confirmation Email
+The booking confirmation email is sent **after the first successful down payment**, not at booking creation. The guest will not receive a confirmation email until payment is secured.
+:::
+
 ### Key Response Fields
 
 | Field | Description |
@@ -437,6 +465,7 @@ node Services/SysScripts/TestScripts/sim/guestServiceBookingCheckInOut.js
 
 | Date | Change |
 |---|---|
+| 2026-07-13 | Response now includes `downPayment` object (20% of total). Booking confirmation email moved to after first successful payment. See [Add Services to Booking](./add-services-to-booking.md) for full addon + payment flow. |
 | 2026-06-14 | Added `quantity` parameter for multi-quantity service bookings. Price = unit price × quantity. Controlled by `max_quantity_per_booking` hms_config key (default: 1). Quantity > provided scheduling entries creates remaining slots as unscheduled. |
 | 2026-06-12 | Booking status defaults to `confirmed` (removed `confirmation_mode` dependency). Only `requires_approval: true` produces `pending`. Added Kids Center example. Added warning about scheduling fields vs formData. |
 | 2026-06-10 | Fixed #263: `checkIn`/`checkOut` now derived for all standalone service types (spa, barber, transport), not just dining. `summariseDates` handles mobile format (`sessions[].date`, `transport.pickupDateTime`). Explicit `checkIn`/`checkOut` in request body honored as fallback. Single-day bookings mirror `checkIn` → `checkOut`. |

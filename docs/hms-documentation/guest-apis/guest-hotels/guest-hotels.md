@@ -14,14 +14,31 @@ Uses **PUBLIC_ENCRYPTED_PLATFORM** — encrypted request/response using the plat
 
 ## Query Parameters
 
-None.
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `q` | `string` | No | — | Free-text search. Matches against the hotel's denormalized `search_text` column (includes hotel name, city, address, translations). |
+| `cityId` | `number` | No | — | Filter hotels by city FK. Use the `cityId` returned from the landmarks CRUD endpoint. |
 
 ---
 
-## Request Example
+## Request Examples
+
+### All hotels
 
 ```
 GET /api/guest/hotels
+```
+
+### Hotels in a specific city
+
+```
+GET /api/guest/hotels?cityId=1
+```
+
+### Text search
+
+```
+GET /api/guest/hotels?q=Makkah
 ```
 
 ---
@@ -35,6 +52,7 @@ GET /api/guest/hotels
     "key": "al-madinah-hilton",
     "label": { "en": "Al Madinah Hilton", "ar": "هيلتون المدينة" },
     "city": { "en": "Madinah", "ar": "المدينة المنورة" },
+    "cityId": 2,
     "country": { "en": "Saudi Arabia", "ar": "المملكة العربية السعودية" },
     "address": { "en": "King Faisal Road", "ar": "طريق الملك فيصل" },
     "images": ["https://cdn.example.com/logos/hilton.png"],
@@ -56,6 +74,7 @@ GET /api/guest/hotels
 | `key` | `string` | Tenant slug, or stringified tenant ID if no slug. |
 | `label` | `object` | Bilingual hotel name `{ en, ar }`. |
 | `city` | `object` | Bilingual city name `{ en, ar }`. |
+| `cityId` | `number\|null` | City FK. Can be used to filter search results by city. |
 | `country` | `object` | Bilingual country name `{ en, ar }`. |
 | `address` | `object` | Bilingual street address `{ en, ar }`. |
 | `images` | `string[]` | Array of image URLs. Currently contains the tenant logo if set, otherwise empty. |
@@ -98,3 +117,4 @@ GET /api/guest/hotels
 | Date | Change |
 |---|---|
 | 2026-07-06 | Initial creation. Includes `rating` (services + packages), `reviewCount`, and `minStayCostPerNight`. |
+| 2026-07-12 | Added `q` and `cityId` query parameters. Added `cityId` to response fields. |

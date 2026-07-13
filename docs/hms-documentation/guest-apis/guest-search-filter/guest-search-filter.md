@@ -22,8 +22,9 @@ All parameters are passed as query string values.
 
 | Parameter | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `q` | `string` | No | — | Free-text search. Matches against service name, description, and short description (LIKE match). |
+| `q` | `string` | No | — | Free-text search (LIKE match). Matches against service name, description, short description, and hotel `search_text`. Use for user-typed keywords (e.g. `"spa"`, `"deluxe"`). **Do not pass landmark display names** — use `cityId` instead for location-based filtering. |
 | `hotelId` | `string` | No | all hotels | Comma-separated hotel/tenant IDs. Example: `"3,16"`. |
+| `cityId` | `number` | No | — | Filter results to hotels in a specific city. Use the `cityId` returned from the landmarks endpoint or hotels endpoint. This is the correct way to discover services/packages near a landmark. |
 | `include` | `string` | No | `"rooms,services,packages"` | Comma-separated entity types to return. Valid values: `rooms`, `services`, `packages`. |
 | `tag` | `string` | No | — | Category slug filter (e.g. `"stay"`, `"dining"`, `"spa"`). When `include=rooms` only, defaults to `"stay"` internally. |
 
@@ -325,6 +326,41 @@ Filters packages based on their configured stay duration:
 1. If the package has a `duration` config, that value is used directly.
 2. Otherwise, the stay service's `min_stay_nights`/`max_stay_nights` configs determine the range.
 3. The bucket range must overlap with the package's allowed range.
+
+---
+
+## Landmark → Hotel → Services Discovery Flow
+
+When a user selects a landmark to explore nearby hotels and their offerings, the correct API flow is:
+
+### Step 1: Search landmarks
+
+```
+GET /api/guest/crud/landmarks?filter_columns_or=["all"]&filter_values_or=["mak"]&filter_columns_and=["landmarks.status"]&filter_values_and=["active"]&sort_by=sort_order&sort_order=ASC&page_size=10
+```
+
+Response includes `cityId`, `latitude`, `longitude`, and `radiusKm` for each landmark.
+
+### Step 2: Get hotels near the landmark
+
+Use the landmark's `cityId` to filter hotels:
+
+```
+GET /api/guest/hotels?cityId=1
+```
+
+### Step 3: Browse services/packages
+
+Use `cityId` for broad discovery, or `hotelId` for a specific hotel:
+
+```
+GET /api/guest/search/filter?cityId=1&include=rooms,packages&detailed=true
+GET /api/guest/search/filter?hotelId=1&include=packages&detailed=true
+```
+
+:::warning
+Do **not** pass the landmark display name (e.g. `"Makkah (Mecca)"`) as the `q` parameter. The `q` parameter performs a literal LIKE match and is intended for user-typed search keywords, not structured location names. Use `cityId` for location-based filtering.
+:::
 
 ---
 

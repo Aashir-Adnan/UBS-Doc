@@ -162,6 +162,7 @@ const sidebars = {
               label: 'Guest Booking Flow',
               items: [
                 'hms-documentation/guest-apis/guest-booking-flow/guest-booking-flow',
+                'hms-documentation/guest-apis/guest-booking-flow/booking-management',
               ],
             },
             {
@@ -211,6 +212,7 @@ const sidebars = {
               label: 'Guest Bookings Service',
               items: [
                 'hms-documentation/guest-apis/guest-bookings-service/guest-bookings-service',
+                'hms-documentation/guest-apis/guest-bookings-service/add-services-to-booking',
               ],
             },
             {
