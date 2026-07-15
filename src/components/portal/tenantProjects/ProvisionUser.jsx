@@ -74,9 +74,9 @@ export default function ProvisionUser({ adminUrdd, actorEmail, onProvisioned }) 
           <select value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
             <option value="">Select a tenant…</option>
             {tenants.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.organization_name || `Tenant ${t.id}`}
-                {` — #${t.id}`}
+              <option key={t.tenant_id} value={t.tenant_id}>
+                {t.organization_name || t.tenant_name || `Tenant ${t.tenant_id}`}
+                {` — #${t.tenant_id}`}
               </option>
             ))}
           </select>
