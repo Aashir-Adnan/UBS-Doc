@@ -24,7 +24,7 @@ function MyProjectsContent() {
     );
   }
 
-  const orgLabel = activeOrg?.org_name || 'Personal';
+  const orgLabel = activeOrg?.display_name || activeOrg?.org_name || 'Personal';
 
   return (
     <>

@@ -6919,3 +6919,129 @@ body.ubs-no-outlines .repo-row:hover {
   font-size: 0.8rem;
   flex-shrink: 0;
 }
+
+/* ── Members list ─────────────────────────────────────────────────────────── */
+
+.tenant-members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tenant-member-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 0.5rem;
+  background: var(--brand-primary-alpha-05);
+}
+
+.tenant-member-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--ifm-color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tenant-member-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tenant-member-initial {
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.tenant-member-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tenant-member-name {
+  font-weight: 600;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tenant-member-email {
+  font-size: 0.72rem;
+  opacity: 0.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tenant-member-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 99px;
+  text-transform: capitalize;
+  flex-shrink: 0;
+}
+
+.tenant-member-badge-owner {
+  background: var(--ifm-color-primary);
+  color: #fff;
+}
+
+.tenant-member-badge-member {
+  background: var(--brand-primary-alpha-14);
+  color: var(--ifm-color-primary);
+}
+
+/* ── Permissions view ─────────────────────────────────────────────────────── */
+
+.tenant-permissions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.tenant-perm-card {
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 0.5rem;
+  background: var(--brand-primary-alpha-05);
+}
+
+.tenant-perm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+
+.tenant-perm-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.tenant-perm-tag {
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: var(--brand-primary-alpha-14);
+  color: var(--ifm-font-color-base);
+}
+
+.tenant-perm-scope {
+  opacity: 0.6;
+  font-size: 0.65rem;
+}

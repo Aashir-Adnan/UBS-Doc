@@ -47,7 +47,7 @@ export default function MyProjects() {
     return <PendingAccess email={me?.email} />;
   }
 
-  const orgLabel = activeOrg?.org_name || 'Personal';
+  const orgLabel = activeOrg?.display_name || activeOrg?.org_name || 'Personal';
 
   if (state.status === 'loading' || state.status === 'idle') {
     return <p className="tenant-muted">Loading projects for {orgLabel}...</p>;

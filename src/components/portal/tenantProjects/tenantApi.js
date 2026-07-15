@@ -173,3 +173,18 @@ export function getUserUrdds(email) {
 export function addProjectToOrg(email, org_id, project_id) {
   return tPost('/portal/org/addproject', { email, org_id, project_id });
 }
+
+// Update organization name.
+export function updateOrganization(email, org_id, organization_name) {
+  return tPost('/portal/org/update', { email, org_id, organization_name });
+}
+
+// Add a member to an organization by their email.
+export function addOrgMember(email, org_id, member_email) {
+  return tPost('/portal/org/addmember', { email, org_id, member_email });
+}
+
+// List members of an organization.
+export function getOrgMembers(email, org_id) {
+  return tGet('/portal/org/members', { email, org_id });
+}
