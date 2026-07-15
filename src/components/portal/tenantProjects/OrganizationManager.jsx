@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   createOrganization, joinOrganization, getMyOrganization,
   updateOrganization, addOrgMember, getOrgMembers,
+  addRepoToOrg, getOrgRepos,
 } from './tenantApi';
 import { fetchUserUrdds, setActiveUrdd } from '@site/src/state/orgSlice';
 
@@ -259,12 +260,88 @@ function PermissionsPanel({ email }) {
   );
 }
 
+function ReposPanel({ email, orgInfo }) {
+  const org = orgInfo?.owned;
+  const [repos, setRepos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [adding, setAdding] = useState(null);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+
+  const loadRepos = async () => {
+    if (!org) return;
+    try {
+      setLoading(true);
+      const res = await getOrgRepos(email, org.id);
+      setRepos(Array.isArray(res?.all) ? res.all : []);
+    } catch {
+      setError('Could not load repositories.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadRepos(); }, [org?.id]);
+
+  const handleAdd = async (repoId) => {
+    setError(null);
+    setSuccess(null);
+    try {
+      setAdding(repoId);
+      const res = await addRepoToOrg(email, org.id, repoId);
+      setSuccess(`"${res.repo_name}" added to organization.`);
+      await loadRepos();
+    } catch (err) {
+      setError(friendlyError(err.message));
+    } finally {
+      setAdding(null);
+    }
+  };
+
+  if (!org) return <p className="tenant-muted">You haven't created an organization. Only organization owners can manage repositories.</p>;
+
+  return (
+    <div>
+      {error && <p className="tenant-error">{error}</p>}
+      {success && <p className="tenant-success">{success}</p>}
+
+      {loading ? (
+        <p className="tenant-muted">Loading repositories...</p>
+      ) : repos.length === 0 ? (
+        <p className="tenant-muted">No tracked repositories found.</p>
+      ) : (
+        <div className="tenant-members-list">
+          {repos.map((r) => (
+            <div key={r.id} className="tenant-member-row">
+              <div className="tenant-member-info">
+                <span className="tenant-member-name">{r.name}</span>
+                <span className="tenant-member-email">{r.url}</span>
+              </div>
+              {r.in_org ? (
+                <span className="tenant-member-badge tenant-member-badge-owner">in org</span>
+              ) : (
+                <button type="button" className="tenant-submit"
+                  style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem', margin: 0 }}
+                  disabled={adding === r.id}
+                  onClick={() => handleAdd(r.id)}>
+                  {adding === r.id ? 'Adding...' : 'Add'}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────────────────
 
 const TABS = [
   { key: 'org', label: 'Create / Join' },
   { key: 'settings', label: 'Settings' },
   { key: 'members', label: 'Members' },
+  { key: 'repos', label: 'Repositories' },
   { key: 'permissions', label: 'My Permissions' },
 ];
 
@@ -312,6 +389,7 @@ export default function OrganizationManager({ email, onOrgChanged }) {
         {tab === 'org' && <CreateJoinPanel email={email} orgInfo={orgInfo} onDone={() => { loadOrg(); if (onOrgChanged) onOrgChanged(); }} />}
         {tab === 'settings' && <SettingsPanel email={email} orgInfo={orgInfo} onDone={loadOrg} />}
         {tab === 'members' && <MembersPanel email={email} orgInfo={orgInfo} />}
+        {tab === 'repos' && <ReposPanel email={email} orgInfo={orgInfo} />}
         {tab === 'permissions' && <PermissionsPanel email={email} />}
       </div>
     </div>

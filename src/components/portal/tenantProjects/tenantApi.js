@@ -188,3 +188,13 @@ export function addOrgMember(email, org_id, member_email) {
 export function getOrgMembers(email, org_id) {
   return tGet('/portal/org/members', { email, org_id });
 }
+
+// Add a repo to an organization.
+export function addRepoToOrg(email, org_id, repo_id) {
+  return tPost('/portal/org/addrepo', { email, org_id, repo_id });
+}
+
+// List repos (all + which are in the org).
+export function getOrgRepos(email, org_id) {
+  return tGet('/portal/org/repos', { email, org_id });
+}
