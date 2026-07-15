@@ -9,8 +9,10 @@ import AssignTenant from '@site/src/components/portal/tenantProjects/AssignTenan
 import GrantProjects from '@site/src/components/portal/tenantProjects/GrantProjects';
 import GrantRepos from '@site/src/components/portal/tenantProjects/GrantRepos';
 import ProvisionUser from '@site/src/components/portal/tenantProjects/ProvisionUser';
+import OrganizationManager from '@site/src/components/portal/tenantProjects/OrganizationManager';
 
 const TABS = [
+  { key: 'org', label: 'Organization' },
   { key: 'provision', label: 'Provision user' },
   { key: 'assign', label: 'Assign tenant' },
   { key: 'grant', label: 'Grant projects' },
@@ -21,7 +23,7 @@ function TenantAdminContent() {
   const { user, signOut } = useAuth();
   const canAccessPortal = !!user && isGranjurEmail(user?.email);
   const { urdd: adminUrdd, refetch } = useActingUrdd();
-  const [tab, setTab] = useState('provision');
+  const [tab, setTab] = useState('org');
 
   if (!user) {
     return (
@@ -95,6 +97,12 @@ function TenantAdminContent() {
         </div>
 
         <div className="portal-card">
+          {tab === 'org' && (
+            <OrganizationManager
+              email={user.email}
+              onOrgChanged={refetch}
+            />
+          )}
           {tab === 'provision' && (
             <ProvisionUser
               adminUrdd={adminUrdd}

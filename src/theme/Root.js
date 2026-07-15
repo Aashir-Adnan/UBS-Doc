@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useHistory, useLocation } from '@docusaurus/router';
+import { Provider as ReduxProvider, useDispatch } from 'react-redux';
+import { store } from '@site/src/state/store';
 import { AuthProvider, useAuth } from '@site/src/components/portal/authStore';
 import GoogleSignIn from '@site/src/components/portal/GoogleSignIn';
+import OrgSwitcher from '@site/src/components/portal/tenantProjects/OrgSwitcher';
+import { fetchUserUrdds, clearOrg } from '@site/src/state/orgSlice';
 
 const NAV_ITEMS = [
   { label: 'Home', to: '/' },
@@ -128,11 +132,13 @@ export default function Root({ children }) {
   }, []);
 
   return (
+    <ReduxProvider store={store}>
     <AuthProvider>
       <AuthGate>
       <div className="ubs-app-shell">
         <aside className="ubs-side-nav">
           <div className="ubs-side-nav-brand">UBS</div>
+          <OrgSwitcher />
           <nav className="ubs-side-nav-links" aria-label="Primary">
             {NAV_ITEMS.map((item) => {
               const active =
@@ -229,11 +235,21 @@ export default function Root({ children }) {
       </div>
     </AuthGate>
     </AuthProvider>
+    </ReduxProvider>
   );
 }
 
 function AuthGate({ children }) {
   const { user } = useAuth();
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    if (user?.email) {
+      dispatch(fetchUserUrdds(user.email));
+    } else {
+      dispatch(clearOrg());
+    }
+  }, [user?.email, dispatch]);
 
   if (!user) {
     return (

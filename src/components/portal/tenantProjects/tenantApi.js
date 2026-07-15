@@ -22,12 +22,16 @@ function qs(params) {
   return s ? `?${s}` : '';
 }
 
+function extractError(data, text, statusText) {
+  return data?.message || data?.error || data?.payload || text || statusText;
+}
+
 async function tGet(path, params) {
   const r = await fetch(`${BASE}${path}${qs(params)}`);
   const text = await r.text();
   let data;
   try { data = JSON.parse(text); } catch { throw new Error(text || r.statusText); }
-  if (!r.ok) throw new Error(data.error || text || r.statusText);
+  if (!r.ok) throw new Error(extractError(data, text, r.statusText));
   return unwrap(data);
 }
 
@@ -40,7 +44,7 @@ async function tPost(path, body) {
   const text = await r.text();
   let data;
   try { data = JSON.parse(text); } catch { throw new Error(text || r.statusText); }
-  if (!r.ok) throw new Error(data.error || text || r.statusText);
+  if (!r.ok) throw new Error(extractError(data, text, r.statusText));
   return unwrap(data);
 }
 
@@ -138,4 +142,34 @@ export function provisionUser({ actor_email, email, portal_user_id, tenant_id })
     body.email = email;
   }
   return tPost('/portal/users/provision', body);
+}
+
+// ---- Organization management ------------------------------------------------
+
+// Create a new organization. Each user may create at most one.
+export function createOrganization(email, organization_name, passcode) {
+  return tPost('/portal/org/create', { email, organization_name, passcode });
+}
+
+// Join an existing organization by name + passcode.
+export function joinOrganization(email, organization_name, passcode) {
+  return tPost('/portal/org/join', { email, organization_name, passcode });
+}
+
+// Get the user's owned and joined organizations.
+export function getMyOrganization(email) {
+  return tGet('/portal/org/mine', { email });
+}
+
+// ---- Multi-URDD / org switching ---------------------------------------------
+
+// Fetch all URDDs for a user, each with tenant/org info and permissions.
+// Called on load to populate the org switcher.
+export function getUserUrdds(email) {
+  return tGet('/portal/users/urdds', { email });
+}
+
+// Add a project to an organization (sets project.tenant_id, updates member perms).
+export function addProjectToOrg(email, org_id, project_id) {
+  return tPost('/portal/org/addproject', { email, org_id, project_id });
 }

@@ -74,9 +74,9 @@ export default function ProvisionUser({ adminUrdd, actorEmail, onProvisioned }) 
           <select value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
             <option value="">Select a tenant…</option>
             {tenants.map((t) => (
-              <option key={t.tenant_id} value={t.tenant_id}>
-                {t.tenant_name || t.tenant_slug || `Tenant ${t.tenant_id}`}
-                {` — #${t.tenant_id}`}
+              <option key={t.id} value={t.id}>
+                {t.organization_name || `Tenant ${t.id}`}
+                {` — #${t.id}`}
               </option>
             ))}
           </select>
@@ -95,9 +95,10 @@ export default function ProvisionUser({ adminUrdd, actorEmail, onProvisioned }) 
       </button>
 
       {error && <p className="tenant-error">{error}</p>}
-      {result?.ok && (
+      {result?.user && (
         <p className="tenant-success">
-          Provisioned {result.email} → URDD #{result.urdd_id} in tenant #{result.tenant_id}.
+          Provisioned {result.user.email} → URDD #{result.user.urdd_id}
+          {result.user.tenant_id ? ` in tenant #${result.user.tenant_id}` : ''}.
         </p>
       )}
     </form>

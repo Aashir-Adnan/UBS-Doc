@@ -4,11 +4,8 @@ import { useActingUrdd } from './useActingUrdd';
 import { listMyProjects } from './tenantApi';
 import PendingAccess from './PendingAccess';
 
-// "My Projects" dashboard (§3.1). Renders exactly what the backend returns for
-// the acting URDD — tenant-scoped and allow/block-narrowed. Empty state when
-// total is 0 (never a "show all" fallback).
 export default function MyProjects() {
-  const { status: idStatus, urdd, me, error: idError } = useActingUrdd();
+  const { status: idStatus, urdd, activeOrg, me, error: idError } = useActingUrdd();
 
   const [state, setState] = useState({ status: 'idle', projects: [], total: 0, error: null });
 
@@ -34,21 +31,36 @@ export default function MyProjects() {
   }, [idStatus, urdd]);
 
   if (idStatus === 'loading' || idStatus === 'idle') {
-    return <p className="tenant-muted">Resolving your access…</p>;
+    return <p className="tenant-muted">Resolving your access...</p>;
   }
   if (idStatus === 'error') {
-    return <p className="tenant-error">Could not resolve your access: {idError}</p>;
+    return (
+      <div className="portal-card tenant-empty-card">
+        <div className="portal-section-header">
+          <h3>Unable to load access</h3>
+          <p>We could not verify your access right now. Please try refreshing the page.</p>
+        </div>
+      </div>
+    );
   }
   if (idStatus === 'pending') {
     return <PendingAccess email={me?.email} />;
   }
 
-  // idStatus === 'ready'
+  const orgLabel = activeOrg?.org_name || 'Personal';
+
   if (state.status === 'loading' || state.status === 'idle') {
-    return <p className="tenant-muted">Loading your projects…</p>;
+    return <p className="tenant-muted">Loading projects for {orgLabel}...</p>;
   }
   if (state.status === 'error') {
-    return <p className="tenant-error">Failed to load projects: {state.error}</p>;
+    return (
+      <div className="portal-card tenant-empty-card">
+        <div className="portal-section-header">
+          <h3>Could not load projects</h3>
+          <p>Something went wrong loading your projects. Please try again later.</p>
+        </div>
+      </div>
+    );
   }
 
   if (state.total === 0 || state.projects.length === 0) {
@@ -56,33 +68,43 @@ export default function MyProjects() {
       <div className="portal-card tenant-empty-card">
         <div className="portal-section-header">
           <h3>No projects yet</h3>
-          <p>There are no projects available to your account under your tenant.</p>
+          <p>
+            There are no projects available under <strong>{orgLabel}</strong>.
+            {activeOrg?.org_name
+              ? ' Ask your organization admin to add projects, or switch organizations using the sidebar.'
+              : ' Join or create an organization to get started.'}
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="tenant-project-grid">
-      {state.projects.map((p) => (
-        <Link
-          key={p.project_id}
-          to={`/tools/myProjects/view?project_id=${p.project_id}`}
-          className="tenant-project-card"
-        >
-          <div className="tenant-project-card-head">
-            <h3>{p.project_name || `Project ${p.project_id}`}</h3>
-            {p.deployment_status ? (
-              <span className={`tenant-status-pill tenant-status-${String(p.deployment_status).toLowerCase()}`}>
-                {p.deployment_status}
-              </span>
-            ) : null}
-          </div>
-          <p className="tenant-muted">
-            Tenant #{p.tenant_id} · Project #{p.project_id}
-          </p>
-        </Link>
-      ))}
-    </div>
+    <>
+      <p className="tenant-muted" style={{ marginBottom: '1rem' }}>
+        Showing projects for <strong>{orgLabel}</strong>
+      </p>
+      <div className="tenant-project-grid">
+        {state.projects.map((p) => (
+          <Link
+            key={p.project_id}
+            to={`/tools/myProjects/view?project_id=${p.project_id}`}
+            className="tenant-project-card"
+          >
+            <div className="tenant-project-card-head">
+              <h3>{p.project_name || `Project ${p.project_id}`}</h3>
+              {p.deployment_status ? (
+                <span className={`tenant-status-pill tenant-status-${String(p.deployment_status).toLowerCase()}`}>
+                  {p.deployment_status}
+                </span>
+              ) : null}
+            </div>
+            <p className="tenant-muted">
+              {orgLabel} &middot; Project #{p.project_id}
+            </p>
+          </Link>
+        ))}
+      </div>
+    </>
   );
 }
