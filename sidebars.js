@@ -162,6 +162,7 @@ const sidebars = {
               label: 'Guest Booking Flow',
               items: [
                 'hms-documentation/guest-apis/guest-booking-flow/guest-booking-flow',
+                'hms-documentation/guest-apis/guest-booking-flow/guest-booking-edit',
                 'hms-documentation/guest-apis/guest-booking-flow/booking-management',
               ],
             },
