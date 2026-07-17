@@ -1,16 +1,19 @@
-import React from 'react';
-import Layout from '@theme/Layout';
-import { useAuth } from '../../../components/portal/authStore';
-import GoogleSignIn from '../../../components/portal/GoogleSignIn';
-import SQLERDVisualizer from '../../../components/portal/SQLERDVisualizer';
-import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
+import React from "react";
+import { useAuth } from "../../../components/portal/authStore";
+import GoogleSignIn from "../../../components/portal/GoogleSignIn";
+import SQLERDVisualizer from "../../../components/portal/SQLERDVisualizer";
+import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
 
 function MapperContent() {
   const { user, loading } = useAuth();
   const canAccessPortal = !!user && isGranjurEmail(user?.email);
 
   if (loading) {
-    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+    return (
+      <section className="portal-hero portal-hero-center">
+        <p>Loading...</p>
+      </section>
+    );
   }
 
   if (!user) {
@@ -56,13 +59,10 @@ function MapperContent() {
 
 export default function MapperPage() {
   return (
-    <Layout
-      title="Project DB Mapper"
-      description="Upload SQL and visualize ERD in orthogonal layout"
-    >
+    <>
       <main className="portal-main-wrapper mapper-visualizer-main">
         <MapperContent />
       </main>
-    </Layout>
+    </>
   );
 }

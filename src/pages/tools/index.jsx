@@ -1,16 +1,19 @@
-import React from 'react';
-import Layout from '@theme/Layout';
-import Link from '@docusaurus/Link';
-import { useAuth } from '@site/src/components/portal/authStore';
-import GoogleSignIn from '@site/src/components/portal/GoogleSignIn';
-import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
+import React from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "@site/src/components/portal/authStore";
+import GoogleSignIn from "@site/src/components/portal/GoogleSignIn";
+import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
 
 function ToolsHub() {
   const { user, signOut, loading } = useAuth();
   const canAccessPortal = !!user && isGranjurEmail(user?.email);
 
   if (loading) {
-    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+    return (
+      <section className="portal-hero portal-hero-center">
+        <p>Loading...</p>
+      </section>
+    );
   }
 
   if (!user) {
@@ -71,16 +74,66 @@ function ToolsHub() {
       <section className="portal-section">
         <div className="tools-hub-grid">
           {[
-            { to: '/tools/database', icon: '🗄️', label: 'Database Tools', desc: 'Upload SQL schemas to generate internal resources and automation utilities.' },
-            { to: '/tools/lucid', icon: '🎨', label: 'Lucid Sanitize', desc: 'Upload and sanitize Lucid chart exports for cleaner diagrams.' },
-            { to: '/tools/notify', icon: '✉️', label: 'Notify Maintainer', desc: 'Send quick bug reports or feature requests directly to the maintainer.' },
-            { to: '/tools/apiObject', icon: '⚙️', label: 'API Object Builder', desc: 'Create custom API objects with flags and pre/post process functions.' },
-            { to: '/tools/projects', icon: '📁', label: 'Projects', desc: 'Browse project documentation and open custom project views and dashboards.' },
-            { to: '/tools/github', icon: '🐙', label: 'GitHub Dev Workflow', desc: 'Browse repositories and dispatch agent tasks as GitHub issues.' },
-            { to: '/tools/meetingWorkflow', icon: '🎙️', label: 'Meeting Workflow', desc: 'Create meetings, transcribe recordings, generate AI-powered notes and sync to GitHub.' },
-            { to: '/tools/repos', icon: '📂', label: 'Tracked Repositories', desc: 'Add, remove, and pull GitHub repos monitored by the agent pipeline.' },
-            { to: '/tools/myProjects', icon: '📌', label: 'My Projects', desc: 'View the projects available to your account under your tenant.' },
-            { to: '/tools/tenantAdmin', icon: '🛡️', label: 'Tenant Admin', desc: 'Provision users and manage tenant and project access (admin only).' },
+            {
+              to: "/tools/database",
+              icon: "🗄️",
+              label: "Database Tools",
+              desc: "Upload SQL schemas to generate internal resources and automation utilities.",
+            },
+            {
+              to: "/tools/lucid",
+              icon: "🎨",
+              label: "Lucid Sanitize",
+              desc: "Upload and sanitize Lucid chart exports for cleaner diagrams.",
+            },
+            {
+              to: "/tools/notify",
+              icon: "✉️",
+              label: "Notify Maintainer",
+              desc: "Send quick bug reports or feature requests directly to the maintainer.",
+            },
+            {
+              to: "/tools/apiObject",
+              icon: "⚙️",
+              label: "API Object Builder",
+              desc: "Create custom API objects with flags and pre/post process functions.",
+            },
+            {
+              to: "/tools/projects",
+              icon: "📁",
+              label: "Projects",
+              desc: "Browse project documentation and open custom project views and dashboards.",
+            },
+            {
+              to: "/tools/github",
+              icon: "🐙",
+              label: "GitHub Dev Workflow",
+              desc: "Browse repositories and dispatch agent tasks as GitHub issues.",
+            },
+            {
+              to: "/tools/meetingWorkflow",
+              icon: "🎙️",
+              label: "Meeting Workflow",
+              desc: "Create meetings, transcribe recordings, generate AI-powered notes and sync to GitHub.",
+            },
+            {
+              to: "/tools/repos",
+              icon: "📂",
+              label: "Tracked Repositories",
+              desc: "Add, remove, and pull GitHub repos monitored by the agent pipeline.",
+            },
+            {
+              to: "/tools/myProjects",
+              icon: "📌",
+              label: "My Projects",
+              desc: "View the projects available to your account under your tenant.",
+            },
+            {
+              to: "/tools/tenantAdmin",
+              icon: "🛡️",
+              label: "Tenant Admin",
+              desc: "Provision users and manage tenant and project access (admin only).",
+            },
           ].map(({ to, icon, label, desc }) => (
             <Link key={to} to={to} className="tool-card">
               <div className="tool-card-face">
@@ -100,13 +153,10 @@ function ToolsHub() {
 
 export default function ToolsPage() {
   return (
-    <Layout
-      title="Dev Tools"
-      description="Granjur Dev Tools - database and automation utilities"
-    >
+    <>
       <main className="portal-main-wrapper">
         <ToolsHub />
       </main>
-    </Layout>
+    </>
   );
 }

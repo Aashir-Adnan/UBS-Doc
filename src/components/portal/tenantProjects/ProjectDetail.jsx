@@ -1,34 +1,44 @@
-import React, { useEffect, useState } from 'react';
-import Link from '@docusaurus/Link';
-import { useLocation } from 'react-router-dom';
-import { useActingUrdd } from './useActingUrdd';
-import { canAccessProject } from './tenantApi';
-import PendingAccess from './PendingAccess';
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { useActingUrdd } from "./useActingUrdd";
+import { canAccessProject } from "./tenantApi";
+import PendingAccess from "./PendingAccess";
 
 // Route guard for a project detail page (§3.2). Before showing any project
 // content it asks the server GET /projects/tenant/canaccess and blocks when
 // `allowed` is false — this guards deep links and bookmarked URLs.
 export default function ProjectDetail() {
   const { search } = useLocation();
-  const projectId = new URLSearchParams(search).get('project_id');
+  const projectId = new URLSearchParams(search).get("project_id");
 
   const { status: idStatus, urdd, me, error: idError } = useActingUrdd();
-  const [state, setState] = useState({ status: 'idle', allowed: false, error: null });
+  const [state, setState] = useState({
+    status: "idle",
+    allowed: false,
+    error: null,
+  });
 
   useEffect(() => {
-    if (idStatus !== 'ready' || urdd == null || !projectId) return;
+    if (idStatus !== "ready" || urdd == null || !projectId) return;
     let cancelled = false;
-    setState({ status: 'checking', allowed: false, error: null });
+    setState({ status: "checking", allowed: false, error: null });
     canAccessProject(urdd, projectId)
       .then((res) => {
         if (cancelled) return;
-        setState({ status: 'done', allowed: res?.allowed === true, error: null });
+        setState({
+          status: "done",
+          allowed: res?.allowed === true,
+          error: null,
+        });
       })
       .catch((e) => {
         if (cancelled) return;
-        setState({ status: 'error', allowed: false, error: e.message });
+        setState({ status: "error", allowed: false, error: e.message });
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [idStatus, urdd, projectId]);
 
   const backLink = (
@@ -49,20 +59,24 @@ export default function ProjectDetail() {
     );
   }
 
-  if (idStatus === 'loading' || idStatus === 'idle') {
+  if (idStatus === "loading" || idStatus === "idle") {
     return <p className="tenant-muted">Resolving your access…</p>;
   }
-  if (idStatus === 'error') {
-    return <p className="tenant-error">Could not resolve your access: {idError}</p>;
+  if (idStatus === "error") {
+    return (
+      <p className="tenant-error">Could not resolve your access: {idError}</p>
+    );
   }
-  if (idStatus === 'pending') {
+  if (idStatus === "pending") {
     return <PendingAccess email={me?.email} />;
   }
 
-  if (state.status === 'checking' || state.status === 'idle') {
-    return <p className="tenant-muted">Checking access to project #{projectId}…</p>;
+  if (state.status === "checking" || state.status === "idle") {
+    return (
+      <p className="tenant-muted">Checking access to project #{projectId}…</p>
+    );
   }
-  if (state.status === 'error') {
+  if (state.status === "error") {
     return <p className="tenant-error">Access check failed: {state.error}</p>;
   }
 

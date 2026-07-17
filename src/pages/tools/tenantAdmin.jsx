@@ -1,29 +1,28 @@
-import React, { useState } from 'react';
-import Layout from '@theme/Layout';
-import Link from '@docusaurus/Link';
-import { useAuth } from '@site/src/components/portal/authStore';
-import GoogleSignIn from '@site/src/components/portal/GoogleSignIn';
-import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
-import { useActingUrdd } from '@site/src/components/portal/tenantProjects/useActingUrdd';
-import AssignTenant from '@site/src/components/portal/tenantProjects/AssignTenant';
-import GrantProjects from '@site/src/components/portal/tenantProjects/GrantProjects';
-import GrantRepos from '@site/src/components/portal/tenantProjects/GrantRepos';
-import ProvisionUser from '@site/src/components/portal/tenantProjects/ProvisionUser';
-import OrganizationManager from '@site/src/components/portal/tenantProjects/OrganizationManager';
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "@site/src/components/portal/authStore";
+import GoogleSignIn from "@site/src/components/portal/GoogleSignIn";
+import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
+import { useActingUrdd } from "@site/src/components/portal/tenantProjects/useActingUrdd";
+import AssignTenant from "@site/src/components/portal/tenantProjects/AssignTenant";
+import GrantProjects from "@site/src/components/portal/tenantProjects/GrantProjects";
+import GrantRepos from "@site/src/components/portal/tenantProjects/GrantRepos";
+import ProvisionUser from "@site/src/components/portal/tenantProjects/ProvisionUser";
+import OrganizationManager from "@site/src/components/portal/tenantProjects/OrganizationManager";
 
 const TABS = [
-  { key: 'org', label: 'Organization' },
-  { key: 'provision', label: 'Provision user' },
-  { key: 'assign', label: 'Assign tenant' },
-  { key: 'grant', label: 'Grant projects' },
-  { key: 'grantRepos', label: 'Grant repos' },
+  { key: "org", label: "Organization" },
+  { key: "provision", label: "Provision user" },
+  { key: "assign", label: "Assign tenant" },
+  { key: "grant", label: "Grant projects" },
+  { key: "grantRepos", label: "Grant repos" },
 ];
 
 function TenantAdminContent() {
   const { user, signOut } = useAuth();
   const canAccessPortal = !!user && isGranjurEmail(user?.email);
   const { urdd: adminUrdd, refetch } = useActingUrdd();
-  const [tab, setTab] = useState('org');
+  const [tab, setTab] = useState("org");
 
   if (!user) {
     return (
@@ -69,9 +68,13 @@ function TenantAdminContent() {
         <div className="portal-hero-text">
           <h2>Tenant Admin</h2>
           <p>
-            Provision users and manage tenant / project access. Signed in as{' '}
-            <strong>{user.name || user.email}</strong>.{' '}
-            <button type="button" className="portal-signout-link" onClick={signOut}>
+            Provision users and manage tenant / project access. Signed in as{" "}
+            <strong>{user.name || user.email}</strong>.{" "}
+            <button
+              type="button"
+              className="portal-signout-link"
+              onClick={signOut}
+            >
               Sign out
             </button>
           </p>
@@ -88,7 +91,7 @@ function TenantAdminContent() {
             <button
               key={t.key}
               type="button"
-              className={`tenant-tab${tab === t.key ? ' tenant-tab-active' : ''}`}
+              className={`tenant-tab${tab === t.key ? " tenant-tab-active" : ""}`}
               onClick={() => setTab(t.key)}
             >
               {t.label}
@@ -97,22 +100,19 @@ function TenantAdminContent() {
         </div>
 
         <div className="portal-card">
-          {tab === 'org' && (
-            <OrganizationManager
-              email={user.email}
-              onOrgChanged={refetch}
-            />
+          {tab === "org" && (
+            <OrganizationManager email={user.email} onOrgChanged={refetch} />
           )}
-          {tab === 'provision' && (
+          {tab === "provision" && (
             <ProvisionUser
               adminUrdd={adminUrdd}
               actorEmail={user.email}
               onProvisioned={refetch}
             />
           )}
-          {tab === 'assign' && <AssignTenant adminUrdd={adminUrdd} />}
-          {tab === 'grant' && <GrantProjects adminUrdd={adminUrdd} />}
-          {tab === 'grantRepos' && <GrantRepos adminUrdd={adminUrdd} />}
+          {tab === "assign" && <AssignTenant adminUrdd={adminUrdd} />}
+          {tab === "grant" && <GrantProjects adminUrdd={adminUrdd} />}
+          {tab === "grantRepos" && <GrantRepos adminUrdd={adminUrdd} />}
         </div>
       </section>
     </>
@@ -121,10 +121,10 @@ function TenantAdminContent() {
 
 export default function TenantAdminPage() {
   return (
-    <Layout title="Tenant Admin" description="Provision users and manage tenant/project access">
+    <>
       <main className="portal-main-wrapper">
         <TenantAdminContent />
       </main>
-    </Layout>
+    </>
   );
 }

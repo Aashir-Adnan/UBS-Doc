@@ -1,10 +1,9 @@
-import React from 'react';
-import Layout from '@theme/Layout';
-import Link from '@docusaurus/Link';
-import { useAuth } from '@site/src/components/portal/authStore';
-import GoogleSignIn from '@site/src/components/portal/GoogleSignIn';
-import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
-import ProjectDetail from '@site/src/components/portal/tenantProjects/ProjectDetail';
+import React from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "@site/src/components/portal/authStore";
+import GoogleSignIn from "@site/src/components/portal/GoogleSignIn";
+import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
+import ProjectDetail from "@site/src/components/portal/tenantProjects/ProjectDetail";
 
 function ProjectViewContent() {
   const { user } = useAuth();
@@ -54,10 +53,10 @@ function ProjectViewContent() {
 
 export default function ProjectViewPage() {
   return (
-    <Layout title="Project" description="Tenant-scoped project detail">
+    <>
       <main className="portal-main-wrapper">
         <ProjectViewContent />
       </main>
-    </Layout>
+    </>
   );
 }

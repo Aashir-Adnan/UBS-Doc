@@ -1,17 +1,20 @@
-import React from 'react';
-import Layout from '@theme/Layout';
-import Link from '@docusaurus/Link';
-import { useAuth } from '../../components/portal/authStore';
-import GoogleSignIn from '../../components/portal/GoogleSignIn';
-import BugReport from '../../components/portal/BugReport';
-import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
+import React from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "../../components/portal/authStore";
+import GoogleSignIn from "../../components/portal/GoogleSignIn";
+import BugReport from "../../components/portal/BugReport";
+import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
 
 function NotifyContent() {
   const { user, signOut, loading } = useAuth();
   const canAccessPortal = !!user && isGranjurEmail(user?.email);
 
   if (loading) {
-    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+    return (
+      <section className="portal-hero portal-hero-center">
+        <p>Loading...</p>
+      </section>
+    );
   }
 
   if (!user) {
@@ -58,8 +61,8 @@ function NotifyContent() {
         <div className="portal-hero-text">
           <h2>Notify Maintainer</h2>
           <p>
-            Send bug reports or feature requests. Signed in as{' '}
-            <strong>{user.name || user.email}</strong>.{' '}
+            Send bug reports or feature requests. Signed in as{" "}
+            <strong>{user.name || user.email}</strong>.{" "}
             <button
               type="button"
               className="portal-signout-link"
@@ -80,13 +83,10 @@ function NotifyContent() {
 
 export default function NotifyPage() {
   return (
-    <Layout
-      title="Notify Maintainer"
-      description="Send bug reports and feature requests"
-    >
+    <>
       <main className="portal-main-wrapper">
         <NotifyContent />
       </main>
-    </Layout>
+    </>
   );
 }
