@@ -98,7 +98,7 @@ Each service object is a minimal landing-card shape with `id`, `name`, `category
 
 **Authentication:** AUTH_PLATFORM (requires guest JWT)
 
-### Request Body
+### Request Body (Simple)
 
 ```json
 {
@@ -128,8 +128,67 @@ Each service object is a minimal landing-card shape with `id`, `name`, `category
 | `checkOut` | `string` | Yes | Check-out date (YYYY-MM-DD) |
 | `guests` | `object` | Yes | `{ adults: number, children: number }` |
 | `isMainGuest` | `boolean` | Yes | Whether the booker is the primary guest |
+| `entries` | `array` | No | Serial/parallel booking entries (see **Serial/Parallel Bookings** below) |
 | `addons` | `array` | No | Array of addon objects (see **Addon Scheduling** below) |
 | `paymentPlan` | `string` | Yes | `"full"` or `"partial"` |
+
+### Serial/Parallel Bookings (Multiple Rooms / Consecutive Stays)
+
+The `entries` array enables two advanced booking modes:
+
+- **Serial booking** — consecutive stay segments (e.g. week 1 in room A, week 2 in room B). Each entry's check-out must equal the next entry's check-in.
+- **Parallel booking** — multiple rooms for the same dates. Set `quantity > 1` on an entry to book N rooms simultaneously.
+- **Combined** — both serial and parallel in one booking (e.g. 2 rooms for 2 consecutive weeks).
+
+When `entries` is provided, the `checkIn`/`checkOut` top-level fields still serve as basic date validation, but the booking's effective date range spans from the first entry's check-in to the last entry's check-out.
+
+#### Request Body (Serial/Parallel)
+
+```json
+{
+  "actionPerformerURDD": 16,
+  "hotelId": 3,
+  "roomId": 71,
+  "checkIn": "2026-07-14",
+  "checkOut": "2026-07-28",
+  "guests": { "adults": 4, "children": 0 },
+  "entries": [
+    { "checkIn": "2026-07-14", "checkOut": "2026-07-21", "quantity": 2 },
+    { "checkIn": "2026-07-21", "checkOut": "2026-07-28", "quantity": 2 }
+  ],
+  "isMainGuest": true,
+  "paymentPlan": "full"
+}
+```
+
+#### Entry Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `checkIn` / `check_in_date` | `string` | Yes | Entry check-in date (YYYY-MM-DD) |
+| `checkOut` / `check_out_date` | `string` | Yes | Entry check-out date (YYYY-MM-DD) |
+| `quantity` | `number` | No | Number of rooms for this entry (default: 1) |
+
+#### Validation Rules
+
+1. **Duration bounds** — each entry's stay must be within `min_stay_nights` and `max_stay_nights` (same rules as single bookings, applied per entry).
+2. **Serial continuity** — for consecutive entries, entry N's check-out must exactly equal entry N+1's check-in. Gaps or overlaps are rejected.
+3. **Max booking cap** — the sum of all entry quantities must not exceed `max_quantity_per_booking`.
+4. **Date sanity** — each entry's check-in must be before its check-out and not in the past.
+
+#### Unit Assignment Strategy
+
+The backend uses a two-phase strategy for assigning rooms:
+
+1. **Full-span strategy** (preferred): attempts to find room(s) available for the entire span (first check-in to last check-out) so the guest stays in the same room across consecutive entries. This avoids room switches mid-stay.
+2. **Per-entry fallback**: if not enough rooms are available for the full span, each entry is assigned rooms independently. Rooms may differ between entries.
+
+When `quantity > 1`, guests are distributed evenly across rooms: `guestsPerUnit = ceil(totalGuests / quantity)`.
+
+#### Pricing
+
+- Room price is multiplied by `totalInstances` (sum of all entry quantities) times the number of nights per entry.
+- Pricing rules (discounts, taxes) are applied once to the full subtotal (stay + addons), not per entry.
 
 ### Addon Scheduling
 
@@ -219,14 +278,16 @@ Returns all bookings for the guest (not limited to upcoming). The created bookin
 
 ## Room Availability
 
-When creating a booking, the backend picks an available delivery unit via `pickAvailableUnitForService`. A unit is considered **available** when no active `booking_items` row overlaps the requested date range — specifically:
+When creating a booking, the backend picks available delivery units. For **single bookings**, `pickAvailableUnitForService` selects one unit. For **serial/parallel bookings**, `pickMultipleAvailableUnits` selects N units per entry.
+
+A unit is considered **available** when no active `booking_items` row overlaps the requested date range — specifically:
 
 - `bi.status = 'active'`
 - `bi.item_status NOT IN ('cancelled', 'checked_out')`
 - `b.booking_status NOT IN ('cancelled', 'checked_out')` (joined from `bookings`)
 - Date overlap: `DATE(bi.scheduled_start) < DATE(checkOut) AND DATE(bi.scheduled_end) > DATE(checkIn)`
 
-If no unit is free, the booking API returns **409** `"No available rooms for the selected dates"`.
+If no unit is free, the booking API returns **409** `"No available rooms for the selected dates"`. For serial/parallel bookings with insufficient units for a specific entry, the error includes the date range and the shortfall (e.g. `"need 2, found 1"`).
 
 **Pinned bookings** (where the guest starts from a specific room/package detail page, bypassing `/guest/search/filter`) rely on the same availability check at submit time. No separate pre-check endpoint is needed — the `roomId` sent by the frontend is a `service_id` (the same `id` returned by search results).
 
@@ -268,3 +329,4 @@ The test exercises all 7 steps above plus direct DB verification, and automatica
 |------|--------|
 | 2026-06-09 | Initial documentation of the end-to-end guest booking flow ([#252](https://github.com/UBS-Dev-Org/hms/issues/252)). |
 | 2026-06-12 | Default `booking_status` changed from `pending` to `confirmed` for new bookings. |
+| 2026-07-16 | Added serial/parallel booking support via `entries` array — multiple rooms and consecutive stays in a single booking. |
