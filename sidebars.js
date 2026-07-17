@@ -38,6 +38,7 @@ const sidebars = {
       items: [
         'backend/UBS-intro',
         'backend/tenancy',
+        'backend/roles-permissions',
         {
           type: 'category',
           label: 'Github Workflows',
