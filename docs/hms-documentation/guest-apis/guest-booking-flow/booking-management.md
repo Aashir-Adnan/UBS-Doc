@@ -7,15 +7,15 @@ This document is the single source of truth for how bookings are managed after c
 ## Table of Contents
 
 1. [Booking Lifecycle](#booking-lifecycle)
-2. [Adding Addon Services to Any Booking](#adding-addon-services-to-any-booking)
-3. [Down Payment on Addon Services](#down-payment-on-addon-services)
-4. [Do Addon Services Extend Booking Dates?](#do-addon-services-extend-booking-dates)
-5. [Adjusting Upcoming Booking Dates](#adjusting-upcoming-booking-dates)
-6. [Increasing Party Size](#increasing-party-size)
-7. [Rescheduling Service Slots](#rescheduling-service-slots)
-8. [Removing Addon Services](#removing-addon-services)
-9. [Cancellation and Refunds](#cancellation-and-refunds)
-10. [Confirmation Email Timing](#confirmation-email-timing)
+2. [Editing a Booking](#editing-a-booking)
+3. [Adding Addon Services to Any Booking](#adding-addon-services-to-any-booking)
+4. [Down Payment on Addon Services](#down-payment-on-addon-services)
+5. [Do Addon Services Extend Booking Dates?](#do-addon-services-extend-booking-dates)
+6. [Rescheduling Service Slots](#rescheduling-service-slots)
+7. [Removing Addon Services](#removing-addon-services)
+8. [Cancellation and Refunds](#cancellation-and-refunds)
+9. [Confirmation Email Timing](#confirmation-email-timing)
+10. [Scheduler Form Schema — Duration Field](#scheduler-form-schema--duration-field)
 11. [Frontend Implementation Guide](#frontend-implementation-guide)
 
 ---
@@ -60,9 +60,9 @@ confirmed/pending ---> cancelled ---> refund processed
 
 | Endpoint | Method | Purpose |
 |---|---|---|
-| `/guest/bookings/{id}/services` | POST | Add addon services |
-| `/guest/bookings/{id}/services` | DELETE | Remove an addon service |
-| `/guest/bookings/{id}/services/{serviceId}` | PUT | Reschedule addon slots |
+| `/guest/booking/edit` | PUT | Edit booking (dates, party size, add/remove services) |
+| `/guest/booking/services` | POST | Add addon services |
+| `/guest/booking/reschedule` | PUT | Reschedule addon slots |
 | `/guest/booking/cancel` | POST | Cancel entire booking |
 | `/guest/booking/checkin` | POST | Check in |
 | `/guest/booking/checkout` | POST | Check out |
@@ -237,54 +237,132 @@ The frontend may choose to display a soft warning if an addon is scheduled outsi
 
 ---
 
-## Adjusting Upcoming Booking Dates
+## Editing a Booking
 
-**There is currently no API to modify a booking's check-in or check-out dates after creation.**
+Guests can edit an existing booking's dates, party size, special requests, and services in a single call:
 
-`bookings.check_in_date` and `bookings.check_out_date` are set at creation and are **immutable** throughout the booking lifecycle. The only date-related writes that happen post-creation are:
+```
+PUT /api/guest/booking/edit
+```
 
-| Field | When Written | By What |
+### Editable Fields
+
+| Field | Description | Effect |
 |---|---|---|
-| `check_in_date` / `check_out_date` | Booking creation only | `createRoomBooking`, `createPackageBooking`, `createServiceBooking` |
-| `actual_check_in` | Guest checks in | `POST /guest/booking/checkin` |
-| `actual_check_out` | Guest checks out | `POST /guest/booking/checkout` |
-| `cancelled_at` | Booking cancelled | `POST /guest/booking/cancel` |
+| `checkIn` / `checkOut` | New stay dates | Re-validates availability, re-picks delivery units, recalculates pricing |
+| `adults` / `children` | Party size | Re-validates against `max_persons_per_booking`, auto-infers room count if party exceeds per-room capacity |
+| `specialRequests` | Guest notes | Direct update, no side effects |
+| `addServices` | Array of service addons | Same as `POST /guest/booking/services` — validates, inserts, prices |
+| `removeServices` | Array of `bookingServiceId`s | Soft-deletes the service + its slots (stay services cannot be removed) |
 
-### If a Guest Needs to Change Dates
+### Which Bookings Can Be Edited?
 
-The current workflow is:
-1. Cancel the existing booking (refund processed minus cancellation fee).
-2. Create a new booking with the desired dates.
+| Status | Editable? |
+|---|---|
+| `pending` | Yes |
+| `confirmed` | Yes |
+| `checked_in` | Yes |
+| `checked_out` | No |
+| `cancelled` | No |
+| `completed` | No |
+| `no_show` | No |
 
-### Future Consideration
+Only the guest who created the booking (`urdd_id` match) can edit it.
 
-A `PUT /guest/bookings/{id}` endpoint could be added to allow date modification. This would need to:
-- Re-check room availability for the new date range.
-- Reassign delivery units if the current unit is unavailable.
-- Recompute pricing (different number of nights = different total).
-- Handle partial payment adjustments (refund overpayment or require additional payment).
+### Request Example
 
----
+```json
+{
+  "actionPerformerURDD": 278,
+  "bookingId": 9060,
+  "checkIn": "2026-07-20",
+  "checkOut": "2026-07-28",
+  "adults": 4,
+  "children": 7,
+  "specialRequests": "Late check-in requested",
+  "addServices": [
+    { "serviceId": 190, "quantity": 2, "meals": [{ "date": "2026-07-21", "mealType": "dinner" }] }
+  ],
+  "removeServices": [1234]
+}
+```
 
-## Increasing Party Size
+All fields except `bookingId` are optional — send only what changed.
 
-**There is currently no API to update `total_guests` on an existing booking.**
+### Response Shape
 
-Party size (`adults + children`) is set at booking creation and stored in `bookings.total_guests`. No endpoint modifies this field post-creation.
+```json
+{
+  "booking": { /* full v2 booking bundle */ },
+  "editSummary": {
+    "previousTotal": 2400,
+    "newTotal": 3200,
+    "paidAmount": 480,
+    "requiredDownPayment": 640,
+    "additionalPaymentNeeded": 160,
+    "currency": "SAR",
+    "changes": {
+      "dates": { "checkIn": "2026-07-20", "checkOut": "2026-07-28" },
+      "partySize": { "adults": 4, "children": 7, "total": 11 },
+      "servicesAdded": 1,
+      "servicesRemoved": 1
+    }
+  }
+}
+```
 
-### If a Guest Needs to Change Party Size
+### Down Payment on Edit
 
-The current workflow is:
-1. Cancel and rebook with the correct party size.
+When the total increases due to date extension or added services:
 
-### Why It Matters
+```
+requiredDownPayment = newTotal × 20%
+additionalPaymentNeeded = max(0, requiredDownPayment − paidAmount)
+```
 
-Party size affects:
-- **Room availability**: `max_persons_per_booking` config may restrict occupancy per room.
-- **Unit assignment**: Larger parties may need a different room type.
-- **Pricing**: Some services price per person.
+| Scenario | Example |
+|---|---|
+| Total increased, not enough paid | Previous: 2400, new: 3200. Required: 640. Already paid: 480. Additional needed: **160 SAR** |
+| Total increased, already overpaid | Previous: 2400, new: 2600. Required: 520. Already paid: 600. Additional needed: **0 SAR** |
+| Total decreased | Previous: 3200, new: 2400. Required: 480. Already paid: 640. Additional needed: **0 SAR** (overpayment stays as credit) |
 
-A future party-size update API would need to validate against `max_persons_per_booking` and potentially reassign the delivery unit.
+### What Happens When Dates Change
+
+1. Existing `booking_items` (unit assignments) are cancelled.
+2. Availability is re-checked for the new date range.
+3. New units are picked and assigned.
+4. The stay `booking_services` row is repriced: `nightlyPrice × newNights × roomCount`.
+5. If the party exceeds per-room capacity, multiple rooms are auto-inferred.
+
+### What Happens When Party Size Changes (Without Date Change)
+
+1. `max_persons_per_booking` is validated against existing room count.
+2. If the party fits in the currently assigned rooms, `booking_items.guests` is updated.
+3. If the party exceeds capacity, the guest must also change dates (which triggers unit re-pick with the correct room count).
+
+### Validation Rules
+
+| Rule | Source | Error |
+|---|---|---|
+| Check-out after check-in | Basic validation | 400 |
+| Check-in not in the past | Basic validation | 400 |
+| Min/max stay nights | `min_stay_nights` / `max_stay_nights` config | 400 |
+| Advance booking window | `advance_booking_min_days` / `advance_booking_max_days` config | 400 |
+| Blackout dates | `blackout_dates` config | 400 |
+| Room availability | `pickAvailableUnitForService` / `pickMultipleAvailableUnits` | 409 |
+| Per-room person limit | `max_persons_per_booking` config | 400 |
+| Stay service cannot be removed | Hardcoded | 422 |
+| Addon must be same hotel | `tenant_id` match | 422 |
+
+### Error Codes
+
+| Code | Meaning |
+|---|---|
+| 400 | Validation failed (dates, party size, booking rules) |
+| 403 | Not the booking owner |
+| 404 | Booking not found |
+| 409 | No rooms available for the selected dates |
+| 422 | Non-editable status or blocked operation |
 
 ---
 
@@ -448,6 +526,32 @@ The email is triggered in two code paths (both check `paid_amount === 0` before 
 
 ---
 
+## Scheduler Form Schema — Duration Field
+
+The `slot_duration_minutes` config key is a **service-level infrastructure setting**, not a guest booking input. It controls how the backend generates time slots from availability windows (e.g., a 45-minute massage generates 45-min increments from 09:00–17:00).
+
+### What Changed
+
+Previously, `slot_duration_minutes` appeared in the form schema as a dropdown with options like 15, 30, 45, 60 minutes. This was incorrect — the duration is fixed per service by the admin and should not be shown to the guest as a selectable field.
+
+**Fix:** `slot_duration_minutes` is now excluded from the `fetchFormSchema` response. The duration is still available on the service object as `sessionDurationMinutes` for display purposes (e.g., "This is a 45-minute session").
+
+### How Duration Works
+
+| Component | Where Duration Comes From |
+|---|---|
+| **Slot generation** (backend) | `unit_availability.slot_duration_min` → `computeSlots.js` generates fixed-size slots |
+| **Service display** (frontend) | `service.sessionDurationMinutes` from `hms_config` `slot_duration_minutes` config |
+| **Guest booking form** | Duration is NOT a form field — guest picks a pre-computed slot like "15:00–15:45" |
+
+### Frontend Guidance
+
+- **Do NOT** render a duration picker in the booking form.
+- **Do** display the session duration as informational text (e.g., "45-minute session").
+- The scheduler API returns pre-computed slots with exact start/end times — the guest picks one.
+
+---
+
 ## Frontend Implementation Guide
 
 ### Booking Creation + Payment Flow
@@ -473,26 +577,45 @@ The email is triggered in two code paths (both check `paid_amount === 0` before 
    Guest receives confirmation email automatically
 ```
 
-### Adding Services to Existing Booking
+### Editing a Booking (Dates, Party Size, Services)
+
+```
+1. Guest taps "Edit Booking" on booking detail screen
+   Only show for bookings where:
+   - booking_status IN ('confirmed', 'pending', 'checked_in')
+
+2. Guest modifies dates, party size, adds/removes services
+   PUT /guest/booking/edit  {
+     bookingId: 9060,
+     checkIn: "2026-07-20",
+     checkOut: "2026-07-28",
+     adults: 4,
+     children: 7,
+     addServices: [{ serviceId: 190, quantity: 2 }],
+     removeServices: [1234]
+   }
+
+3. Response includes editSummary with payment delta
+   editSummary.additionalPaymentNeeded > 0 → show payment prompt
+   "An additional 160.00 SAR is required"
+
+4. If payment needed → same payment flow (initiate → form → confirm)
+
+5. Booking detail refreshes with updated data
+```
+
+### Adding Services Only (Standalone)
 
 ```
 1. Guest browses services on booking detail screen
-   Only show "Add Service" for bookings where:
-   - booking_status IN ('confirmed', 'pending', 'checked_in')
-   - NOT cancelled, checked_out, or no_show
+   POST /guest/booking/services  { booking_id, addons: [...] }
 
-2. Guest selects services + scheduling
-   POST /guest/bookings/{id}/services  { addons: [...] }
-
-3. Response includes downPayment
+2. Response includes downPayment
    { downPayment: { required: true, amount: 45, currency: "SAR" } }
 
-4. Show payment prompt
-   "A down payment of 45.00 SAR is required for the added services"
+3. Show payment prompt → same payment flow
 
-5. Same payment flow as above (initiate → form → confirm)
-
-6. Booking detail refreshes with updated services + pricing
+4. Booking detail refreshes
 ```
 
 ### Rescheduling
@@ -500,7 +623,7 @@ The email is triggered in two code paths (both check `paid_amount === 0` before 
 ```
 1. Guest taps a service slot on the booking detail screen
 2. Show scheduler/calendar with available slots
-3. PUT /guest/bookings/{id}/services/{serviceId}  { sessions/meals/transport }
+3. PUT /guest/booking/reschedule  { booking_id, service_id, sessions/meals/transport }
 4. Booking detail refreshes with updated schedule
 ```
 
@@ -516,14 +639,14 @@ The email is triggered in two code paths (both check `paid_amount === 0` before 
 
 ### Key UI States by Booking Status
 
-| Status | Show "Add Service"? | Show "Reschedule"? | Show "Cancel"? | Show "Pay"? |
-|---|---|---|---|---|
-| `pending` | Yes | Yes | Yes | Yes |
-| `confirmed` | Yes | Yes | Yes | Yes (if balance due) |
-| `checked_in` | Yes | Yes | No | Yes (if balance due) |
-| `checked_out` | No | No | No | No |
-| `cancelled` | No | No | No | No |
-| `no_show` | No | No | No | No |
+| Status | Show "Edit"? | Show "Add Service"? | Show "Reschedule"? | Show "Cancel"? | Show "Pay"? |
+|---|---|---|---|---|---|
+| `pending` | Yes | Yes | Yes | Yes | Yes |
+| `confirmed` | Yes | Yes | Yes | Yes | Yes (if balance due) |
+| `checked_in` | Yes | Yes | Yes | No | Yes (if balance due) |
+| `checked_out` | No | No | No | No | No |
+| `cancelled` | No | No | No | No | No |
+| `no_show` | No | No | No | No | No |
 
 ---
 
@@ -531,15 +654,15 @@ The email is triggered in two code paths (both check `paid_amount === 0` before 
 
 | Attribute | Modifiable? | How |
 |---|---|---|
-| Addon services | Yes | `POST /bookings/{id}/services` |
-| Addon service schedule | Yes | `PUT /bookings/{id}/services/{serviceId}` |
-| Addon services (remove) | Yes | `DELETE /bookings/{id}/services` |
-| Booking dates (check_in/check_out) | **No** | Cancel and rebook |
-| Party size (total_guests) | **No** | Cancel and rebook |
-| Room assignment (delivery_unit) | **No** | Cancel and rebook |
-| Special requests | **No** | No API exists |
-| Booking status | Yes | Check-in, checkout, cancel endpoints |
-| Payment | Yes | `POST /payments/initiate` + `POST /payments/confirm` |
+| Booking dates (check_in/check_out) | **Yes** | `PUT /guest/booking/edit` with `checkIn`/`checkOut` |
+| Party size (adults/children) | **Yes** | `PUT /guest/booking/edit` with `adults`/`children` |
+| Special requests | **Yes** | `PUT /guest/booking/edit` with `specialRequests` |
+| Addon services (add) | **Yes** | `PUT /guest/booking/edit` with `addServices`, or `POST /guest/booking/services` |
+| Addon services (remove) | **Yes** | `PUT /guest/booking/edit` with `removeServices` |
+| Addon service schedule | **Yes** | `PUT /guest/booking/reschedule` |
+| Room assignment (delivery_unit) | **Auto** | Automatically reassigned when dates change |
+| Booking status | **Yes** | Check-in, checkout, cancel endpoints |
+| Payment | **Yes** | `POST /payments/initiate` + `POST /payments/confirm` |
 
 ---
 
@@ -547,4 +670,5 @@ The email is triggered in two code paths (both check `paid_amount === 0` before 
 
 | Date | Change |
 |---|---|
+| 2026-07-17 | Added `PUT /guest/booking/edit` — full booking edit flow (dates, party size, add/remove services, down payment delta). Removed "cancel and rebook" guidance for date/party changes. Added scheduler form schema duration field documentation. Updated summary table, frontend guide, and UI states. |
 | 2026-07-13 | Initial version. Comprehensive booking management reference covering addon services, down payments, date handling, party size, rescheduling, removal, cancellation, and frontend guide. |
