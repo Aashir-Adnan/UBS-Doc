@@ -10,6 +10,8 @@ import GrantProjects from '@site/src/components/portal/tenantProjects/GrantProje
 import GrantRepos from '@site/src/components/portal/tenantProjects/GrantRepos';
 import ProvisionUser from '@site/src/components/portal/tenantProjects/ProvisionUser';
 import OrganizationManager from '@site/src/components/portal/tenantProjects/OrganizationManager';
+import RoleManager from '@site/src/components/portal/tenantProjects/RoleManager';
+import UserPermissions from '@site/src/components/portal/tenantProjects/UserPermissions';
 
 const TABS = [
   { key: 'org', label: 'Organization' },
@@ -17,6 +19,8 @@ const TABS = [
   { key: 'assign', label: 'Assign tenant' },
   { key: 'grant', label: 'Grant projects' },
   { key: 'grantRepos', label: 'Grant repos' },
+  { key: 'roles', label: 'Roles' },
+  { key: 'permissions', label: 'Permissions' },
 ];
 
 function TenantAdminContent() {
@@ -113,6 +117,12 @@ function TenantAdminContent() {
           {tab === 'assign' && <AssignTenant adminUrdd={adminUrdd} />}
           {tab === 'grant' && <GrantProjects adminUrdd={adminUrdd} />}
           {tab === 'grantRepos' && <GrantRepos adminUrdd={adminUrdd} />}
+          {tab === 'roles' && (
+            <RoleManager adminUrdd={adminUrdd} actorEmail={user.email} />
+          )}
+          {tab === 'permissions' && (
+            <UserPermissions adminUrdd={adminUrdd} actorEmail={user.email} />
+          )}
         </div>
       </section>
     </>
