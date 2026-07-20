@@ -119,7 +119,7 @@ const sidebars = {
             },
             {
               type: 'category',
-              label: 'Front Desk Checkout',
+              label: 'Front Desk Check-In & Check-Out',
               items: [
                 'hms-documentation/major-implementations/front-desk-checkout/front-desk-checkout',
               ],
