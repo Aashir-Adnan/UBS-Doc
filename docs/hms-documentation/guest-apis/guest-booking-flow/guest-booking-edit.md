@@ -35,23 +35,33 @@ All fields except `bookingId` are optional — send only what changed.
 
 ### `removeServices` Shape
 
-Each entry can be either a plain `bookingServiceId` (removes all quantity) or an object to decrement by a specific amount:
+Each entry can be a plain `bookingServiceId` (removes all), an object with `quantity` (removes newest N slots), or an object with `slot_id` (removes a specific scheduled slot):
 
 ```json
 // Remove all quantity (deactivate entirely)
 "removeServices": [1234]
 
-// Remove 1 unit of quantity (decrement)
+// Remove 1 unit of quantity (deactivates the newest slot)
 "removeServices": [{ "bookingServiceId": 1234, "quantity": 1 }]
 
-// Mix both formats
+// Remove a specific scheduled slot by its ID
+"removeServices": [{ "bookingServiceId": 1234, "slot_id": 5012 }]
+
+// Mix formats
 "removeServices": [
   1234,
-  { "bookingServiceId": 5678, "quantity": 2 }
+  { "bookingServiceId": 5678, "quantity": 2 },
+  { "bookingServiceId": 9012, "slot_id": 5013 }
 ]
 ```
 
-When `quantity` is provided and the resulting quantity is still > 0, the service stays active with reduced quantity and the newest slots are deactivated. When the quantity reaches 0 (or no quantity is specified), the service is fully deactivated.
+| Format | Behaviour |
+|--------|-----------|
+| Plain number | Removes all slots and deactivates the `booking_services` row entirely. |
+| `{ bookingServiceId, quantity }` | Decrements by N, deactivating the **newest** slots (by `slot_id` DESC). If quantity reaches 0, the service is fully deactivated. |
+| `{ bookingServiceId, slot_id }` | Removes **one specific** scheduled slot. The quantity and total are decremented by 1. If it was the last active slot, the service is fully deactivated. |
+
+The `slot_id` value comes from the booking response: `services[].sessions[].id`, `services[].meals[].id`, or `services[].transport.id`.
 
 ### `addServices` Shape
 

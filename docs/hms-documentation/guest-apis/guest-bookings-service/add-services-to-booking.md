@@ -254,17 +254,49 @@ The booking confirmation email is sent **after the first successful down payment
 
 ## Remove Service — DELETE
 
-Removes a previously added service addon from a booking.
+Removes a previously added service addon from a booking. Supports three modes:
 
-### Request
+### Mode 1: Remove all instances of a service
+
+Removes every slot and the entire `booking_services` row for the given `serviceId`.
 
 ```json
 {
   "actionPerformerURDD": 16,
   "booking_id": 9060,
-  "booking_service_id": 145
+  "serviceId": 228
 }
 ```
+
+### Mode 2: Remove a specific scheduled slot
+
+Pass `slot_id` to remove one specific time slot. The `booking_services` quantity and total are decremented by one. If it was the last active slot, the entire service is removed.
+
+```json
+{
+  "actionPerformerURDD": 16,
+  "booking_id": 9060,
+  "serviceId": 228,
+  "slot_id": 1012
+}
+```
+
+The `slot_id` is returned in the booking response under `services[].sessions[].id` (or `meals[].id` / `transport.id`).
+
+**Example:** A guest booked 3 barber sessions (9:00, 10:00, 11:00). To remove only the 10:00 session, send the `slot_id` of that session. The other two remain active and the quantity drops from 3 to 2.
+
+### Response
+
+```json
+{
+  "booking_id": 9060,
+  "removed": 1,
+  "removedSlotId": 1012,
+  "remainingSlots": 2
+}
+```
+
+When `slot_id` is omitted, `removedSlotId` and `remainingSlots` are not included and `removed` reflects the number of `booking_services` rows deactivated.
 
 The booking total is recomputed after removal.
 
@@ -303,5 +335,6 @@ In practice, eligible categories include: spa, dining, room-service, barber, gym
 
 | Date | Change |
 |---|---|
+| 2026-07-20 | Added `slot_id` parameter to DELETE endpoint for targeted slot removal. A guest can now remove a specific scheduled session (e.g., the 10:00 barber slot) without affecting other slots of the same service. |
 | 2026-07-13 | Added 20% down payment requirement for added services. Response now includes `downPayment` object. Booking confirmation email moved to after first successful payment. |
 | 2026-06-14 | Initial documentation for add/remove/reschedule service addons on existing bookings. |

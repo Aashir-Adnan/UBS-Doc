@@ -41,6 +41,7 @@ availability in the scheduler.
 | 2 | **Dual-Price Storage** | Store both `base_price` (catalog price) and `current_price` (after pricing rules) on each `booking_services` row at insert time. Return both in the API response. |
 | 3 | **Scheduler Delivery Unit Awareness** | Enhance the scheduler API to factor in how many delivery units exist per service, which are already reserved, and optionally which are tentatively held (via request body). |
 | 4 | **Stage → Payment → Commit Flow** | Update booking edit and add-services docs/APIs to enforce the ordering: stage first, pay the delta, then commit the actual changes. |
+| 5 | **Targeted Slot Removal** | Allow removing a specific scheduled slot (by `slot_id`) from a multi-quantity service booking, instead of only removing all instances or the newest N slots. |
 
 ---
 
@@ -542,6 +543,105 @@ This can run on the existing cron infrastructure (see `Services/CronManager/`).
 
 ---
 
+## 5. Targeted Slot Removal
+
+### Problem
+
+When a guest books a service multiple times (e.g., 3 barber sessions at 9:00,
+10:00, and 11:00), there was no way to remove a specific session. The two
+existing removal paths both had limitations:
+
+- `DELETE /api/guest/bookings/services` takes `serviceId` and removes **all**
+  instances of that service from the booking.
+- `PUT /api/guest/booking/edit` with `removeServices: [{ bookingServiceId, quantity: 1 }]`
+  always removes the **newest** slot (highest `slot_id`), not a specific one.
+
+### Solution
+
+Both APIs now accept `slot_id` for targeted removal of a single scheduled
+session.
+
+### DELETE /api/guest/bookings/services — with `slot_id`
+
+```json
+{
+  "actionPerformerURDD": 225,
+  "booking_id": 9724,
+  "serviceId": 228,
+  "slot_id": 1012
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `booking_id` | `number` | Yes | The booking. |
+| `serviceId` | `number` | Yes | The service to remove a slot from. |
+| `slot_id` | `number` | No | The specific slot to remove. Omit to remove all instances. |
+
+**Behaviour:**
+
+1. Verify the slot exists, is active, and belongs to the given booking + service.
+2. Soft-delete the `booking_service_slots` row (`status = 'inactive'`).
+3. Count remaining active slots for the `booking_services` row.
+4. If remaining > 0: decrement `quantity` and `total_price` by one unit.
+5. If remaining = 0: deactivate the entire `booking_services` row.
+6. Subtract one unit's price from `bookings.total_amount`.
+
+**Response:**
+
+```json
+{
+  "booking_id": 9724,
+  "removed": 1,
+  "removedSlotId": 1012,
+  "remainingSlots": 2
+}
+```
+
+### PUT /api/guest/booking/edit — with `slot_id` in `removeServices`
+
+```json
+{
+  "bookingId": 9724,
+  "removeServices": [
+    { "bookingServiceId": 994, "slot_id": 1012 }
+  ]
+}
+```
+
+Each `removeServices` entry now supports three formats:
+
+| Format | Behaviour |
+|--------|-----------|
+| Plain number (`1234`) | Removes all slots, deactivates the service entirely. |
+| `{ bookingServiceId, quantity }` | Decrements by N, deactivating the **newest** slots. |
+| `{ bookingServiceId, slot_id }` | Removes **one specific** slot by ID. |
+
+### Where to find `slot_id`
+
+The `slot_id` is returned in the booking response under:
+- `services[].sessions[].id` — for session-based services (barber, spa, gym)
+- `services[].meals[].id` — for dining/room-service
+- `services[].transport.id` — for transport
+
+### What Was Implemented
+
+**Modified files:**
+- `Src/HelperFunctions/PreProcessingFunctions/Guest/removeBookingService.js` — added `slot_id` branch
+- `Src/HelperFunctions/PreProcessingFunctions/Guest/editBooking.js` — added `slot_id` support in `removeServices` entries
+- `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestBookingServices/CRUD_parameters.js` — added `slot_id` parameter
+
+### Frontend Requirements
+
+- When displaying a multi-session service (e.g., 3 barber slots), show a remove
+  button per session row, not just per service.
+- On remove, send `DELETE /api/guest/bookings/services` with `slot_id` set to
+  the session's `id` field.
+- After removal, refresh the booking detail to reflect updated quantity, pricing,
+  and remaining sessions.
+
+---
+
 ## Error Responses
 
 | HTTP | Condition | Message |
@@ -551,6 +651,7 @@ This can run on the existing cron infrastructure (see `Services/CronManager/`).
 | 400 | `stageId` booking_id mismatch | `Stage does not match this booking.` |
 | 402 | `stageId` requires payment but none found | `Payment required before committing changes. Additional amount: N SAR.` |
 | 404 | `stageId` not found | `Stage not found.` |
+| 404 | `slot_id` not found or already removed | `Slot not found or already removed` |
 
 ---
 
@@ -606,18 +707,19 @@ ALTER TABLE booking_services
 
 | File | Change |
 |------|--------|
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/removeBookingService.js` | Accept `slot_id` for targeted slot removal |
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/addBookingServices.js` | Store `current_price`, verify `stageId` |
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/createServiceBooking.js` | Store `current_price` |
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/createRoomBooking.js` | Store `current_price` |
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/createPackageBooking.js` | Store `current_price` |
-| `Src/HelperFunctions/PreProcessingFunctions/Guest/editBooking.js` | Store `current_price`, verify `stageId` |
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/editBooking.js` | Store `current_price`, verify `stageId`, `slot_id` in `removeServices` |
 | `Src/HelperFunctions/Guest/v2/bookingsBundle.js` | Return `basePrice` + `currentPrice` |
 | `Src/HelperFunctions/Guest/v2/availability/computeSlots.js` | Accept `holdSlots`, return `remaining`/`total` |
 | `Src/HelperFunctions/Guest/v2/availability/buildSchedulerTree.js` | Pass `holdSlots` through |
 | `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestScheduler/GuestScheduler.js` | Accept POST + `holdSlots` |
 | `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestScheduler/CRUD_parameters.js` | Add `holdSlots` param |
 | `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestBookingEdit/CRUD_parameters.js` | Add `stageId` param |
-| `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestBookingServices/CRUD_parameters.js` | Add `stageId` param |
+| `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestBookingServices/CRUD_parameters.js` | Add `stageId` + `slot_id` params |
 
 ---
 
