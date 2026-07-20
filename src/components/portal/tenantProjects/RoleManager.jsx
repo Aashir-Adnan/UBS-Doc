@@ -82,8 +82,16 @@ export default function RoleManager({ adminUrdd, actorEmail }) {
         actor_email: actorEmail,
       });
       const updated = res?.user;
+      // A role change issues the user a NEW urdd and starts them from the new role's
+      // defaults alone, so any per-user permission an admin had granted is cleared.
+      // Say so explicitly — otherwise those overrides vanish silently.
+      const dropped = res?.permissions?.dropped_manual ?? [];
       setNotice(
-        `${updated?.email || target.email} is now ${updated?.role_name || nextRole.name}.`,
+        `${updated?.email || target.email} is now ${updated?.role_name || nextRole.name}.`
+        + (dropped.length
+          ? ` Cleared ${dropped.length === 1 ? 'the manual override' : 'manual overrides'} for `
+            + `${dropped.join(', ')} — re-apply in Permissions if still needed.`
+          : ''),
       );
       await load();
     } catch (e) {
