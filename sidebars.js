@@ -360,6 +360,13 @@ const sidebars = {
             },
             {
               type: 'category',
+              label: 'Guest Booking Constraints',
+              items: [
+                'hms-documentation/guest-apis/guest-booking-constraints/guest-booking-constraints',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Guest Review',
               items: [
                 'hms-documentation/guest-apis/guest-review/guest-review',
