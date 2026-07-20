@@ -138,6 +138,13 @@ const sidebars = {
                 'hms-documentation/major-implementations/access-token-security/access-token-security',
               ],
             },
+            {
+              type: 'category',
+              label: 'Booking Changes Pipeline',
+              items: [
+                'hms-documentation/major-implementations/booking-changes-pipeline/booking-changes-pipeline',
+              ],
+            },
           ],
         },
         {
