@@ -76,7 +76,8 @@ confirmed/pending ---> cancelled ---> refund processed
 Services can be added to **any booking type** — room, package, or standalone service — via:
 
 ```
-POST /api/guest/bookings/{bookingId}/services
+POST /api/guest/bookings/services
+Body: { booking_id, addons: [...] }
 ```
 
 ### Which Bookings Can Receive Addons?
@@ -161,7 +162,7 @@ This applies uniformly to:
 | Scenario | Down Payment Base | Example |
 |---|---|---|
 | **New standalone booking** (`POST /bookings/service`) | 20% of the full booking total | Booking total = 200 SAR, down payment = 40 SAR |
-| **Addon to existing booking** (`POST /bookings/{id}/services`) | 20% of the newly added services total | Added spa (150 SAR) + dinner (75 SAR) = 225 SAR, down payment = 45 SAR |
+| **Addon to existing booking** (`POST /bookings/services`) | 20% of the newly added services total | Added spa (150 SAR) + dinner (75 SAR) = 225 SAR, down payment = 45 SAR |
 
 ### How It Works End-to-End
 
@@ -371,7 +372,8 @@ additionalPaymentNeeded = max(0, requiredDownPayment − paidAmount)
 Addon service slots (sessions, meals, transport times) **can** be rescheduled after creation:
 
 ```
-PUT /api/guest/bookings/{bookingId}/services/{serviceId}
+PUT /api/guest/bookings/services
+Body: { booking_id, serviceId, sessions/meals/transport }
 ```
 
 ### What Gets Rescheduled
@@ -431,8 +433,8 @@ If the client does not provide `slotId`, slots are auto-assigned sequentially fr
 ## Removing Addon Services
 
 ```
-DELETE /api/guest/bookings/{bookingId}/services
-Body: { serviceId: 55 }
+DELETE /api/guest/bookings/services
+Body: { booking_id: 9060, serviceId: 55 }
 ```
 
 ### Behavior
@@ -445,11 +447,11 @@ Body: { serviceId: 55 }
 
 | Allowed | Blocked |
 |---|---|
-| Remove any addon service added via `POST /bookings/{id}/services` | Remove a service that is part of the booking's **package** (409 error: "Package services cannot be removed individually") |
+| Remove any addon service added via `POST /bookings/services` | Remove a service that is part of the booking's **package** (409 error: "Package services cannot be removed individually") |
 
 ### Refund Impact
 
-Removing a service reduces `total_amount` but does **not** trigger an automatic refund. If `paid_amount > total_amount` after removal, the overpayment remains on the booking as credit. A refund only happens via the cancellation flow.
+Removing a service reduces `total_amount` but does **not** trigger an immediate refund. If `paid_amount > total_amount` after removal, the overpayment is refunded automatically after checkout by the [Overflow Refund Cron](../../major-implementations/payment-and-refund/overflow-refund-cron.md).
 
 ---
 

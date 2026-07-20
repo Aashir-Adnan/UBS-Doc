@@ -8,9 +8,11 @@ Add one or more standalone services (addons) to an existing **upcoming or future
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| **POST** | `/api/guest/bookings/{bookingId}/services` | Add service addons |
-| **DELETE** | `/api/guest/bookings/{bookingId}/services` | Remove a service addon |
-| **PUT** | `/api/guest/bookings/{bookingId}/services/{serviceId}` | Reschedule addon slots |
+| **POST** | `/api/guest/bookings/services` | Add service addons |
+| **DELETE** | `/api/guest/bookings/services` | Remove a service addon |
+| **PUT** | `/api/guest/bookings/services` | Reschedule addon slots |
+
+All IDs (`booking_id`, `serviceId`) are passed in the **request body**, not the URL path.
 
 All endpoints use **AUTH_PLATFORM** (require a valid guest JWT).
 
@@ -28,7 +30,7 @@ Requires a valid guest JWT (`accessToken`). The guest's identity is resolved via
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `booking_id` | `number` | Yes | The existing booking to add services to (path parameter, mapped to body). |
+| `booking_id` | `number` | Yes | The existing booking to add services to. |
 | `addons` | `array` | Yes | Non-empty array of service addons to add. |
 | `addons[].serviceId` | `number` | Yes | The service to add. Must not be a stay-category service. |
 | `addons[].quantity` | `number` | No | Number of slots (default: 1). Capped by `max_quantity_per_booking` config. |
@@ -92,7 +94,7 @@ Requires a valid guest JWT (`accessToken`). The guest's identity is resolved via
 }
 ```
 
-The addon is created with `schedulingStatus: "unscheduled"`. The guest can schedule later via `PUT /guest/bookings/{id}/services/{serviceId}`.
+The addon is created with `schedulingStatus: "unscheduled"`. The guest can schedule later via `PUT /guest/bookings/services` with `booking_id` and `serviceId` in the body.
 
 ---
 
@@ -151,18 +153,18 @@ Returns the full v2 booking bundle with the updated services list, plus a `downP
 Every service addition (standalone or addon) requires a **20% down payment**. This applies to:
 
 - **New standalone bookings** (`POST /guest/bookings/service`) — 20% of the booking total.
-- **Addons to existing bookings** (`POST /guest/bookings/{id}/services`) — 20% of the added services total.
+- **Addons to existing bookings** (`POST /guest/bookings/services`) — 20% of the added services total.
 
 ### Sequence Diagram
 
 ```
 Guest App                        Backend                          Moyasar
    |                                |                                |
-   |-- POST /bookings/{id}/services -->                              |
-   |                                |  (insert booking_services,     |
+   |-- POST /bookings/services ------>                              |
+   |   { booking_id, addons }       |  (insert booking_services,     |
    |                                |   recompute total,             |
    |                                |   return downPayment info)     |
-   |<-- 200 { booking, downPayment } --                              |
+   |<-- 200  booking + downPayment --                                |
    |                                |                                |
    |  [Show payment screen with     |                                |
    |   downPayment.amount]          |                                |
@@ -192,10 +194,10 @@ Guest App                        Backend                          Moyasar
 
 ### Frontend Implementation Steps
 
-1. **Call the add-services API** — `POST /guest/bookings/{id}/services` with the desired addons.
+1. **Call the add-services API** — `POST /guest/bookings/services` with `booking_id` and addons in the body.
 2. **Check `downPayment.required`** in the response.
 3. **If required**, show a payment prompt to the guest:
-   - Display: "A down payment of **{downPayment.amount} {downPayment.currency}** (20%) is required for the added services."
+   - Display: "A down payment of **[downPayment.amount] [downPayment.currency]** (20%) is required for the added services."
    - Pre-fill the payment amount with `downPayment.amount`.
 4. **Initiate payment** — `POST /guest/payments/initiate`:
    ```json
@@ -245,7 +247,7 @@ The booking confirmation email is sent **after the first successful down payment
 | Stay-category services cannot be added as addons | `422 Stay services cannot be added as addons` |
 | Quantity must not exceed `max_quantity_per_booking` | `400 Maximum N booking(s) allowed for service "..."` |
 | `addons` must be a non-empty array | `400 addons must be a non-empty array` |
-| `booking_id` is required | `400 booking id is required (path param)` |
+| `booking_id` is required | `400 booking id is required` |
 | `tenant_id` is required | `400 tenant_id is required` |
 
 ---

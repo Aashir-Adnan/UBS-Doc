@@ -114,6 +114,7 @@ const sidebars = {
               label: 'Payment & Refund Flow',
               items: [
                 'hms-documentation/major-implementations/payment-and-refund/payment-and-refund',
+                'hms-documentation/major-implementations/payment-and-refund/overflow-refund-cron',
               ],
             },
             {

@@ -29,9 +29,29 @@ All changes are atomic — if any validation fails (e.g., no rooms available for
 | `children` | number | No | New children count |
 | `specialRequests` | string | No | Updated special requests text |
 | `addServices` | array | No | Services to add (same shape as addons in booking creation) |
-| `removeServices` | array of numbers | No | `bookingServiceId` values to remove |
+| `removeServices` | array | No | Services to remove — see `removeServices` shape below |
 
 All fields except `bookingId` are optional — send only what changed.
+
+### `removeServices` Shape
+
+Each entry can be either a plain `bookingServiceId` (removes all quantity) or an object to decrement by a specific amount:
+
+```json
+// Remove all quantity (deactivate entirely)
+"removeServices": [1234]
+
+// Remove 1 unit of quantity (decrement)
+"removeServices": [{ "bookingServiceId": 1234, "quantity": 1 }]
+
+// Mix both formats
+"removeServices": [
+  1234,
+  { "bookingServiceId": 5678, "quantity": 2 }
+]
+```
+
+When `quantity` is provided and the resulting quantity is still > 0, the service stays active with reduced quantity and the newest slots are deactivated. When the quantity reaches 0 (or no quantity is specified), the service is fully deactivated.
 
 ### `addServices` Shape
 
@@ -72,7 +92,7 @@ Only include the scheduling field relevant to the service category (sessions for
       ]
     }
   ],
-  "removeServices": [1234]
+  "removeServices": [{ "bookingServiceId": 1234, "quantity": 1 }]
 }
 ```
 
@@ -109,6 +129,8 @@ Only include the scheduling field relevant to the service category (sessions for
       "paidAmount": 480,
       "requiredDownPayment": 640,
       "additionalPaymentNeeded": 160,
+      "overflowAmount": 0,
+      "overflowRefundNote": null,
       "currency": "SAR",
       "changes": {
         "dates": {
@@ -156,7 +178,57 @@ When `additionalPaymentNeeded > 0`, the frontend should prompt the guest to pay 
 POST /api/guest/payments/initiate  { bookingId, amount: additionalPaymentNeeded, currency }
 ```
 
-When the total decreases, the overpayment stays as credit on the booking. Refunds only happen through the cancellation flow.
+---
+
+## Overflow Refund (Overpayment)
+
+When the booking total **decreases** after an edit (e.g., shortened stay, removed services) and the guest has already paid more than the new total, the difference is tracked as an **overflow**.
+
+```
+overflowAmount = max(0, paidAmount − newTotal)
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `overflowAmount` | number | Amount overpaid (0 if no overflow) |
+| `overflowRefundNote` | string\|null | Human-readable refund message, or `null` if no overflow |
+
+### Overflow Response Example
+
+When a guest shortens a 5-night booking (450 SAR, fully paid) to 3 nights (270 SAR):
+
+```json
+{
+  "editSummary": {
+    "previousTotal": 450,
+    "newTotal": 270,
+    "paidAmount": 450,
+    "overflowAmount": 180,
+    "overflowRefundNote": "You have overpaid. The excess amount will be refunded after checkout.",
+    "additionalPaymentNeeded": 0,
+    "currency": "SAR"
+  }
+}
+```
+
+### Refund Processing
+
+Overflow refunds are **not** processed immediately. They are handled by the **Overflow Refund Cron** which runs every 30 minutes and processes refunds for checked-out bookings where `paid_amount > total_amount`. See [Overflow Refund Cron](../../major-implementations/payment-and-refund/overflow-refund-cron.md) for details.
+
+### Scenarios
+
+| Scenario | Previous Total | New Total | Paid Amount | Overflow | Refund Note |
+|---|---|---|---|---|---|
+| Shortened stay (fully paid) | 450 | 270 | 450 | **180** | "You have overpaid..." |
+| Removed services (fully paid) | 600 | 400 | 600 | **200** | "You have overpaid..." |
+| Shortened stay (partially paid) | 450 | 270 | 100 | **0** | `null` |
+| Extended stay | 270 | 450 | 270 | **0** | `null` |
+
+### Notification
+
+A `booking_modified` push notification and email are sent on every successful edit, informing the guest that their booking details have been updated.
 
 ---
 
@@ -185,7 +257,11 @@ Delegates to the existing `addBookingServices` handler — same validation, inse
 
 1. Validates the `bookingServiceId` belongs to this booking.
 2. Blocks removal of stay services (the room itself cannot be removed).
-3. Soft-deletes the `booking_services` row and all associated `booking_service_slots`.
+3. If `quantity` is specified and results in remaining quantity > 0:
+   - Decrements `booking_services.quantity` and recalculates `total_price`.
+   - Deactivates the newest N `booking_service_slots` rows (by `slot_id DESC`).
+4. If no `quantity` specified or remaining quantity reaches 0:
+   - Soft-deletes the `booking_services` row and all associated `booking_service_slots`.
 
 ### Price Recalculation
 
@@ -257,7 +333,10 @@ After all changes are applied:
    → POST /api/guest/payments/initiate
    → Standard payment flow (Moyasar form / saved card)
 
-   If = 0 → show success confirmation
+   If = 0 AND overflowAmount > 0 → show overflow notice:
+   Display overflowRefundNote to the guest
+
+   If = 0 AND overflowAmount = 0 → show success confirmation
 
 5. Refresh booking detail screen
 ```
