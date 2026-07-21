@@ -462,7 +462,7 @@ accept an optional `stageId` to link back to a staged preview.
 │     └─ Hold tentative slots for 15 minutes                      │
 │                                                                 │
 │  2. PAYMENT (if additionalPaymentRequired > 0)                  │
-│     POST /api/guest/payment                                     │
+│     POST /api/guest/payments/initiate                                     │
 │     ├─ Pass stageId in the payment request body                 │
 │     ├─ Balance due is calculated from staged proposed_total     │
 │     ├─ Hard-limited to 20% down payment of staged total         │
@@ -526,7 +526,7 @@ Same verification logic as edit booking.
 
 ### Payment with Staged Total
 
-**Endpoint:** `POST /api/guest/payment`
+**Endpoint:** `POST /api/guest/payments/initiate`
 
 **New optional parameter:**
 
