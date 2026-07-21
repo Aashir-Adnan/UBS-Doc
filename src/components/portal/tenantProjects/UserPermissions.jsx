@@ -7,14 +7,26 @@ import {
   listMembers,
   getMe,
 } from './tenantApi';
+import { useActingPermissions } from './useActingPermissions';
+import PermissionNotice from './PermissionNotice';
 
 // Admin → Permissions. View and override one portal user's permissions on top of
-// their role defaults. Admin authorized by actor_email (like ProvisionUser).
+// their role defaults.
+//
+// /portal/permissions/* is gated on the caller holding update_permissions — not on
+// their role name — so the toggles follow that permission, read from the URDD
+// selected in the org switcher. Without it the panel stays readable but inert.
 //
 // Id spaces differ: the member dropdown (listMembers) is keyed by urdd_id, but
 // the permission endpoints need portal_user_id (portal_users.id). Resolve it via
 // getMe(email).id before loading/setting permissions.
+const EDIT_PERMS_PERM = 'update_permissions';
+
 export default function UserPermissions({ adminUrdd, actorEmail }) {
+  // Fails closed: false while the URDDs load, and no role-name fallback.
+  const { has } = useActingPermissions();
+  const canEdit = has(EDIT_PERMS_PERM);
+
   // Catalog: all permissions + each role's default group.
   const [catalog, setCatalog] = useState({ permissions: [], groups: [] });
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -37,7 +49,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
   useEffect(() => {
     let cancelled = false;
     setCatalogLoading(true);
-    permissionsCatalog(actorEmail)
+    permissionsCatalog(actorEmail, adminUrdd)
       .then((res) => {
         if (cancelled) return;
         setCatalog({
@@ -48,7 +60,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
       .catch((e) => { if (!cancelled) setCatalogError(e.message); })
       .finally(() => { if (!cancelled) setCatalogLoading(false); });
     return () => { cancelled = true; };
-  }, [actorEmail]);
+  }, [actorEmail, adminUrdd]);
 
   // Load members for the dropdown when an admin URDD is available.
   useEffect(() => {
@@ -75,7 +87,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
       if (portalUserId == null) {
         throw new Error('Could not resolve this user’s portal id (have they signed in?).');
       }
-      const res = await getUserPermissions(actorEmail, portalUserId);
+      const res = await getUserPermissions(actorEmail, portalUserId, adminUrdd);
       setTarget({
         portalUserId,
         email,
@@ -103,7 +115,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
   const reloadTarget = async () => {
     if (!target?.portalUserId) return;
     try {
-      const res = await getUserPermissions(actorEmail, target.portalUserId);
+      const res = await getUserPermissions(actorEmail, target.portalUserId, adminUrdd);
       setTarget((t) => (t ? {
         ...t,
         pending: !!res?.pending,
@@ -120,7 +132,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
     setNotice(null);
     try {
       setSavingName(permName);
-      await setUserPermission(actorEmail, target.portalUserId, permName, nextActive);
+      await setUserPermission(actorEmail, target.portalUserId, permName, nextActive, adminUrdd);
       setNotice(`${permName} ${nextActive ? 'granted' : 'revoked'}.`);
       await reloadTarget();
     } catch (e) {
@@ -136,7 +148,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
     setNotice(null);
     try {
       setSavingName(permName);
-      await resetUserPermission(actorEmail, target.portalUserId, permName);
+      await resetUserPermission(actorEmail, target.portalUserId, permName, adminUrdd);
       setNotice(`${permName} reset to role default.`);
       await reloadTarget();
     } catch (e) {
@@ -162,6 +174,13 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
 
   return (
     <div className="tenant-form">
+      {!canEdit && (
+        <PermissionNotice
+          permission={EDIT_PERMS_PERM}
+          action="changing a user's permissions"
+        />
+      )}
+
       {/* Role defaults reference */}
       {catalogLoading ? (
         <p className="tenant-muted">Loading permission catalog…</p>
@@ -264,7 +283,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
                   <input
                     type="checkbox"
                     checked={active}
-                    disabled={saving}
+                    disabled={saving || !canEdit}
                     onChange={(e) => handleToggle(c.permission_name, e.target.checked)}
                   />
                   <span className="up-perm-name">{c.permission_name}</span>
@@ -282,7 +301,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
                   )}
                 </div>
 
-                {isManual && (
+                {isManual && canEdit && (
                   <button
                     type="button"
                     className="up-reset-btn"

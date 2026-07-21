@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { listPortalUsers, setUserRole } from './tenantApi';
+import { useActingPermissions } from './useActingPermissions';
 
 // Admin → Roles. Promote/demote portal users (Admin, Repository Manager, Dev...).
 //
 // Admin is a live database role: flipping it takes effect immediately and
-// globally, which is why the endpoint checks for admin server-side and 403s
+// globally, which is why the endpoint checks the caller server-side and 403s
 // otherwise (we surface that message verbatim).
 //
 // NOTE: that server-side check is defense-in-depth, NOT authentication. These
@@ -19,6 +20,12 @@ import { listPortalUsers, setUserRole } from './tenantApi';
 // This screen is driven ONLY from listPortalUsers, so `id` is always correct.
 
 const ADMIN_ROLE = 'Admin';
+// /portal/users/role is gated on this, not on the caller's role name — a Dev who
+// has been granted it may change roles, and an Admin who lacks it may not.
+const EDIT_USERS_PERM = 'update_portal_users';
+// Granting ADMIN specifically needs more: the server accepts it only from a
+// role-Admin or a holder of update_permissions.
+const EDIT_PERMS_PERM = 'update_permissions';
 
 function sameEmail(a, b) {
   return (a || '').toLowerCase() === (b || '').toLowerCase();
@@ -53,10 +60,15 @@ export default function RoleManager({ adminUrdd, actorEmail }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // The signed-in user's own row is the source of truth for admin-ness — so a
-  // self-demotion hides these controls as soon as the list refetches.
+  // Editing is gated on the permission the server actually checks, read from the
+  // URDD selected in the org switcher. Fails closed while it loads.
+  const { has } = useActingPermissions();
+  const canEditRoles = has(EDIT_USERS_PERM);
+
+  // Assigning Admin is a stricter case. The caller's own row supplies role-Admin —
+  // this is an extra way to qualify, never a fallback for canEditRoles above.
   const meRow = users.find((u) => sameEmail(u.email, actorEmail)) || null;
-  const meIsAdmin = meRow?.role_name === ADMIN_ROLE;
+  const canGrantAdmin = meRow?.role_name === ADMIN_ROLE || has(EDIT_PERMS_PERM);
 
   const handleChange = async (target, nextRoleId) => {
     setError(null);
@@ -107,13 +119,16 @@ export default function RoleManager({ adminUrdd, actorEmail }) {
 
   return (
     <div>
-      {meIsAdmin ? (
+      {canEditRoles ? (
         <p className="tenant-muted" style={{ marginBottom: '1rem' }}>
           Changing a role takes effect immediately and applies everywhere.
+          {!canGrantAdmin && ' Assigning Admin needs the update_permissions permission.'}
         </p>
       ) : (
         <p className="tenant-muted" style={{ marginBottom: '1rem' }}>
-          Roles are shown read-only — only an Admin can change them.
+          Roles are shown read-only — changing them needs the{' '}
+          <code>update_portal_users</code> permission in the organization you are
+          acting in.
         </p>
       )}
 
@@ -157,7 +172,7 @@ export default function RoleManager({ adminUrdd, actorEmail }) {
                 </span>
               )}
 
-              {meIsAdmin ? (
+              {canEditRoles ? (
                 <select
                   value={u.role_id ?? ''}
                   disabled={savingId === u.id}
@@ -174,9 +189,19 @@ export default function RoleManager({ adminUrdd, actorEmail }) {
                   }}
                 >
                   {u.role_id == null && <option value="">No role</option>}
-                  {roles.map((r) => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
-                  ))}
+                  {roles.map((r) => {
+                    // Keep Admin listed but unselectable when the server would
+                    // reject it, so the current value still renders and the reason
+                    // is visible instead of arriving as a 403.
+                    const blocked = r.name === ADMIN_ROLE
+                      && !canGrantAdmin
+                      && String(u.role_id) !== String(r.id);
+                    return (
+                      <option key={r.id} value={r.id} disabled={blocked}>
+                        {r.name}{blocked ? ' (needs update_permissions)' : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               ) : (
                 <span

@@ -1,11 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { listMembers, listAvailableProjects, getGrants, grantProjects } from './tenantApi';
+import { useActingPermissions } from './useActingPermissions';
+import PermissionNotice from './PermissionNotice';
 
 // Admin → Grant projects (§3.4 + §7.3/§7.4). Pick a target user, show the
 // projects available in *their* tenant as a checkbox list pre-checked from their
 // current grants, and write a plain project_ids array. Turning the restriction
 // off clears the allow-list (user then sees ALL projects in their tenant).
+//
+// Writing is gated on update_portal_users (what /projects/tenant/grant checks).
+// Without it the boxes still show who has what — they just can't be changed.
+const EDIT_USERS_PERM = 'update_portal_users';
+
 export default function GrantProjects({ adminUrdd }) {
+  const { has } = useActingPermissions();
+  const canEdit = has(EDIT_USERS_PERM);
   const [members, setMembers] = useState([]);
   const [loadError, setLoadError] = useState(null);
 
@@ -72,6 +81,9 @@ export default function GrantProjects({ adminUrdd }) {
     e.preventDefault();
     setError(null);
     setNotice(null);
+    // Belt and braces: a disabled submit button doesn't reliably stop implicit
+    // submission (Enter in a field) in every browser.
+    if (!canEdit) return;
     if (!selectedMember) {
       setError('Pick a user first.');
       return;
@@ -133,6 +145,13 @@ export default function GrantProjects({ adminUrdd }) {
 
   return (
     <form className="tenant-form" onSubmit={handleSubmit}>
+      {!canEdit && (
+        <PermissionNotice
+          permission={EDIT_USERS_PERM}
+          action="changing a user's project grants"
+        />
+      )}
+
       {loadError && <p className="tenant-error">Failed to load members: {loadError}</p>}
 
       <label className="tenant-field">
@@ -156,6 +175,7 @@ export default function GrantProjects({ adminUrdd }) {
             <input
               type="checkbox"
               checked={restrict}
+              disabled={!canEdit}
               onChange={(e) => setRestrict(e.target.checked)}
             />
             <span>
@@ -178,6 +198,7 @@ export default function GrantProjects({ adminUrdd }) {
                     <input
                       type="checkbox"
                       checked={checked.has(Number(p.project_id))}
+                      disabled={!canEdit}
                       onChange={() => toggle(Number(p.project_id))}
                     />
                     <span>
@@ -196,7 +217,11 @@ export default function GrantProjects({ adminUrdd }) {
         </>
       )}
 
-      <button type="submit" className="tenant-submit" disabled={submitting || !selectedMember}>
+      <button
+        type="submit"
+        className="tenant-submit"
+        disabled={submitting || !selectedMember || !canEdit}
+      >
         {submitting ? 'Saving…' : 'Save grants'}
       </button>
 

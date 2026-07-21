@@ -80,8 +80,9 @@ function TenantAdminContent() {
             </button>
           </p>
           <p className="tenant-muted">
-            These actions are admin-only and enforced on the server — non-admins
-            receive an error even though the screens are visible.
+            These actions are gated by permission, not by role, and enforced on the
+            server — without the right permission you receive an error even though
+            the screens are visible.
           </p>
         </div>
       </section>
