@@ -85,7 +85,7 @@ List **ignores its raw SQL rows** and rebuilds the response as a map keyed by `s
 }
 ```
 
-Every row has the same five keys. The frontend filters a bucket by `hmsConfigPossibleValues_configId` to find one key's options. (The grouped object is **not** paginated even though `pageSize: 10` is configured.)
+Every row also carries **`hmsConfigPossibleValues_isKeyWide`** — the SHARED marker (§A.4): `0` explicit · `1` Case A (`'*'` name → every category **and** packages) · `2` Case B (`service_categories` + value `'*'` → every service category). Case A/B rows are **fanned** into every enabled category bucket (Case A also into `package`), so the *same* option object (same `id`, `isKeyWide > 0`) appears in multiple buckets — treat an edit/delete of it as **one** action. The FE shows the **apply-to-this-category vs keep-shared** dialog when `isKeyWide > 0` and sends `keep_shared` on the write (see [Config Keys — Enabled-For](./config-keys-enabled-for.md)). The frontend filters a bucket by `hmsConfigPossibleValues_configId` to find one key's options. (The grouped object is **not** paginated even though `pageSize: 10` is configured.)
 
 ### View — single plain row
 
@@ -95,7 +95,7 @@ Every row has the same five keys. The frontend filters a bucket by `hmsConfigPos
   "hmsConfigPossibleValues_id": 105,
   "hmsConfigPossibleValues_configId": 68,
   "hmsConfigPossibleValues_configValueNum": 1,
-  "hmsConfigPossibleValues_configPossibleValue": "{\"en\":\"SAR\",\"ar\":\"ر.س\"}",
+  "hmsConfigPossibleValues_configPossibleValue": { "en": "SAR", "ar": "ر.س" },
   "hmsConfigPossibleValues_status": "active",
   "hmsConfigPossibleValues_createdBy": 1,
   "hmsConfigPossibleValues_updatedBy": 1
@@ -108,20 +108,21 @@ Write operations return the query-resolver metadata.
 
 ## Behavior
 
-**List builds an effective-values map from two base queries.**
-1. **Service buckets** ← `hms_config` where `base_table = 'service_categories'` and `catalog_id = (the 'service' catalog)`, grouped by `record_id` (= `service_category_id`).
-2. **`package` bucket** ← `hms_config_possible_values` joined to `hms_config_keys` where the key `applies_to = '*'` or `target_table LIKE '%packages%'`.
+**List builds an effective-values map from two base queries** (both now over `hms_config_possible_values` — storage refactor Phase 4/5):
+1. **Service buckets** ← `hms_config_possible_values` where `scope_constraint_name = 'service_categories'`, grouped by `scope_constraint_value` (= `service_category_id`). *(Historically these lived in `hms_config`, `base_table='service_categories'` — no longer.)*
+2. **`package` bucket** ← `hms_config_possible_values` where `scope_constraint_name = 'packages'`, joined to `hms_config_keys` where the key `applies_to = '*'` or `target_table LIKE '%packages%'`. The `scope_constraint_name='packages'` filter keeps co-resident service mirrors out of the package bucket.
+3. **`'*'` (both-scope) options** ← rows where `scope_constraint_name = '*'` (key-wide — apply to every category **and** packages). Because a `'*'` row has no single category, it's **fanned server-side** into every category the key is `enabled_for` (added to those category buckets) **and** the `package` bucket. It's tenant-scoped by `created_by`/`applies_to` (a dedicated `starTenancyFilter`), not by `scope_constraint_value`, so a Service Manager's category filter doesn't drop it.
 
 **Per-request tenancy scoping (List).** This post-process bypasses the query resolver, so it scopes both reads itself by the actor resolved from `actionPerformerURDD`:
 - **Service Manager** → his tenant + his service category.
 - **Tenant Admin / Tenant Manager / SaaS Admin** → his tenant only (rows whose `created_by` URDD belongs to his tenant).
 - Tenancy on but no resolvable tenant → **fail closed** (`AND 1 = 0`, no tenant-specific rows). Tenancy off → no extra filter.
 
-**Curated ordering.** Service-category buckets are re-sorted to follow each key's `hms_config_keys.possible_values` pointer-map sequence (e.g. `access_scope`'s public-first order), with `hc.id` as a stable tiebreaker. The `package` bucket is already ordered by `config_value_num`.
+**Curated ordering.** Both buckets are ordered by `config_value_num` — the curated sequence (e.g. `access_scope`'s public-first order) was baked into `config_value_num` by the storage-refactor migration. The old `orderServiceBucketsByPointerMap` step (which followed `hms_config_keys.possible_values`) was **removed** — that pointer map is retired.
 
 **`sort_order` prefill augment (currently DISABLED).** The helpers that would overwrite each `sort_order` ("Display Order") row with the next free position (`max + 1`, scoped to the acting tenant) are kept intact but their invocation is commented out. Today List returns the plain grouped buckets with `sort_order` rows keeping their stored value.
 
-**Value normalization on write.** `config_possible_value` is stored as JSON-valid text via `toEmbeddedConfigValue`. Delete is a soft-delete (`status = 'inactive'`); Add/Update/View have no post-process.
+**Value normalization on write (§8.2 split).** `config_possible_value` is written through `splitConfigValueForWrite`: a simple `{en,ar}` label stores the **bare `en`** and mirrors `ar` to `translated_entries` (`applyArTranslation`); a structured value (`key`/`label`/`group`) is stored whole. Reads reconstruct the object via `localizedConfigValueSql`. Delete is a soft-delete (`status = 'inactive'`).
 
 > **Known cross-tenant breadth caveat:** the two base List queries are otherwise not tenant-scoped at the SQL level (the per-request filters above narrow them); the frontend only reads its own clone's `config_id`, so it is benign in practice but noted as an open follow-up.
 
@@ -135,4 +136,4 @@ Write operations return the query-resolver metadata.
 | `Src/Apis/ProjectSpecificApis/HmsConfigPossibleValuesCrud/CRUD_parameters.js` | Request field schema + `colMapper` |
 | `Src/Apis/ProjectSpecificApis/HmsConfigPossibleValuesCrud/CONTEXT.md` | Design notes (grouped map, tenancy, disabled `sort_order` augment) |
 | `Src/HelperFunctions/PreProcessingFunctions/configKeyManagementPermission.js` | `requireAnyConfigKeyPermission` — RBAC gate for writes |
-| `Src/HelperFunctions/PayloadFunctions/Governance/normalizeConfigValue.js` | `toEmbeddedConfigValue` — JSON-valid value normalization |
+| `Src/HelperFunctions/PayloadFunctions/Governance/configValueLocalization.js` | `splitConfigValueForWrite` / `applyArTranslation` / `localizedConfigValueSql` — §8.2 value split, `ar`→`translated_entries`, read reconstruction |

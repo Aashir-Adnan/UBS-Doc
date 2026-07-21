@@ -133,6 +133,13 @@ const sidebars = {
             },
             {
               type: 'category',
+              label: 'Email Validation Pipeline',
+              items: [
+                'hms-documentation/major-implementations/email-validation/email-validation',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Access Token Security',
               items: [
                 'hms-documentation/major-implementations/access-token-security/access-token-security',
@@ -426,6 +433,7 @@ const sidebars = {
               label: 'Config Keys',
               items: [
                 'hms-documentation/tenant-governance/config-keys/config-keys',
+                'hms-documentation/tenant-governance/config-keys/config-storage-model/config-storage-model',
                 'hms-documentation/tenant-governance/config-keys/config-keys-catalog/config-keys-catalog',
               ],
             },

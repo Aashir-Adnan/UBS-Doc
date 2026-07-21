@@ -124,7 +124,7 @@ In all three cases, the **response shape is identical** — `user_id`, `email`, 
 
 ### What Gets Created (new user path)
 
-1. **User record** in the `users` table with `created_by` set to the admin's URDD.
+1. **User record** in the `users` table with `created_by` set to the platform **SaaS-Admin URDD** (`System / Admin`) — a stable global creator, **not** the acting admin's URDD (which is tenant-scoped and could later be removed, orphaning the reference). The same convention is used by guest self-signup.
 2. **Global URDD** (null-tenant) on the consolidated global guest RDD (`Guest / STANDARD / GENERAL`).
 3. **Per-tenant URDDs** for every **eligible** active hotel (excludes the platform/system tenant), each bound to **that tenant's own Guest RDD clone** (`Guest / STANDARD / TENANT_<code>`; falls back to the global guest RDD when a tenant has no clone yet). This reuses the exact same shared helper (`reconcileGuestTenantUrdds`) as guest self-signup and login — so an admin-created guest is identical to a self-signed-up one.
 4. **URDP (per-user permissions)** materialized for each per-tenant guest URDD from that tenant's **`PG-STANDARD-GUEST`** permission group (per-tenant clone preferred, global fallback). This is currently a no-op because the guest group has no permissions seeded yet, but it keeps every guest in sync the moment guest permissions are added (also re-applied on signup and login).

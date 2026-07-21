@@ -10,14 +10,15 @@ This is the **data inventory**. For *how* keys are created, toggled, and given v
 
 ## How to read this catalog
 
-Each key in §Catalog is one row of `hms_config_keys`. To understand a key fully you usually look at it across the four tables. Worked example — key **67 `base_price`**:
+Each key in §Catalog is one row of `hms_config_keys`. To understand a key fully you look at it across a few tables. Worked example — key **67 `base_price`**:
 
 1. **The definition** (this catalog / `hms_config_keys`): target `svc,pkg`, phase `booking`, `applies_to = *` (usable by any category), value type `decimal`. So: a price field, rendered as a decimal input, available everywhere.
 2. **Where it's switched on** (`enabled_for` on the key): e.g. `{"1":1,"2":1,"package":1}` → on for Stay, Dining, and Packages.
-3. **The allowed values** (`hms_config` for service scope / `hms_config_possible_values` for package scope): the actual preset values an admin defined, e.g. `{"en":"100",…}`.
-4. **The pointer map** (`possible_values` on the key): `{"1":[3066],"package":[104]}` — *which value rows* belong to which scope. Auto-maintained; you read it, never write it.
+3. **The allowed option values** (`hms_config_possible_values`, scope-tagged): the preset options an admin defined, e.g. `{"en":"100",…}`. Service options are tagged `scope_constraint_name='service_categories'` + `scope_constraint_value=<category>`, package options `='packages'`; both ordered by `config_value_num`. Simple `{en,ar}` labels store bare `en` + `ar` in `translated_entries` (§8.2). See [config-storage-model.md](../config-storage-model/config-storage-model.md).
 
-So a single "config key" is a definition here, a set of on/off flags, and a set of value rows elsewhere — all tied together by `config_key_id`. Keep that four-table picture in mind while scanning the tables below.
+> The old `hms_config_keys.possible_values` **pointer map** (`{"1":[3066],"package":[104]}`) is **retired** — no longer read; option order/membership come from the scope tag + `config_value_num`. The column is frozen pending a drop.
+
+So a single "config key" is a definition here, a set of on/off flags, and a set of scope-tagged option rows in `hms_config_possible_values` — all tied together by `config_key_id`.
 
 ---
 
@@ -203,19 +204,19 @@ He does **not** see keys scoped only to *other* categories, nor **package-only k
 
 ---
 
-## The four storage tables
+## The storage tables
 
-`hms_config_keys` is the master registry of *what a config key is*. Three sibling tables hold *the values*:
+`hms_config_keys` is the master registry of *what a config key is*. Its sibling tables hold *the values*:
 
 | Table | Holds | Linked from |
 |---|---|---|
-| `hms_config_keys` | Registry: name, display name, target table, category, phase, applies-to scopes, enabled-for flags, value type, pointer map, required/multi flags, description. | — (authoritative) |
-| `hms_config` | Polymorphic value rows; doubles as **service-scope possible values** when `base_table='service_categories'`. Value in `config_value`. | `config_key_id` → `hms_config_keys.config_key_id` |
-| `hms_config_possible_values` | **Package-scope possible values**. Value in `config_possible_value`, auto-numbered by `config_value_num`. | `config_id` → `hms_config_keys.config_key_id` |
+| `hms_config_keys` | Registry: name, display name, target table, category, phase, applies-to scopes, enabled-for flags, value type, required/multi flags, description. *(`possible_values` — the old pointer map — is a frozen legacy column.)* | — (authoritative) |
+| `hms_config_possible_values` | **All option (possible) values — service AND package**, scope-tagged: `scope_constraint_name='service_categories'` + `scope_constraint_value=<category>` (explicit), `='packages'`, or **SHARED** — Case A `='*'` (every category **and** packages) / Case B `='service_categories'`+value `'*'` (every service category). Value in `config_possible_value`, ordered by `config_value_num`; each read row carries `isKeyWide` (0/1/2). Admin readers fold shared rows into both scopes (edit/delete via `keep_shared` = in-place vs split); guest readers read explicit only. | `config_id` → `hms_config_keys.config_key_id` |
+| `translated_entries` | The Arabic side of simple option labels (`en` stored bare on the option row). | `record_id` → `hms_config_possible_values.id` |
+| `hms_config` | **Applied** values — what a specific service/package *instance* picked (`base_table='services'`/`'packages'`). Value in `config_value`. Written by the CustomServices/CustomPackages APIs. | `config_key_id` → `hms_config_keys.config_key_id` |
 | `hms_config_categories` | The grouping categories that organise keys in the admin UI. | `hms_config_keys.category_id` → `hms_config_categories.category_id` |
 
-`hms_config_keys.possible_values` is a **JSON pointer map**, not a list of values:
-`{ "<service_category_id>": [hms_config.id, …], "package": [hms_config_possible_values.id, …] }`. It is auto-maintained whenever a value row is added or soft-deleted.
+> **Storage refactor.** Service option values used to live in `hms_config` (`base_table='service_categories'`) and the `hms_config_keys.possible_values` JSON pointer map tracked which rows belonged to which scope. Both are **retired** — all option values now live in `hms_config_possible_values`, scope-tagged and ordered by `config_value_num`; the pointer map is no longer read. Full detail: [config-storage-model.md](../config-storage-model/config-storage-model.md).
 
 ---
 
@@ -235,7 +236,7 @@ He does **not** see keys scoped only to *other* categories, nor **package-only k
 
 Almost all keys are scope `1` (service); package-anchored keys use `4`.
 
-### Service categories (`category_id` — used in `applies_to`, `enabled_for`, the pointer map)
+### Service categories (`category_id` — used in `applies_to`, `enabled_for`, and `scope_constraint_value`)
 
 | id | slug | Label (EN) |
 |---|---|---|
@@ -294,8 +295,8 @@ Almost all keys are scope `1` (service); package-anchored keys use `4`.
 | `phase` | enum | `viewing` (admin setup), `booking` (capture time), `consumption` (run-time). |
 | `applies_to` | JSON | `*` = all service categories; otherwise an array of category ids plus literal `"package"`. |
 | `enabled_for` | JSON | `{ "<scope>": 0\|1 }` on/off map per category + `package`. |
-| `value_type` | string | The widget the frontend renders. The value is stored verbatim as JSON regardless. |
-| `possible_values` | JSON | Auto-synced pointer map (see above). |
+| `value_type` | string | The widget the frontend renders. Option values follow the §8.2 split (simple → bare `en` + `ar` in `translated_entries`; structured → whole object). |
+| `possible_values` | JSON | **Legacy** pointer map — frozen, no longer read (see above). |
 | `is_required` | 0/1 | Mandatory at write time. |
 | `is_multi_value` | 0/1 | `1` = stored as selectable options; `0` = single value / placeholder schema. |
 | `description` | text | Freeform note or `{ "en": …, "ar": … }` localised label. |
@@ -591,9 +592,9 @@ A clone is the same key with a tenant-specific scope override (`applies_to` / `e
 |---|---|
 | **Catalog API** (`GET /api/hms_config_keys_catalog`) | `hms_config_keys` (+ scope/category joins) — dual-locale browse. See [The Catalog API](#the-catalog-api). |
 | Admin "Enabled For" CRUD | `hms_config_keys` — toggles `enabled_for` per scope. |
-| Admin "Possible Values" CRUD (service) | `hms_config` rows where `base_table='service_categories'`. |
-| Admin "Possible Values" CRUD (package) | `hms_config_possible_values` rows. |
-| Pointer-map maintenance | `hms_config_keys.possible_values`, auto-synced after Add/Delete. |
+| Admin "Possible Values" CRUD (service) | `hms_config_possible_values` rows, `scope_constraint_name IN ('service_categories','*')` (`'*'` = both-scope). |
+| Admin "Possible Values" CRUD (package) | `hms_config_possible_values` rows, `scope_constraint_name IN ('packages','*')`. |
+| Applied values (a service/package instance's picks) | `hms_config` rows, `base_table='services'`/`'packages'` — written by CustomServices/CustomPackages. |
 | Guest-side form render | Category 12 and 13 rows, filtered by service category and ordered by `group_order`. |
 
 See [config-keys.md](../config-keys.md) for the CRUD contract behind the first four.

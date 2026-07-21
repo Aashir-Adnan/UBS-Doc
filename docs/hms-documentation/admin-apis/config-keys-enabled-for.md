@@ -23,10 +23,25 @@ Operated by the **SaaS Admin** (framework-tier permissions, editing global origi
 | mode | target | Add | List / View | Update | Delete |
 |---|---|---|---|---|---|
 | `enabled_for` | — | **NOT_SUPPORTED** | Lists/Views `hms_config_keys`, decorated with an `enabled` flag | REPLACE `hms_config_keys.enabled_for` with a sanitized `{ scope: 0\|1 }` map | **NOT_SUPPORTED** |
-| `possible_values` | `service` | INSERT/UPSERT `hms_config` row (scoped to a service category), then sync | Lists/Views `hms_config` rows | UPDATE `hms_config.config_value` | Soft-delete `hms_config` row, then sync |
-| `possible_values` | `package` | INSERT/UPSERT `hms_config_possible_values` row (scoped to a config key), then sync | Lists/Views `hms_config_possible_values` rows (sorted by `config_value_num`) | UPDATE `hms_config_possible_values.config_possible_value` | Soft-delete row, then sync |
+| `possible_values` | `service` | INSERT/UPSERT `hms_config_possible_values` row tagged `scope_constraint_name='service_categories'`, `scope_constraint_value=<category>` | Lists/Views mirror rows (aliased to the old `hmsConfig_*` shape) | UPDATE `hms_config_possible_values.config_possible_value` | Soft-delete the mirror row |
+| `possible_values` | `package` | INSERT/UPSERT `hms_config_possible_values` row tagged `scope_constraint_name='packages'` | Lists/Views mirror rows (sorted by `config_value_num`) | UPDATE `hms_config_possible_values.config_possible_value` | Soft-delete the mirror row |
 
 `Add`/`Delete` in `enabled_for` mode throw `NOT_SUPPORTED` (config-key rows are seeded centrally by migrations). `pageSize: 20`.
+
+> **Storage refactor.** Service **and** package options now live in the **one** table
+> `hms_config_possible_values`, distinguished by a **scope tag** (`scope_constraint_name` +
+> `scope_constraint_value`), not by table. Service options used to live in `hms_config`
+> (`base_table='service_categories'`) — those rows are no longer the source of truth. Values follow
+> the **§8.2 split** (bare `en` + `ar`→`translated_entries` for simple labels; whole object for
+> structured), and the old `hms_config_keys.possible_values` pointer map is **retired** (readers hit
+> the mirror directly). Every write also carries an `apply_on_all` **value-level** fan-out (Add /
+> Update / Delete) to tenant clones. See [Config Option Storage Model](../tenant-governance/config-keys/config-storage-model/config-storage-model.md).
+>
+> **`'*'` (both-scope) options.** A row tagged `scope_constraint_name='*'` is **key-wide** — it applies
+> to every service category **and** packages. These List reads include it: **service** →
+> `scope_constraint_name IN ('service_categories','*')` (the `'*'` row shows for any category filter);
+> **package** → `IN ('packages','*')`. `'*'` options are cloned/propagated to tenants like package
+> options. (This is admin-side; guest readers are unchanged.)
 
 ---
 
@@ -55,8 +70,9 @@ Errors: `TENANT_MISMATCH` (403), `RECORD_NOT_FOUND` (404), `REQUEST_TENANT_MISSI
 | `service_category_id` | `number` | query | service Add | Service category (also filters List). |
 | `enabled_for` | `object` | body | enabled_for Update | Complete `{ "<category_id>": 0\|1, "package": 0\|1, "<scope>": 0\|1 }` map. Whole-object replace; values coerced to `0`/`1`, keys kept verbatim. |
 | `apply_on_all` | `boolean` | body | No | On a **global-original** edit only: `true` propagates the change to tenant clones + emails affected tenant admins. Read in post-process; not bound to SQL. |
-| `config_value` | `string` \| `object` | body | service Add/Update | Value stored in `hms_config.config_value` (JSON-normalized). |
-| `config_possible_value` | `string` \| `object` | body | package Add/Update | Value stored in `hms_config_possible_values.config_possible_value` (JSON-normalized). |
+| `keep_shared` | `boolean` | body | shared PV Add/Update/Delete | **Add** (service): `true` creates a **Case A `'*'`** key-wide option (no `service_category_id` needed) instead of a per-category row. **Update/Delete** of a shared PV (`isKeyWide > 0`): `true` = change it in place (stays shared); `false`/omitted (with a `service_category_id`) = **split** for that category only (§A.4). Ignored for explicit (`isKeyWide=0`) rows and for package target. |
+| `config_value` | `string` \| `object` | body | service Add/Update | Option value → `hms_config_possible_values.config_possible_value` (service scope). §8.2 split: simple `{en,ar}` stores bare `en` + `ar`→`translated_entries`; structured stored whole. |
+| `config_possible_value` | `string` \| `object` | body | package Add/Update | Option value → `hms_config_possible_values.config_possible_value` (package scope). Same §8.2 split. |
 | `actionPerformerURDD` | `number` | body | Yes | Acting admin's URDD. |
 | `language_code` | `string` | query | No | Language hint. |
 
@@ -110,6 +126,16 @@ Errors: `TENANT_MISMATCH` (403), `RECORD_NOT_FOUND` (404), `REQUEST_TENANT_MISSI
 
 Rows carry `hmsConfig_configValue` (service) or `hmsConfigPv_configPossibleValue` (package), each parsed back into the original object.
 
+Each row also carries **`hmsConfig_isKeyWide`** (service) / **`hmsConfigPv_isKeyWide`** (package) — the SHARED-scope marker (§A.4):
+
+| value | meaning |
+|---|---|
+| `0` | explicit — this one category (or packages) only |
+| `1` | **Case A** — `scope_constraint_name='*'`: applies to **every** service category **AND** packages |
+| `2` | **Case B** — `scope_constraint_name='service_categories'`, value `'*'`: applies to **every** service category |
+
+When `isKeyWide > 0`, on **edit/delete** the FE shows a dialog offering **"apply to this category only"** vs **"apply to all (keep shared)"**, and sends the choice back via **`keep_shared`** (see Behavior → shared-PV split). Same `'*'` option object (same `id`) can appear in multiple category buckets — treat an edit/delete of it as one key-wide action.
+
 ### Write responses
 
 Return the query-resolver metadata. When an `apply_on_all` propagation ran, the response also carries `propagation` (`{ updated, conflicts }`) and `notification` (`{ emailed, tenants }`).
@@ -120,13 +146,25 @@ Return the query-resolver metadata. When an `apply_on_all` propagation ran, the 
 
 **enabled_for = whole-object replace.** The frontend always sends the complete `enabled_for` map; the pre-process sanitizes every value to `0`/`1` and JSON-stringifies it before the `UPDATE hms_config_keys SET enabled_for = {{enabled_for}} …`. Keys are accepted verbatim (no whitelist) so new scope types don't require a backend release.
 
-**possible_values value storage.** For both targets, the value is stored verbatim as JSON-stringified text (multilingual `{ en, ar, … }` written as-is — no fan-out to `translated_entries`). Reads parse it back into an object.
+**possible_values value storage (§8.2 split).** Both targets write `hms_config_possible_values`. `splitConfigValueForWrite` branches on structure: a **simple** `{ en, ar }` label stores the **bare `en`** in `config_possible_value` and mirrors `ar` to `translated_entries`; a **structured** value (`key`/`label`/`group`) stores the **whole object** (plus an object `translated_entries` copy). Reads reconstruct the `{ en, ar, … }` object via `localizedConfigValueSql` — so the wire shape is unchanged.
 
-**`syncPossibleValues` back-fill.** `hms_config_keys.possible_values` is a JSON pointer map `{ "<category_id>": [hms_config.id …], "package": [hms_config_possible_values.id …] }`. Every successful Add/Delete in possible_values mode recomputes the relevant slot so the map self-heals. Update does not sync (row IDs are unchanged).
+**Shared-PV edit/delete — split vs keep-shared (§A.4).** When a possible value is **shared**
+(`isKeyWide` = 1 Case A / 2 Case B) and the admin edits or deletes it from a per-category screen (a
+`service_category_id` is in scope), the `keep_shared` flag decides:
+- **`keep_shared = true`** → the shared row is changed/soft-deleted **in place** — it stays shared and the change is key-wide.
+- **`keep_shared = false` / omitted** → the backend **splits** (de-collapses) the shared option: it materialises explicit `service_categories` rows for every category the key is `enabled_for` — plus a `packages` row for Case A — where the **target** category gets the edit (or is omitted on delete) and every **other** category (and packages, Case A) keeps the **original** value; the original shared (`'*'`) row is soft-deleted. Net: "edit/remove this option for just Dining" makes Dining diverge while the rest are untouched. Translations are cloned per new row (§8.2). **Add** also honours the flag: a service Add with `keep_shared=true` creates a Case A `'*'` key-wide option directly (no `service_category_id`), rather than a per-category row.
 
-**Single-value scalar upsert.** For scalar key types (`text`, `number`, `date`, etc. with `is_multi_value = 0`), Add upserts the single placeholder row in place (reactivating a soft-deleted one) rather than inserting duplicates.
+**`syncPossibleValues` — retired pointer map.** `hms_config_keys.possible_values` was a JSON pointer map; readers no longer consult it. `syncPossibleValues` is now a **no-op for service** and only maintains the legacy `["package"]` slot (filtered to `scope_constraint_name='packages'`). Option order + membership come from `hms_config_possible_values` (`config_value_num`, scope tag). The column is frozen pending a drop.
 
-**`apply_on_all` propagation.** When a Tenant Manager edits a **global original** (`source_hms_config_key_id IS NULL`) with `apply_on_all = true`, the change is pushed to each unedited tenant clone (`propagateAssignmentUpdates` / `propagateConfigValueUpdates`); tenant-customised clones are left as-is and reported as conflicts. Each updated tenant's active Tenant Admin(s) then get a plain-language email. Both steps are best-effort — the original save is already committed.
+**Single-value scalar upsert.** For scalar key types (`text`, `number`, `date`, etc. with `is_multi_value = 0`), Add upserts the single placeholder row in place — by natural key (`config_id` + scope) — reactivating a soft-deleted one rather than inserting duplicates.
+
+**`apply_on_all` propagation (now value-level too).** When a Tenant Manager edits a **global original** (`source_hms_config_key_id IS NULL`) with `apply_on_all = true`, the change fans out to eligible tenant clones — **not just for `enabled_for`**:
+- `enabled_for` Update → `propagateAssignmentUpdates`;
+- possible_values **Add** → `propagateConfigValueAdds` (inserts the new option into clones, with cloned `translated_entries`; category-owning + not-already-customised gates);
+- possible_values **Update** → `propagateConfigValueUpdates`;
+- possible_values **Delete** → `propagateConfigValueDeletes`.
+
+Unedited clones receive the change; tenant-customised clones are left as-is and reported as `conflicts`. Each updated tenant's active Tenant Admin(s) then get a plain-language email. All steps are best-effort — the original save is already committed.
 
 ### Booked-dependency guards
 
