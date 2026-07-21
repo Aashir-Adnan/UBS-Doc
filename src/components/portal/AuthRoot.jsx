@@ -24,9 +24,9 @@ function toFirebaseConfig(runtimeKeys = {}) {
 }
 
 export default function AuthRoot({ children }) {
-  useEffect(() => {
-    store.dispatch(loadRuntimeKeys());
-  }, []);
+  // useEffect(() => {
+  //   store.dispatch(loadRuntimeKeys());
+  // }, []);
 
   useEffect(() => {
     initFirebase(toFirebaseConfig(store.getState().runtimeKeys.keys));

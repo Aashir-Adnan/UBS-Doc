@@ -3,14 +3,7 @@ import { useLocation } from "react-router-dom";
 import SidebarItem from "./SidebarItem";
 import styles from "./DocsSidebar.module.css";
 import { buildSidebarTree } from "./buildSidebarTree";
-
-const markdownFiles = import.meta.glob("../../docs/**/*.md", {
-  query: "?raw",
-  import: "default",
-  eager: true,
-});
-
-const tree = buildSidebarTree(markdownFiles);
+import { getSidebar } from "../services/DocumentationService";
 
 function containsCurrentPage(node, pathname) {
   if (node.files.some((file) => pathname === `/docs/${file.slug}`)) {
@@ -25,7 +18,26 @@ function containsCurrentPage(node, pathname) {
 export default function DocsSidebar() {
   const location = useLocation();
 
+  const [tree, setTree] = useState({
+    folders: {},
+    files: [],
+  });
+
   const [openFolder, setOpenFolder] = useState("");
+
+  useEffect(() => {
+    async function loadSidebar() {
+      try {
+        const docs = await getSidebar(9);
+
+        setTree(buildSidebarTree(docs));
+      } catch (err) {
+        console.error("Failed to load sidebar", err);
+      }
+    }
+
+    loadSidebar();
+  }, []);
 
   useEffect(() => {
     const current = Object.entries(tree.folders).find(([_, node]) =>
@@ -35,7 +47,7 @@ export default function DocsSidebar() {
     if (current) {
       setOpenFolder(current[0]);
     }
-  }, [location.pathname]);
+  }, [location.pathname, tree]);
 
   return (
     <aside className={styles.sidebar}>

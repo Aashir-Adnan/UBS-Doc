@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap");
+
 .pitchMain {
   min-height: 100vh;
   background:
@@ -13,6 +15,7 @@
     ),
     var(--ifm-background-color);
   color: var(--ifm-font-color-base);
+  font-family: "Inter", var(--ifm-font-family-base, sans-serif);
   padding-bottom: 4rem;
 }
 
@@ -20,14 +23,30 @@
   position: relative;
   max-width: 1160px;
   margin: 0 auto;
-  padding: 5.5rem 1rem 4rem;
+  padding: 3.75rem 1rem 3rem;
 }
 
 .heroGlow {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(9, 60, 93, 0.06), transparent 60%);
+  background: linear-gradient(180deg, rgba(9, 60, 93, 0.05), transparent 60%);
   pointer-events: none;
+}
+
+.heroGrid {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.heroCopy {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .kicker {
@@ -36,10 +55,13 @@
   text-transform: uppercase;
   letter-spacing: 0.16em;
   font-size: 0.72rem;
+  font-weight: 600;
 }
 
 .heroTitle {
   margin: 0.6rem 0 0;
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-weight: 700;
   font-size: clamp(2.2rem, 5.5vw, 4.4rem);
   line-height: 1.05;
   letter-spacing: -0.02em;
@@ -47,8 +69,8 @@
 }
 
 .heroSubtitle {
-  margin: 1rem 0 0;
-  max-width: 740px;
+  margin: 1.5rem auto 0;
+  max-width: 560px;
   color: var(--ifm-color-emphasis-700);
   font-size: clamp(1rem, 1.65vw, 1.25rem);
   line-height: 1.7;
@@ -59,6 +81,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  justify-content: center;
 }
 
 .ctaPrimary,
@@ -71,7 +94,8 @@
   transition:
     transform 160ms ease,
     border-color 160ms ease,
-    background 160ms ease;
+    background 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .ctaPrimary {
@@ -99,13 +123,217 @@
   transform: translateY(-1px);
 }
 
-.scrollShell {
+/* ── Hero visual: terminal signature card ─────────────────────────────── */
+
+.heroVisual {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.terminalCard {
+  width: 100%;
+  max-width: 420px;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: #0d1520;
+  border: 1px solid rgba(111, 209, 215, 0.25);
+  box-shadow:
+    0 24px 60px rgba(9, 60, 93, 0.28),
+    0 2px 0 rgba(111, 209, 215, 0.08) inset;
+  transform: rotate(-1.2deg);
+}
+
+.terminalBar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.65rem 0.9rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.terminalDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.terminalTitle {
+  margin-left: 0.5rem;
+  font-size: 0.72rem;
+  color: rgba(230, 237, 243, 0.45);
+  font-family: "Space Grotesk", monospace;
+}
+
+.terminalBody {
+  padding: 1.1rem 1.1rem 1.3rem;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.84rem;
+  line-height: 1.9;
+}
+
+.terminalLine {
+  margin: 0;
+  color: #e6edf3;
+  white-space: pre-wrap;
+}
+
+.terminalPrompt {
+  color: #6fd1d7;
+  margin-right: 0.4rem;
+}
+
+.terminalMuted {
+  color: #8b949e;
+}
+
+.terminalCursor {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  margin-left: 0.3rem;
+  background: #6fd1d7;
+  vertical-align: text-bottom;
+  animation: cursorBlink 1.1s steps(1) infinite;
+}
+
+@keyframes cursorBlink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ── Shared section scaffolding ──────────────────────────────────────── */
+
+.sectionBlock {
   max-width: 1160px;
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 3rem 1rem 0;
+}
+
+.sectionHeading {
+  max-width: 640px;
+  margin: 0 auto 2.4rem;
+  text-align: center;
+  opacity: 0.18;
+  transform: translateY(16px);
+  transition:
+    opacity 480ms ease,
+    transform 480ms ease;
+}
+
+.sectionEyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ifm-color-primary);
+}
+
+.sectionTitle {
+  margin: 0.5rem 0 0;
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-weight: 600;
+  font-size: clamp(1.6rem, 3vw, 2.3rem);
+  letter-spacing: -0.01em;
+  color: var(--ifm-font-color-base);
+}
+
+.sectionSubtitle {
+  margin: 0.7rem 0 0;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+/* ── Documentation category cards ────────────────────────────────────── */
+
+.categoryGrid {
   display: grid;
-  grid-template-columns: 300px 1fr;
-  gap: 2rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.categoryCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1.3rem 1.2rem;
+  border-radius: 1rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: color-mix(
+    in srgb,
+    var(--ifm-background-surface-color) 90%,
+    transparent
+  );
+  text-decoration: none;
+  color: inherit;
+  opacity: 0.18;
+  transform: translateY(16px);
+  transition:
+    opacity 480ms ease,
+    transform 480ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.categoryCard:hover {
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 12px 28px rgba(9, 60, 93, 0.12);
+}
+
+.categoryIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--ifm-color-primary) 12%, transparent);
+  color: var(--ifm-color-primary);
+}
+
+.categoryIconSvg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.categoryLabel {
+  font-weight: 600;
+  font-size: 0.98rem;
+  color: var(--ifm-font-color-base);
+}
+
+.categoryMeta {
+  font-size: 0.8rem;
+  color: var(--ifm-color-emphasis-700);
+}
+
+/* ── Existing sidebar + story rail (unchanged) ───────────────────────── */
+
+.scrollShell {
+  max-width: 1350px;
+  margin: 80px auto;
+  padding: 0 40px;
+
+  display: grid;
+  grid-template-columns: 280px 1fr;
+
+  column-gap: 70px; /* sidebar aur cards ke darmiyan space */
+  align-items: start;
+}
+
+.featureColumn {
+  width: 100%;
+  padding-left: 15px;
 }
 
 .docsSidebar {
@@ -177,6 +405,7 @@
 
 .storyCard h2 {
   margin: 0;
+  font-family: "Space Grotesk", "Inter", sans-serif;
   font-size: clamp(1.6rem, 3vw, 2.6rem);
   letter-spacing: -0.01em;
   color: var(--ifm-font-color-base);
@@ -195,7 +424,239 @@
   transform: translateY(0);
 }
 
+/* ── Feature cards ────────────────────────────────────────────────────── */
+
+.featureGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(300px, 1fr));
+
+  gap: 35px;
+  align-items: stretch;
+}
+
+.featureCard {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  /* Keep cards short: min/max height per the 180-220px requirement. */
+  padding: 32px;
+  min-height: 190px;
+  max-height: none;
+
+  border-radius: 18px;
+  overflow: hidden;
+  /* Subtle shadow even at rest, so the surface reads as a raised card
+     rather than a flat panel. */
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.featureCard:hover {
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 12px 28px rgba(9, 60, 93, 0.12);
+  transform: translateY(-4px);
+}
+
+.featureIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--ifm-color-primary) 12%, transparent);
+  color: var(--ifm-color-primary);
+  margin-bottom: 0.85rem;
+  flex-shrink: 0;
+}
+
+.featureIconSvg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.featureTitle {
+  margin: 0;
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--ifm-font-color-base);
+}
+
+.featureBody {
+  margin: 0.5rem 0 0;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Quick start ──────────────────────────────────────────────────────── */
+
+.stepList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 2.6rem 1fr;
+  gap: 1rem;
+  padding: 1.4rem;
+  border-radius: 1rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: color-mix(
+    in srgb,
+    var(--ifm-background-surface-color) 90%,
+    transparent
+  );
+  opacity: 0.18;
+  transform: translateY(16px);
+  transition:
+    opacity 480ms ease,
+    transform 480ms ease;
+}
+
+.stepNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #ffffff;
+  background: linear-gradient(
+    120deg,
+    var(--ifm-color-primary),
+    var(--ifm-color-primary-dark)
+  );
+}
+
+.stepBody {
+  min-width: 0;
+}
+
+.stepTitle {
+  margin: 0.15rem 0 0;
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--ifm-font-color-base);
+}
+
+.stepText {
+  margin: 0.5rem 0 0.8rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.codeBlock {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.6rem;
+  background: #0d1520;
+  color: #e6edf3;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.85rem;
+  overflow-x: auto;
+}
+
+/* ── Final CTA ────────────────────────────────────────────────────────── */
+
+.finalCta {
+  position: relative;
+  max-width: 1160px;
+  margin: 5rem auto 0;
+  padding: 3.4rem 1.5rem;
+  border-radius: 1.4rem;
+  text-align: center;
+  overflow: hidden;
+  background: linear-gradient(
+    135deg,
+    var(--ifm-color-primary-dark),
+    var(--ifm-color-primary)
+  );
+  opacity: 0.18;
+  transform: translateY(16px);
+  transition:
+    opacity 480ms ease,
+    transform 480ms ease;
+}
+
+.finalCtaGlow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    600px 260px at 80% -20%,
+    rgba(111, 209, 215, 0.35),
+    transparent 60%
+  );
+  pointer-events: none;
+}
+
+.finalCtaTitle {
+  position: relative;
+  margin: 0;
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.6rem, 3.4vw, 2.4rem);
+  color: #ffffff;
+}
+
+.finalCtaSubtitle {
+  position: relative;
+  margin: 0.7rem auto 0;
+  max-width: 480px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.finalCta .ctaRow {
+  position: relative;
+  justify-content: center;
+}
+
+.finalCta .ctaGhost {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.finalCta .ctaPrimary {
+  background: #ffffff;
+  color: var(--ifm-color-primary-dark);
+  border-color: #ffffff;
+}
+
 @media (max-width: 996px) {
+  .heroGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .heroVisual {
+    margin-top: 1rem;
+  }
+
+  .terminalCard {
+    max-width: 480px;
+    transform: none;
+  }
+
   .scrollShell {
     grid-template-columns: 1fr;
   }
@@ -210,6 +671,43 @@
   }
 }
 
+@media (max-width: 640px) {
+  .featureGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .featureCard {
+    max-height: none;
+  }
+
+  .step {
+    grid-template-columns: 1fr;
+  }
+
+  .stepNumber {
+    width: 2.2rem;
+    height: 2.2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .storyCard,
+  .categoryCard,
+  .featureCard,
+  .step,
+  .sectionHeading,
+  .finalCta,
+  .ctaPrimary,
+  .ctaGhost {
+    transition: none !important;
+  }
+
+  .terminalCursor {
+    animation: none;
+    opacity: 1;
+  }
+}
+
 /* ── Dark theme refinements ──────────────────────────────────────────────
    The rules above already read most colors from Infima's --ifm-* custom
    properties, so tuning the dark palette in custom.css goes a long way.
@@ -219,66 +717,157 @@
    treatment. */
 
 :global([data-theme="dark"]) .heroGlow {
-  background: linear-gradient(180deg, rgba(88, 166, 255, 0.1), transparent 60%);
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.1), transparent 60%);
 }
 
 :global([data-theme="dark"]) .pitchMain {
+  /* Design tokens for dark mode. Kept as custom properties (rather than
+     scattering hex values across every rule below) so the palette lives
+     in one place: a dark slate surface, never pure black, matching
+     modern docs sites (Vercel / Stripe / GitHub / Linear). */
+  --app-surface: #1e293b;
+  --app-border: #334155;
+  --app-border-soft: #334155;
+  --app-hover: #263445;
+  --app-active: rgba(59, 130, 246, 0.18);
+  --app-accent: #3b82f6;
+  --app-text: #f8fafc;
+  --app-text-secondary: #94a3b8;
+  --app-btn-primary-bg: linear-gradient(120deg, #3b82f6, #2563eb);
+  --app-btn-primary-text: #f8fafc;
+  --app-btn-primary-border: #3b82f6;
+  --app-btn-ghost-border: #334155;
+  --app-btn-ghost-bg: rgba(248, 250, 252, 0.03);
+  --app-shadow-lg: 0 12px 32px rgba(2, 6, 23, 0.45);
+
   background:
     radial-gradient(
       950px 520px at 18% -8%,
-      rgba(88, 166, 255, 0.1),
+      rgba(59, 130, 246, 0.1),
       transparent 62%
     ),
     radial-gradient(
       780px 460px at 90% 6%,
-      rgba(88, 166, 255, 0.06),
+      rgba(59, 130, 246, 0.06),
       transparent 58%
     ),
-    var(--ifm-background-color);
+    var(--ifm-background-color, #0f172a);
 }
 
 :global([data-theme="dark"]) .ctaPrimary {
+  background: var(--app-btn-primary-bg);
+  color: var(--app-btn-primary-text);
+  border-color: var(--app-btn-primary-border);
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.25);
+}
+
+:global([data-theme="dark"]) .ctaPrimary:hover {
+  box-shadow: 0 6px 18px rgba(59, 130, 246, 0.35);
+}
+
+:global([data-theme="dark"]) .ctaGhost {
+  border-color: var(--app-btn-ghost-border);
+  background: var(--app-btn-ghost-bg);
+  color: var(--app-text);
+}
+
+:global([data-theme="dark"]) .ctaGhost:hover {
+  border-color: var(--app-accent);
+  background: var(--app-hover);
+}
+
+:global([data-theme="dark"]) .docsSidebar {
+  background: var(--app-surface);
+  border-color: var(--app-border);
+  box-shadow: var(--app-shadow-lg);
+}
+
+:global([data-theme="dark"]) .docsSidebar nav a:hover {
+  border-color: var(--app-accent);
+  background: var(--app-active);
+}
+
+:global([data-theme="dark"]) .storyCard {
+  border-bottom-color: var(--app-border-soft);
+}
+
+:global([data-theme="dark"]) .kicker,
+:global([data-theme="dark"]) .heroSubtitle,
+:global([data-theme="dark"]) .storyCard p {
+  color: var(--app-text-secondary);
+}
+
+/* ── Dark theme: new sections (categories, features, quick start, CTA) ── */
+
+:global([data-theme="dark"]) .sectionEyebrow {
+  color: var(--app-accent);
+}
+
+:global([data-theme="dark"]) .sectionSubtitle,
+:global([data-theme="dark"]) .categoryMeta,
+:global([data-theme="dark"]) .featureBody,
+:global([data-theme="dark"]) .stepText {
+  color: var(--app-text-secondary);
+}
+
+:global([data-theme="dark"]) .categoryCard,
+:global([data-theme="dark"]) .featureCard,
+:global([data-theme="dark"]) .step {
+  background: var(--app-surface);
+  border-color: var(--app-border);
+  /* Cards sit slightly lighter than the page background even at rest,
+     so they read as distinct surfaces rather than flat panels. */
+  box-shadow: 0 1px 2px rgba(2, 6, 23, 0.3);
+}
+
+:global([data-theme="dark"]) .categoryCard:hover,
+:global([data-theme="dark"]) .featureCard:hover {
+  border-color: var(--app-accent);
+  background: var(--app-hover);
+  box-shadow: var(--app-shadow-lg);
+}
+
+:global([data-theme="dark"]) .categoryIcon,
+:global([data-theme="dark"]) .featureIcon {
+  background: rgba(59, 130, 246, 0.18);
+  color: var(--app-accent);
+}
+
+:global([data-theme="dark"]) .terminalCard {
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+:global([data-theme="dark"]) .terminalPrompt,
+:global([data-theme="dark"]) .terminalCursor {
+  background: var(--app-accent);
+  color: var(--app-accent);
+}
+
+:global([data-theme="dark"]) .stepNumber {
+  background: var(--app-btn-primary-bg);
+  color: var(--app-btn-primary-text);
+}
+
+:global([data-theme="dark"]) .finalCta {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  border: 1px solid var(--app-border);
+}
+
+:global([data-theme="dark"]) .finalCtaSubtitle {
+  color: var(--app-text-secondary, #8b949e);
+}
+
+:global([data-theme="dark"]) .finalCta .ctaPrimary {
   background: var(
     --app-btn-primary-bg,
     linear-gradient(120deg, #58a6ff, #388bfd)
   );
   color: var(--app-btn-primary-text, #0d1117);
   border-color: var(--app-btn-primary-border, #58a6ff);
-  box-shadow: 0 4px 14px rgba(56, 139, 253, 0.25);
 }
 
-:global([data-theme="dark"]) .ctaPrimary:hover {
-  box-shadow: 0 6px 18px rgba(56, 139, 253, 0.35);
-}
-
-:global([data-theme="dark"]) .ctaGhost {
+:global([data-theme="dark"]) .finalCta .ctaGhost {
   border-color: var(--app-btn-ghost-border, #30363d);
   background: var(--app-btn-ghost-bg, rgba(255, 255, 255, 0.03));
   color: var(--app-text, #e6edf3);
-}
-
-:global([data-theme="dark"]) .ctaGhost:hover {
-  border-color: var(--app-accent, #58a6ff);
-  background: var(--app-hover, #1c2530);
-}
-
-:global([data-theme="dark"]) .docsSidebar {
-  background: var(--app-surface, #161b22);
-  border-color: var(--app-border, #30363d);
-  box-shadow: var(--app-shadow-lg, 0 12px 32px rgba(1, 4, 9, 0.55));
-}
-
-:global([data-theme="dark"]) .docsSidebar nav a:hover {
-  border-color: var(--app-accent, #58a6ff);
-  background: var(--app-active, rgba(88, 166, 255, 0.15));
-}
-
-:global([data-theme="dark"]) .storyCard {
-  border-bottom-color: var(--app-border-soft, #21262d);
-}
-
-:global([data-theme="dark"]) .kicker,
-:global([data-theme="dark"]) .heroSubtitle,
-:global([data-theme="dark"]) .storyCard p {
-  color: var(--app-text-secondary, #8b949e);
 }

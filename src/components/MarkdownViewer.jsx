@@ -1,6 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import rehypeSlug from "rehype-slug";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter/dist/esm";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 function MarkdownViewer({ content }) {

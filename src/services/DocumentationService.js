@@ -1,24 +1,11 @@
-const documentationFiles = import.meta.glob("../../docs/**/*.{md,html}", {
-  query: "?raw",
-  import: "default",
-});
+import { mwGet } from "../components/meetingWorkflow/api";
 
-export async function getDocument(slug) {
-  const mdFile = documentationFiles[`../../docs/${slug}.md`];
-  const htmlFile = documentationFiles[`../../docs/${slug}.html`];
+export async function getDocument(repoId, slug) {
+  return await mwGet(
+    `/documentation?repo_id=${repoId}&slug=${encodeURIComponent(slug)}`,
+  );
+}
 
-  const file = mdFile || htmlFile;
-
-  if (!file) {
-    return null;
-  }
-
-  const type = mdFile ? "md" : "html";
-
-  const content = await file();
-
-  return {
-    type,
-    content,
-  };
+export async function getSidebar(repoId) {
+  return await mwGet(`/documentation?repo_id=${repoId}&type=sidebar`);
 }

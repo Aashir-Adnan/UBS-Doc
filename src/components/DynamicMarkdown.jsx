@@ -20,7 +20,8 @@ function DynamicMarkdown() {
     async function loadMarkdown() {
       setNotFound(false);
 
-      const document = await getDocument(slug);
+      // const document = await getDocument(slug);
+      const document = await getDocument(9, slug);
 
       if (!document) {
         setNotFound(true);

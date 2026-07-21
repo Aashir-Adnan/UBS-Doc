@@ -1,13 +1,11 @@
-export function buildSidebarTree(markdownFiles) {
+export function buildSidebarTree(docs = []) {
   const tree = {
     folders: {},
     files: [],
   };
 
-  Object.keys(markdownFiles).forEach((path) => {
-    const relativePath = path.replace("../../docs/", "").replace(".md", "");
-
-    const parts = relativePath.split("/");
+  docs.forEach((doc) => {
+    const parts = doc.slug.split("/");
 
     let current = tree;
 
@@ -26,16 +24,9 @@ export function buildSidebarTree(markdownFiles) {
       current = current.folders[folderName];
     }
 
-    const fileName = parts[parts.length - 1];
-    const content = markdownFiles[path];
-
-    const match = content.match(/^#\s+(.+)$/m);
-
-    const title = match ? match[1].trim() : fileName.replace(/-/g, " ");
-
     current.files.push({
-      title,
-      slug: relativePath,
+      title: doc.title,
+      slug: doc.slug,
     });
   });
 
