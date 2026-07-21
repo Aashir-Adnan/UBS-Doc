@@ -1,19 +1,15 @@
-import React from 'react';
-import { useLocation } from 'react-router-dom';
-import Layout from '@theme/Layout';
-import Link from '@docusaurus/Link';
-import { useAuth } from '@site/src/components/portal/authStore';
-import GoogleSignIn from '@site/src/components/portal/GoogleSignIn';
-import {
-  projects,
-  getProjectComponent,
-} from '@site/src/data/projectsConfig';
-import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
+import React from "react";
+import { useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { useAuth } from "@site/src/components/portal/authStore";
+import GoogleSignIn from "@site/src/components/portal/GoogleSignIn";
+import { projects, getProjectComponent } from "@site/src/data/projectsConfig";
+import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
 
 function useProjectSlug() {
   const { search } = useLocation();
   const params = new URLSearchParams(search);
-  return params.get('project');
+  return params.get("project");
 }
 
 function ProjectViewContent() {
@@ -22,7 +18,11 @@ function ProjectViewContent() {
   const canAccessPortal = !!user && isGranjurEmail(user?.email);
 
   if (loading) {
-    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+    return (
+      <section className="portal-hero portal-hero-center">
+        <p>Loading...</p>
+      </section>
+    );
   }
 
   const project = projectSlug
@@ -71,7 +71,7 @@ function ProjectViewContent() {
             <p className="card-subtitle">
               {projectSlug
                 ? `No project with slug "${projectSlug}".`
-                : 'Specify a project with ?project=&lt;slug&gt;.'}
+                : "Specify a project with ?project=&lt;slug&gt;."}
             </p>
             <Link to="/tools/projects" className="button button--primary">
               Back to Projects
@@ -102,7 +102,7 @@ function ProjectViewContent() {
             <Link
               to="/tools/projects"
               className="button button--secondary"
-              style={{ marginLeft: '0.5rem' }}
+              style={{ marginLeft: "0.5rem" }}
             >
               Back to Projects
             </Link>
@@ -130,13 +130,10 @@ function ProjectViewContent() {
 
 export default function ProjectViewPage() {
   return (
-    <Layout
-      title="Project view"
-      description="Custom project view"
-    >
+    <>
       <main className="portal-main-wrapper">
         <ProjectViewContent />
       </main>
-    </Layout>
+    </>
   );
 }

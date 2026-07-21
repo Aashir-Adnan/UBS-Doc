@@ -3,6 +3,10 @@ import { Link } from "react-router-dom";
 import styles from "./index.module.css";
 
 export default function Home() {
+  const siteConfig = {
+    title: "UBS Documentation",
+  };
+
   useEffect(() => {
     const sections = Array.from(document.querySelectorAll("[data-reveal]"));
     if (!sections.length) return undefined;
@@ -30,7 +34,7 @@ export default function Home() {
         <section className={styles.hero}>
           <div className={styles.heroGlow} />
           <p className={styles.kicker}>Framework for high-growth teams</p>
-          <h1 className={styles.heroTitle}>UBS Framework</h1>
+          <h1 className={styles.heroTitle}>{siteConfig.title}</h1>
           <p className={styles.heroSubtitle}>
             Launch production-ready platforms faster with a framework engineered
             for scale, security, and delivery velocity.
@@ -39,6 +43,7 @@ export default function Home() {
             <Link className={styles.ctaPrimary} to="/docs/backend/UBS-intro">
               Explore Documentation
             </Link>
+
             <Link className={styles.ctaGhost} to="/tools">
               Open Dev Tools
             </Link>

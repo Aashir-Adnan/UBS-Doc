@@ -1,6 +1,6 @@
-import React from 'react';
-import Link from '@docusaurus/Link';
-import OperaDiagrams from './opera/OperaDiagrams';
+import React from "react";
+import { Link } from "react-router-dom";
+import OperaDiagrams from "./opera/OperaDiagrams";
 
 /**
  * Custom project view for Badar HMS.
@@ -11,14 +11,15 @@ export default function BadarHMSView({ project }) {
   return (
     <div className="project-view-badar-hms">
       <div className="portal-section-header">
-        <h2>{project?.name ?? 'Badar HMS'}</h2>
-        <p>
-          Hotel Management System – documentation and integration overview.
-        </p>
+        <h2>{project?.name ?? "Badar HMS"}</h2>
+        <p>Hotel Management System – documentation and integration overview.</p>
       </div>
 
       <div className="project-view-grid">
-        <Link to="/docs/projects/badar-hms/Opera_Integration" className="project-view-card">
+        <Link
+          to="/docs/projects/badar-hms/Opera_Integration"
+          className="project-view-card"
+        >
           <div className="project-view-card-face">
             <div className="project-view-card-icon">📄</div>
             <h3>Opera Integration</h3>

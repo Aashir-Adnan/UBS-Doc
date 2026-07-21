@@ -1,10 +1,9 @@
-import React from 'react';
-import Layout from '@theme/Layout';
-import Link from '@docusaurus/Link';
-import { useAuth } from '@site/src/components/portal/authStore';
-import GoogleSignIn from '@site/src/components/portal/GoogleSignIn';
-import MyProjects from '@site/src/components/portal/tenantProjects/MyProjects';
-import { useActingUrdd } from '@site/src/components/portal/tenantProjects/useActingUrdd';
+import React from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "@site/src/components/portal/authStore";
+import GoogleSignIn from "@site/src/components/portal/GoogleSignIn";
+import MyProjects from "@site/src/components/portal/tenantProjects/MyProjects";
+import { useActingUrdd } from "@site/src/components/portal/tenantProjects/useActingUrdd";
 
 function MyProjectsContent() {
   const { user, signOut } = useAuth();
@@ -24,7 +23,7 @@ function MyProjectsContent() {
     );
   }
 
-  const orgLabel = activeOrg?.display_name || activeOrg?.org_name || 'Personal';
+  const orgLabel = activeOrg?.display_name || activeOrg?.org_name || "Personal";
 
   return (
     <>
@@ -36,9 +35,13 @@ function MyProjectsContent() {
         <div className="portal-hero-text">
           <h2>My Projects</h2>
           <p>
-            Projects available under <strong>{orgLabel}</strong>. Signed in as{' '}
-            <strong>{user.name || user.email}</strong>.{' '}
-            <button type="button" className="portal-signout-link" onClick={signOut}>
+            Projects available under <strong>{orgLabel}</strong>. Signed in as{" "}
+            <strong>{user.name || user.email}</strong>.{" "}
+            <button
+              type="button"
+              className="portal-signout-link"
+              onClick={signOut}
+            >
               Sign out
             </button>
           </p>
@@ -54,10 +57,10 @@ function MyProjectsContent() {
 
 export default function MyProjectsPage() {
   return (
-    <Layout title="My Projects" description="Projects available under your organization">
+    <>
       <main className="portal-main-wrapper">
         <MyProjectsContent />
       </main>
-    </Layout>
+    </>
   );
 }
