@@ -205,6 +205,78 @@ Addons also support an optional `quantity` field (integer, default: 1). When `qu
 
 > **This is the same shape used across all booking creation endpoints** (`/bookings/room`, `/bookings/package`, `/bookings/service`) and matches what the read bundle (`GET /guest/bookings`) returns in `services[].meals[]`, `services[].sessions[]`, and `services[].transport`. The `id` field in each read-side slot is the `slotId` used for rescheduling.
 
+---
+
+## Step 5b: Create Package Booking
+
+**POST** `/api/guest/bookings/package`
+
+**Authentication:** AUTH_PLATFORM (requires guest JWT)
+
+Package bookings use two separate arrays in the request body:
+
+- **`services`** — scheduling hints for **package-included** services only. Services listed here must be part of the package definition (`package_services` table). Any service ID in this array that is not a package-included service is **silently ignored** — it will not be booked or charged.
+- **`addons`** — extra services **beyond the package** that the guest wants to add. These are charged separately on top of the package price. Uses the same shape as room booking addons (see **Addon Scheduling** above).
+
+### Request Body
+
+```json
+{
+  "actionPerformerURDD": 89,
+  "hotelId": 16,
+  "packageId": 345,
+  "checkIn": "2026-07-30",
+  "checkOut": "2026-08-02",
+  "adults": 4,
+  "children": 3,
+  "isMainGuest": true,
+  "services": [
+    { "serviceId": 196 },
+    { "serviceId": 190 }
+  ],
+  "addons": [
+    { "serviceId": 193, "quantity": 1 }
+  ],
+  "paymentPlan": "full"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `actionPerformerURDD` | `number` | Yes | Tenant-specific URDD ID |
+| `hotelId` | `number` | Yes | Hotel/tenant ID |
+| `packageId` | `number` | Yes | Package ID from search results |
+| `checkIn` | `string` | Yes | Check-in date (YYYY-MM-DD) |
+| `checkOut` | `string` | No | Check-out date (YYYY-MM-DD). If omitted, derived from `checkIn` + package stay duration. |
+| `adults` | `number` | Yes | Number of adult guests |
+| `children` | `number` | No | Number of child guests (default: 0) |
+| `guests` | `object` | No | Alternative to top-level `adults`/`children`: `{ adults, children }` |
+| `isMainGuest` | `boolean` | Yes | Whether the booker is the primary guest |
+| `entries` | `array` | No | Serial/parallel booking entries (same as room bookings) |
+| `services` | `array` | No | Scheduling hints for package-included services. Each entry: `{ serviceId, sessions?, meals?, transport? }`. **Only package-included service IDs are recognized — non-package services here are ignored.** |
+| `addons` | `array` | No | Extra services beyond the package, charged separately. Same shape as room booking addons. |
+| `paymentPlan` | `string` | Yes | `"full"` or `"partial"` |
+
+### Important: `services` vs `addons`
+
+| Array | Purpose | Charged? | What happens if a non-package service is placed here? |
+|-------|---------|----------|------------------------------------------------------|
+| `services` | Attach scheduling data to package-included services | No (covered by package price) | **Silently ignored** — the service is not booked. |
+| `addons` | Add extra services beyond the package | Yes (added to total) | Booked and charged at catalog price. |
+
+### Pricing
+
+- **Package total** = `package_catalog_price x instances` + sum of addon prices
+- Package-included services (stay, kids, dining, etc.) are covered by the flat package price
+- Only services in `addons` are charged on top
+- Pricing rules (discounts, surcharges) are applied once to the full subtotal
+
+### Response
+
+Returns the same v2 booking bundle as room bookings.
+
+---
+
 ### Response
 
 Returns a full v2 booking bundle object:
