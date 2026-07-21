@@ -179,20 +179,53 @@ function CheckList({ items, selectedIds, onToggle, getLabel, getId, getSubLabel,
   );
 }
 
+// mwGet throws the raw response body as the Error message. The portal API answers
+// errors with a JSON envelope, so pull the readable server message out of it for
+// inline display (same fields tenantApi's error helper uses); fall back to the raw
+// text when it isn't JSON.
+function readableError(message) {
+  try {
+    const parsed = JSON.parse(message);
+    return parsed?.message || parsed?.payload || message;
+  } catch {
+    return message;
+  }
+}
+
 function ScopePicker({ actingUrdd, selectedRepoIds, onRepoToggle, selectedFeatureIds, onFeatureToggle }) {
   const [repos, setRepos] = useState([]);
   const [features, setFeatures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [reposError, setReposError] = useState(null);
   const [repoSearch, setRepoSearch] = useState('');
   const [featSearch, setFeatSearch] = useState('');
 
   useEffect(() => {
-    // Tenant-scoped repo list — the user can only pick repos in their tenant.
-    Promise.all([listTenantRepos(actingUrdd), fetchAllFeatures()])
-      .then(([r, f]) => { setRepos(r); setFeatures(f); })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    setLoading(true);
+    setReposError(null);
+
+    // Loaded independently so one failure can't take out the other.
+    // /repos/tenant/list is permission-gated (needs list_repos) and can 403 for a
+    // user without repo access — that must degrade only the repo column, never
+    // block the whole Create Meeting form.
+    const reposDone = listTenantRepos(actingUrdd)
+      .then((r) => { if (!cancelled) setRepos(r); })
+      .catch((e) => {
+        if (cancelled) return;
+        setRepos([]);
+        setReposError(readableError(e.message));
+      });
+
+    const featuresDone = fetchAllFeatures()
+      .then((f) => { if (!cancelled) setFeatures(f); })
+      .catch((e) => { if (!cancelled) setError(e.message); });
+
+    Promise.all([reposDone, featuresDone])
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
   }, [actingUrdd]);
 
   if (loading) return <div className="mw-scope-loading">Loading…</div>;
@@ -226,21 +259,27 @@ function ScopePicker({ actingUrdd, selectedRepoIds, onRepoToggle, selectedFeatur
           Repositories
           {selectedRepoIds.length > 0 && <span className="mw-scope-badge">{selectedRepoIds.length}</span>}
         </p>
-        <input
-          className="mw-input mw-input--sm"
-          placeholder="Filter…"
-          value={repoSearch}
-          onChange={(e) => setRepoSearch(e.target.value)}
-        />
-        <CheckList
-          items={repos}
-          selectedIds={selectedRepoIds}
-          onToggle={onRepoToggle}
-          getLabel={(r) => r.name}
-          getId={(r) => r.id}
-          getSubLabel={(r) => r.branch || 'main'}
-          search={repoSearch}
-        />
+        {reposError ? (
+          <div className="mw-field-error">Could not load repos: {reposError}</div>
+        ) : (
+          <>
+            <input
+              className="mw-input mw-input--sm"
+              placeholder="Filter…"
+              value={repoSearch}
+              onChange={(e) => setRepoSearch(e.target.value)}
+            />
+            <CheckList
+              items={repos}
+              selectedIds={selectedRepoIds}
+              onToggle={onRepoToggle}
+              getLabel={(r) => r.name}
+              getId={(r) => r.id}
+              getSubLabel={(r) => r.branch || 'main'}
+              search={repoSearch}
+            />
+          </>
+        )}
       </div>
 
       <div className="mw-scope-col">
