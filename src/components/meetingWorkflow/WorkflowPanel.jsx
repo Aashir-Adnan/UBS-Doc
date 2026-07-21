@@ -210,7 +210,7 @@ function ContextFilesPanel({ meetingId }) {
 }
 
 // ─── Stage 0: Pre-Meeting Notes ───────────────────────────────────────────────
-function PreMeetingStage({ meeting, detail, onDone }) {
+function PreMeetingStage({ meeting, detail, onDone, actingUrdd }) {
   const [busy, setBusy] = useState(false);
   const [md, setMd] = useState(detail?.meeting?.pre_meeting_notes || meeting.pre_meeting_notes || '');
   const [html, setHtml] = useState(detail?.meeting?.pre_meeting_html || meeting.pre_meeting_html || '');
@@ -226,7 +226,10 @@ function PreMeetingStage({ meeting, detail, onDone }) {
   async function run() {
     setBusy(true); setError('');
     try {
-      const data = await mwPost('/meeting/workflow/premeeting', { meeting_id: meeting.meeting_id });
+      const data = await mwPost('/meeting/workflow/premeeting', {
+        meeting_id: meeting.meeting_id,
+        actionPerformerURDD: actingUrdd,
+      });
       setMd(data.preMeetingNotes || '');
       setHtml(data.preMeetingHtml || '');
       setKeyTopics(data.keyTopics || []);
@@ -831,7 +834,7 @@ export default function WorkflowPanel({ meeting, actingUrdd, onStageComplete }) 
   }
 
   const stageComponents = {
-    0: <PreMeetingStage  meeting={meeting} detail={detail} onDone={handleDone} />,
+    0: <PreMeetingStage  meeting={meeting} detail={detail} onDone={handleDone} actingUrdd={actingUrdd} />,
     1: <LiveTranscribeStage meeting={meeting} detail={detail} onDone={handleDone} />,
     2: <AnalyzeStage     meeting={meeting} detail={detail} onDone={handleDone} />,
     3: <TasksStage       meeting={meeting} detail={detail} onDone={handleDone} />,
