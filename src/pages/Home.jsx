@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 import styles from "./index.module.css";
+import DocsSidebar from "../components/DocsSidebar";
 
 export default function Home() {
   const siteConfig = {
@@ -51,22 +52,7 @@ export default function Home() {
         </section>
 
         <section className={styles.scrollShell}>
-          <aside className={styles.docsSidebar}>
-            <h3>Developer Docs</h3>
-            <p>Core sections for engineering teams.</p>
-            <nav>
-              <Link to="/docs/backend/UBS-intro">Backend Foundation</Link>
-              <Link to="/docs/frontend/UBS-intro">Frontend Foundation</Link>
-              <Link to="/docs/database/Lucidchart">Database Standards</Link>
-              <Link to="/docs/backend/githubWorkflows/ai-agent">
-                AI Workflows
-              </Link>
-              <Link to="/docs/agents/agent-issue-format">Agents Docs</Link>
-              <Link to="/docs/backend/Payments">Payments Integration</Link>
-              <Link to="/docs/backend/FAQs">Engineering FAQs</Link>
-            </nav>
-          </aside>
-
+          <DocsSidebar />
           <div className={styles.storyRail}>
             <article
               className={`${styles.storyCard} ${styles.isVisible}`}

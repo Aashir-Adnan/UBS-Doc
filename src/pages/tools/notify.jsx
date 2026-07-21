@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../components/portal/authStore";
 import GoogleSignIn from "../../components/portal/GoogleSignIn";
 import BugReport from "../../components/portal/BugReport";
-import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
+import { isGranjurEmail } from "../../utils/isGranjurEmail";
 
 function NotifyContent() {
   const { user, signOut, loading } = useAuth();

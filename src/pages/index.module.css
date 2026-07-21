@@ -1,8 +1,16 @@
 .pitchMain {
   min-height: 100vh;
   background:
-    radial-gradient(950px 520px at 18% -8%, rgba(9, 60, 93, 0.18), transparent 62%),
-    radial-gradient(780px 460px at 90% 6%, rgba(111, 209, 215, 0.10), transparent 58%),
+    radial-gradient(
+      950px 520px at 18% -8%,
+      rgba(9, 60, 93, 0.18),
+      transparent 62%
+    ),
+    radial-gradient(
+      780px 460px at 90% 6%,
+      rgba(111, 209, 215, 0.1),
+      transparent 58%
+    ),
     var(--ifm-background-color);
   color: var(--ifm-font-color-base);
   padding-bottom: 4rem;
@@ -60,11 +68,18 @@
   font-size: 0.88rem;
   font-weight: 600;
   text-decoration: none;
-  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
 }
 
 .ctaPrimary {
-  background: linear-gradient(120deg, var(--ifm-color-primary), var(--ifm-color-primary-dark));
+  background: linear-gradient(
+    120deg,
+    var(--ifm-color-primary),
+    var(--ifm-color-primary-dark)
+  );
   color: #ffffff;
   border: 1px solid var(--ifm-color-primary-light);
 }
@@ -72,7 +87,11 @@
 .ctaGhost {
   border: 1px solid var(--ifm-color-emphasis-400);
   color: var(--ifm-font-color-base);
-  background: color-mix(in srgb, var(--ifm-background-surface-color) 82%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--ifm-background-surface-color) 82%,
+    transparent
+  );
 }
 
 .ctaPrimary:hover,
@@ -93,7 +112,11 @@
   position: sticky;
   top: 86px;
   align-self: start;
-  background: color-mix(in srgb, var(--ifm-background-surface-color) 90%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--ifm-background-surface-color) 90%,
+    transparent
+  );
   border: 1px solid var(--ifm-color-emphasis-300);
   border-radius: 1rem;
   padding: 1rem;
@@ -144,8 +167,11 @@
   justify-content: center;
   opacity: 0.18;
   transform: translateY(16px);
-  transition: opacity 480ms ease, transform 480ms ease;
-  border-bottom: 1px solid color-mix(in srgb, var(--ifm-color-primary) 25%, transparent);
+  transition:
+    opacity 480ms ease,
+    transform 480ms ease;
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--ifm-color-primary) 25%, transparent);
   padding-bottom: 2.2rem;
 }
 
@@ -182,4 +208,77 @@
   .storyCard {
     min-height: 34vh;
   }
+}
+
+/* ── Dark theme refinements ──────────────────────────────────────────────
+   The rules above already read most colors from Infima's --ifm-* custom
+   properties, so tuning the dark palette in custom.css goes a long way.
+   These overrides remove the last hardcoded light-mode assumptions
+   (a navy glow tuned for a light background, flat card borders, a
+   default scrollbar) and give buttons a proper primary/secondary
+   treatment. */
+
+:global([data-theme="dark"]) .heroGlow {
+  background: linear-gradient(180deg, rgba(88, 166, 255, 0.1), transparent 60%);
+}
+
+:global([data-theme="dark"]) .pitchMain {
+  background:
+    radial-gradient(
+      950px 520px at 18% -8%,
+      rgba(88, 166, 255, 0.1),
+      transparent 62%
+    ),
+    radial-gradient(
+      780px 460px at 90% 6%,
+      rgba(88, 166, 255, 0.06),
+      transparent 58%
+    ),
+    var(--ifm-background-color);
+}
+
+:global([data-theme="dark"]) .ctaPrimary {
+  background: var(
+    --app-btn-primary-bg,
+    linear-gradient(120deg, #58a6ff, #388bfd)
+  );
+  color: var(--app-btn-primary-text, #0d1117);
+  border-color: var(--app-btn-primary-border, #58a6ff);
+  box-shadow: 0 4px 14px rgba(56, 139, 253, 0.25);
+}
+
+:global([data-theme="dark"]) .ctaPrimary:hover {
+  box-shadow: 0 6px 18px rgba(56, 139, 253, 0.35);
+}
+
+:global([data-theme="dark"]) .ctaGhost {
+  border-color: var(--app-btn-ghost-border, #30363d);
+  background: var(--app-btn-ghost-bg, rgba(255, 255, 255, 0.03));
+  color: var(--app-text, #e6edf3);
+}
+
+:global([data-theme="dark"]) .ctaGhost:hover {
+  border-color: var(--app-accent, #58a6ff);
+  background: var(--app-hover, #1c2530);
+}
+
+:global([data-theme="dark"]) .docsSidebar {
+  background: var(--app-surface, #161b22);
+  border-color: var(--app-border, #30363d);
+  box-shadow: var(--app-shadow-lg, 0 12px 32px rgba(1, 4, 9, 0.55));
+}
+
+:global([data-theme="dark"]) .docsSidebar nav a:hover {
+  border-color: var(--app-accent, #58a6ff);
+  background: var(--app-active, rgba(88, 166, 255, 0.15));
+}
+
+:global([data-theme="dark"]) .storyCard {
+  border-bottom-color: var(--app-border-soft, #21262d);
+}
+
+:global([data-theme="dark"]) .kicker,
+:global([data-theme="dark"]) .heroSubtitle,
+:global([data-theme="dark"]) .storyCard p {
+  color: var(--app-text-secondary, #8b949e);
 }

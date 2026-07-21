@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../components/portal/authStore";
 import GoogleSignIn from "../../components/portal/GoogleSignIn";
-import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
+import { isGranjurEmail } from "../../utils/isGranjurEmail";
 
 /** Converts URL path to object name: /test/api → TestApi_object */
 function urlToObjectName(url) {

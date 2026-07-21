@@ -1,9 +1,9 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "@site/src/components/portal/authStore";
-import GoogleSignIn from "@site/src/components/portal/GoogleSignIn";
-import MyProjects from "@site/src/components/portal/tenantProjects/MyProjects";
-import { useActingUrdd } from "@site/src/components/portal/tenantProjects/useActingUrdd";
+import { useAuth } from "../../components/portal/authStore";
+import GoogleSignIn from "../../components/portal/GoogleSignIn";
+import MyProjects from "../../components/portal/tenantProjects/MyProjects";
+import { useActingUrdd } from "../../components/portal/tenantProjects/useActingUrdd";
 
 function MyProjectsContent() {
   const { user, signOut } = useAuth();

@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { mwPost } from './api';
-import { listTenantRepos } from './tenantRepos';
-import { API_BASE_URL } from '@site/src/components/portal/config';
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { mwPost } from "./api";
+import { listTenantRepos } from "./tenantRepos";
+import { API_BASE_URL } from "../portal/config";
 
 const REPOS_BASE = `${API_BASE_URL}/api/tracked`;
 const USERS_BASE = `${API_BASE_URL}/api/portal/users`;
@@ -25,19 +25,30 @@ async function fetchPortalUsers() {
 // ─── Digital clock picker ────────────────────────────────────────────────────
 // date: 'YYYY-MM-DD', hours: '00'-'23', minutes: '00'-'59'
 
-function DigitalClock({ date, hours, minutes, onDateChange, onHoursChange, onMinutesChange }) {
+function DigitalClock({
+  date,
+  hours,
+  minutes,
+  onDateChange,
+  onHoursChange,
+  onMinutesChange,
+}) {
   const hourRef = useRef(null);
   const minRef = useRef(null);
 
   function onHourKey(e) {
-    const cur = parseInt(hours || '0', 10);
-    if (e.key === 'ArrowUp') onHoursChange(String(Math.min(23, cur + 1)).padStart(2, '0'));
-    else if (e.key === 'ArrowDown') onHoursChange(String(Math.max(0, cur - 1)).padStart(2, '0'));
+    const cur = parseInt(hours || "0", 10);
+    if (e.key === "ArrowUp")
+      onHoursChange(String(Math.min(23, cur + 1)).padStart(2, "0"));
+    else if (e.key === "ArrowDown")
+      onHoursChange(String(Math.max(0, cur - 1)).padStart(2, "0"));
   }
   function onMinKey(e) {
-    const cur = parseInt(minutes || '0', 10);
-    if (e.key === 'ArrowUp') onMinutesChange(String(Math.min(59, cur + 1)).padStart(2, '0'));
-    else if (e.key === 'ArrowDown') onMinutesChange(String(Math.max(0, cur - 1)).padStart(2, '0'));
+    const cur = parseInt(minutes || "0", 10);
+    if (e.key === "ArrowUp")
+      onMinutesChange(String(Math.min(59, cur + 1)).padStart(2, "0"));
+    else if (e.key === "ArrowDown")
+      onMinutesChange(String(Math.max(0, cur - 1)).padStart(2, "0"));
   }
 
   return (
@@ -53,31 +64,33 @@ function DigitalClock({ date, hours, minutes, onDateChange, onHoursChange, onMin
           ref={hourRef}
           className="mw-clock-seg"
           type="number"
-          min="0" max="23"
+          min="0"
+          max="23"
           value={hours}
           placeholder="HH"
           onChange={(e) => {
-            const v = e.target.value.replace(/\D/g, '').slice(0, 2);
+            const v = e.target.value.replace(/\D/g, "").slice(0, 2);
             onHoursChange(v);
             if (v.length === 2) minRef.current?.focus();
           }}
           onKeyDown={onHourKey}
-          onBlur={() => onHoursChange(hours.padStart(2, '0'))}
+          onBlur={() => onHoursChange(hours.padStart(2, "0"))}
         />
         <span className="mw-clock-colon">:</span>
         <input
           ref={minRef}
           className="mw-clock-seg"
           type="number"
-          min="0" max="59"
+          min="0"
+          max="59"
           value={minutes}
           placeholder="MM"
           onChange={(e) => {
-            const v = e.target.value.replace(/\D/g, '').slice(0, 2);
+            const v = e.target.value.replace(/\D/g, "").slice(0, 2);
             onMinutesChange(v);
           }}
           onKeyDown={onMinKey}
-          onBlur={() => onMinutesChange(minutes.padStart(2, '0'))}
+          onBlur={() => onMinutesChange(minutes.padStart(2, "0"))}
         />
       </div>
     </div>
@@ -89,7 +102,7 @@ function DigitalClock({ date, hours, minutes, onDateChange, onHoursChange, onMin
 function ParticipantsPicker({ selectedEmails, onToggle, currentUserEmail }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetchPortalUsers()
@@ -99,9 +112,10 @@ function ParticipantsPicker({ selectedEmails, onToggle, currentUserEmail }) {
   }, []);
 
   const filtered = search.trim()
-    ? users.filter((u) =>
-        (u.name || '').toLowerCase().includes(search.toLowerCase()) ||
-        u.email.toLowerCase().includes(search.toLowerCase())
+    ? users.filter(
+        (u) =>
+          (u.name || "").toLowerCase().includes(search.toLowerCase()) ||
+          u.email.toLowerCase().includes(search.toLowerCase()),
       )
     : users;
 
@@ -114,7 +128,7 @@ function ParticipantsPicker({ selectedEmails, onToggle, currentUserEmail }) {
         placeholder="Search people…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        style={{ marginBottom: '0.5rem' }}
+        style={{ marginBottom: "0.5rem" }}
       />
       <div className="mw-participants-list">
         {filtered.map((u) => {
@@ -124,18 +138,27 @@ function ParticipantsPicker({ selectedEmails, onToggle, currentUserEmail }) {
             <button
               key={u.email}
               type="button"
-              className={`mw-participant-tile${selected ? ' mw-participant-tile--selected' : ''}`}
+              className={`mw-participant-tile${selected ? " mw-participant-tile--selected" : ""}`}
               onClick={() => !isSelf && onToggle(u)}
               disabled={isSelf}
-              title={isSelf ? 'You are always included' : u.email}
+              title={isSelf ? "You are always included" : u.email}
             >
-              {u.photo_url
-                ? <img src={u.photo_url} className="mw-participant-avatar" alt="" />
-                : <span className="mw-participant-initials">{(u.name || u.email)[0].toUpperCase()}</span>
-              }
+              {u.photo_url ? (
+                <img
+                  src={u.photo_url}
+                  className="mw-participant-avatar"
+                  alt=""
+                />
+              ) : (
+                <span className="mw-participant-initials">
+                  {(u.name || u.email)[0].toUpperCase()}
+                </span>
+              )}
               <span className="mw-participant-name">{u.name || u.email}</span>
               {isSelf && <span className="mw-participant-you">you</span>}
-              {selected && !isSelf && <span className="mw-participant-check">✓</span>}
+              {selected && !isSelf && (
+                <span className="mw-participant-check">✓</span>
+              )}
             </button>
           );
         })}
@@ -147,9 +170,19 @@ function ParticipantsPicker({ selectedEmails, onToggle, currentUserEmail }) {
 
 // ─── Scope picker — always-visible two-column list ──────────────────────────
 
-function CheckList({ items, selectedIds, onToggle, getLabel, getId, getSubLabel, search }) {
+function CheckList({
+  items,
+  selectedIds,
+  onToggle,
+  getLabel,
+  getId,
+  getSubLabel,
+  search,
+}) {
   const filtered = search.trim()
-    ? items.filter((item) => getLabel(item).toLowerCase().includes(search.toLowerCase()))
+    ? items.filter((item) =>
+        getLabel(item).toLowerCase().includes(search.toLowerCase()),
+      )
     : items;
 
   return (
@@ -161,36 +194,53 @@ function CheckList({ items, selectedIds, onToggle, getLabel, getId, getSubLabel,
           <button
             key={id}
             type="button"
-            className={`mw-checklist-item${selected ? ' mw-checklist-item--selected' : ''}`}
+            className={`mw-checklist-item${selected ? " mw-checklist-item--selected" : ""}`}
             onClick={() => onToggle(id)}
           >
-            <span className={`mw-checklist-box${selected ? ' mw-checklist-box--checked' : ''}`}>
-              {selected && '✓'}
+            <span
+              className={`mw-checklist-box${selected ? " mw-checklist-box--checked" : ""}`}
+            >
+              {selected && "✓"}
             </span>
             <span className="mw-checklist-label">
               {getLabel(item)}
-              {getSubLabel && <small className="mw-checklist-sub">{getSubLabel(item)}</small>}
+              {getSubLabel && (
+                <small className="mw-checklist-sub">{getSubLabel(item)}</small>
+              )}
             </span>
           </button>
         );
       })}
-      {filtered.length === 0 && <p className="mw-empty" style={{ padding: '0.5rem 0' }}>No matches.</p>}
+      {filtered.length === 0 && (
+        <p className="mw-empty" style={{ padding: "0.5rem 0" }}>
+          No matches.
+        </p>
+      )}
     </div>
   );
 }
 
-function ScopePicker({ actingUrdd, selectedRepoIds, onRepoToggle, selectedFeatureIds, onFeatureToggle }) {
+function ScopePicker({
+  actingUrdd,
+  selectedRepoIds,
+  onRepoToggle,
+  selectedFeatureIds,
+  onFeatureToggle,
+}) {
   const [repos, setRepos] = useState([]);
   const [features, setFeatures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [repoSearch, setRepoSearch] = useState('');
-  const [featSearch, setFeatSearch] = useState('');
+  const [repoSearch, setRepoSearch] = useState("");
+  const [featSearch, setFeatSearch] = useState("");
 
   useEffect(() => {
     // Tenant-scoped repo list — the user can only pick repos in their tenant.
     Promise.all([listTenantRepos(actingUrdd), fetchAllFeatures()])
-      .then(([r, f]) => { setRepos(r); setFeatures(f); })
+      .then(([r, f]) => {
+        setRepos(r);
+        setFeatures(f);
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [actingUrdd]);
@@ -198,33 +248,37 @@ function ScopePicker({ actingUrdd, selectedRepoIds, onRepoToggle, selectedFeatur
   if (loading) return <div className="mw-scope-loading">Loading…</div>;
   if (error) return <div className="mw-field-error">{error}</div>;
 
-  const scopedFeatures = selectedRepoIds.length > 0
-    ? features.filter((f) => selectedRepoIds.includes(f.repo_id))
-    : features;
+  const scopedFeatures =
+    selectedRepoIds.length > 0
+      ? features.filter((f) => selectedRepoIds.includes(f.repo_id))
+      : features;
 
   // Split manual vs framework features
-  const manualFeatures = scopedFeatures.filter((f) => f.source !== 'project-status');
-  const psFeatures = scopedFeatures.filter((f) => f.source === 'project-status');
+  const manualFeatures = scopedFeatures.filter(
+    (f) => f.source !== "project-status",
+  );
+  const psFeatures = scopedFeatures.filter(
+    (f) => f.source === "project-status",
+  );
 
   // Group framework features by category for display
   const psByCategory = psFeatures.reduce((acc, f) => {
-    const cat = f.category || 'Other';
+    const cat = f.category || "Other";
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(f);
     return acc;
   }, {});
 
-  const displayFeatures = [
-    ...manualFeatures,
-    ...psFeatures,
-  ];
+  const displayFeatures = [...manualFeatures, ...psFeatures];
 
   return (
     <div className="mw-scope-picker">
       <div className="mw-scope-col">
         <p className="mw-scope-col-title">
           Repositories
-          {selectedRepoIds.length > 0 && <span className="mw-scope-badge">{selectedRepoIds.length}</span>}
+          {selectedRepoIds.length > 0 && (
+            <span className="mw-scope-badge">{selectedRepoIds.length}</span>
+          )}
         </p>
         <input
           className="mw-input mw-input--sm"
@@ -238,7 +292,7 @@ function ScopePicker({ actingUrdd, selectedRepoIds, onRepoToggle, selectedFeatur
           onToggle={onRepoToggle}
           getLabel={(r) => r.name}
           getId={(r) => r.id}
-          getSubLabel={(r) => r.branch || 'main'}
+          getSubLabel={(r) => r.branch || "main"}
           search={repoSearch}
         />
       </div>
@@ -246,8 +300,12 @@ function ScopePicker({ actingUrdd, selectedRepoIds, onRepoToggle, selectedFeatur
       <div className="mw-scope-col">
         <p className="mw-scope-col-title">
           Features
-          {selectedFeatureIds.length > 0 && <span className="mw-scope-badge">{selectedFeatureIds.length}</span>}
-          {selectedRepoIds.length === 0 && <small className="mw-scope-hint"> (all repos)</small>}
+          {selectedFeatureIds.length > 0 && (
+            <span className="mw-scope-badge">{selectedFeatureIds.length}</span>
+          )}
+          {selectedRepoIds.length === 0 && (
+            <small className="mw-scope-hint"> (all repos)</small>
+          )}
         </p>
         <input
           className="mw-input mw-input--sm"
@@ -272,7 +330,9 @@ function ScopePicker({ actingUrdd, selectedRepoIds, onRepoToggle, selectedFeatur
         {/* Framework features grouped by category */}
         {Object.entries(psByCategory).map(([cat, items]) => {
           const filteredItems = featSearch.trim()
-            ? items.filter((f) => f.feature_name.toLowerCase().includes(featSearch.toLowerCase()))
+            ? items.filter((f) =>
+                f.feature_name.toLowerCase().includes(featSearch.toLowerCase()),
+              )
             : items;
           if (!filteredItems.length) return null;
           return (
@@ -284,7 +344,9 @@ function ScopePicker({ actingUrdd, selectedRepoIds, onRepoToggle, selectedFeatur
                 onToggle={onFeatureToggle}
                 getLabel={(f) => f.feature_name}
                 getId={(f) => f.id}
-                getSubLabel={(f) => f.status === 'functional' ? 'done' : 'in progress'}
+                getSubLabel={(f) =>
+                  f.status === "functional" ? "done" : "in progress"
+                }
                 search=""
               />
             </div>
@@ -292,8 +354,10 @@ function ScopePicker({ actingUrdd, selectedRepoIds, onRepoToggle, selectedFeatur
         })}
 
         {displayFeatures.length === 0 && (
-          <p className="mw-empty" style={{ padding: '0.5rem 0' }}>
-            {selectedRepoIds.length === 0 ? 'Select a repo to filter features.' : 'No features for selected repos.'}
+          <p className="mw-empty" style={{ padding: "0.5rem 0" }}>
+            {selectedRepoIds.length === 0
+              ? "Select a repo to filter features."
+              : "No features for selected repos."}
           </p>
         )}
       </div>
@@ -303,12 +367,17 @@ function ScopePicker({ actingUrdd, selectedRepoIds, onRepoToggle, selectedFeatur
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function CreateMeeting({ actingUrdd, onCreated, onCancel, userEmail }) {
-  const [title, setTitle] = useState('');
-  const [date, setDate] = useState('');
-  const [hours, setHours] = useState('09');
-  const [minutes, setMinutes] = useState('00');
-  const [agenda, setAgenda] = useState('');
+export default function CreateMeeting({
+  actingUrdd,
+  onCreated,
+  onCancel,
+  userEmail,
+}) {
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState("");
+  const [hours, setHours] = useState("09");
+  const [minutes, setMinutes] = useState("00");
+  const [agenda, setAgenda] = useState("");
   const [selectedRepoIds, setSelectedRepoIds] = useState([]);
   const [selectedFeatureIds, setSelectedFeatureIds] = useState([]);
   const [selectedParticipants, setSelectedParticipants] = useState([]);
@@ -324,13 +393,21 @@ export default function CreateMeeting({ actingUrdd, onCreated, onCancel, userEma
     }
   }, [userEmail]);
 
-  const toggleRepo = useCallback((id) => setSelectedRepoIds((prev) =>
-    prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-  ), []);
+  const toggleRepo = useCallback(
+    (id) =>
+      setSelectedRepoIds((prev) =>
+        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+      ),
+    [],
+  );
 
-  const toggleFeature = useCallback((id) => setSelectedFeatureIds((prev) =>
-    prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-  ), []);
+  const toggleFeature = useCallback(
+    (id) =>
+      setSelectedFeatureIds((prev) =>
+        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+      ),
+    [],
+  );
 
   const toggleParticipant = useCallback((user) => {
     setSelectedParticipants((prev) => {
@@ -343,16 +420,18 @@ export default function CreateMeeting({ actingUrdd, onCreated, onCancel, userEma
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setBusy(true); setError(null); setNotice(null);
+    setBusy(true);
+    setError(null);
+    setNotice(null);
     try {
       let scheduled_at = null;
       if (date) {
-        const h = hours.padStart(2, '0');
-        const m = minutes.padStart(2, '0');
+        const h = hours.padStart(2, "0");
+        const m = minutes.padStart(2, "0");
         scheduled_at = `${date} ${h}:${m}:00`;
       }
 
-      const res = await mwPost('/meeting/workflow/create', {
+      const res = await mwPost("/meeting/workflow/create", {
         actionPerformerURDD: actingUrdd,
         title,
         scheduled_at,
@@ -365,12 +444,14 @@ export default function CreateMeeting({ actingUrdd, onCreated, onCancel, userEma
 
       // The returned scope_repo_ids are the SURVIVING set after tenant filtering;
       // if fewer came back, some repos were cross-tenant and were dropped.
-      const survived = Array.isArray(res?.scope_repo_ids) ? res.scope_repo_ids : null;
+      const survived = Array.isArray(res?.scope_repo_ids)
+        ? res.scope_repo_ids
+        : null;
       if (survived && survived.length < selectedRepoIds.length) {
         const dropped = selectedRepoIds.length - survived.length;
         setNotice(
           `Meeting created, but ${dropped} repo(s) were outside your tenant and ` +
-          `were not attached.`,
+            `were not attached.`,
         );
         // Meeting already exists — mark done so the form can't re-submit it.
         setDone(true);
@@ -400,7 +481,9 @@ export default function CreateMeeting({ actingUrdd, onCreated, onCancel, userEma
             required
           />
 
-          <label className="mw-field-label">When <span className="mw-optional">(optional)</span></label>
+          <label className="mw-field-label">
+            When <span className="mw-optional">(optional)</span>
+          </label>
           <DigitalClock
             date={date}
             hours={hours}
@@ -410,13 +493,17 @@ export default function CreateMeeting({ actingUrdd, onCreated, onCancel, userEma
             onMinutesChange={setMinutes}
           />
 
-          <label className="mw-field-label">Agenda <span className="mw-optional">(one item per line)</span></label>
+          <label className="mw-field-label">
+            Agenda <span className="mw-optional">(one item per line)</span>
+          </label>
           <textarea
             className="mw-input"
             rows={4}
             value={agenda}
             onChange={(e) => setAgenda(e.target.value)}
-            placeholder={'1. Review last sprint\n2. Discuss new feature X\n3. Blockers'}
+            placeholder={
+              "1. Review last sprint\n2. Discuss new feature X\n3. Blockers"
+            }
           />
 
           <label className="mw-field-label">Participants</label>
@@ -429,18 +516,30 @@ export default function CreateMeeting({ actingUrdd, onCreated, onCancel, userEma
           {error && <p className="mw-field-error">{error}</p>}
           {notice && <p className="tenant-success">{notice}</p>}
 
-          <div className="mw-btn-row" style={{ marginTop: '0.5rem' }}>
+          <div className="mw-btn-row" style={{ marginTop: "0.5rem" }}>
             {done ? (
-              <button className="mw-btn mw-btn--primary" type="button" onClick={() => onCreated?.()}>
+              <button
+                className="mw-btn mw-btn--primary"
+                type="button"
+                onClick={() => onCreated?.()}
+              >
                 Go to meetings
               </button>
             ) : (
               <>
-                <button className="mw-btn mw-btn--primary" type="submit" disabled={busy}>
-                  {busy ? 'Creating…' : 'Create Meeting'}
+                <button
+                  className="mw-btn mw-btn--primary"
+                  type="submit"
+                  disabled={busy}
+                >
+                  {busy ? "Creating…" : "Create Meeting"}
                 </button>
                 {onCancel && (
-                  <button className="mw-btn mw-btn--ghost" type="button" onClick={onCancel}>
+                  <button
+                    className="mw-btn mw-btn--ghost"
+                    type="button"
+                    onClick={onCancel}
+                  >
                     Cancel
                   </button>
                 )}
@@ -452,9 +551,12 @@ export default function CreateMeeting({ actingUrdd, onCreated, onCancel, userEma
 
       {/* ── Right: scope picker ── */}
       <div className="mw-create-right">
-        <p className="mw-scope-col-title" style={{ marginBottom: '0.75rem' }}>
+        <p className="mw-scope-col-title" style={{ marginBottom: "0.75rem" }}>
           Scope
-          <small className="mw-scope-hint"> — repos &amp; features for this meeting</small>
+          <small className="mw-scope-hint">
+            {" "}
+            — repos &amp; features for this meeting
+          </small>
         </p>
         <ScopePicker
           actingUrdd={actingUrdd}

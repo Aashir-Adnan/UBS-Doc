@@ -1,9 +1,9 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "@site/src/components/portal/authStore";
-import GoogleSignIn from "@site/src/components/portal/GoogleSignIn";
-import { projects } from "@site/src/data/projectsConfig";
-import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
+import { useAuth } from "../../../components/portal/authStore";
+import GoogleSignIn from "../../../components/portal/GoogleSignIn";
+import { projects } from "../../../data/projectsConfig";
+import { isGranjurEmail } from "../../../utils/isGranjurEmail";
 
 function ProjectsContent() {
   const { user, signOut, loading } = useAuth();

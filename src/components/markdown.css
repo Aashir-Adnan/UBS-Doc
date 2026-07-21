@@ -1,0 +1,238 @@
+/* ============================================================
+   Theme tokens
+   Light values below match the hex codes this file used to have
+   hardcoded, so light mode is visually unchanged. Dark values
+   follow a GitHub-Dark-style palette with layered surfaces
+   instead of a flat black-on-white inversion.
+   ============================================================ */
+:root {
+  --md-text: #333333;
+  --md-heading: #111827;
+  --md-secondary-text: #6b7280;
+  --md-border: #e5e7eb;
+  --md-link: #2563eb;
+
+  --md-code-bg: #f5f5f5;
+  --md-code-text: #333333;
+
+  --md-table-header-bg: #f5f5f5;
+  --md-table-cell-bg: #f3f4f6;
+  --md-table-border: #ddd;
+
+  --md-blockquote-bg: #f9fafb;
+  --md-blockquote-text: #4b5563;
+  --md-blockquote-border: #2563eb;
+
+  --md-breadcrumb-text: #6b7280;
+  --md-breadcrumb-separator: #9ca3af;
+  --md-breadcrumb-active-bg: #eef6ff;
+  --md-breadcrumb-active-text: #2563eb;
+}
+
+[data-theme="dark"] {
+  --md-text: #e6edf3;
+  --md-heading: #f0f6fc;
+  --md-secondary-text: #9ca3af;
+  --md-border: #30363d;
+  --md-link: #58a6ff;
+
+  --md-code-bg: #161b22;
+  --md-code-text: #e6edf3;
+
+  --md-table-header-bg: #1c2530;
+  --md-table-cell-bg: #161b22;
+  --md-table-border: #30363d;
+
+  --md-blockquote-bg: #161b22;
+  --md-blockquote-text: #9ca3af;
+  --md-blockquote-border: #58a6ff;
+
+  --md-breadcrumb-text: #9ca3af;
+  --md-breadcrumb-separator: #6b7280;
+  --md-breadcrumb-active-bg: rgba(88, 166, 255, 0.15);
+  --md-breadcrumb-active-text: #58a6ff;
+}
+
+/* ============================================================
+   Markdown body
+   ============================================================ */
+.markdown-body {
+  line-height: 1.8;
+  font-size: 16px;
+  color: var(--md-text);
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  color: var(--md-heading);
+}
+
+.markdown-body h1 {
+  font-size: 2.5rem;
+  margin-top: 0;
+  margin-bottom: 1rem;
+  line-height: 1.2;
+}
+
+.markdown-body h2 {
+  font-size: 2rem;
+  margin-top: 3rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--md-border);
+  padding-bottom: 0.5rem;
+}
+
+.markdown-body h3 {
+  font-size: 1.5rem;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.markdown-body p {
+  margin: 1rem 0;
+  line-height: 1.8;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 28px;
+  margin: 18px 0;
+}
+
+.markdown-body li {
+  margin: 8px 0;
+}
+
+.markdown-body a {
+  color: var(--md-link);
+  text-decoration: color 0.2s ease;
+}
+
+.markdown-body a:hover {
+  text-decoration: underline;
+}
+
+.markdown-body img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.markdown-body code {
+  background: var(--md-code-bg);
+  color: var(--md-code-text);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.markdown-body pre {
+  background: var(--md-code-bg);
+}
+
+.markdown-body pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 24px 0;
+  overflow: hidden;
+}
+
+.markdown-body th,
+.markdown-body td {
+  background: var(--md-table-cell-bg);
+  border: 1px solid var(--md-table-border);
+  padding: 10px;
+  color: var(--md-text);
+}
+
+.markdown-body th {
+  background: var(--md-table-header-bg);
+  color: var(--md-heading);
+}
+
+.markdown-body blockquote {
+  border-left: 4px solid var(--md-blockquote-border);
+  padding: 12px 16px;
+  background: var(--md-blockquote-bg);
+  border-radius: 4px;
+  color: var(--md-blockquote-text);
+}
+
+/* ============================================================
+   Breadcrumbs
+   ============================================================ */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 28px;
+  font-size: 14px;
+}
+
+.breadcrumb-home {
+  display: flex;
+  align-items: center;
+  color: var(--md-breadcrumb-text);
+}
+
+.breadcrumb-home:hover {
+  color: var(--md-link);
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.breadcrumb-separator {
+  color: var(--md-breadcrumb-separator);
+}
+
+.breadcrumb a {
+  color: var(--md-breadcrumb-text);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.breadcrumb a:hover {
+  color: var(--md-link);
+}
+
+.breadcrumb-current {
+  background: var(--md-breadcrumb-active-bg);
+  color: var(--md-breadcrumb-active-text);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.breadcrumb-text {
+  color: var(--md-breadcrumb-text);
+  font-weight: 500;
+}
+
+.breadcrumb-home {
+  color: var(--md-breadcrumb-text);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.breadcrumb-home:hover {
+  color: var(--md-link);
+}
+
+.breadcrumb-separator {
+  color: var(--md-breadcrumb-separator);
+}

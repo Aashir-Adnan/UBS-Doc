@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "@site/src/components/portal/authStore";
-import GoogleSignIn from "@site/src/components/portal/GoogleSignIn";
-import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
-import { API_BASE_URL } from "@site/src/components/portal/config";
-import { useActingUrdd } from "@site/src/components/portal/tenantProjects/useActingUrdd";
+import { useAuth } from "../../components/portal/authStore";
+import GoogleSignIn from "../../components/portal/GoogleSignIn";
+import { isGranjurEmail } from "../../utils/isGranjurEmail";
+import { API_BASE_URL } from "../../components/portal/config";
+import { useActingUrdd } from "../../components/portal/tenantProjects/useActingUrdd";
 
 const BASE = `${API_BASE_URL}/api/tracked/repos`;
 

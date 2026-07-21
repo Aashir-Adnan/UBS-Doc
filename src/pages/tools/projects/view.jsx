@@ -1,10 +1,10 @@
 import React from "react";
 import { useLocation } from "react-router-dom";
 import { Link } from "react-router-dom";
-import { useAuth } from "@site/src/components/portal/authStore";
-import GoogleSignIn from "@site/src/components/portal/GoogleSignIn";
-import { projects, getProjectComponent } from "@site/src/data/projectsConfig";
-import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
+import { useAuth } from "../../../components/portal/authStore";
+import GoogleSignIn from "../../../components/portal/GoogleSignIn";
+import { projects, getProjectComponent } from "../../../data/projectsConfig";
+import { isGranjurEmail } from "../../../utils/isGranjurEmail";
 
 function useProjectSlug() {
   const { search } = useLocation();

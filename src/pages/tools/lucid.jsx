@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../components/portal/authStore";
 import GoogleSignIn from "../../components/portal/GoogleSignIn";
 import LucidSanitize from "../../components/portal/LucidSanitize";
-import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
+import { isGranjurEmail } from "../../utils/isGranjurEmail";
 
 function LucidToolContent() {
   const { user, signOut, loading } = useAuth();

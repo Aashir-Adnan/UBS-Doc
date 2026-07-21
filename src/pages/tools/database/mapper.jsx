@@ -2,7 +2,7 @@ import React from "react";
 import { useAuth } from "../../../components/portal/authStore";
 import GoogleSignIn from "../../../components/portal/GoogleSignIn";
 import SQLERDVisualizer from "../../../components/portal/SQLERDVisualizer";
-import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
+import { isGranjurEmail } from "../../../utils/isGranjurEmail";
 
 function MapperContent() {
   const { user, loading } = useAuth();

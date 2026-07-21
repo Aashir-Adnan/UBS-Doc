@@ -1,9 +1,9 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "@site/src/components/portal/authStore";
-import GoogleSignIn from "@site/src/components/portal/GoogleSignIn";
-import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
-import GithubWorkflow from "@site/src/components/portal/GithubWorkflow";
+import { useAuth } from "../../components/portal/authStore";
+import GoogleSignIn from "../../components/portal/GoogleSignIn";
+import { isGranjurEmail } from "../../utils/isGranjurEmail";
+import GithubWorkflow from "../../components/portal/GithubWorkflow";
 
 function GithubContent() {
   const { user, signOut, loading } = useAuth();

@@ -1,0 +1,189 @@
+/* ============================================================
+   Local theme tokens
+   Light values match what this file already used (#555 / #2563eb),
+   so light mode is unchanged. --md-link is reused for the hover
+   color because it already resolves to the same #2563eb / #58A6FF
+   pair in markdown.css — no new inconsistent accent is introduced.
+   Everything else falls back to a hardcoded value if these globals
+   aren't present, so the file is safe to use standalone too.
+   ============================================================ */
+:root {
+  --docs-toc-text: #555;
+  --docs-border: #e5e7eb;
+  --docs-scrollbar-thumb: #d0d7de;
+}
+
+[data-theme="dark"] {
+  --docs-toc-text: #d1d5db;
+  --docs-border: #30363d;
+  --docs-scrollbar-thumb: #30363d;
+}
+
+/* ============================================================
+   Layout: Docs Sidebar | Content | Table of Contents
+   (App Sidebar lives outside this grid, in AppLayout.module.css)
+   ============================================================ */
+.docs-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) 250px;
+  gap: 40px;
+  align-items: start;
+
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 32px;
+
+  overflow-x: hidden;
+}
+
+/* ── Documentation sidebar ─────────────────────────────────────────────── */
+.docs-sidebar {
+  position: sticky;
+  top: 20px;
+  align-self: start;
+
+  width: 100%;
+  height: calc(100vh - 40px);
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  padding-right: 8px;
+  scroll-behavior: smooth;
+
+  scrollbar-width: thin;
+  scrollbar-color: var(--docs-scrollbar-thumb, #d0d7de) transparent;
+}
+
+.docs-sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.docs-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.docs-sidebar::-webkit-scrollbar-thumb {
+  background-color: var(--docs-scrollbar-thumb, #d0d7de);
+  border-radius: 999px;
+}
+
+/* ── Main content ──────────────────────────────────────────────────────── */
+.docs-content {
+  min-width: 0; /* let wide children (tables, code) scroll internally
+                   instead of stretching the grid track */
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 8px;
+
+  overflow-x: auto;
+  scroll-behavior: smooth;
+}
+
+.docs-content pre {
+  overflow-x: auto;
+  max-width: 100%;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.docs-content code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Table of contents ─────────────────────────────────────────────────── */
+.docs-toc {
+  position: sticky;
+  top: 20px;
+  align-self: start;
+
+  width: 220px;
+  height: calc(100vh - 40px);
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  padding-left: 16px;
+  border-left: 1px solid var(--docs-border, #e5e7eb);
+  scroll-behavior: smooth;
+
+  scrollbar-width: thin;
+  scrollbar-color: var(--docs-scrollbar-thumb, #d0d7de) transparent;
+}
+
+.docs-toc::-webkit-scrollbar {
+  width: 6px;
+}
+
+.docs-toc::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.docs-toc::-webkit-scrollbar-thumb {
+  background-color: var(--docs-scrollbar-thumb, #d0d7de);
+  border-radius: 999px;
+}
+
+.docs-toc h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: var(--md-heading, #e6edf3);
+}
+
+.docs-toc a {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--docs-toc-text, #555);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.docs-toc a:hover {
+  color: var(--md-link, #2563eb);
+}
+
+/* ============================================================
+   Responsive behavior (mirrors Docusaurus' own breakpoints)
+   Desktop : App Sidebar | Docs Sidebar | Content | TOC
+   Tablet  : App Sidebar | Content              (docs sidebar + TOC hidden)
+   Mobile  : App Sidebar | Content, tighter spacing
+   ============================================================ */
+
+/* Right rail (TOC) is the first thing to go on narrower desktops/laptops */
+@media (max-width: 1200px) {
+  .docs-layout {
+    grid-template-columns: 300px minmax(0, 1fr);
+  }
+
+  .docs-toc {
+    display: none;
+  }
+}
+
+/* Tablet: collapse to a single content column */
+@media (max-width: 996px) {
+  .docs-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 24px;
+  }
+
+  .docs-sidebar {
+    display: none;
+  }
+
+  .docs-content {
+    max-width: 100%;
+  }
+}
+
+/* Mobile: tighten padding, keep everything full-width and stacked */
+@media (max-width: 640px) {
+  .docs-layout {
+    padding: 16px;
+  }
+
+  .docs-content {
+    padding: 0;
+  }
+}

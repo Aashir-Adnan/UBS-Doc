@@ -1,13 +1,13 @@
 import React, { useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "@site/src/components/portal/authStore";
-import GoogleSignIn from "@site/src/components/portal/GoogleSignIn";
-import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
-import MeetingList from "@site/src/components/meetingWorkflow/MeetingList";
-import CreateMeeting from "@site/src/components/meetingWorkflow/CreateMeeting";
-import WorkflowPanel from "@site/src/components/meetingWorkflow/WorkflowPanel";
-import { useActingUrdd } from "@site/src/components/portal/tenantProjects/useActingUrdd";
-import PendingAccess from "@site/src/components/portal/tenantProjects/PendingAccess";
+import { useAuth } from "../../components/portal/authStore";
+import GoogleSignIn from "../../components/portal/GoogleSignIn";
+import { isGranjurEmail } from "../../utils/isGranjurEmail";
+import MeetingList from "../../components/meetingWorkflow/MeetingList";
+import CreateMeeting from "../../components/meetingWorkflow/CreateMeeting";
+import WorkflowPanel from "../../components/meetingWorkflow/WorkflowPanel";
+import { useActingUrdd } from "../../components/portal/tenantProjects/useActingUrdd";
+import PendingAccess from "../../components/portal/tenantProjects/PendingAccess";
 
 // Three views: 'list' | 'create' | 'meeting'
 function MeetingWorkflowContent() {

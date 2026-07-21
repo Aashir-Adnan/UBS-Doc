@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "@site/src/components/portal/authStore";
-import GoogleSignIn from "@site/src/components/portal/GoogleSignIn";
-import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
-import { useActingUrdd } from "@site/src/components/portal/tenantProjects/useActingUrdd";
-import AssignTenant from "@site/src/components/portal/tenantProjects/AssignTenant";
-import GrantProjects from "@site/src/components/portal/tenantProjects/GrantProjects";
-import GrantRepos from "@site/src/components/portal/tenantProjects/GrantRepos";
-import ProvisionUser from "@site/src/components/portal/tenantProjects/ProvisionUser";
-import OrganizationManager from "@site/src/components/portal/tenantProjects/OrganizationManager";
+import { useAuth } from "../../components/portal/authStore";
+import GoogleSignIn from "../../components/portal/GoogleSignIn";
+import { isGranjurEmail } from "../../utils/isGranjurEmail";
+import { useActingUrdd } from "../../components/portal/tenantProjects/useActingUrdd";
+import AssignTenant from "../../components/portal/tenantProjects/AssignTenant";
+import GrantProjects from "../../components/portal/tenantProjects/GrantProjects";
+import GrantRepos from "../../components/portal/tenantProjects/GrantRepos";
+import ProvisionUser from "../../components/portal/tenantProjects/ProvisionUser";
+import OrganizationManager from "../../components/portal/tenantProjects/OrganizationManager";
 
 const TABS = [
   { key: "org", label: "Organization" },

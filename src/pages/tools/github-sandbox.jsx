@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import GithubWorkflowSandbox from "@site/src/components/portal/GithubWorkflowSandbox";
+import GithubWorkflowSandbox from "../../components/portal/GithubWorkflowSandbox";
 
 const SANDBOX_USER = {
   uid: "sandbox-001",

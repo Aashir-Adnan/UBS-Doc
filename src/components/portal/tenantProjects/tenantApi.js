@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '@site/src/components/portal/config';
+import { API_BASE_URL } from "../config";
 
 // Feature-local API helper for the Tenant-Based Project Access feature.
 // Mirrors the existing meetingWorkflow api.js pattern: every response is
@@ -16,10 +16,10 @@ function unwrap(data) {
 function qs(params) {
   const sp = new URLSearchParams();
   Object.entries(params || {}).forEach(([k, v]) => {
-    if (v !== null && v !== undefined && v !== '') sp.append(k, v);
+    if (v !== null && v !== undefined && v !== "") sp.append(k, v);
   });
   const s = sp.toString();
-  return s ? `?${s}` : '';
+  return s ? `?${s}` : "";
 }
 
 function extractError(data, text, statusText) {
@@ -30,20 +30,28 @@ async function tGet(path, params) {
   const r = await fetch(`${BASE}${path}${qs(params)}`);
   const text = await r.text();
   let data;
-  try { data = JSON.parse(text); } catch { throw new Error(text || r.statusText); }
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(text || r.statusText);
+  }
   if (!r.ok) throw new Error(extractError(data, text, r.statusText));
   return unwrap(data);
 }
 
 async function tPost(path, body) {
   const r = await fetch(`${BASE}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   const text = await r.text();
   let data;
-  try { data = JSON.parse(text); } catch { throw new Error(text || r.statusText); }
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(text || r.statusText);
+  }
   if (!r.ok) throw new Error(extractError(data, text, r.statusText));
   return unwrap(data);
 }
@@ -53,7 +61,7 @@ async function tPost(path, body) {
 // Resolve the portal user record (including urdd_id) for a Google email.
 // Returns the `user` object: { id, email, name, ..., role_id, urdd_id }.
 export async function getMe(email) {
-  const res = await tGet('/portal/users/me', { email });
+  const res = await tGet("/portal/users/me", { email });
   return res?.user ?? res;
 }
 
@@ -61,17 +69,20 @@ export async function getMe(email) {
 
 // §3.1 — tenant-scoped project list for the acting user.
 export function listMyProjects(actionPerformerURDD) {
-  return tGet('/projects/tenant/list', { actionPerformerURDD });
+  return tGet("/projects/tenant/list", { actionPerformerURDD });
 }
 
 // §3.2 — can the acting user open this project?
 export function canAccessProject(actionPerformerURDD, project_id) {
-  return tGet('/projects/tenant/canaccess', { actionPerformerURDD, project_id });
+  return tGet("/projects/tenant/canaccess", {
+    actionPerformerURDD,
+    project_id,
+  });
 }
 
 // §3.3 — assign a user's URDD to a tenant (admin only, server-enforced 403).
 export function assignTenant(actionPerformerURDD, target_urdd_id, tenant_id) {
-  return tPost('/projects/tenant/assign', {
+  return tPost("/projects/tenant/assign", {
     actionPerformerURDD,
     target_urdd_id,
     tenant_id,
@@ -82,45 +93,52 @@ export function assignTenant(actionPerformerURDD, target_urdd_id, tenant_id) {
 // Pass a plain array of ids to restrict; pass null/undefined to CLEAR the
 // restriction (user then sees all projects in their tenant). The backend owns
 // the storage format and drops any id outside the target's tenant.
-export function grantProjects(actionPerformerURDD, target_urdd_id, project_ids) {
+export function grantProjects(
+  actionPerformerURDD,
+  target_urdd_id,
+  project_ids,
+) {
   const body = { actionPerformerURDD, target_urdd_id };
   if (Array.isArray(project_ids)) body.project_ids = project_ids;
-  return tPost('/projects/tenant/grant', body);
+  return tPost("/projects/tenant/grant", body);
 }
 
 // ---- Admin read endpoints (§7) ------------------------------------------
 
 // §7.1 — tenants for the "assign tenant" dropdown.
 export function listTenants(actionPerformerURDD) {
-  return tGet('/tenants/list', { actionPerformerURDD });
+  return tGet("/tenants/list", { actionPerformerURDD });
 }
 
 // §7.2 — members (optionally scoped to a tenant) to pick target_urdd_id.
 export function listMembers(actionPerformerURDD, tenant_id) {
-  return tGet('/tenants/members', { actionPerformerURDD, tenant_id });
+  return tGet("/tenants/members", { actionPerformerURDD, tenant_id });
 }
 
 // §7.3 — projects available in a tenant (the checkbox list for granting).
 export function listAvailableProjects(actionPerformerURDD, tenant_id) {
-  return tGet('/projects/tenant/available', { actionPerformerURDD, tenant_id });
+  return tGet("/projects/tenant/available", { actionPerformerURDD, tenant_id });
 }
 
 // §7.4 — a target user's current grants, to pre-check the boxes.
 export function getGrants(actionPerformerURDD, target_urdd_id) {
-  return tGet('/projects/tenant/grants', { actionPerformerURDD, target_urdd_id });
+  return tGet("/projects/tenant/grants", {
+    actionPerformerURDD,
+    target_urdd_id,
+  });
 }
 
 // ---- Repo grants (admin) — mirrors the project grant endpoints ----------
 
 // Repos available in a tenant (the checkbox list for granting to a user).
 export function listAvailableRepos(actionPerformerURDD, tenant_id) {
-  return tGet('/repos/tenant/available', { actionPerformerURDD, tenant_id });
+  return tGet("/repos/tenant/available", { actionPerformerURDD, tenant_id });
 }
 
 // A target user's current repo grants, to pre-check the boxes.
 // Response: { mode: 'all' | 'specific', repo_ids: [...] }.
 export function getRepoGrants(actionPerformerURDD, target_urdd_id) {
-  return tGet('/repos/tenant/grants', { actionPerformerURDD, target_urdd_id });
+  return tGet("/repos/tenant/grants", { actionPerformerURDD, target_urdd_id });
 }
 
 // Grant the allow-list of repo ids (admin only). Pass a plain array to restrict;
@@ -129,36 +147,41 @@ export function getRepoGrants(actionPerformerURDD, target_urdd_id) {
 export function grantRepos(actionPerformerURDD, target_urdd_id, repo_ids) {
   const body = { actionPerformerURDD, target_urdd_id };
   if (Array.isArray(repo_ids)) body.repo_ids = repo_ids;
-  return tPost('/repos/tenant/grant', body);
+  return tPost("/repos/tenant/grant", body);
 }
 
 // §7.5 — provision/approve a pending portal user (admin authorized by email).
 // This endpoint intentionally does NOT take actionPerformerURDD.
-export function provisionUser({ actor_email, email, portal_user_id, tenant_id }) {
+export function provisionUser({
+  actor_email,
+  email,
+  portal_user_id,
+  tenant_id,
+}) {
   const body = { actor_email, tenant_id };
   if (portal_user_id !== undefined && portal_user_id !== null) {
     body.portal_user_id = portal_user_id;
   } else {
     body.email = email;
   }
-  return tPost('/portal/users/provision', body);
+  return tPost("/portal/users/provision", body);
 }
 
 // ---- Organization management ------------------------------------------------
 
 // Create a new organization. Each user may create at most one.
 export function createOrganization(email, organization_name, passcode) {
-  return tPost('/portal/org/create', { email, organization_name, passcode });
+  return tPost("/portal/org/create", { email, organization_name, passcode });
 }
 
 // Join an existing organization by name + passcode.
 export function joinOrganization(email, organization_name, passcode) {
-  return tPost('/portal/org/join', { email, organization_name, passcode });
+  return tPost("/portal/org/join", { email, organization_name, passcode });
 }
 
 // Get the user's owned and joined organizations.
 export function getMyOrganization(email) {
-  return tGet('/portal/org/mine', { email });
+  return tGet("/portal/org/mine", { email });
 }
 
 // ---- Multi-URDD / org switching ---------------------------------------------
@@ -166,35 +189,35 @@ export function getMyOrganization(email) {
 // Fetch all URDDs for a user, each with tenant/org info and permissions.
 // Called on load to populate the org switcher.
 export function getUserUrdds(email) {
-  return tGet('/portal/users/urdds', { email });
+  return tGet("/portal/users/urdds", { email });
 }
 
 // Add a project to an organization (sets project.tenant_id, updates member perms).
 export function addProjectToOrg(email, org_id, project_id) {
-  return tPost('/portal/org/addproject', { email, org_id, project_id });
+  return tPost("/portal/org/addproject", { email, org_id, project_id });
 }
 
 // Update organization name.
 export function updateOrganization(email, org_id, organization_name) {
-  return tPost('/portal/org/update', { email, org_id, organization_name });
+  return tPost("/portal/org/update", { email, org_id, organization_name });
 }
 
 // Add a member to an organization by their email.
 export function addOrgMember(email, org_id, member_email) {
-  return tPost('/portal/org/addmember', { email, org_id, member_email });
+  return tPost("/portal/org/addmember", { email, org_id, member_email });
 }
 
 // List members of an organization.
 export function getOrgMembers(email, org_id) {
-  return tGet('/portal/org/members', { email, org_id });
+  return tGet("/portal/org/members", { email, org_id });
 }
 
 // Add a repo to an organization.
 export function addRepoToOrg(email, org_id, repo_id) {
-  return tPost('/portal/org/addrepo', { email, org_id, repo_id });
+  return tPost("/portal/org/addrepo", { email, org_id, repo_id });
 }
 
 // List repos (all + which are in the org).
 export function getOrgRepos(email, org_id) {
-  return tGet('/portal/org/repos', { email, org_id });
+  return tGet("/portal/org/repos", { email, org_id });
 }

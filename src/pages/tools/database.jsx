@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../components/portal/authStore";
 import GoogleSignIn from "../../components/portal/GoogleSignIn";
 import FileUpload from "../../components/portal/FileUpload";
-import { isGranjurEmail } from "@site/src/utils/isGranjurEmail";
+import { isGranjurEmail } from "../../utils/isGranjurEmail";
 
 function DatabaseToolsContent() {
   const { user, signOut, loading } = useAuth();
