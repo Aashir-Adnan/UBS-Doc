@@ -173,7 +173,7 @@ POST /api/guest/booking/stage
    - Party size changes → validate against `max_persons_per_booking`.
    - Add services → validate `max_quantity_per_booking`, fetch catalog prices, check slot availability against delivery units.
    - Remove services → subtract from cloned total.
-4. Run `applyPricingRules(clonedSubtotal, tenantId)` to get proposed grand total.
+4. Run `applyPricingRules(clonedSubtotal, tenantId, checkInDate)` to get proposed grand total. Pricing rules are evaluated against the **proposed check-in date** (not the current date), so seasonal rules like "Summer Discount" apply based on when the stay begins.
 5. Compute delta: `proposedTotal - currentTotal`, `additionalPayment = max(0, proposedTotal - paidAmount)`.
 6. Generate a `stageId` (prefixed `stg_`, random hex) and store the staged payload in a lightweight store (Redis key or `booking_stages` table) with a 15-minute TTL.
 7. Return the full pricing comparison without touching the booking.
@@ -201,7 +201,8 @@ CREATE TABLE booking_stages (
 | Booking not found or not owned | 404 | `Booking not found` |
 | Booking status is cancelled/checked_out/completed | 400 | `Booking cannot be modified in its current status` |
 | Check-in in the past | 400 | `Check-in date cannot be in the past` |
-| Check-out before check-in | 400 | `Check-out must be after check-in` |
+| Check-out before check-in (stay bookings) | 400 | `Check-out must be after check-in` |
+| Check-out before check-in (non-stay bookings) | 400 | `Check-out cannot be before check-in` |
 | Stay duration outside min/max nights | 400 | `Stay duration must be between N and M nights` |
 | Date in blackout window | 400 | `Check-in date falls in a blackout period` |
 | Service not found or inactive | 404 | `Service N not found` |
@@ -462,8 +463,10 @@ accept an optional `stageId` to link back to a staged preview.
 │                                                                 │
 │  2. PAYMENT (if additionalPaymentRequired > 0)                  │
 │     POST /api/guest/payment                                     │
+│     ├─ Pass stageId in the payment request body                 │
+│     ├─ Balance due is calculated from staged proposed_total     │
+│     ├─ Hard-limited to 20% down payment of staged total         │
 │     ├─ Charge the delta amount                                  │
-│     ├─ Record transaction with stageId reference                │
 │     └─ Return paymentId / confirmation                          │
 │                                                                 │
 │  3. COMMIT                                                      │
@@ -521,10 +524,73 @@ accept an optional `stageId` to link back to a staged preview.
 
 Same verification logic as edit booking.
 
+### Payment with Staged Total
+
+**Endpoint:** `POST /api/guest/payment`
+
+**New optional parameter:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `stageId` | `string` | No | Links to a prior stage call. When provided, balance validation uses the staged `proposed_total` instead of the booking's current `total_amount`. |
+
+**Behaviour when `stageId` is provided:**
+
+1. Load the stage record from `booking_stages`.
+2. Verify `status = 'pending'` and `expires_at > NOW()`.
+3. Verify `booking_id` matches.
+4. Use `proposed_total` as the effective total for balance calculations: `effectiveBalanceDue = proposed_total - paid_amount`.
+5. **Hard-limit the payment to 20% of the staged total** (down payment only — the guest should not pay the full new balance until changes are committed).
+6. Minimum payment rules still apply (first payment must be at least 20% of total).
+
+**Behaviour when `stageId` is NOT provided:**
+
+- Existing behaviour unchanged. Balance due is calculated from `bookings.total_amount - bookings.paid_amount`.
+
+**Why the 20% limit?** Staged changes are not yet committed — the booking still reflects
+the old state. Allowing full payment against a proposed total that may never be committed
+would create accounting discrepancies. The 20% down payment secures the guest's intent
+to commit while limiting financial exposure.
+
+**Error responses:**
+
+| HTTP | Condition | Message |
+|------|-----------|---------|
+| 422 | Stage not found | `Stage not found` |
+| 422 | Stage already committed | `Stage has already been committed` |
+| 422 | Stage expired | `Stage has expired. Please re-stage your changes.` |
+| 422 | Amount exceeds 20% of staged total | `Payment for staged changes is limited to 20% down payment (N CUR)` |
+
+### Edit Booking Pricing Recalculation
+
+When `PUT /api/guest/booking/edit` is called, the total is recalculated **from scratch**
+using the same logic as the create booking flows to ensure pricing consistency:
+
+1. **Re-price every active `booking_services` row** from its current catalog price
+   (fetched from `catalog_pricing`) multiplied by the stored quantity.
+2. **Package bookings:** total = `package_catalog_price x unit_instances + addon_totals`.
+   Package-included services are covered by the package price and not summed individually.
+   Only services that exceed the package's declared quota count as addons.
+3. **Non-package bookings:** total = sum of all `booking_services` line totals.
+4. **Apply pricing rules using the check-in date** (not the current date), so seasonal
+   rules are evaluated correctly for the booking's actual stay period.
+
+This ensures that an edit always produces the same total as if the booking were created
+fresh with the same parameters.
+
+### Date Validation for Non-Stay Bookings
+
+Stay bookings (rooms, packages with rooms) require `checkOut > checkIn` (at least 1
+night). Non-stay bookings (spa, dining, activities, etc.) allow same-day dates where
+`checkIn === checkOut` — only `checkOut < checkIn` is rejected.
+
 ### Files Changed
 
-- `Src/HelperFunctions/PreProcessingFunctions/Guest/editBooking.js` — add `stageId` verification
+- `Src/HelperFunctions/PreProcessingFunctions/Guest/editBooking.js` — add `stageId` verification, from-scratch pricing recalculation with check-in-based rules, non-stay date validation
 - `Src/HelperFunctions/PreProcessingFunctions/Guest/addBookingServices.js` — add `stageId` verification
+- `Src/HelperFunctions/PreProcessingFunctions/Guest/stageBookingChanges.js` — check-in-based pricing rules, non-stay date validation
+- `Src/HelperFunctions/PreProcessingFunctions/Guest/guestMoyasarPayments.js` — accept `stageId`, use staged `proposed_total` for balance, 20% down payment limit
+- `Src/HelperFunctions/Guest/v2/catalogPricing.js` — `applyPricingRules` and `fetchRulesForTenant` accept optional `ruleDate` parameter
 - `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestBookingEdit/CRUD_parameters.js` — add `stageId` param
 - `Src/Apis/ProjectSpecificApis/GuestSpecificApis/GuestBookingServices/CRUD_parameters.js` — add `stageId` param
 
@@ -712,7 +778,10 @@ ALTER TABLE booking_services
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/createServiceBooking.js` | Store `current_price` |
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/createRoomBooking.js` | Store `current_price` |
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/createPackageBooking.js` | Store `current_price` |
-| `Src/HelperFunctions/PreProcessingFunctions/Guest/editBooking.js` | Store `current_price`, verify `stageId`, `slot_id` in `removeServices` |
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/editBooking.js` | Store `current_price`, verify `stageId`, `slot_id` in `removeServices`, from-scratch pricing recalculation, non-stay date validation |
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/stageBookingChanges.js` | Check-in-based pricing rules, non-stay date validation |
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/guestMoyasarPayments.js` | Accept `stageId`, staged balance validation, 20% down payment limit |
+| `Src/HelperFunctions/Guest/v2/catalogPricing.js` | Optional `ruleDate` parameter on `applyPricingRules` and `fetchRulesForTenant` |
 | `Src/HelperFunctions/Guest/v2/bookingsBundle.js` | Return `basePrice` + `currentPrice` |
 | `Src/HelperFunctions/Guest/v2/availability/computeSlots.js` | Accept `holdSlots`, return `remaining`/`total` |
 | `Src/HelperFunctions/Guest/v2/availability/buildSchedulerTree.js` | Pass `holdSlots` through |
@@ -729,18 +798,14 @@ ALTER TABLE booking_services
    Redis with TTL is an alternative if the team prefers in-memory expiry over
    cron-based cleanup.
 
-2. **Payment integration for staged delta:** The payment endpoint that accepts a
-   `stageId` and charges the delta needs to be designed alongside the payment
-   team. The stage API only computes the amount — it does not initiate payment.
-
-3. **Concurrent stage conflict resolution:** If two guests stage changes to the
+2. **Concurrent stage conflict resolution:** If two guests stage changes to the
    same booking (e.g., same URDD on two devices), only the first committed stage
    should succeed. The second commit should re-validate against the new state.
 
-4. **Backfill `current_price`:** Existing `booking_services` rows have
+3. **Backfill `current_price`:** Existing `booking_services` rows have
    `current_price = NULL`. Options: leave as-is (frontend falls back to
    `unitPrice`) or run a one-time backfill script that resolves prices for
    historical bookings.
 
-5. **Stage expiry cron interval:** Suggested every 5 minutes. Needs alignment
+4. **Stage expiry cron interval:** Suggested every 5 minutes. Needs alignment
    with cron manager schedule.
