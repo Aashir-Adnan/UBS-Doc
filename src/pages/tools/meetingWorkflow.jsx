@@ -2,8 +2,9 @@ import React, { useState, useCallback } from 'react';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 import { useAuth } from '@site/src/components/portal/authStore';
-import GoogleSignIn from '@site/src/components/portal/GoogleSignIn';
-import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
+import PortalSignIn from '@site/src/components/portal/PortalSignIn';
+import { usePortalAccess } from '@site/src/components/portal/usePortalAccess';
+import AccessRestricted from '@site/src/components/portal/AccessRestricted';
 import MeetingList from '@site/src/components/meetingWorkflow/MeetingList';
 import CreateMeeting from '@site/src/components/meetingWorkflow/CreateMeeting';
 import WorkflowPanel from '@site/src/components/meetingWorkflow/WorkflowPanel';
@@ -13,7 +14,7 @@ import PendingAccess from '@site/src/components/portal/tenantProjects/PendingAcc
 // Three views: 'list' | 'create' | 'meeting'
 function MeetingWorkflowContent() {
   const { user, signOut, loading } = useAuth();
-  const canAccess = !!user && isGranjurEmail(user?.email);
+  const { allowed: canAccess, loading: accessLoading } = usePortalAccess();
   // Tenant scoping: resolve the acting URDD once and thread it to the children.
   const { status: idStatus, urdd: actingUrdd, me, error: idError } = useActingUrdd();
   const [view, setView] = useState('list');          // 'list' | 'create' | 'meeting'
@@ -34,34 +35,17 @@ function MeetingWorkflowContent() {
     setListKey((k) => k + 1);
   }, []);
 
-  if (loading) {
+  if (loading || accessLoading) {
     return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
   }
 
   if (!user) {
-    return (
-      <section className="portal-hero portal-hero-center">
-        <div className="portal-auth-card portal-auth-centered">
-          <h2 className="card-title">Sign in</h2>
-          <p className="card-subtitle">Use your Google account to access Granjur Dev tools.</p>
-          <GoogleSignIn />
-          <p className="card-helper">Use your @granjur.com account for full access.</p>
-        </div>
-      </section>
-    );
+    return <PortalSignIn />;
   }
 
   if (!canAccess) {
     return (
-      <section className="portal-hero portal-hero-center">
-        <div className="portal-auth-card portal-auth-centered">
-          <h2 className="card-title">Access restricted</h2>
-          <p className="card-subtitle">This portal is limited to @granjur.com accounts.</p>
-          <p className="card-helper">
-            Signed in as <strong>{user.email}</strong>. Please sign out and use your Granjur workspace account.
-          </p>
-        </div>
-      </section>
+      <AccessRestricted email={user.email} onSignOut={signOut} />
     );
   }
 
