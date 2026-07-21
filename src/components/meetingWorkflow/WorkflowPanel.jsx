@@ -703,10 +703,40 @@ function TasksStage({ meeting, detail, onDone }) {
 }
 
 // ─── Stage 4: Report ─────────────────────────────────────────────────────────
-function ReportStage({ meeting, detail, onDone }) {
+function ReportStage({ meeting, detail, onDone, actingUrdd, onFollowUpCreated }) {
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
+  const [followUpBusy, setFollowUpBusy] = useState(false);
+  const [followUpError, setFollowUpError] = useState('');
+  const [followUpNotice, setFollowUpNotice] = useState('');
+
+  const canFollowUp = ['report_ready', 'completed'].includes(
+    detail?.meeting?.status || meeting.status
+  );
+
+  async function createFollowUp() {
+    setFollowUpBusy(true); setFollowUpError(''); setFollowUpNotice('');
+    try {
+      const data = await mwPost('/meeting/workflow/follow-up', {
+        parent_meeting_id: meeting.meeting_id,
+        actionPerformerURDD: actingUrdd,
+        created_by: meeting.created_by || null,
+      });
+      // `duplicate` means the backend de-duplicated a rapid second submission and
+      // handed back the meeting the FIRST one created. Navigate there either way,
+      // but say which happened — silently presenting an existing meeting as new
+      // makes a user who is deliberately branching think the button is broken.
+      if (data.duplicate) {
+        setFollowUpNotice('Opened the follow-up you just created.');
+      }
+      onFollowUpCreated?.(data.meeting);
+    } catch (e) {
+      setFollowUpError(e.message);
+    } finally {
+      setFollowUpBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (detail?.latestHtml || detail?.notes?.raw_notes) {
@@ -755,6 +785,24 @@ function ReportStage({ meeting, detail, onDone }) {
             initialNotes={report.notes}
             initialHtml={report.html}
           />
+          {canFollowUp && (
+            <div className="mw-followup-cta">
+              <StatusBar message={followUpError} type="error" />
+              <StatusBar message={followUpNotice} type="info" />
+              <button
+                className="mw-btn mw-btn--primary"
+                onClick={createFollowUp}
+                disabled={followUpBusy}
+                type="button"
+              >
+                {followUpBusy ? 'Creating…' : '↳ Create follow-up meeting'}
+              </button>
+              <p className="mw-followup-hint">
+                Inherits this meeting&apos;s repositories and features. You&apos;ll land on
+                the new meeting to generate its pre-meeting notes.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -780,7 +828,7 @@ function readBlock(err) {
   return { blocked: is403, reason };
 }
 
-export default function WorkflowPanel({ meeting, actingUrdd, onStageComplete }) {
+export default function WorkflowPanel({ meeting, actingUrdd, onStageComplete, onFollowUpCreated }) {
   const [activeStage, setActiveStage] = useState(meeting?.current_stage ?? 0);
   const [completedStage, setCompletedStage] = useState(meeting?.current_stage ?? 0);
   const [detail, setDetail] = useState(null);
@@ -791,6 +839,15 @@ export default function WorkflowPanel({ meeting, actingUrdd, onStageComplete }) 
   useEffect(() => {
     setCompletedStage(meeting?.current_stage ?? 0);
   }, [meeting?.current_stage]);
+
+  // WorkflowPanel is not remounted when the selected meeting changes (no `key`
+  // prop upstream), so activeStage would otherwise stay on whatever tab was
+  // open for the previous meeting — e.g. landing on a brand-new follow-up
+  // meeting while still showing its (nonexistent) Report tab. Reset the active
+  // tab whenever the meeting identity changes.
+  useEffect(() => {
+    setActiveStage(meeting?.current_stage ?? 0);
+  }, [meeting?.meeting_id]);
 
   useEffect(() => {
     if (!meeting?.meeting_id) return;
@@ -838,7 +895,7 @@ export default function WorkflowPanel({ meeting, actingUrdd, onStageComplete }) 
     1: <LiveTranscribeStage meeting={meeting} detail={detail} onDone={handleDone} />,
     2: <AnalyzeStage     meeting={meeting} detail={detail} onDone={handleDone} />,
     3: <TasksStage       meeting={meeting} detail={detail} onDone={handleDone} />,
-    4: <ReportStage      meeting={meeting} detail={detail} onDone={handleDone} />,
+    4: <ReportStage      meeting={meeting} detail={detail} onDone={handleDone} actingUrdd={actingUrdd} onFollowUpCreated={onFollowUpCreated} />,
   };
 
   return (
@@ -859,6 +916,20 @@ export default function WorkflowPanel({ meeting, actingUrdd, onStageComplete }) 
             {meeting.status || 'pending'}
           </span>
         </div>
+        {detail?.parent && (
+          <button
+            className="mw-followup-link"
+            type="button"
+            onClick={() => onFollowUpCreated?.(detail.parent)}
+          >
+            ↳ Follow-up to {detail.parent.title}
+          </button>
+        )}
+        {!!detail?.followUps?.length && (
+          <span className="mw-followup-count">
+            {detail.followUps.length} follow-up{detail.followUps.length === 1 ? '' : 's'}
+          </span>
+        )}
       </div>
       <StageNav active={activeStage} completed={completedStage} onSelect={setActiveStage} />
       <div className="mw-stage-body">

@@ -88,6 +88,9 @@ export default function MeetingList({ actingUrdd, onSelectMeeting, selectedId, o
                 <span className={`mw-meeting-status mw-meeting-status--${m.status || 'pending'}`}>
                   {STATUS_LABEL[m.status] || m.status || 'pending'}
                 </span>
+                {m.parent_meeting_id && (
+                  <span className="mw-chip mw-chip--followup" title="Follow-up meeting">↳ Follow-up</span>
+                )}
               </div>
               {m.scheduled_at && (
                 <p className="mw-meeting-card-date">

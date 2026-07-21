@@ -34,6 +34,12 @@ function MeetingWorkflowContent() {
     setListKey((k) => k + 1);
   }, []);
 
+  function handleFollowUpCreated(newMeeting) {
+    if (!newMeeting?.meeting_id) return;
+    setSelectedMeeting(newMeeting);
+    setView('meeting');
+  }
+
   if (loading) {
     return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
   }
@@ -145,6 +151,7 @@ function MeetingWorkflowContent() {
             meeting={selectedMeeting}
             actingUrdd={actingUrdd}
             onStageComplete={handleStageComplete}
+            onFollowUpCreated={handleFollowUpCreated}
           />
         )}
       </section>

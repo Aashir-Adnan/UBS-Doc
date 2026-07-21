@@ -5354,6 +5354,26 @@ body.ubs-no-outlines .repo-row:hover {
 [data-theme='dark'] .mw-chip--project  { background: rgba(159,122,234,0.2); color: #d6bcfa; }
 [data-theme='dark'] .mw-chip--platform { background: rgba(66,153,225,0.2); color: #90cdf4; }
 
+/* Follow-up affordances -------------------------------------------------- */
+.mw-chip--followup {
+  background: #ede9fe;
+  color: #5b21b6;
+  border: 1px solid #ddd6fe;
+}
+[data-theme='dark'] .mw-chip--followup {
+  background: rgba(139, 92, 246, 0.18);
+  color: #c4b5fd;
+  border-color: rgba(139, 92, 246, 0.35);
+}
+.mw-followup-cta { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--ifm-color-emphasis-300); }
+.mw-followup-hint { margin: 0.5rem 0 0; font-size: 0.82rem; color: var(--ifm-color-emphasis-700); }
+.mw-followup-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-size: 0.85rem; color: var(--ifm-color-primary); text-align: left;
+}
+.mw-followup-link:hover { text-decoration: underline; }
+.mw-followup-count { font-size: 0.8rem; color: var(--ifm-color-emphasis-700); margin-left: 0.5rem; }
+
 /* Task status badges */
 .mw-status-badge {
   display: inline-block;
