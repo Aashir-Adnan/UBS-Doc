@@ -86,6 +86,6 @@ changes.
   `actionPerformerURDD` on the query string (the `mwGet`/`mwPost` helpers and the
   `tenantApi.js` `tGet`/`tPost` helpers).
 - Portal pages use the standard three-state auth guard (sign-in → wrong-account →
-  content) and the `isGranjurEmail` allowlist.
+  content) and the `usePortalAccess` gate.
 - Styles live in `src/css/custom.css` under the
   `/* ===== Tenant-Based Project Access ===== */` section.

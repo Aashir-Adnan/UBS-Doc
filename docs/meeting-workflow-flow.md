@@ -31,7 +31,7 @@ Supporting / shared files referenced by the workflow:
 | [`src/components/portal/config.js`](../src/components/portal/config.js) | Exports `API_BASE_URL` (window-injected at build, else env, else `localhost:3000`). |
 | [`src/components/portal/authStore.jsx`](../src/components/portal/authStore.jsx) | `useAuth()` → `{ user, setUser, signOut }`. |
 | [`src/components/portal/GoogleSignIn`](../src/components/portal/GoogleSignIn.jsx) | Sign-in card shown when unauthenticated. |
-| [`src/utils/isGranjurEmail.js`](../src/utils/isGranjurEmail.js) | Per-page access gate (`@granjur.com` + hardcoded allow-list). |
+| [`src/components/portal/usePortalAccess.js`](../src/components/portal/usePortalAccess.js) | Per-page access gate (`@granjur.com`, or provisioned into a tenant). |
 | [`docs/agents/claude-github-issues-agent.md`](agents/claude-github-issues-agent.md) | **The downstream agent** that turns issues into PRs (backend, separate). |
 | [`docs/agents/agent-issue-format.md`](agents/agent-issue-format.md) | The `[Agent Call]` issue spec the backend must emit for the agent to pick it up. |
 
@@ -63,7 +63,7 @@ So the backend's canonical envelope is `{ payload: { return: <actual data> } }`.
 `MeetingWorkflowPage` → `MeetingWorkflowContent`. Two gates run before any workflow UI:
 
 1. **Not signed in** (`!user`) → renders `<GoogleSignIn />` card. Nothing else loads.
-2. **Signed in but wrong domain** (`!isGranjurEmail(user.email)`) → "Access restricted" card.
+2. **Signed in but not granted access** (`!allowed` from `usePortalAccess()`) → "Access restricted" card.
 3. **Authorized** → the three-view shell.
 
 State machine (single `view` state, `'list' | 'create' | 'meeting'`):

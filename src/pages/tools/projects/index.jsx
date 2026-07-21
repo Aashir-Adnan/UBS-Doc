@@ -2,49 +2,26 @@ import React from 'react';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 import { useAuth } from '@site/src/components/portal/authStore';
-import GoogleSignIn from '@site/src/components/portal/GoogleSignIn';
+import PortalSignIn from '@site/src/components/portal/PortalSignIn';
 import { projects } from '@site/src/data/projectsConfig';
-import { isGranjurEmail } from '@site/src/utils/isGranjurEmail';
+import { usePortalAccess } from '@site/src/components/portal/usePortalAccess';
+import AccessRestricted from '@site/src/components/portal/AccessRestricted';
 
 function ProjectsContent() {
   const { user, signOut, loading } = useAuth();
-  const canAccessPortal = !!user && isGranjurEmail(user?.email);
+  const { allowed: canAccessPortal, loading: accessLoading } = usePortalAccess();
 
-  if (loading) {
+  if (loading || accessLoading) {
     return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
   }
 
   if (!user) {
-    return (
-      <section className="portal-hero portal-hero-center">
-        <div className="portal-auth-card portal-auth-centered">
-          <h2 className="card-title">Sign in</h2>
-          <p className="card-subtitle">
-            Use your Google account to access Granjur Dev tools.
-          </p>
-          <GoogleSignIn />
-          <p className="card-helper">
-            Use your organization&apos;s @granjur.com account for full access.
-          </p>
-        </div>
-      </section>
-    );
+    return <PortalSignIn />;
   }
 
   if (!canAccessPortal) {
     return (
-      <section className="portal-hero portal-hero-center">
-        <div className="portal-auth-card portal-auth-centered">
-          <h2 className="card-title">Access restricted</h2>
-          <p className="card-subtitle">
-            This portal is limited to @granjur.com accounts.
-          </p>
-          <p className="card-helper">
-            You are currently signed in as <strong>{user.email}</strong>. Please
-            sign out and use your Granjur workspace account.
-          </p>
-        </div>
-      </section>
+      <AccessRestricted email={user.email} onSignOut={signOut} />
     );
   }
 
