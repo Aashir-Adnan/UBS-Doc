@@ -159,6 +159,13 @@ const sidebars = {
                 'hms-documentation/major-implementations/landmarks-cities-regions-hotels/landmarks-cities-regions-hotels',
               ],
             },
+            {
+              type: 'category',
+              label: 'Centralized Booking Pricing',
+              items: [
+                'hms-documentation/major-implementations/centralized-booking-pricing/centralized-booking-pricing',
+              ],
+            },
           ],
         },
         {
