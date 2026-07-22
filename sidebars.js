@@ -152,6 +152,13 @@ const sidebars = {
                 'hms-documentation/major-implementations/booking-changes-pipeline/booking-changes-pipeline',
               ],
             },
+            {
+              type: 'category',
+              label: 'Landmarks, Cities, Regions and Hotels',
+              items: [
+                'hms-documentation/major-implementations/landmarks-cities-regions-hotels/landmarks-cities-regions-hotels',
+              ],
+            },
           ],
         },
         {
