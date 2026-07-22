@@ -9,6 +9,7 @@ import MeetingList from '@site/src/components/meetingWorkflow/MeetingList';
 import CreateMeeting from '@site/src/components/meetingWorkflow/CreateMeeting';
 import WorkflowPanel from '@site/src/components/meetingWorkflow/WorkflowPanel';
 import { useActingUrdd } from '@site/src/components/portal/tenantProjects/useActingUrdd';
+import { useActingPermissions } from '@site/src/components/portal/tenantProjects/useActingPermissions';
 import PendingAccess from '@site/src/components/portal/tenantProjects/PendingAccess';
 
 // Three views: 'list' | 'create' | 'meeting'
@@ -17,6 +18,11 @@ function MeetingWorkflowContent() {
   const { allowed: canAccess, loading: accessLoading } = usePortalAccess();
   // Tenant scoping: resolve the acting URDD once and thread it to the children.
   const { status: idStatus, urdd: actingUrdd, me, error: idError } = useActingUrdd();
+  // UI gating mirrors the server's permission checks (see useActingPermissions):
+  // fails-open only while permissions are still loading, so nothing flickers
+  // disabled — the 403 remains the real enforcement.
+  const { has, loaded: permsLoaded } = useActingPermissions();
+  const canCreate = !permsLoaded || has('add_meetings');
   const [view, setView] = useState('list');          // 'list' | 'create' | 'meeting'
   const [selectedMeeting, setSelectedMeeting] = useState(null);
   const [listKey, setListKey] = useState(0);
@@ -34,6 +40,12 @@ function MeetingWorkflowContent() {
   const handleStageComplete = useCallback(() => {
     setListKey((k) => k + 1);
   }, []);
+
+  function handleFollowUpCreated(newMeeting) {
+    if (!newMeeting?.meeting_id) return;
+    setSelectedMeeting(newMeeting);
+    setView('meeting');
+  }
 
   if (loading || accessLoading) {
     return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
@@ -96,7 +108,13 @@ function MeetingWorkflowContent() {
           </span>
           <button type="button" className="mw-btn mw-btn--ghost mw-btn--sm" onClick={signOut}>Sign out</button>
           {view === 'list' && (
-            <button type="button" className="mw-btn mw-btn--primary mw-btn--sm" onClick={() => setView('create')}>
+            <button
+              type="button"
+              className="mw-btn mw-btn--primary mw-btn--sm"
+              onClick={() => setView('create')}
+              disabled={!canCreate}
+              title={canCreate ? undefined : "You need the 'add_meetings' permission to create meetings."}
+            >
               + New Meeting
             </button>
           )}
@@ -112,6 +130,7 @@ function MeetingWorkflowContent() {
             onSelectMeeting={handleSelectMeeting}
             selectedId={selectedMeeting?.meeting_id}
             onCreateClick={() => setView('create')}
+            canCreate={canCreate}
           />
         )}
 
@@ -121,6 +140,7 @@ function MeetingWorkflowContent() {
             onCreated={handleCreated}
             onCancel={() => setView('list')}
             userEmail={user.email}
+            canCreate={canCreate}
           />
         )}
 
@@ -129,6 +149,7 @@ function MeetingWorkflowContent() {
             meeting={selectedMeeting}
             actingUrdd={actingUrdd}
             onStageComplete={handleStageComplete}
+            onFollowUpCreated={handleFollowUpCreated}
           />
         )}
       </section>
