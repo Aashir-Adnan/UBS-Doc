@@ -331,15 +331,11 @@ Filters packages based on their configured stay duration:
 
 ## Landmark → Hotel → Services Discovery Flow
 
-When a user selects a landmark to explore nearby hotels and their offerings, the correct API flow is:
+When a user selects a landmark to explore nearby hotels and their offerings, the frontend should use the **locally cached** landmarks/cities/hotels data (see [Frontend Search & Caching Strategy](/hms-documentation/major-implementations/landmarks-cities-regions-hotels/landmarks-cities-regions-hotels#frontend-search--caching-strategy)). The backend calls only happen for fetching services/packages:
 
-### Step 1: Search landmarks
+### Step 1: User selects a landmark (from local cache)
 
-```
-GET /api/guest/crud/landmarks?filter_columns_or=["all"]&filter_values_or=["mak"]&filter_columns_and=["landmarks.status"]&filter_values_and=["active"]&sort_by=sort_order&sort_order=ASC&page_size=10
-```
-
-Response includes `cityId`, `latitude`, `longitude`, and `radiusKm` for each landmark.
+The landmark object in the cache already contains `cityId`, `latitude`, `longitude`, and `radiusKm`.
 
 ### Step 2: Get hotels near the landmark
 
@@ -349,13 +345,18 @@ Use the landmark's `cityId` to filter hotels:
 GET /api/guest/hotels?cityId=1
 ```
 
-### Step 3: Browse services/packages
+Display hotels as pins on the map using their `coordinates`.
 
-Use `cityId` for broad discovery, or `hotelId` for a specific hotel:
+### Step 3: Browse services/packages for a selected hotel
+
+```
+GET /api/guest/search/filter?hotelId=1&include=rooms,packages&detailed=true
+```
+
+Or use `cityId` for broad discovery across all hotels in the city:
 
 ```
 GET /api/guest/search/filter?cityId=1&include=rooms,packages&detailed=true
-GET /api/guest/search/filter?hotelId=1&include=packages&detailed=true
 ```
 
 :::warning

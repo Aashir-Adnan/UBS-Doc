@@ -143,7 +143,7 @@ Uses **PUBLIC_ENCRYPTED_PLATFORM** — encrypted with the platform key only, no 
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `q` | `string` | No | Text search on landmark name, slug, or search text. |
+| `q` | `string` | No | Text search on landmark name, slug, search text, or Arabic translation. |
 | `cityId` | `number` | No | Filter landmarks by city. |
 
 #### Response Example
@@ -180,17 +180,68 @@ The `type` field is an ENUM with these values:
 
 ---
 
-## Typical Client Flow
+## Frontend Search & Caching Strategy
+
+### Cache on App Start
+
+On app launch, the frontend should fetch and cache **all three datasets** plus hotels in a single burst:
 
 ```
-1. GET /api/guest/regions          → user picks a region
-2. GET /api/guest/cities?countryId=1  → show cities for that region's country
-   (or use the cityIds from step 1 to filter locally)
-3. GET /api/guest/landmarks?cityId=10 → show landmarks near that city
-4. GET /api/guest/hotels?landmarkId=100 → show hotels near that landmark
+GET /api/guest/hotels
+GET /api/guest/cities
+GET /api/guest/landmarks
+GET /api/guest/regions       (optional — only if region picker is shown)
 ```
 
-Each step is a separate, lightweight call that returns only the data the user needs at that point in the flow.
+These datasets are small (tens to low hundreds of items) and change infrequently, so they can be cached for the entire session or with a long TTL (e.g. 24 hours). There is no need to re-fetch on every search interaction.
+
+### Local Search (Search Bar)
+
+When the user types in the search bar, **match locally against the cached data** — do not call the backend on every keystroke. The search should match across all translated fields:
+
+| Dataset | Fields to Match |
+|---|---|
+| Hotels | `label.en`, `label.ar`, `city.en`, `city.ar`, `address.en`, `address.ar` |
+| Cities | `name.en`, `name.ar`, `code` |
+| Landmarks | `name.en`, `name.ar`, `slug` |
+
+Display results grouped by type (e.g. "Hotels", "Cities", "Landmarks") as the user types. This gives instant, lag-free autocomplete without any network calls.
+
+### Map Behaviour on Selection
+
+**When a landmark is selected:**
+- Centre the map on the landmark's `latitude`/`longitude`.
+- Use the landmark's `radiusKm` to set the map zoom level.
+- Fetch hotels filtered to the landmark's city: `GET /api/guest/hotels?cityId=<landmark.cityId>`.
+- Display each hotel as a pin on the map using its `coordinates` (`lat`, `lng`).
+- Tapping a hotel pin navigates to that hotel's detail/services view.
+
+**When a city is selected:**
+- Filter the cached landmarks to those matching `cityId` (each landmark has a `cityId` field).
+- Display all matching landmarks as pins on the map.
+- The map should auto-fit to show all landmark pins.
+- Tapping a landmark pin selects it (triggers the landmark-selected flow above).
+
+**When a hotel is selected:**
+- Navigate directly to the hotel detail/services view (no map step needed).
+
+### Typical Progressive Flow
+
+```
+1. User opens app → hotels, cities, landmarks cached
+2. User types "مكة" in search bar → local match finds Makkah city + landmarks
+3. User taps Makkah (city) → map shows all landmarks in Makkah as pins
+4. User taps Al-Haram (landmark) → map zooms in, shows nearby hotel pins
+5. User taps a hotel pin → hotel detail / service listing
+```
+
+### When to Use Server-Side Search
+
+The `?q=` parameter on each endpoint exists as a fallback for scenarios where local search is insufficient:
+- **Deep text search** — The server searches additional fields like `search_text` (which may contain transliterations, aliases, and alternate spellings not present in the cached `name` object).
+- **Refreshing stale caches** — If the cache is old, a server call with `?q=` ensures up-to-date results.
+
+In normal operation, prefer local matching for speed and use server `?q=` only when the local cache returns no results for a query the user expects to find.
 
 ---
 
