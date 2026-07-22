@@ -1,6 +1,5 @@
 import React from "react";
-import Layout from "@theme/Layout";
-import Link from "@docusaurus/Link";
+import { Link } from "react-router-dom";
 import { useAuth } from "@site/src/components/portal/authStore";
 import PortalSignIn from "@site/src/components/portal/PortalSignIn";
 import { usePortalAccess } from "@site/src/components/portal/usePortalAccess";
@@ -11,13 +10,12 @@ function GithubContent() {
   const { user, signOut, loading } = useAuth();
   const { allowed: canAccess, loading: accessLoading } = usePortalAccess();
 
-if (loading || accessLoading) {
-  return (
-    <section className="portal-hero portal-hero-center">
-      <p>Loading...</p>
-    </section>
-  );
-}
+  if (loading || accessLoading) {
+    return (
+      <section className="portal-hero portal-hero-center">
+        <p>Loading...</p>
+      </section>
+    );
   }
 
   if (!user) {
@@ -25,9 +23,7 @@ if (loading || accessLoading) {
   }
 
   if (!canAccess) {
-    return (
-      <AccessRestricted email={user.email} onSignOut={signOut} />
-    );
+    return <AccessRestricted email={user.email} onSignOut={signOut} />;
   }
 
   return (

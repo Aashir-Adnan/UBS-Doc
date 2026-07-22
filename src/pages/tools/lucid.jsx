@@ -1,6 +1,5 @@
 import React from "react";
-import Layout from "@theme/Layout";
-import Link from "@docusaurus/Link";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../components/portal/authStore";
 import PortalSignIn from "../../components/portal/PortalSignIn";
 import LucidSanitize from "../../components/portal/LucidSanitize";

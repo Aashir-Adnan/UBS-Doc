@@ -1,6 +1,6 @@
 import React from "react";
 import { useLocation } from "react-router-dom";
-import Link from "@docusaurus/Link";
+import { Link } from "react-router-dom";
 import { useAuth } from "@site/src/components/portal/authStore";
 import PortalSignIn from "@site/src/components/portal/PortalSignIn";
 import { projects, getProjectComponent } from "@site/src/data/projectsConfig";

@@ -1,5 +1,5 @@
 import React from "react";
-import Link from "@docusaurus/Link";
+import { Link } from "react-router-dom";
 import { useAuth } from "@site/src/components/portal/authStore";
 import PortalSignIn from "@site/src/components/portal/PortalSignIn";
 import { usePortalAccess } from "@site/src/components/portal/usePortalAccess";

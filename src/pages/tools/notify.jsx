@@ -1,5 +1,5 @@
 import React from "react";
-import Link from "@docusaurus/Link";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../components/portal/authStore";
 import PortalSignIn from "../../components/portal/PortalSignIn";
 import BugReport from "../../components/portal/BugReport";

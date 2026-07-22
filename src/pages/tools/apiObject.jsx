@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from "react";
-import Layout from "@theme/Layout";
-import Link from "@docusaurus/Link";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../components/portal/authStore";
 import PortalSignIn from "../../components/portal/PortalSignIn";
 import { usePortalAccess } from "@site/src/components/portal/usePortalAccess";
@@ -182,7 +181,8 @@ function buildOutput(state) {
 
 function ApiObjectBuilderContent() {
   const { user, signOut, loading } = useAuth();
-  const { allowed: canAccessPortal, loading: accessLoading } = usePortalAccess();
+  const { allowed: canAccessPortal, loading: accessLoading } =
+    usePortalAccess();
   const [state, setState] = useState(DEFAULT_STATE);
   const [activeTab, setActiveTab] = useState("form");
 
@@ -199,13 +199,12 @@ function ApiObjectBuilderContent() {
     );
   };
 
-if (loading || accessLoading) {
-  return (
-    <section className="portal-hero portal-hero-center">
-      <p>Loading...</p>
-    </section>
-  );
-}
+  if (loading || accessLoading) {
+    return (
+      <section className="portal-hero portal-hero-center">
+        <p>Loading...</p>
+      </section>
+    );
   }
 
   if (!user) {
@@ -213,9 +212,7 @@ if (loading || accessLoading) {
   }
 
   if (!canAccessPortal) {
-    return (
-      <AccessRestricted email={user.email} onSignOut={signOut} />
-    );
+    return <AccessRestricted email={user.email} onSignOut={signOut} />;
   }
 
   return (
