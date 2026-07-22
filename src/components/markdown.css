@@ -27,6 +27,14 @@
   --md-breadcrumb-separator: #9ca3af;
   --md-breadcrumb-active-bg: #eef6ff;
   --md-breadcrumb-active-text: #2563eb;
+
+  --repo-bg: #ffffff;
+
+  --repo-border: #d1d5db;
+
+  --repo-select-bg: #ffffff;
+
+  --repo-text: #111827;
 }
 
 [data-theme="dark"] {
@@ -51,6 +59,14 @@
   --md-breadcrumb-separator: #6b7280;
   --md-breadcrumb-active-bg: rgba(88, 166, 255, 0.15);
   --md-breadcrumb-active-text: #58a6ff;
+
+  --repo-bg: #161b22;
+
+  --repo-border: #30363d;
+
+  --repo-select-bg: #0d1117;
+
+  --repo-text: #f0f6fc;
 }
 
 /* ============================================================
@@ -235,4 +251,12 @@
 
 .breadcrumb-separator {
   color: var(--md-breadcrumb-separator);
+}
+
+.docs-repository-switcher select:focus {
+  outline: none;
+
+  border-color: var(--md-link);
+
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }

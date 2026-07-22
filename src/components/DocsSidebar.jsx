@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import SidebarItem from "./SidebarItem";
 import styles from "./DocsSidebar.module.css";
 import { buildSidebarTree } from "./buildSidebarTree";
@@ -15,7 +15,7 @@ function containsCurrentPage(node, pathname) {
   );
 }
 
-export default function DocsSidebar() {
+export default function DocsSidebar({ repoId }) {
   const location = useLocation();
 
   const [tree, setTree] = useState({
@@ -27,8 +27,9 @@ export default function DocsSidebar() {
 
   useEffect(() => {
     async function loadSidebar() {
+      if (!repoId) return;
       try {
-        const docs = await getSidebar(9);
+        const docs = await getSidebar(repoId);
 
         setTree(buildSidebarTree(docs));
       } catch (err) {
@@ -37,7 +38,7 @@ export default function DocsSidebar() {
     }
 
     loadSidebar();
-  }, []);
+  }, [repoId]);
 
   useEffect(() => {
     const current = Object.entries(tree.folders).find(([_, node]) =>
@@ -53,6 +54,24 @@ export default function DocsSidebar() {
     <aside className={styles.sidebar}>
       <h2 className={styles.title}>Documentation</h2>
 
+      {/* Root files */}
+      <div className={styles.links}>
+        {tree.files.map((file) => (
+          <Link
+            key={file.slug}
+            to={`/docs/${file.slug}`}
+            className={
+              location.pathname === `/docs/${file.slug}`
+                ? `${styles.link} ${styles.active}`
+                : styles.link
+            }
+          >
+            {file.title}
+          </Link>
+        ))}
+      </div>
+
+      {/* Folders */}
       {Object.entries(tree.folders).map(([name, node]) => (
         <SidebarItem
           key={name}
