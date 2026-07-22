@@ -465,7 +465,7 @@ accept an optional `stageId` to link back to a staged preview.
 │     POST /api/guest/payments/initiate                                     │
 │     ├─ Pass stageId in the payment request body                 │
 │     ├─ Balance due is calculated from staged proposed_total     │
-│     ├─ Hard-limited to 20% down payment of staged total         │
+│     ├─ Cannot exceed staged balance due (proposed - paid)       │
 │     ├─ Charge the delta amount                                  │
 │     └─ Return paymentId / confirmation                          │
 │                                                                 │
@@ -540,17 +540,12 @@ Same verification logic as edit booking.
 2. Verify `status = 'pending'` and `expires_at > NOW()`.
 3. Verify `booking_id` matches.
 4. Use `proposed_total` as the effective total for balance calculations: `effectiveBalanceDue = proposed_total - paid_amount`.
-5. **Hard-limit the payment to 20% of the staged total** (down payment only — the guest should not pay the full new balance until changes are committed).
+5. Payment cannot exceed the staged balance due (`proposed_total - paid_amount`).
 6. Minimum payment rules still apply (first payment must be at least 20% of total).
 
 **Behaviour when `stageId` is NOT provided:**
 
 - Existing behaviour unchanged. Balance due is calculated from `bookings.total_amount - bookings.paid_amount`.
-
-**Why the 20% limit?** Staged changes are not yet committed — the booking still reflects
-the old state. Allowing full payment against a proposed total that may never be committed
-would create accounting discrepancies. The 20% down payment secures the guest's intent
-to commit while limiting financial exposure.
 
 **Error responses:**
 
@@ -559,7 +554,7 @@ to commit while limiting financial exposure.
 | 422 | Stage not found | `Stage not found` |
 | 422 | Stage already committed | `Stage has already been committed` |
 | 422 | Stage expired | `Stage has expired. Please re-stage your changes.` |
-| 422 | Amount exceeds 20% of staged total | `Payment for staged changes is limited to 20% down payment (N CUR)` |
+| 422 | Amount exceeds staged balance due | `amount cannot exceed the booking balance due (N)` |
 
 ### Edit Booking Pricing Recalculation
 
@@ -780,7 +775,7 @@ ALTER TABLE booking_services
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/createPackageBooking.js` | Store `current_price` |
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/editBooking.js` | Store `current_price`, verify `stageId`, `slot_id` in `removeServices`, from-scratch pricing recalculation, non-stay date validation |
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/stageBookingChanges.js` | Check-in-based pricing rules, non-stay date validation |
-| `Src/HelperFunctions/PreProcessingFunctions/Guest/guestMoyasarPayments.js` | Accept `stageId`, staged balance validation, 20% down payment limit |
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/guestMoyasarPayments.js` | Accept `stageId`, staged balance validation |
 | `Src/HelperFunctions/Guest/v2/catalogPricing.js` | Optional `ruleDate` parameter on `applyPricingRules` and `fetchRulesForTenant` |
 | `Src/HelperFunctions/Guest/v2/bookingsBundle.js` | Return `basePrice` + `currentPrice` |
 | `Src/HelperFunctions/Guest/v2/availability/computeSlots.js` | Accept `holdSlots`, return `remaining`/`total` |
