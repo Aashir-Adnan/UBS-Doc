@@ -3,6 +3,7 @@ import { marked } from 'marked';
 import { mwGet, mwPost, mwPostForm } from './api';
 import NoteEditor from './NoteEditor';
 import LiveTranscribeStage from './LiveTranscribeStage';
+import { useActingPermissions } from '@site/src/components/portal/tenantProjects/useActingPermissions';
 
 // Stages: removed Approve (merged into Tasks) and Issue Sync
 const STAGES = [
@@ -51,7 +52,7 @@ function StatusBar({ message, type }) {
 }
 
 // ─── Inline editable cell ─────────────────────────────────────────────────────
-function EditableCell({ value, field, taskId, meetingId, options, onSaved, multiline }) {
+function EditableCell({ value, field, taskId, meetingId, options, onSaved, multiline, actingUrdd, onError, canEdit = true }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value || '');
   const [busy, setBusy] = useState(false);
@@ -68,9 +69,10 @@ function EditableCell({ value, field, taskId, meetingId, options, onSaved, multi
         task_id: taskId,
         meeting_id: meetingId,
         [field]: val,
+        actionPerformerURDD: actingUrdd,
       });
       onSaved?.(data.task);
-    } catch (_) {}
+    } catch (e) { onError?.(e.message); }
     finally { setBusy(false); setEditing(false); }
   }
 
@@ -82,9 +84,9 @@ function EditableCell({ value, field, taskId, meetingId, options, onSaved, multi
   if (!editing) {
     return (
       <span
-        className="mw-editable-cell"
-        onClick={() => setEditing(true)}
-        title="Click to edit"
+        className={`mw-editable-cell${canEdit ? '' : ' mw-editable-cell--readonly'}`}
+        onClick={() => canEdit && setEditing(true)}
+        title={canEdit ? 'Click to edit' : "You need the 'update_meetings' permission to edit tasks."}
       >
         {value || <span className="mw-editable-placeholder">—</span>}
       </span>
@@ -122,29 +124,31 @@ function EditableCell({ value, field, taskId, meetingId, options, onSaved, multi
 // ─── Context Files Panel ─────────────────────────────────────────────────────
 // Allows uploading reference files that Claude uses as extra context.
 
-function ContextFilesPanel({ meetingId }) {
+function ContextFilesPanel({ meetingId, actingUrdd, canEdit = true }) {
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef(null);
 
   useEffect(() => {
-    mwGet(`/meeting/workflow/context-files?meeting_id=${meetingId}`)
+    mwGet(`/meeting/workflow/context-files?meeting_id=${meetingId}&actionPerformerURDD=${actingUrdd}`)
       .then((d) => setFiles(d.files || []))
-      .catch(() => {});
-  }, [meetingId]);
+      .catch((e) => setError(e.message));
+  }, [meetingId, actingUrdd]);
 
   async function handleFiles(fileList) {
     if (!fileList?.length) return;
+    if (!canEdit) return;
     setUploading(true); setError('');
     try {
       const form = new FormData();
       form.append('meeting_id', meetingId);
+      form.append('actionPerformerURDD', actingUrdd);
       for (const f of fileList) form.append('files', f);
       const data = await mwPostForm('/meeting/workflow/context-files', form);
       const uploaded = data.uploaded || [];
       // Refresh list
-      const fresh = await mwGet(`/meeting/workflow/context-files?meeting_id=${meetingId}`);
+      const fresh = await mwGet(`/meeting/workflow/context-files?meeting_id=${meetingId}&actionPerformerURDD=${actingUrdd}`);
       setFiles(fresh.files || []);
     } catch (e) { setError(e.message); }
     finally { setUploading(false); }
@@ -152,7 +156,7 @@ function ContextFilesPanel({ meetingId }) {
 
   async function removeFile(fileId) {
     try {
-      await mwPost('/meeting/workflow/context-files/delete', { file_id: fileId, meeting_id: meetingId });
+      await mwPost('/meeting/workflow/context-files/delete', { file_id: fileId, meeting_id: meetingId, actionPerformerURDD: actingUrdd });
       setFiles((prev) => prev.filter((f) => f.file_id !== fileId));
     } catch (e) { setError(e.message); }
   }
@@ -168,19 +172,23 @@ function ContextFilesPanel({ meetingId }) {
         Context Files <span className="mw-optional">(uploaded text is injected into Claude prompts)</span>
       </p>
       <div
-        className="mw-dropzone"
-        onDrop={onDrop}
+        className={`mw-dropzone${canEdit ? '' : ' mw-dropzone--disabled'}`}
+        onDrop={canEdit ? onDrop : (e) => e.preventDefault()}
         onDragOver={(e) => e.preventDefault()}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => canEdit && inputRef.current?.click()}
         role="button"
         tabIndex={0}
-        onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.click()}
+        aria-disabled={!canEdit}
+        title={canEdit ? undefined : "You need the 'update_meetings' permission to upload context files."}
+        onKeyDown={(e) => canEdit && e.key === 'Enter' && inputRef.current?.click()}
       >
-        {uploading ? 'Uploading…' : 'Drop files here or click to browse'}
+        {!canEdit ? 'Uploading context files requires the update_meetings permission.'
+          : uploading ? 'Uploading…' : 'Drop files here or click to browse'}
         <input
           ref={inputRef}
           type="file"
           multiple
+          disabled={!canEdit}
           style={{ display: 'none' }}
           onChange={(e) => handleFiles(e.target.files)}
         />
@@ -199,7 +207,8 @@ function ContextFilesPanel({ meetingId }) {
                 className="mw-btn mw-btn--danger mw-btn--sm"
                 onClick={() => removeFile(f.file_id)}
                 type="button"
-                title="Remove"
+                disabled={!canEdit}
+                title={canEdit ? 'Remove' : "You need the 'update_meetings' permission to remove files."}
               >✕</button>
             </li>
           ))}
@@ -210,7 +219,7 @@ function ContextFilesPanel({ meetingId }) {
 }
 
 // ─── Stage 0: Pre-Meeting Notes ───────────────────────────────────────────────
-function PreMeetingStage({ meeting, detail, onDone, actingUrdd }) {
+function PreMeetingStage({ meeting, detail, onDone, actingUrdd, canAI, canEdit }) {
   const [busy, setBusy] = useState(false);
   const [md, setMd] = useState(detail?.meeting?.pre_meeting_notes || meeting.pre_meeting_notes || '');
   const [html, setHtml] = useState(detail?.meeting?.pre_meeting_html || meeting.pre_meeting_html || '');
@@ -252,9 +261,16 @@ function PreMeetingStage({ meeting, detail, onDone, actingUrdd }) {
           <pre className="mw-pre">{meeting.agenda}</pre>
         </div>
       )}
-      <ContextFilesPanel meetingId={meeting.meeting_id} />
+      <ContextFilesPanel meetingId={meeting.meeting_id} actingUrdd={actingUrdd} canEdit={canEdit} />
       <StatusBar message={error} type="error" />
-      <button className="mw-btn mw-btn--primary" onClick={run} disabled={busy} type="button" style={{ marginTop: '0.75rem' }}>
+      <button
+        className="mw-btn mw-btn--primary"
+        onClick={run}
+        disabled={busy || !canAI}
+        type="button"
+        style={{ marginTop: '0.75rem' }}
+        title={canAI ? undefined : "You need the 'run_meeting_ai' permission to generate notes."}
+      >
         {busy ? 'Generating…' : hasContent ? 'Regenerate Notes' : 'Generate Pre-Meeting Notes'}
       </button>
       {hasContent && (
@@ -301,7 +317,7 @@ function PreMeetingStage({ meeting, detail, onDone, actingUrdd }) {
 // Delegated to LiveTranscribeStage component
 
 // ─── Stage 2: Analyze ────────────────────────────────────────────────────────
-function AnalyzeStage({ meeting, detail, onDone }) {
+function AnalyzeStage({ meeting, detail, onDone, actingUrdd, canAI }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(detail?.meeting?.analysis_json || null);
   const [error, setError] = useState('');
@@ -315,7 +331,7 @@ function AnalyzeStage({ meeting, detail, onDone }) {
   async function run() {
     setBusy(true); setError(''); setResult(null); setQuestions(null);
     try {
-      const data = await mwPost('/meeting/workflow/analyze', { meeting_id: meeting.meeting_id });
+      const data = await mwPost('/meeting/workflow/analyze', { meeting_id: meeting.meeting_id, actionPerformerURDD: actingUrdd });
       setResult(data.analysis || data);
       onDone?.();
     } catch (e) { setError(e.message); }
@@ -325,7 +341,7 @@ function AnalyzeStage({ meeting, detail, onDone }) {
   async function runClarify() {
     setClarifyBusy(true); setError('');
     try {
-      const data = await mwPost('/meeting/workflow/clarify', { meeting_id: meeting.meeting_id });
+      const data = await mwPost('/meeting/workflow/clarify', { meeting_id: meeting.meeting_id, actionPerformerURDD: actingUrdd });
       setQuestions(data.questions || []);
       setAnswers({});
     } catch (e) { setError(e.message); }
@@ -342,6 +358,7 @@ function AnalyzeStage({ meeting, detail, onDone }) {
       const data = await mwPost('/meeting/workflow/clarify/revise', {
         meeting_id: meeting.meeting_id,
         answered_questions: answered,
+        actionPerformerURDD: actingUrdd,
       });
       setResult(data.analysis);
       setQuestions(null);
@@ -364,11 +381,23 @@ function AnalyzeStage({ meeting, detail, onDone }) {
       <StatusBar message={error} type="error" />
 
       <div className="mw-btn-row">
-        <button className="mw-btn mw-btn--primary" onClick={run} disabled={busy || clarifyBusy || reviseBusy} type="button">
+        <button
+          className="mw-btn mw-btn--primary"
+          onClick={run}
+          disabled={busy || clarifyBusy || reviseBusy || !canAI}
+          type="button"
+          title={canAI ? undefined : "You need the 'run_meeting_ai' permission to run analysis."}
+        >
           {busy ? 'Analyzing…' : result ? 'Re-run Analysis' : 'Run MTA Analysis'}
         </button>
         {result && (
-          <button className="mw-btn mw-btn--ghost" onClick={runClarify} disabled={busy || clarifyBusy || reviseBusy} type="button">
+          <button
+            className="mw-btn mw-btn--ghost"
+            onClick={runClarify}
+            disabled={busy || clarifyBusy || reviseBusy || !canAI}
+            type="button"
+            title={canAI ? undefined : "You need the 'run_meeting_ai' permission to generate clarifying questions."}
+          >
             {clarifyBusy ? 'Generating questions…' : 'Prompt Claude for Clarity'}
           </button>
         )}
@@ -432,8 +461,9 @@ function AnalyzeStage({ meeting, detail, onDone }) {
             <button
               className="mw-btn mw-btn--primary"
               onClick={runRevise}
-              disabled={reviseBusy || !allAnswered}
+              disabled={reviseBusy || !allAnswered || !canAI}
               type="button"
+              title={canAI ? undefined : "You need the 'run_meeting_ai' permission to revise the analysis."}
             >
               {reviseBusy ? 'Revising…' : 'Revise Analysis'}
             </button>
@@ -450,7 +480,7 @@ function AnalyzeStage({ meeting, detail, onDone }) {
 // ─── Stage 3: Tasks + Approve (consolidated) ─────────────────────────────────
 const EMPTY_NEW_TASK = { project: '', platform: '', feature: '', sub_feature: '', code_residence: '', goal_of_task: '' };
 
-function TasksStage({ meeting, detail, onDone }) {
+function TasksStage({ meeting, detail, onDone, actingUrdd, canAI, canEdit }) {
   const [busy, setBusy] = useState(false);
   const [tasks, setTasks] = useState(detail?.tasks || null);
   const [error, setError] = useState('');
@@ -464,9 +494,9 @@ function TasksStage({ meeting, detail, onDone }) {
   // Load tasks from DB on mount
   useEffect(() => {
     if (tasks !== null) return;
-    mwGet(`/meeting/workflow/tasks?meeting_id=${meeting.meeting_id}`)
+    mwGet(`/meeting/workflow/tasks?meeting_id=${meeting.meeting_id}&actionPerformerURDD=${actingUrdd}`)
       .then((data) => setTasks(data.tasks || []))
-      .catch(() => setTasks([]));
+      .catch((e) => { setError(e.message); setTasks([]); });
   }, [meeting.meeting_id]);
 
   // Reflect pre-existing approval state
@@ -481,7 +511,7 @@ function TasksStage({ meeting, detail, onDone }) {
   async function generate() {
     setBusy(true); setError('');
     try {
-      const data = await mwPost('/meeting/workflow/tasks', { meeting_id: meeting.meeting_id });
+      const data = await mwPost('/meeting/workflow/tasks', { meeting_id: meeting.meeting_id, actionPerformerURDD: actingUrdd });
       setTasks(data.tasks || []);
       setApproveResult(null);
     } catch (e) { setError(e.message); }
@@ -491,7 +521,7 @@ function TasksStage({ meeting, detail, onDone }) {
   async function refresh() {
     setBusy(true); setError('');
     try {
-      const data = await mwGet(`/meeting/workflow/tasks?meeting_id=${meeting.meeting_id}`);
+      const data = await mwGet(`/meeting/workflow/tasks?meeting_id=${meeting.meeting_id}&actionPerformerURDD=${actingUrdd}`);
       setTasks(data.tasks || []);
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
@@ -501,7 +531,7 @@ function TasksStage({ meeting, detail, onDone }) {
     if (!newTask.goal_of_task.trim()) return;
     setAddBusy(true); setError('');
     try {
-      const data = await mwPost('/meeting/workflow/tasks/add', { meeting_id: meeting.meeting_id, ...newTask });
+      const data = await mwPost('/meeting/workflow/tasks/add', { meeting_id: meeting.meeting_id, ...newTask, actionPerformerURDD: actingUrdd });
       setTasks((prev) => [...(prev || []), data.task]);
       setNewTask(EMPTY_NEW_TASK);
       setShowAddForm(false);
@@ -512,7 +542,7 @@ function TasksStage({ meeting, detail, onDone }) {
   async function deleteTask(taskId) {
     setDeletingId(taskId); setError('');
     try {
-      await mwPost('/meeting/workflow/tasks/delete', { task_id: taskId, meeting_id: meeting.meeting_id });
+      await mwPost('/meeting/workflow/tasks/delete', { task_id: taskId, meeting_id: meeting.meeting_id, actionPerformerURDD: actingUrdd });
       setTasks((prev) => prev.filter((t) => t.task_id !== taskId));
     } catch (e) { setError(e.message); }
     finally { setDeletingId(null); }
@@ -529,6 +559,7 @@ function TasksStage({ meeting, detail, onDone }) {
         meeting_id: meeting.meeting_id,
         decision,
         approved_by: 'human',
+        actionPerformerURDD: actingUrdd,
       });
       setApproveResult({ decision, count: data.tasks?.length || 0, issueResults: data.issueResults || [] });
       setTasks(data.tasks || tasks);
@@ -550,13 +581,25 @@ function TasksStage({ meeting, detail, onDone }) {
       <StatusBar message={error} type="error" />
 
       <div className="mw-btn-row">
-        <button className="mw-btn mw-btn--primary" onClick={generate} disabled={busy || approveBusy} type="button">
+        <button
+          className="mw-btn mw-btn--primary"
+          onClick={generate}
+          disabled={busy || approveBusy || !canAI}
+          type="button"
+          title={canAI ? undefined : "You need the 'run_meeting_ai' permission to generate tasks."}
+        >
           {busy ? 'Generating…' : tasks?.length ? 'Regenerate Tasks' : 'Generate Tasks'}
         </button>
         <button className="mw-btn mw-btn--ghost" onClick={refresh} disabled={busy || approveBusy} type="button">
           Refresh
         </button>
-        <button className="mw-btn mw-btn--ghost" onClick={() => setShowAddForm((v) => !v)} type="button">
+        <button
+          className="mw-btn mw-btn--ghost"
+          onClick={() => setShowAddForm((v) => !v)}
+          disabled={!canEdit}
+          type="button"
+          title={canEdit ? undefined : "You need the 'update_meetings' permission to add tasks."}
+        >
           {showAddForm ? 'Cancel' : '+ Add Task'}
         </button>
       </div>
@@ -582,9 +625,10 @@ function TasksStage({ meeting, detail, onDone }) {
           <button
             className="mw-btn mw-btn--success"
             onClick={addTask}
-            disabled={addBusy || !newTask.goal_of_task.trim()}
+            disabled={addBusy || !newTask.goal_of_task.trim() || !canEdit}
             type="button"
             style={{ marginTop: '0.5rem' }}
+            title={canEdit ? undefined : "You need the 'update_meetings' permission to add tasks."}
           >
             {addBusy ? 'Adding…' : 'Add Task'}
           </button>
@@ -608,35 +652,35 @@ function TasksStage({ meeting, detail, onDone }) {
                   <tr key={t.task_id || i}>
                     <td>{i + 1}</td>
                     <td>
-                      <EditableCell value={t.project} field="project" taskId={t.task_id} meetingId={meeting.meeting_id} onSaved={handleTaskSaved} />
+                      <EditableCell value={t.project} field="project" taskId={t.task_id} meetingId={meeting.meeting_id} onSaved={handleTaskSaved} actingUrdd={actingUrdd} onError={setError} canEdit={canEdit} />
                     </td>
                     <td>
-                      <EditableCell value={t.platform} field="platform" taskId={t.task_id} meetingId={meeting.meeting_id} options={PLATFORM_OPTIONS} onSaved={handleTaskSaved} />
+                      <EditableCell value={t.platform} field="platform" taskId={t.task_id} meetingId={meeting.meeting_id} options={PLATFORM_OPTIONS} onSaved={handleTaskSaved} actingUrdd={actingUrdd} onError={setError} canEdit={canEdit} />
                     </td>
                     <td>
-                      <EditableCell value={t.feature} field="feature" taskId={t.task_id} meetingId={meeting.meeting_id} onSaved={handleTaskSaved} />
+                      <EditableCell value={t.feature} field="feature" taskId={t.task_id} meetingId={meeting.meeting_id} onSaved={handleTaskSaved} actingUrdd={actingUrdd} onError={setError} canEdit={canEdit} />
                       {t.sub_feature && (
-                        <><br /><small><EditableCell value={t.sub_feature} field="sub_feature" taskId={t.task_id} meetingId={meeting.meeting_id} onSaved={handleTaskSaved} /></small></>
+                        <><br /><small><EditableCell value={t.sub_feature} field="sub_feature" taskId={t.task_id} meetingId={meeting.meeting_id} onSaved={handleTaskSaved} actingUrdd={actingUrdd} onError={setError} canEdit={canEdit} /></small></>
                       )}
                     </td>
                     <td>
                       <code className="mw-code">
-                        <EditableCell value={t.code_residence} field="code_residence" taskId={t.task_id} meetingId={meeting.meeting_id} onSaved={handleTaskSaved} />
+                        <EditableCell value={t.code_residence} field="code_residence" taskId={t.task_id} meetingId={meeting.meeting_id} onSaved={handleTaskSaved} actingUrdd={actingUrdd} onError={setError} canEdit={canEdit} />
                       </code>
                     </td>
                     <td>
-                      <EditableCell value={t.goal_of_task} field="goal_of_task" taskId={t.task_id} meetingId={meeting.meeting_id} onSaved={handleTaskSaved} />
+                      <EditableCell value={t.goal_of_task} field="goal_of_task" taskId={t.task_id} meetingId={meeting.meeting_id} onSaved={handleTaskSaved} actingUrdd={actingUrdd} onError={setError} canEdit={canEdit} />
                     </td>
                     <td>
-                      <EditableCell value={t.status} field="status" taskId={t.task_id} meetingId={meeting.meeting_id} options={STATUS_OPTIONS} onSaved={handleTaskSaved} />
+                      <EditableCell value={t.status} field="status" taskId={t.task_id} meetingId={meeting.meeting_id} options={STATUS_OPTIONS} onSaved={handleTaskSaved} actingUrdd={actingUrdd} onError={setError} canEdit={canEdit} />
                     </td>
                     <td>
                       <button
                         className="mw-btn mw-btn--danger mw-btn--sm"
                         onClick={() => deleteTask(t.task_id)}
-                        disabled={deletingId === t.task_id}
+                        disabled={deletingId === t.task_id || !canEdit}
                         type="button"
-                        title="Delete task"
+                        title={canEdit ? 'Delete task' : "You need the 'update_meetings' permission to delete tasks."}
                       >
                         {deletingId === t.task_id ? '…' : '✕'}
                       </button>
@@ -688,10 +732,22 @@ function TasksStage({ meeting, detail, onDone }) {
             </div>
           ) : (
             <div className="mw-btn-row">
-              <button className="mw-btn mw-btn--success" onClick={() => decide('approved')} disabled={approveBusy || busy} type="button">
+              <button
+                className="mw-btn mw-btn--success"
+                onClick={() => decide('approved')}
+                disabled={approveBusy || busy || !canEdit}
+                type="button"
+                title={canEdit ? undefined : "You need the 'update_meetings' permission to approve tasks."}
+              >
                 {approveBusy ? 'Saving…' : 'Approve All'}
               </button>
-              <button className="mw-btn mw-btn--danger" onClick={() => decide('rejected')} disabled={approveBusy || busy} type="button">
+              <button
+                className="mw-btn mw-btn--danger"
+                onClick={() => decide('rejected')}
+                disabled={approveBusy || busy || !canEdit}
+                type="button"
+                title={canEdit ? undefined : "You need the 'update_meetings' permission to reject tasks."}
+              >
                 Reject All
               </button>
             </div>
@@ -703,7 +759,7 @@ function TasksStage({ meeting, detail, onDone }) {
 }
 
 // ─── Stage 4: Report ─────────────────────────────────────────────────────────
-function ReportStage({ meeting, detail, onDone, actingUrdd, onFollowUpCreated }) {
+function ReportStage({ meeting, detail, onDone, actingUrdd, canAI, canEdit, canCreate, onFollowUpCreated }) {
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
@@ -746,7 +802,7 @@ function ReportStage({ meeting, detail, onDone, actingUrdd, onFollowUpCreated })
       });
       return;
     }
-    mwGet(`/meeting/workflow/notes?meeting_id=${meeting.meeting_id}`)
+    mwGet(`/meeting/workflow/notes?meeting_id=${meeting.meeting_id}&actionPerformerURDD=${actingUrdd}`)
       .then((data) => {
         if (data?.latestHtml || data?.notes?.raw_notes) {
           setReport({
@@ -755,13 +811,13 @@ function ReportStage({ meeting, detail, onDone, actingUrdd, onFollowUpCreated })
           });
         }
       })
-      .catch(() => {});
+      .catch((e) => setError(e.message));
   }, [meeting.meeting_id]);
 
   async function generate() {
     setBusy(true); setError(''); setReport(null);
     try {
-      const data = await mwPost('/meeting/workflow/report', { meeting_id: meeting.meeting_id });
+      const data = await mwPost('/meeting/workflow/report', { meeting_id: meeting.meeting_id, actionPerformerURDD: actingUrdd });
       setReport(data);
       onDone?.();
     } catch (e) { setError(e.message); }
@@ -775,7 +831,13 @@ function ReportStage({ meeting, detail, onDone, actingUrdd, onFollowUpCreated })
         Claude generates concise notes and fills the fixed HTML report template — including the full transcript. Review and edit notes below, then rebuild the HTML.
       </p>
       <StatusBar message={error} type="error" />
-      <button className="mw-btn mw-btn--primary" onClick={generate} disabled={busy} type="button">
+      <button
+        className="mw-btn mw-btn--primary"
+        onClick={generate}
+        disabled={busy || !canAI}
+        type="button"
+        title={canAI ? undefined : "You need the 'run_meeting_ai' permission to generate the report."}
+      >
         {busy ? 'Generating Report…' : report ? 'Regenerate HTML Report' : 'Generate HTML Report'}
       </button>
       {report && (
@@ -784,6 +846,9 @@ function ReportStage({ meeting, detail, onDone, actingUrdd, onFollowUpCreated })
             meetingId={meeting.meeting_id}
             initialNotes={report.notes}
             initialHtml={report.html}
+            actingUrdd={actingUrdd}
+            canEdit={canEdit}
+            canAI={canAI}
           />
           {canFollowUp && (
             <div className="mw-followup-cta">
@@ -792,8 +857,9 @@ function ReportStage({ meeting, detail, onDone, actingUrdd, onFollowUpCreated })
               <button
                 className="mw-btn mw-btn--primary"
                 onClick={createFollowUp}
-                disabled={followUpBusy}
+                disabled={followUpBusy || !canCreate}
                 type="button"
+                title={canCreate ? undefined : "You need the 'add_meetings' permission to create a follow-up meeting."}
               >
                 {followUpBusy ? 'Creating…' : '↳ Create follow-up meeting'}
               </button>
@@ -835,6 +901,15 @@ export default function WorkflowPanel({ meeting, actingUrdd, onStageComplete, on
   const [detailLoading, setDetailLoading] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [blockReason, setBlockReason] = useState(null);
+
+  // UI gating that mirrors the server's permission checks. Fails open only while
+  // permissions are still loading (nothing disabled mid-flight); once loaded, the
+  // absence of a permission disables the matching controls. The 403 handling on
+  // each call remains the real enforcement — this is UX only.
+  const { has, loaded: permsLoaded } = useActingPermissions();
+  const canEdit   = !permsLoaded || has('update_meetings');
+  const canAI     = !permsLoaded || has('run_meeting_ai');
+  const canCreate = !permsLoaded || has('add_meetings');
 
   useEffect(() => {
     setCompletedStage(meeting?.current_stage ?? 0);
@@ -891,11 +966,11 @@ export default function WorkflowPanel({ meeting, actingUrdd, onStageComplete, on
   }
 
   const stageComponents = {
-    0: <PreMeetingStage  meeting={meeting} detail={detail} onDone={handleDone} actingUrdd={actingUrdd} />,
-    1: <LiveTranscribeStage meeting={meeting} detail={detail} onDone={handleDone} />,
-    2: <AnalyzeStage     meeting={meeting} detail={detail} onDone={handleDone} />,
-    3: <TasksStage       meeting={meeting} detail={detail} onDone={handleDone} />,
-    4: <ReportStage      meeting={meeting} detail={detail} onDone={handleDone} actingUrdd={actingUrdd} onFollowUpCreated={onFollowUpCreated} />,
+    0: <PreMeetingStage  meeting={meeting} detail={detail} onDone={handleDone} actingUrdd={actingUrdd} canAI={canAI} canEdit={canEdit} />,
+    1: <LiveTranscribeStage meeting={meeting} detail={detail} onDone={handleDone} actingUrdd={actingUrdd} canAI={canAI} />,
+    2: <AnalyzeStage     meeting={meeting} detail={detail} onDone={handleDone} actingUrdd={actingUrdd} canAI={canAI} />,
+    3: <TasksStage       meeting={meeting} detail={detail} onDone={handleDone} actingUrdd={actingUrdd} canAI={canAI} canEdit={canEdit} />,
+    4: <ReportStage      meeting={meeting} detail={detail} onDone={handleDone} actingUrdd={actingUrdd} canAI={canAI} canEdit={canEdit} canCreate={canCreate} onFollowUpCreated={onFollowUpCreated} />,
   };
 
   return (

@@ -14,7 +14,7 @@ const STATUS_LABEL = {
 
 const STAGE_LABELS = ['Pre-Meeting', 'Transcribe', 'Analyze', 'Tasks', 'Report'];
 
-export default function MeetingList({ actingUrdd, onSelectMeeting, selectedId, onCreateClick }) {
+export default function MeetingList({ actingUrdd, onSelectMeeting, selectedId, onCreateClick, canCreate = true }) {
   const [meetings, setMeetings] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -65,7 +65,13 @@ export default function MeetingList({ actingUrdd, onSelectMeeting, selectedId, o
         <div className="mw-meetings-empty">
           <p>{search ? 'No meetings match your search.' : 'No meetings yet.'}</p>
           {!search && onCreateClick && (
-            <button type="button" className="mw-btn mw-btn--primary" onClick={onCreateClick}>
+            <button
+              type="button"
+              className="mw-btn mw-btn--primary"
+              onClick={onCreateClick}
+              disabled={!canCreate}
+              title={canCreate ? undefined : "You need the 'add_meetings' permission to create meetings."}
+            >
               Schedule your first meeting
             </button>
           )}

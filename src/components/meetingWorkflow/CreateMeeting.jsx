@@ -342,7 +342,7 @@ function ScopePicker({ actingUrdd, selectedRepoIds, onRepoToggle, selectedFeatur
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function CreateMeeting({ actingUrdd, onCreated, onCancel, userEmail }) {
+export default function CreateMeeting({ actingUrdd, onCreated, onCancel, userEmail, canCreate = true }) {
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [hours, setHours] = useState('09');
@@ -475,7 +475,12 @@ export default function CreateMeeting({ actingUrdd, onCreated, onCancel, userEma
               </button>
             ) : (
               <>
-                <button className="mw-btn mw-btn--primary" type="submit" disabled={busy}>
+                <button
+                  className="mw-btn mw-btn--primary"
+                  type="submit"
+                  disabled={busy || !canCreate}
+                  title={canCreate ? undefined : "You need the 'add_meetings' permission to create meetings."}
+                >
                   {busy ? 'Creating…' : 'Create Meeting'}
                 </button>
                 {onCancel && (

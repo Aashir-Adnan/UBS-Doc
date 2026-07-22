@@ -5547,6 +5547,16 @@ body.ubs-no-outlines .repo-row:hover {
   background: #ebf4ff;
   outline: none;
 }
+/* Permission-gated: no update_meetings → uploads blocked (server enforces via 403) */
+.mw-dropzone--disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.mw-dropzone--disabled:hover,
+.mw-dropzone--disabled:focus {
+  border-color: #cbd5e0;
+  background: transparent;
+}
 
 .mw-context-file-list {
   list-style: none;
@@ -5871,6 +5881,12 @@ body.ubs-no-outlines .repo-row:hover {
   display: inline-block;
 }
 .mw-editable-cell:hover { border-bottom-color: var(--ifm-color-primary, #2563eb); }
+/* Permission-gated: no update_meetings → cell is read-only (server enforces via 403) */
+.mw-editable-cell--readonly {
+  cursor: not-allowed;
+  border-bottom-style: none;
+}
+.mw-editable-cell--readonly:hover { border-bottom-color: transparent; }
 .mw-editable-placeholder { color: var(--ifm-color-emphasis-400, #adb5bd); }
 .mw-inline-input {
   border: 1px solid var(--ifm-color-primary, #2563eb);

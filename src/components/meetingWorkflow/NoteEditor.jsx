@@ -6,7 +6,9 @@ import { mwPost } from './api';
  * Lets the user read/edit the markdown notes, preview the HTML iframe,
  * and rebuild the HTML after edits. Both are saved to the database.
  */
-export default function NoteEditor({ meetingId, initialNotes, initialHtml }) {
+export default function NoteEditor({ meetingId, initialNotes, initialHtml, actingUrdd, canEdit = true, canAI = true }) {
+  // /updatenotes is gated on BOTH update_meetings and run_meeting_ai server-side.
+  const canRebuild = canEdit && canAI;
   const [notes, setNotes] = useState(initialNotes || '');
   const [html, setHtml] = useState(initialHtml || '');
   const [view, setView] = useState('html'); // 'html' | 'notes'
@@ -22,6 +24,7 @@ export default function NoteEditor({ meetingId, initialNotes, initialHtml }) {
         meeting_id: meetingId,
         edited_notes: notes,
         edited_by: 'human',
+        actionPerformerURDD: actingUrdd,
       });
       setHtml(data.html || html);
       setSaved(true);
@@ -81,8 +84,9 @@ export default function NoteEditor({ meetingId, initialNotes, initialHtml }) {
           <button
             className="mw-btn mw-btn--primary"
             onClick={rebuild}
-            disabled={busy}
+            disabled={busy || !canRebuild}
             type="button"
+            title={canRebuild ? undefined : "You need the 'update_meetings' and 'run_meeting_ai' permissions to rebuild notes."}
           >
             {busy ? 'Rebuilding HTML…' : 'Rebuild HTML'}
           </button>
