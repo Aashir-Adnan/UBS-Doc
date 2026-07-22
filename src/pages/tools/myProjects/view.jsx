@@ -1,20 +1,24 @@
-import React from 'react';
-import Layout from '@theme/Layout';
-import Link from '@docusaurus/Link';
-import { useAuth } from '@site/src/components/portal/authStore';
-import PortalSignIn from '@site/src/components/portal/PortalSignIn';
-import { usePortalAccess } from '@site/src/components/portal/usePortalAccess';
-import AccessRestricted from '@site/src/components/portal/AccessRestricted';
-import ProjectDetail from '@site/src/components/portal/tenantProjects/ProjectDetail';
+import React from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "@site/src/components/portal/authStore";
+import PortalSignIn from "@site/src/components/portal/PortalSignIn";
+import { usePortalAccess } from "@site/src/components/portal/usePortalAccess";
+import AccessRestricted from "@site/src/components/portal/AccessRestricted";
+import ProjectDetail from "@site/src/components/portal/tenantProjects/ProjectDetail";
 
 function ProjectViewContent() {
   const { user } = useAuth();
-  const { allowed: canAccessPortal, loading: accessLoading } = usePortalAccess();
+  const { allowed: canAccessPortal, loading: accessLoading } =
+    usePortalAccess();
 
   // Access now depends on a fetch, so there is a window where the answer is
   // unknown. Render neither the project nor a rejection during it.
   if (accessLoading) {
-    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+    return (
+      <section className="portal-hero portal-hero-center">
+        <p>Loading...</p>
+      </section>
+    );
   }
 
   if (!user) {
@@ -22,9 +26,7 @@ function ProjectViewContent() {
   }
 
   if (!canAccessPortal) {
-    return (
-      <AccessRestricted email={user.email} />
-    );
+    return <AccessRestricted email={user.email} />;
   }
 
   return (
@@ -44,10 +46,10 @@ function ProjectViewContent() {
 
 export default function ProjectViewPage() {
   return (
-    <Layout title="Project" description="Tenant-scoped project detail">
+    <>
       <main className="portal-main-wrapper">
         <ProjectViewContent />
       </main>
-    </Layout>
+    </>
   );
 }

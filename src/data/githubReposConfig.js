@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '@site/src/components/portal/config';
+import { API_BASE_URL } from "../components/portal/config";
 
 /**
  * Fetch tracked repos from the backend and normalize them into the shape
@@ -14,21 +14,21 @@ export async function fetchTrackedRepos() {
   return rows.map((row) => {
     const { owner, repo } = parseGithubUrl(row.url);
     return {
-      slug: row.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      slug: row.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
       name: row.name,
       owner,
       repo,
-      branch: row.branch || 'main',
+      branch: row.branch || "main",
       id: row.id,
     };
   });
 }
 
-function parseGithubUrl(url = '') {
+function parseGithubUrl(url = "") {
   // Handle https://github.com/owner/repo or https://github.com/owner/repo.git
-  const clean = url.replace(/\.git$/, '').replace(/\/$/, '');
-  const parts = clean.split('/');
-  const repo = parts.pop() || '';
-  const owner = parts.pop() || '';
+  const clean = url.replace(/\.git$/, "").replace(/\/$/, "");
+  const parts = clean.split("/");
+  const repo = parts.pop() || "";
+  const owner = parts.pop() || "";
   return { owner, repo };
 }

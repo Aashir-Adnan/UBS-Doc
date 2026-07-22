@@ -1,30 +1,27 @@
-import React, { useMemo, useState } from 'react';
-import Layout from '@theme/Layout';
-import Link from '@docusaurus/Link';
-import { useAuth } from '../../components/portal/authStore';
-import PortalSignIn from '../../components/portal/PortalSignIn';
-import { usePortalAccess } from '@site/src/components/portal/usePortalAccess';
-import AccessRestricted from '@site/src/components/portal/AccessRestricted';
+import React, { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "../../components/portal/authStore";
+import PortalSignIn from "../../components/portal/PortalSignIn";
+import { usePortalAccess } from "@site/src/components/portal/usePortalAccess";
+import AccessRestricted from "@site/src/components/portal/AccessRestricted";
 
 /** Converts URL path to object name: /test/api → TestApi_object */
 function urlToObjectName(url) {
-  if (!url || typeof url !== 'string') return '';
-  const segments = url.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+  if (!url || typeof url !== "string") return "";
+  const segments = url
+    .replace(/^\/+|\/+$/g, "")
+    .split("/")
+    .filter(Boolean);
   const pascal = segments
     .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
-    .join('');
-  return pascal ? `${pascal}_object` : '';
+    .join("");
+  return pascal ? `${pascal}_object` : "";
 }
 
 /** Inline help icon with hover tooltip */
 function FieldHelp({ text }) {
   return (
-    <span
-      className="api-object-help"
-      title={text}
-      role="img"
-      aria-label="Help"
-    >
+    <span className="api-object-help" title={text} role="img" aria-label="Help">
       ?
     </span>
   );
@@ -39,7 +36,7 @@ const FIELDS_JSON_EXAMPLE = `[
 ]`;
 
 const DEFAULT_STATE = {
-  url: '/test/api',
+  url: "/test/api",
   // config.features
   multistep: true,
   parameters: true,
@@ -52,18 +49,18 @@ const DEFAULT_STATE = {
   otp: false,
   accessToken: false,
   // requestMetaData
-  requestMethod: 'POST',
-  permission: '',
+  requestMethod: "POST",
+  permission: "",
   pageSize: 10,
   // response
-  successMessage: 'Configuration generated successfully!',
-  errorMessage: 'There was an error generating the configuration.',
+  successMessage: "Configuration generated successfully!",
+  errorMessage: "There was an error generating the configuration.",
   // apiInfo — write full function definitions; names are extracted and referenced in config
-  preProcessDefinitions: '',
-  postProcessDefinition: '',
-  query: '',
+  preProcessDefinitions: "",
+  postProcessDefinition: "",
+  query: "",
   // optional: fields JSON
-  fieldsJson: '[]',
+  fieldsJson: "[]",
 };
 
 /** Extract function names from definition code (async function name( or function name() in order. */
@@ -93,9 +90,9 @@ function parseFieldsJson(raw) {
 }
 
 function buildOutput(state) {
-  const objectName = urlToObjectName(state.url) || 'Api_object';
-  const preDefs = (state.preProcessDefinitions || '').trim();
-  const postDef = (state.postProcessDefinition || '').trim();
+  const objectName = urlToObjectName(state.url) || "Api_object";
+  const preDefs = (state.preProcessDefinitions || "").trim();
+  const postDef = (state.postProcessDefinition || "").trim();
   const preNames = extractFunctionNames(preDefs);
   const postName = extractSingleFunctionName(postDef);
   const fields = parseFieldsJson(state.fieldsJson);
@@ -105,7 +102,7 @@ function buildOutput(state) {
     versions: {
       versionData: [
         {
-          '*': {
+          "*": {
             steps: [
               {
                 config: {
@@ -118,7 +115,8 @@ function buildOutput(state) {
                     encryption: state.encryption
                       ? {
                           accessToken: state.encryptionAccessToken,
-                          platformEncryption: state.encryptionPlatformEncryption,
+                          platformEncryption:
+                            state.encryptionPlatformEncryption,
                         }
                       : false,
                   },
@@ -137,7 +135,7 @@ function buildOutput(state) {
                     postProcessFunction: postName,
                   },
                   requestMetaData: {
-                    requestMethod: state.requestMethod || 'POST',
+                    requestMethod: state.requestMethod || "POST",
                     permission: state.permission.trim() || null,
                     pagination: {
                       pageSize: Number(state.pageSize) || 10,
@@ -145,8 +143,8 @@ function buildOutput(state) {
                   },
                 },
                 response: {
-                  successMessage: state.successMessage || '',
-                  errorMessage: state.errorMessage || '',
+                  successMessage: state.successMessage || "",
+                  errorMessage: state.errorMessage || "",
                 },
               },
             ],
@@ -157,35 +155,36 @@ function buildOutput(state) {
   };
 
   let js = JSON.stringify(obj, null, 4);
-  js = js.replace(/"([^"]+)":/g, '$1:');
+  js = js.replace(/"([^"]+)":/g, "$1:");
   // Output preProcessFunctions as array of identifiers when we have definitions
   if (preNames.length > 0) {
-    const arrLiteral = '[' + preNames.join(', ') + ']';
+    const arrLiteral = "[" + preNames.join(", ") + "]";
     js = js.replace(
       /preProcessFunctions:\s*\[[^\]]*\]/,
-      `preProcessFunctions: ${arrLiteral}`
+      `preProcessFunctions: ${arrLiteral}`,
     );
   }
   // Output postProcessFunction as identifier when we have a definition
   if (postName) {
     js = js.replace(
-      new RegExp(`postProcessFunction:\\s*"${postName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`),
-      `postProcessFunction: ${postName}`
+      new RegExp(
+        `postProcessFunction:\\s*"${postName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`,
+      ),
+      `postProcessFunction: ${postName}`,
     );
   }
 
-  const definitionsBlock = [preDefs, postDef].filter(Boolean).join('\n\n');
+  const definitionsBlock = [preDefs, postDef].filter(Boolean).join("\n\n");
   const configPart = `global.${objectName} = ${js}\nmodule.exports = { ${objectName} }`;
-  return definitionsBlock
-    ? `${definitionsBlock}\n\n${configPart}`
-    : configPart;
+  return definitionsBlock ? `${definitionsBlock}\n\n${configPart}` : configPart;
 }
 
 function ApiObjectBuilderContent() {
   const { user, signOut, loading } = useAuth();
-  const { allowed: canAccessPortal, loading: accessLoading } = usePortalAccess();
+  const { allowed: canAccessPortal, loading: accessLoading } =
+    usePortalAccess();
   const [state, setState] = useState(DEFAULT_STATE);
-  const [activeTab, setActiveTab] = useState('form');
+  const [activeTab, setActiveTab] = useState("form");
 
   const outputJs = useMemo(() => buildOutput(state), [state]);
   const objectName = urlToObjectName(state.url);
@@ -195,13 +194,17 @@ function ApiObjectBuilderContent() {
 
   const copyOutput = () => {
     navigator.clipboard.writeText(outputJs).then(
-      () => alert('Copied to clipboard!'),
-      () => alert('Failed to copy.')
+      () => alert("Copied to clipboard!"),
+      () => alert("Failed to copy."),
     );
   };
 
   if (loading || accessLoading) {
-    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+    return (
+      <section className="portal-hero portal-hero-center">
+        <p>Loading...</p>
+      </section>
+    );
   }
 
   if (!user) {
@@ -209,9 +212,7 @@ function ApiObjectBuilderContent() {
   }
 
   if (!canAccessPortal) {
-    return (
-      <AccessRestricted email={user.email} onSignOut={signOut} />
-    );
+    return <AccessRestricted email={user.email} onSignOut={signOut} />;
   }
 
   return (
@@ -225,8 +226,8 @@ function ApiObjectBuilderContent() {
           <h2>API Object Builder</h2>
           <p>
             Create custom API objects with pre-configured flags and optional
-            pre/post process functions. Signed in as{' '}
-            <strong>{user.name || user.email}</strong>.{' '}
+            pre/post process functions. Signed in as{" "}
+            <strong>{user.name || user.email}</strong>.{" "}
             <button
               type="button"
               className="portal-signout-link"
@@ -242,33 +243,33 @@ function ApiObjectBuilderContent() {
         <div className="api-object-tabs">
           <button
             type="button"
-            className={`api-object-tab ${activeTab === 'form' ? 'active' : ''}`}
-            onClick={() => setActiveTab('form')}
+            className={`api-object-tab ${activeTab === "form" ? "active" : ""}`}
+            onClick={() => setActiveTab("form")}
           >
             Configure
           </button>
           <button
             type="button"
-            className={`api-object-tab ${activeTab === 'output' ? 'active' : ''}`}
-            onClick={() => setActiveTab('output')}
+            className={`api-object-tab ${activeTab === "output" ? "active" : ""}`}
+            onClick={() => setActiveTab("output")}
           >
             Output (JS)
           </button>
         </div>
 
-        {activeTab === 'form' && (
+        {activeTab === "form" && (
           <div className="portal-card api-object-form-card">
             <div className="api-object-form">
               {/* URL → Object name */}
               <div className="api-object-field">
                 <label>
-                  API URL path{' '}
+                  API URL path{" "}
                   <FieldHelp text="Path used for this API (e.g. /test/api). Becomes the exported object name (e.g. TestApi_object)." />
                 </label>
                 <input
                   type="text"
                   value={state.url}
-                  onChange={(e) => update('url', e.target.value)}
+                  onChange={(e) => update("url", e.target.value)}
                   placeholder="/test/api"
                 />
                 {objectName && (
@@ -284,7 +285,7 @@ function ApiObjectBuilderContent() {
                   <input
                     type="checkbox"
                     checked={state.multistep}
-                    onChange={() => toggle('multistep')}
+                    onChange={() => toggle("multistep")}
                   />
                   <span>multistep</span>
                   <FieldHelp text="Enable multi-step flow for this API." />
@@ -293,7 +294,7 @@ function ApiObjectBuilderContent() {
                   <input
                     type="checkbox"
                     checked={state.parameters}
-                    onChange={() => toggle('parameters')}
+                    onChange={() => toggle("parameters")}
                   />
                   <span>parameters</span>
                   <FieldHelp text="Enable parameter handling for this API." />
@@ -302,7 +303,7 @@ function ApiObjectBuilderContent() {
                   <input
                     type="checkbox"
                     checked={state.pagination}
-                    onChange={() => toggle('pagination')}
+                    onChange={() => toggle("pagination")}
                   />
                   <span>pagination</span>
                   <FieldHelp text="Enable pagination for responses." />
@@ -315,7 +316,7 @@ function ApiObjectBuilderContent() {
                   <input
                     type="checkbox"
                     checked={state.encryption}
-                    onChange={() => toggle('encryption')}
+                    onChange={() => toggle("encryption")}
                   />
                   <span>encryption</span>
                   <FieldHelp text="When true, sets an encryption object with accessToken and platformEncryption (at least one must be true)." />
@@ -326,7 +327,7 @@ function ApiObjectBuilderContent() {
                       <input
                         type="checkbox"
                         checked={state.encryptionAccessToken}
-                        onChange={() => toggle('encryptionAccessToken')}
+                        onChange={() => toggle("encryptionAccessToken")}
                       />
                       <span>accessToken</span>
                     </label>
@@ -334,13 +335,17 @@ function ApiObjectBuilderContent() {
                       <input
                         type="checkbox"
                         checked={state.encryptionPlatformEncryption}
-                        onChange={() => toggle('encryptionPlatformEncryption')}
+                        onChange={() => toggle("encryptionPlatformEncryption")}
                       />
                       <span>platformEncryption</span>
                     </label>
-                    {!state.encryptionAccessToken && !state.encryptionPlatformEncryption && (
-                      <span className="api-object-warn">At least one of accessToken or platformEncryption should be true.</span>
-                    )}
+                    {!state.encryptionAccessToken &&
+                      !state.encryptionPlatformEncryption && (
+                        <span className="api-object-warn">
+                          At least one of accessToken or platformEncryption
+                          should be true.
+                        </span>
+                      )}
                   </>
                 )}
               </div>
@@ -351,7 +356,7 @@ function ApiObjectBuilderContent() {
                   <input
                     type="checkbox"
                     checked={state.otp}
-                    onChange={() => toggle('otp')}
+                    onChange={() => toggle("otp")}
                   />
                   <span>otp</span>
                   <FieldHelp text="Require OTP verification for this API." />
@@ -360,7 +365,7 @@ function ApiObjectBuilderContent() {
                   <input
                     type="checkbox"
                     checked={state.accessToken}
-                    onChange={() => toggle('accessToken')}
+                    onChange={() => toggle("accessToken")}
                   />
                   <span>accessToken</span>
                   <FieldHelp text="Require access token verification." />
@@ -370,12 +375,12 @@ function ApiObjectBuilderContent() {
               <h4 className="api-object-group-title">Request metadata</h4>
               <div className="api-object-field">
                 <label>
-                  requestMethod{' '}
+                  requestMethod{" "}
                   <FieldHelp text="HTTP method for the request (e.g. POST, GET)." />
                 </label>
                 <select
                   value={state.requestMethod}
-                  onChange={(e) => update('requestMethod', e.target.value)}
+                  onChange={(e) => update("requestMethod", e.target.value)}
                 >
                   <option value="POST">POST</option>
                   <option value="GET">GET</option>
@@ -386,101 +391,115 @@ function ApiObjectBuilderContent() {
               </div>
               <div className="api-object-field">
                 <label>
-                  permission{' '}
+                  permission{" "}
                   <FieldHelp text="Permission key required to call this API (null for no restriction)." />
                 </label>
                 <input
                   type="text"
                   value={state.permission}
-                  onChange={(e) => update('permission', e.target.value)}
+                  onChange={(e) => update("permission", e.target.value)}
                   placeholder="null"
                 />
               </div>
               <div className="api-object-field">
                 <label>
-                  pageSize (pagination){' '}
+                  pageSize (pagination){" "}
                   <FieldHelp text="Default page size when pagination is enabled." />
                 </label>
                 <input
                   type="number"
                   min={1}
                   value={state.pageSize}
-                  onChange={(e) => update('pageSize', e.target.value)}
+                  onChange={(e) => update("pageSize", e.target.value)}
                 />
               </div>
 
               <h4 className="api-object-group-title">Response messages</h4>
               <div className="api-object-field">
                 <label>
-                  successMessage{' '}
+                  successMessage{" "}
                   <FieldHelp text="Message shown when the request succeeds." />
                 </label>
                 <input
                   type="text"
                   value={state.successMessage}
-                  onChange={(e) => update('successMessage', e.target.value)}
+                  onChange={(e) => update("successMessage", e.target.value)}
                 />
               </div>
               <div className="api-object-field">
                 <label>
-                  errorMessage{' '}
+                  errorMessage{" "}
                   <FieldHelp text="Message shown when the request fails." />
                 </label>
                 <input
                   type="text"
                   value={state.errorMessage}
-                  onChange={(e) => update('errorMessage', e.target.value)}
+                  onChange={(e) => update("errorMessage", e.target.value)}
                 />
               </div>
 
               <h4 className="api-object-group-title">Pre / Post process</h4>
               <div className="api-object-field">
                 <label>
-                  Pre-process function definitions{' '}
+                  Pre-process function definitions{" "}
                   <FieldHelp text="Write one or more full function definitions (e.g. async function func1(req, decryptedPayload) { }). The return of this function is added to decryptedPayload under the key of the function name." />
                 </label>
                 <textarea
                   value={state.preProcessDefinitions}
-                  onChange={(e) => update('preProcessDefinitions', e.target.value)}
-                  placeholder={'async function func1(req, decryptedPayload) {\n  // ...\n}\nasync function func2(req, decryptedPayload) {\n  // ...\n}'}
+                  onChange={(e) =>
+                    update("preProcessDefinitions", e.target.value)
+                  }
+                  placeholder={
+                    "async function func1(req, decryptedPayload) {\n  // ...\n}\nasync function func2(req, decryptedPayload) {\n  // ...\n}"
+                  }
                   rows={6}
                   className="api-object-code"
                   spellCheck={false}
                 />
                 {state.preProcessDefinitions.trim() && (
                   <span className="api-object-name-hint">
-                    → Referenced as: [{extractFunctionNames(state.preProcessDefinitions).join(', ')}]
+                    → Referenced as: [
+                    {extractFunctionNames(state.preProcessDefinitions).join(
+                      ", ",
+                    )}
+                    ]
                   </span>
                 )}
               </div>
               <div className="api-object-field">
                 <label>
-                  Post-process function definition{' '}
+                  Post-process function definition{" "}
                   <FieldHelp text="Write a single full function definition. The return of this function is assigned to response." />
                 </label>
                 <textarea
                   value={state.postProcessDefinition}
-                  onChange={(e) => update('postProcessDefinition', e.target.value)}
-                  placeholder={'async function ubs_init_wrapper(req, decryptedPayload) {\n  // ...\n}'}
+                  onChange={(e) =>
+                    update("postProcessDefinition", e.target.value)
+                  }
+                  placeholder={
+                    "async function ubs_init_wrapper(req, decryptedPayload) {\n  // ...\n}"
+                  }
                   rows={4}
                   className="api-object-code"
                   spellCheck={false}
                 />
-                {state.postProcessDefinition.trim() && extractSingleFunctionName(state.postProcessDefinition) && (
-                  <span className="api-object-name-hint">
-                    → Referenced as: {extractSingleFunctionName(state.postProcessDefinition)}
-                  </span>
-                )}
+                {state.postProcessDefinition.trim() &&
+                  extractSingleFunctionName(state.postProcessDefinition) && (
+                    <span className="api-object-name-hint">
+                      → Referenced as:{" "}
+                      {extractSingleFunctionName(state.postProcessDefinition)}
+                    </span>
+                  )}
               </div>
               <div className="api-object-field">
                 <label>
-                  query{' '}
+                  query{" "}
                   <FieldHelp text="Optional query identifier (null for none)." />
                 </label>
                 <input
                   type="text"
                   value={state.query}
-                  onChange={(e) => update('query', e.target.value)}
+                  onChange={(e) => update("query", e.target.value)}
                   placeholder="null"
                 />
               </div>
@@ -488,12 +507,12 @@ function ApiObjectBuilderContent() {
               <h4 className="api-object-group-title">Parameters fields</h4>
               <div className="api-object-field">
                 <label>
-                  fields (JSON array){' '}
+                  fields (JSON array){" "}
                   <FieldHelp text="JSON array of field definitions. Each field: name, validations (array), required (bool), source (e.g. req.body)." />
                 </label>
                 <textarea
                   value={state.fieldsJson}
-                  onChange={(e) => update('fieldsJson', e.target.value)}
+                  onChange={(e) => update("fieldsJson", e.target.value)}
                   placeholder={FIELDS_JSON_EXAMPLE}
                   rows={6}
                   className="api-object-code"
@@ -503,7 +522,7 @@ function ApiObjectBuilderContent() {
           </div>
         )}
 
-        {activeTab === 'output' && (
+        {activeTab === "output" && (
           <div className="portal-card api-object-output-card">
             <div className="api-object-output-header">
               <span>Generated JS — copy and save as a .js file</span>
@@ -525,13 +544,10 @@ function ApiObjectBuilderContent() {
 
 export default function ApiObjectBuilderPage() {
   return (
-    <Layout
-      title="API Object Builder"
-      description="Create custom API objects with flags and pre/post process functions"
-    >
+    <>
       <main className="portal-main-wrapper">
         <ApiObjectBuilderContent />
       </main>
-    </Layout>
+    </>
   );
 }

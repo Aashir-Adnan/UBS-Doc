@@ -2,7 +2,7 @@ import { GoogleAuthProvider, getAuth, signInWithPopup } from "firebase/auth";
 import { useAuth } from "./authStore";
 import { initFirebase } from "./firebase";
 import { useState, useEffect } from "react";
-import { store } from "@site/src/state/store";
+import { store } from "../../state/store";
 import { API_BASE_URL } from "./config";
 
 async function persistSignIn({ uid, email, name, photoURL }) {
@@ -10,7 +10,12 @@ async function persistSignIn({ uid, email, name, photoURL }) {
     await fetch(`${API_BASE_URL}/api/portal/users/signin`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ google_uid: uid, email, name, photo_url: photoURL }),
+      body: JSON.stringify({
+        google_uid: uid,
+        email,
+        name,
+        photo_url: photoURL,
+      }),
     });
   } catch (_) {
     // Non-fatal — sign-in still succeeds even if DB upsert fails
@@ -22,10 +27,10 @@ const provider = new GoogleAuthProvider();
 export default function GoogleSignIn() {
   const { setUser } = useAuth();
   const [runtimeStatus, setRuntimeStatus] = useState(
-    () => store.getState().runtimeKeys.status
+    () => store.getState().runtimeKeys.status,
   );
   const [runtimeError, setRuntimeError] = useState(
-    () => store.getState().runtimeKeys.error
+    () => store.getState().runtimeKeys.error,
   );
 
   useEffect(() => {
@@ -69,7 +74,7 @@ export default function GoogleSignIn() {
       setLoading(false);
     }
   };
-  
+
   return (
     <div className="google-signin-wrap">
       <button

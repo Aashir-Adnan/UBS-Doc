@@ -1,0 +1,369 @@
+/* ============================================================
+   Local theme tokens
+   Light values match what this file already used (#555 / #2563eb),
+   so light mode is unchanged. --md-link is reused for the hover
+   color because it already resolves to the same #2563eb / #58A6FF
+   pair in markdown.css — no new inconsistent accent is introduced.
+   Everything else falls back to a hardcoded value if these globals
+   aren't present, so the file is safe to use standalone too.
+   ============================================================ */
+:root {
+  --docs-toc-text: #555;
+  --docs-border: #e5e7eb;
+  --docs-scrollbar-thumb: #d0d7de;
+}
+
+[data-theme="dark"] {
+  --docs-toc-text: #d1d5db;
+  --docs-border: #30363d;
+  --docs-scrollbar-thumb: #30363d;
+}
+
+/* ============================================================
+   Layout: Docs Sidebar | Content | Table of Contents
+   (App Sidebar lives outside this grid, in AppLayout.module.css)
+   ============================================================ */
+.docs-layout {
+  display: grid;
+
+  grid-template-columns: 300px minmax(0, 1fr) 250px;
+
+  gap: 40px;
+
+  max-width: 1600px;
+
+  margin: 0 auto;
+
+  padding: 24px 32px;
+
+  position: relative;
+}
+
+/* ── Documentation sidebar ─────────────────────────────────────────────── */
+.docs-sidebar {
+  position: sticky;
+  top: 90px;
+  align-self: start;
+
+  width: 100%;
+  height: calc(100vh - 110px);
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  padding-right: 8px;
+  scroll-behavior: smooth;
+
+  scrollbar-width: thin;
+  scrollbar-color: var(--docs-scrollbar-thumb, #d0d7de) transparent;
+}
+
+.docs-sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.docs-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.docs-sidebar::-webkit-scrollbar-thumb {
+  background-color: var(--docs-scrollbar-thumb, #d0d7de);
+  border-radius: 999px;
+}
+
+/* ── Main content ──────────────────────────────────────────────────────── */
+.docs-content {
+  min-width: 0; /* let wide children (tables, code) scroll internally
+                   instead of stretching the grid track */
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 8px;
+
+  overflow-x: auto;
+  scroll-behavior: smooth;
+}
+
+.docs-content pre {
+  overflow-x: auto;
+  max-width: 100%;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.docs-content code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Table of contents ─────────────────────────────────────────────────── */
+.docs-toc {
+  position: sticky;
+  top: 90px;
+  align-self: start;
+
+  width: 220px;
+  height: calc(100vh - 110px);
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  padding-left: 16px;
+  border-left: 1px solid var(--docs-border, #e5e7eb);
+  scroll-behavior: smooth;
+
+  scrollbar-width: thin;
+  scrollbar-color: var(--docs-scrollbar-thumb, #d0d7de) transparent;
+}
+
+.docs-toc::-webkit-scrollbar {
+  width: 6px;
+}
+
+.docs-toc::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.docs-toc::-webkit-scrollbar-thumb {
+  background-color: var(--docs-scrollbar-thumb, #d0d7de);
+  border-radius: 999px;
+}
+
+.docs-toc h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: var(--md-heading, #e6edf3);
+}
+
+.docs-toc a {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--docs-toc-text, #555);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.docs-toc a:hover {
+  color: var(--md-link, #2563eb);
+}
+
+/* ============================================================
+   Responsive behavior (mirrors Docusaurus' own breakpoints)
+   Desktop : App Sidebar | Docs Sidebar | Content | TOC
+   Tablet  : App Sidebar | Content              (docs sidebar + TOC hidden)
+   Mobile  : App Sidebar | Content, tighter spacing
+   ============================================================ */
+
+/* Right rail (TOC) is the first thing to go on narrower desktops/laptops */
+@media (max-width: 1200px) {
+  .docs-layout {
+    grid-template-columns: 300px minmax(0, 1fr);
+  }
+
+  .docs-toc {
+    display: none;
+  }
+}
+
+/* Tablet: collapse to a single content column */
+@media (max-width: 996px) {
+  .docs-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 24px;
+  }
+
+  .docs-sidebar {
+    display: none;
+  }
+
+  .docs-content {
+    max-width: 100%;
+    padding-top: 70px;
+  }
+}
+
+/* Mobile: tighten padding, keep everything full-width and stacked */
+@media (max-width: 640px) {
+  .docs-layout {
+    padding: 16px;
+  }
+
+  .docs-content {
+    padding: 0;
+  }
+}
+
+.docs-repository-switcher {
+  position: fixed;
+
+  top: 24px;
+
+  left: 235px;
+  width: 280px;
+  height: 25px;
+
+  z-index: 1000;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 10px;
+
+  padding: 12px 18px;
+
+  border-radius: 12px;
+
+  background: var(--repo-bg);
+
+  border: 1px solid var(--repo-border);
+
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.docs-repository-switcher select {
+  min-width: 200px;
+
+  padding: 8px 14px;
+
+  border-radius: 8px;
+
+  border: 1px solid var(--repo-border);
+
+  background: var(--repo-select-bg);
+
+  color: var(--repo-text);
+
+  cursor: pointer;
+}
+
+.docs-repository-switcher label {
+  font-weight: 600;
+  color: var(--repo-text);
+}
+
+/* ============================================================
+   Repository selection (empty) page
+   Intentionally decoupled from .docs-layout/.docs-content — this
+   screen has no sidebar/TOC, so reusing the 3-column grid left
+   awkward empty columns. It's a standalone centered page instead,
+   built with its own repo-select-* classes so nothing above (the
+   real docs page) had to be touched. Colors reuse the same
+   repo-* and md-* tokens already defined in markdown.css, so
+   light and dark mode "just work" without any new theme wiring.
+   ============================================================ */
+.repo-select-page {
+  min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* top padding clears the fixed app header; matches the offset the
+     real docs page already assumes (see .docs-sidebar/.docs-toc top) */
+  padding: 90px 1.5rem 3rem;
+}
+
+.repo-select-card {
+  width: 100%;
+  max-width: 460px;
+  box-sizing: border-box;
+
+  background: var(--repo-bg, #ffffff);
+  border: 1px solid var(--repo-border, #d1d5db);
+  border-radius: 16px;
+  padding: 2.75rem 2.25rem;
+
+  text-align: center;
+  box-shadow: 0 20px 45px rgba(16, 24, 40, 0.08);
+}
+
+.repo-select-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 1.25rem;
+  border-radius: 12px;
+
+  color: var(--md-link, #2563eb);
+  background: color-mix(in srgb, var(--md-link, #2563eb) 12%, transparent);
+}
+
+.repo-select-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.repo-select-title {
+  margin: 0 0 0.6rem;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--md-heading, #111827);
+}
+
+.repo-select-description {
+  margin: 0 0 2rem;
+  color: var(--md-secondary-text, #6b7280);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.repo-select-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: left;
+}
+
+.repo-select-field label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--repo-text, #111827);
+}
+
+.repo-select-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+
+  border: 1px solid var(--repo-border, #d1d5db);
+  background: var(--repo-select-bg, #ffffff);
+  color: var(--repo-text, #111827);
+
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.repo-select-input:hover {
+  border-color: var(--md-link, #2563eb);
+}
+
+.repo-select-input:focus-visible {
+  outline: none;
+  border-color: var(--md-link, #2563eb);
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--md-link, #2563eb) 15%, transparent);
+}
+
+/* Mobile: tighten the card so it never forces horizontal scrolling */
+@media (max-width: 480px) {
+  .repo-select-page {
+    padding: 80px 1rem 2.5rem;
+  }
+
+  .repo-select-card {
+    padding: 2rem 1.5rem;
+  }
+
+  .repo-select-title {
+    font-size: 1.4rem;
+  }
+}

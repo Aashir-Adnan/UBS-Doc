@@ -1,7 +1,18 @@
-import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { getAuth, onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
-import { initFirebase } from './firebase';
-import { store } from '@site/src/state/store';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signOut as firebaseSignOut,
+} from "firebase/auth";
+import { initFirebase } from "./firebase";
+import { store } from "../../state/store";
 
 const AuthContext = createContext(null);
 

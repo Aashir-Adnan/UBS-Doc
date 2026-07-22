@@ -1,18 +1,21 @@
-import React from 'react';
-import Layout from '@theme/Layout';
-import Link from '@docusaurus/Link';
-import { useAuth } from '@site/src/components/portal/authStore';
-import PortalSignIn from '@site/src/components/portal/PortalSignIn';
-import { usePortalAccess } from '@site/src/components/portal/usePortalAccess';
-import AccessRestricted from '@site/src/components/portal/AccessRestricted';
-import GithubWorkflow from '@site/src/components/portal/GithubWorkflow';
+import React from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "@site/src/components/portal/authStore";
+import PortalSignIn from "@site/src/components/portal/PortalSignIn";
+import { usePortalAccess } from "@site/src/components/portal/usePortalAccess";
+import AccessRestricted from "@site/src/components/portal/AccessRestricted";
+import GithubWorkflow from "@site/src/components/portal/GithubWorkflow";
 
 function GithubContent() {
   const { user, signOut, loading } = useAuth();
   const { allowed: canAccess, loading: accessLoading } = usePortalAccess();
 
   if (loading || accessLoading) {
-    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+    return (
+      <section className="portal-hero portal-hero-center">
+        <p>Loading...</p>
+      </section>
+    );
   }
 
   if (!user) {
@@ -20,9 +23,7 @@ function GithubContent() {
   }
 
   if (!canAccess) {
-    return (
-      <AccessRestricted email={user.email} onSignOut={signOut} />
-    );
+    return <AccessRestricted email={user.email} onSignOut={signOut} />;
   }
 
   return (
@@ -35,9 +36,13 @@ function GithubContent() {
         <div className="portal-hero-text">
           <h2>GitHub Development Workflow</h2>
           <p>
-            Browse repositories and dispatch agent tasks as GitHub issues. Signed in as{' '}
-            <strong>{user.name || user.email}</strong>.{' '}
-            <button type="button" className="portal-signout-link" onClick={signOut}>
+            Browse repositories and dispatch agent tasks as GitHub issues.
+            Signed in as <strong>{user.name || user.email}</strong>.{" "}
+            <button
+              type="button"
+              className="portal-signout-link"
+              onClick={signOut}
+            >
               Sign out
             </button>
           </p>
@@ -53,13 +58,10 @@ function GithubContent() {
 
 export default function GithubPage() {
   return (
-    <Layout
-      title="GitHub Development Workflow"
-      description="Browse repositories and create agent task issues"
-    >
+    <>
       <main className="portal-main-wrapper">
         <GithubContent />
       </main>
-    </Layout>
+    </>
   );
 }

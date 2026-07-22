@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import { fetchRuntimeClientKeys } from "@site/src/services/runtimeKeysClient";
+import { fetchRuntimeClientKeys } from "../services/runtimeKeysClient";
 
 export const loadRuntimeKeys = createAsyncThunk(
   "runtimeKeys/load",
@@ -9,7 +9,7 @@ export const loadRuntimeKeys = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error?.message || "Runtime key load failed");
     }
-  }
+  },
 );
 
 const runtimeKeysSlice = createSlice({

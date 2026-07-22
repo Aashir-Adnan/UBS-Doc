@@ -1,18 +1,22 @@
-import React from 'react';
-import Layout from '@theme/Layout';
-import Link from '@docusaurus/Link';
-import { useAuth } from '@site/src/components/portal/authStore';
-import PortalSignIn from '@site/src/components/portal/PortalSignIn';
-import { projects } from '@site/src/data/projectsConfig';
-import { usePortalAccess } from '@site/src/components/portal/usePortalAccess';
-import AccessRestricted from '@site/src/components/portal/AccessRestricted';
+import React from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "@site/src/components/portal/authStore";
+import PortalSignIn from "@site/src/components/portal/PortalSignIn";
+import { projects } from "@site/src/data/projectsConfig";
+import { usePortalAccess } from "@site/src/components/portal/usePortalAccess";
+import AccessRestricted from "@site/src/components/portal/AccessRestricted";
 
 function ProjectsContent() {
   const { user, signOut, loading } = useAuth();
-  const { allowed: canAccessPortal, loading: accessLoading } = usePortalAccess();
+  const { allowed: canAccessPortal, loading: accessLoading } =
+    usePortalAccess();
 
   if (loading || accessLoading) {
-    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+    return (
+      <section className="portal-hero portal-hero-center">
+        <p>Loading...</p>
+      </section>
+    );
   }
 
   if (!user) {
@@ -20,9 +24,7 @@ function ProjectsContent() {
   }
 
   if (!canAccessPortal) {
-    return (
-      <AccessRestricted email={user.email} onSignOut={signOut} />
-    );
+    return <AccessRestricted email={user.email} onSignOut={signOut} />;
   }
 
   return (
@@ -36,7 +38,7 @@ function ProjectsContent() {
           <h2>Projects</h2>
           <p>
             View documentation and custom dashboards for each project. Signed in
-            as <strong>{user.name || user.email}</strong>.{' '}
+            as <strong>{user.name || user.email}</strong>.{" "}
             <button
               type="button"
               className="portal-signout-link"
@@ -60,14 +62,16 @@ function ProjectsContent() {
               </div>
               <div className="project-card-hover-layer">
                 {project.description && (
-                  <p className="project-card-hover-desc">{project.description}</p>
+                  <p className="project-card-hover-desc">
+                    {project.description}
+                  </p>
                 )}
                 <div className="project-card-actions">
                   <Link
                     to={project.docPath}
                     className="button button--secondary button--sm"
                   >
-                    {project.docLabel || 'Documentation'}
+                    {project.docLabel || "Documentation"}
                   </Link>
                   {project.hasCustomView && (
                     <Link
@@ -89,13 +93,10 @@ function ProjectsContent() {
 
 export default function ProjectsPage() {
   return (
-    <Layout
-      title="Projects"
-      description="Project documentation and custom views"
-    >
+    <>
       <main className="portal-main-wrapper">
         <ProjectsContent />
       </main>
-    </Layout>
+    </>
   );
 }
