@@ -150,21 +150,124 @@ export function grantRepos(actionPerformerURDD, target_urdd_id, repo_ids) {
   return tPost("/repos/tenant/grant", body);
 }
 
-// §7.5 — provision/approve a pending portal user (admin authorized by email).
-// This endpoint intentionally does NOT take actionPerformerURDD.
+// §7.5 — provision/approve a pending portal user.
+// Send the acting URDD when we have one: without it the backend falls back to
+// portal_users.urdd_id — the actor's DEFAULT urdd, which for a multi-org user is
+// not the one the UI gated on. actor_email stays as the fallback identity for an
+// actor who has no urdd yet (bootstrap).
 export function provisionUser({
   actor_email,
   email,
   portal_user_id,
   tenant_id,
+  actionPerformerURDD,
 }) {
   const body = { actor_email, tenant_id };
+  if (actionPerformerURDD != null)
+    body.actionPerformerURDD = actionPerformerURDD;
+
   if (portal_user_id !== undefined && portal_user_id !== null) {
     body.portal_user_id = portal_user_id;
   } else {
     body.email = email;
   }
+
   return tPost("/portal/users/provision", body);
+}
+
+// ---- Portal user roles (admin) ----------------------------------------------
+
+// List portal users plus the roles that exist. This is the ONLY list the role
+// screen is driven from — its `id` is portal_users.id, a different id space from
+// the urdd_id returned by /tenants/members.
+// Response: { users: [{ id, email, name, photo_url, is_active, last_sign_in,
+//   created_at, role_id, role_name, urdd_id }], roles: [{ id, name }] }.
+// `urdd_id === null` means the user is pending (not provisioned).
+export function listPortalUsers() {
+  return tGet("/portal/users/list");
+}
+
+// Set a portal user's role. The server checks for admin and 403s otherwise —
+// note that check is defense-in-depth, not authentication: the actor identity
+// below is not verified against an access token.
+//   user_id             — the TARGET's portal_users.id (from listPortalUsers)
+//   role_id             — the new role id (from the `roles` array)
+//   actionPerformerURDD — the acting ADMIN's urdd_id (the actor, not the target)
+//   actor_email         — the acting admin's email; accepted in place of the URDD,
+//                         and the only identity a not-yet-provisioned admin has.
+// Response: { user: { id, email, name, role_name } }.
+export function setUserRole({
+  user_id,
+  role_id,
+  actionPerformerURDD,
+  actor_email,
+}) {
+  const body = { user_id, role_id };
+  if (actionPerformerURDD != null)
+    body.actionPerformerURDD = actionPerformerURDD;
+  if (actor_email) body.actor_email = actor_email;
+  return tPost("/portal/users/role", body);
+}
+
+// ---- Portal permissions (admin) ---------------------------------------------
+// Gated on the caller holding update_permissions. Each call carries the acting
+// URDD when available, with actor_email as the fallback for a caller that has no
+// urdd yet — sending only the email makes the backend authorize against the
+// actor's DEFAULT urdd instead of the one the UI is acting as. Transport-only:
+// the endpoints are unencrypted and need no access token, same as the other
+// portal calls — do NOT add platformCrypto or runtime-keys logic here.
+
+// All permissions + each role's default group.
+// Response: { permissions: [{permission_id, permission_name}],
+//   groups: [{role_id, role_name, permissions: [name...]}] }.
+export function permissionsCatalog(actor_email, actionPerformerURDD) {
+  const params = { actor_email };
+  if (actionPerformerURDD != null)
+    params.actionPerformerURDD = actionPerformerURDD;
+  return tGet("/portal/permissions/catalog", params);
+}
+
+// One user's effective permissions. `portal_user_id` is portal_users.id (NOT a
+// urdd_id). Response: { user, pending, permissions: [{permission_id,
+//   permission_name, source, status, from_role}] }. If pending is true the user
+// has no assignment yet.
+export function getUserPermissions(
+  actor_email,
+  portal_user_id,
+  actionPerformerURDD,
+) {
+  const params = { actor_email, portal_user_id };
+  if (actionPerformerURDD != null)
+    params.actionPerformerURDD = actionPerformerURDD;
+  return tGet("/portal/permissions/user", params);
+}
+
+// Grant (active:true) or revoke (active:false) one permission — written as a
+// source=manual override that survives later role changes.
+export function setUserPermission(
+  actor_email,
+  portal_user_id,
+  permission_name,
+  active,
+  actionPerformerURDD,
+) {
+  const body = { actor_email, portal_user_id, permission_name, active };
+  if (actionPerformerURDD != null)
+    body.actionPerformerURDD = actionPerformerURDD;
+  return tPost("/portal/permissions/set", body);
+}
+
+// Drop the manual override and fall back to the role default.
+export function resetUserPermission(
+  actor_email,
+  portal_user_id,
+  permission_name,
+  actionPerformerURDD,
+) {
+  const body = { actor_email, portal_user_id, permission_name };
+  if (actionPerformerURDD != null)
+    body.actionPerformerURDD = actionPerformerURDD;
+  return tPost("/portal/permissions/reset", body);
 }
 
 // ---- Organization management ------------------------------------------------

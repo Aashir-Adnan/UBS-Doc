@@ -1,18 +1,21 @@
 import React, { useState, useCallback } from "react";
-import { Link } from "react-router-dom";
-import { useAuth } from "../../components/portal/authStore";
-import GoogleSignIn from "../../components/portal/GoogleSignIn";
-import { isGranjurEmail } from "../../utils/isGranjurEmail";
-import MeetingList from "../../components/meetingWorkflow/MeetingList";
-import CreateMeeting from "../../components/meetingWorkflow/CreateMeeting";
-import WorkflowPanel from "../../components/meetingWorkflow/WorkflowPanel";
-import { useActingUrdd } from "../../components/portal/tenantProjects/useActingUrdd";
-import PendingAccess from "../../components/portal/tenantProjects/PendingAccess";
+import Layout from "@theme/Layout";
+import Link from "@docusaurus/Link";
+import { useAuth } from "@site/src/components/portal/authStore";
+import PortalSignIn from "@site/src/components/portal/PortalSignIn";
+import { usePortalAccess } from "@site/src/components/portal/usePortalAccess";
+import AccessRestricted from "@site/src/components/portal/AccessRestricted";
+import MeetingList from "@site/src/components/meetingWorkflow/MeetingList";
+import CreateMeeting from "@site/src/components/meetingWorkflow/CreateMeeting";
+import WorkflowPanel from "@site/src/components/meetingWorkflow/WorkflowPanel";
+import { useActingUrdd } from "@site/src/components/portal/tenantProjects/useActingUrdd";
+import { useActingPermissions } from "@site/src/components/portal/tenantProjects/useActingPermissions";
+import PendingAccess from "@site/src/components/portal/tenantProjects/PendingAccess";
 
 // Three views: 'list' | 'create' | 'meeting'
 function MeetingWorkflowContent() {
   const { user, signOut, loading } = useAuth();
-  const canAccess = !!user && isGranjurEmail(user?.email);
+  const { allowed: canAccess, loading: accessLoading } = usePortalAccess();
   // Tenant scoping: resolve the acting URDD once and thread it to the children.
   const {
     status: idStatus,
@@ -20,7 +23,12 @@ function MeetingWorkflowContent() {
     me,
     error: idError,
   } = useActingUrdd();
-  const [view, setView] = useState("list"); // 'list' | 'create' | 'meeting'
+
+  // UI gating mirrors server permissions
+  const { has, loaded: permsLoaded } = useActingPermissions();
+  const canCreate = !permsLoaded || has("add_meetings");
+
+  const [view, setView] = useState("list");
   const [selectedMeeting, setSelectedMeeting] = useState(null);
   const [listKey, setListKey] = useState(0);
 
@@ -38,7 +46,13 @@ function MeetingWorkflowContent() {
     setListKey((k) => k + 1);
   }, []);
 
-  if (loading) {
+  function handleFollowUpCreated(newMeeting) {
+    if (!newMeeting?.meeting_id) return;
+    setSelectedMeeting(newMeeting);
+    setView("meeting");
+  }
+
+  if (loading || accessLoading) {
     return (
       <section className="portal-hero portal-hero-center">
         <p>Loading...</p>
@@ -47,37 +61,11 @@ function MeetingWorkflowContent() {
   }
 
   if (!user) {
-    return (
-      <section className="portal-hero portal-hero-center">
-        <div className="portal-auth-card portal-auth-centered">
-          <h2 className="card-title">Sign in</h2>
-          <p className="card-subtitle">
-            Use your Google account to access Granjur Dev tools.
-          </p>
-          <GoogleSignIn />
-          <p className="card-helper">
-            Use your @granjur.com account for full access.
-          </p>
-        </div>
-      </section>
-    );
+    return <PortalSignIn />;
   }
 
   if (!canAccess) {
-    return (
-      <section className="portal-hero portal-hero-center">
-        <div className="portal-auth-card portal-auth-centered">
-          <h2 className="card-title">Access restricted</h2>
-          <p className="card-subtitle">
-            This portal is limited to @granjur.com accounts.
-          </p>
-          <p className="card-helper">
-            Signed in as <strong>{user.email}</strong>. Please sign out and use
-            your Granjur workspace account.
-          </p>
-        </div>
-      </section>
-    );
+    return <AccessRestricted email={user.email} onSignOut={signOut} />;
   }
 
   // Tenant gate: resolve identity before showing the (now tenant-scoped) tool.
@@ -145,6 +133,12 @@ function MeetingWorkflowContent() {
               type="button"
               className="mw-btn mw-btn--primary mw-btn--sm"
               onClick={() => setView("create")}
+              disabled={!canCreate}
+              title={
+                canCreate
+                  ? undefined
+                  : "You need the 'add_meetings' permission to create meetings."
+              }
             >
               + New Meeting
             </button>
@@ -161,6 +155,7 @@ function MeetingWorkflowContent() {
             onSelectMeeting={handleSelectMeeting}
             selectedId={selectedMeeting?.meeting_id}
             onCreateClick={() => setView("create")}
+            canCreate={canCreate}
           />
         )}
 
@@ -170,6 +165,7 @@ function MeetingWorkflowContent() {
             onCreated={handleCreated}
             onCancel={() => setView("list")}
             userEmail={user.email}
+            canCreate={canCreate}
           />
         )}
 
@@ -178,6 +174,7 @@ function MeetingWorkflowContent() {
             meeting={selectedMeeting}
             actingUrdd={actingUrdd}
             onStageComplete={handleStageComplete}
+            onFollowUpCreated={handleFollowUpCreated}
           />
         )}
       </section>

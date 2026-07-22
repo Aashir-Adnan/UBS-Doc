@@ -1,11 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { listTenants, provisionUser } from './tenantApi';
+import { useActingPermissions } from './useActingPermissions';
+import PermissionNotice from './PermissionNotice';
 
 // Admin → Provision / approve a portal user (§6 + §7.5). Gives a pending portal
-// user a tenant-scoped URDD. This endpoint authorizes by actor_email (the admin's
-// Google email), NOT actionPerformerURDD — so it works even before the admin
-// themselves has a URDD (bootstrap). Idempotent; re-homing is allowed.
+// user a tenant-scoped URDD. Idempotent; re-homing is allowed.
+//
+// Gated on update_portal_users, the permission the endpoint itself checks. The
+// acting URDD is sent when we have one, with actor_email as the fallback so an
+// admin who has no URDD yet can still bootstrap.
+const EDIT_USERS_PERM = 'update_portal_users';
+
 export default function ProvisionUser({ adminUrdd, actorEmail, onProvisioned }) {
+  const { has } = useActingPermissions();
+  const canEdit = has(EDIT_USERS_PERM);
   const [tenants, setTenants] = useState([]);
   const [targetEmail, setTargetEmail] = useState('');
   const [tenantId, setTenantId] = useState('');
@@ -28,6 +36,9 @@ export default function ProvisionUser({ adminUrdd, actorEmail, onProvisioned }) 
     e.preventDefault();
     setResult(null);
     setError(null);
+    // Belt and braces: a disabled submit button doesn't reliably stop implicit
+    // submission (Enter in a field) in every browser.
+    if (!canEdit) return;
     if (!actorEmail) {
       setError('Your admin email could not be resolved.');
       return;
@@ -40,6 +51,7 @@ export default function ProvisionUser({ adminUrdd, actorEmail, onProvisioned }) 
       setSubmitting(true);
       const res = await provisionUser({
         actor_email: actorEmail,
+        actionPerformerURDD: adminUrdd,
         email: targetEmail.trim(),
         tenant_id: Number(tenantId),
       });
@@ -54,15 +66,23 @@ export default function ProvisionUser({ adminUrdd, actorEmail, onProvisioned }) 
 
   return (
     <form className="tenant-form" onSubmit={handleSubmit}>
-      <p className="tenant-muted">
-        Provisioning as <strong>{actorEmail || '(unknown)'}</strong>.
-      </p>
+      {canEdit ? (
+        <p className="tenant-muted">
+          Provisioning as <strong>{actorEmail || '(unknown)'}</strong>.
+        </p>
+      ) : (
+        <PermissionNotice
+          permission="update_portal_users"
+          action="provisioning a user"
+        />
+      )}
 
       <label className="tenant-field">
         <span>Target user email</span>
         <input
           type="email"
           value={targetEmail}
+          disabled={!canEdit}
           onChange={(e) => setTargetEmail(e.target.value)}
           placeholder="dev@granjur.com"
         />
@@ -71,7 +91,11 @@ export default function ProvisionUser({ adminUrdd, actorEmail, onProvisioned }) 
       <label className="tenant-field">
         <span>Tenant</span>
         {tenants.length > 0 ? (
-          <select value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
+          <select
+            value={tenantId}
+            disabled={!canEdit}
+            onChange={(e) => setTenantId(e.target.value)}
+          >
             <option value="">Select a tenant…</option>
             {tenants.map((t) => (
               <option key={t.tenant_id} value={t.tenant_id}>
@@ -84,13 +108,14 @@ export default function ProvisionUser({ adminUrdd, actorEmail, onProvisioned }) 
           <input
             type="number"
             value={tenantId}
+            disabled={!canEdit}
             onChange={(e) => setTenantId(e.target.value)}
             placeholder="Tenant id (e.g. 5)"
           />
         )}
       </label>
 
-      <button type="submit" className="tenant-submit" disabled={submitting}>
+      <button type="submit" className="tenant-submit" disabled={submitting || !canEdit}>
         {submitting ? 'Provisioning…' : 'Provision user'}
       </button>
 

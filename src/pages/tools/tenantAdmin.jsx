@@ -1,14 +1,18 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { useAuth } from "../../components/portal/authStore";
-import GoogleSignIn from "../../components/portal/GoogleSignIn";
-import { isGranjurEmail } from "../../utils/isGranjurEmail";
-import { useActingUrdd } from "../../components/portal/tenantProjects/useActingUrdd";
-import AssignTenant from "../../components/portal/tenantProjects/AssignTenant";
-import GrantProjects from "../../components/portal/tenantProjects/GrantProjects";
-import GrantRepos from "../../components/portal/tenantProjects/GrantRepos";
-import ProvisionUser from "../../components/portal/tenantProjects/ProvisionUser";
-import OrganizationManager from "../../components/portal/tenantProjects/OrganizationManager";
+import Layout from "@theme/Layout";
+import Link from "@docusaurus/Link";
+import { useAuth } from "@site/src/components/portal/authStore";
+import PortalSignIn from "@site/src/components/portal/PortalSignIn";
+import { usePortalAccess } from "@site/src/components/portal/usePortalAccess";
+import AccessRestricted from "@site/src/components/portal/AccessRestricted";
+import { useActingUrdd } from "@site/src/components/portal/tenantProjects/useActingUrdd";
+import AssignTenant from "@site/src/components/portal/tenantProjects/AssignTenant";
+import GrantProjects from "@site/src/components/portal/tenantProjects/GrantProjects";
+import GrantRepos from "@site/src/components/portal/tenantProjects/GrantRepos";
+import ProvisionUser from "@site/src/components/portal/tenantProjects/ProvisionUser";
+import OrganizationManager from "@site/src/components/portal/tenantProjects/OrganizationManager";
+import RoleManager from "@site/src/components/portal/tenantProjects/RoleManager";
+import UserPermissions from "@site/src/components/portal/tenantProjects/UserPermissions";
 
 const TABS = [
   { key: "org", label: "Organization" },
@@ -16,46 +20,33 @@ const TABS = [
   { key: "assign", label: "Assign tenant" },
   { key: "grant", label: "Grant projects" },
   { key: "grantRepos", label: "Grant repos" },
+  { key: "roles", label: "Roles" },
+  { key: "permissions", label: "Permissions" },
 ];
 
 function TenantAdminContent() {
   const { user, signOut } = useAuth();
-  const canAccessPortal = !!user && isGranjurEmail(user?.email);
+  const { allowed: canAccessPortal, loading: accessLoading } =
+    usePortalAccess();
   const { urdd: adminUrdd, refetch } = useActingUrdd();
   const [tab, setTab] = useState("org");
 
-  if (!user) {
+  // Access now depends on a fetch, so there is a window where the answer is
+  // unknown. Render neither the console nor a rejection during it.
+  if (accessLoading) {
     return (
       <section className="portal-hero portal-hero-center">
-        <div className="portal-auth-card portal-auth-centered">
-          <h2 className="card-title">Sign in</h2>
-          <p className="card-subtitle">
-            Use your Google account to access Granjur Dev tools.
-          </p>
-          <GoogleSignIn />
-          <p className="card-helper">
-            Use your organization&apos;s @granjur.com account for full access.
-          </p>
-        </div>
+        <p>Loading...</p>
       </section>
     );
   }
 
+  if (!user) {
+    return <PortalSignIn />;
+  }
+
   if (!canAccessPortal) {
-    return (
-      <section className="portal-hero portal-hero-center">
-        <div className="portal-auth-card portal-auth-centered">
-          <h2 className="card-title">Access restricted</h2>
-          <p className="card-subtitle">
-            This portal is limited to @granjur.com accounts.
-          </p>
-          <p className="card-helper">
-            You are currently signed in as <strong>{user.email}</strong>. Please
-            sign out and use your Granjur workspace account.
-          </p>
-        </div>
-      </section>
-    );
+    return <AccessRestricted email={user.email} onSignOut={signOut} />;
   }
 
   return (
@@ -79,8 +70,9 @@ function TenantAdminContent() {
             </button>
           </p>
           <p className="tenant-muted">
-            These actions are admin-only and enforced on the server — non-admins
-            receive an error even though the screens are visible.
+            These actions are gated by permission, not by role, and enforced on
+            the server — without the right permission you receive an error even
+            though the screens are visible.
           </p>
         </div>
       </section>
@@ -111,8 +103,18 @@ function TenantAdminContent() {
             />
           )}
           {tab === "assign" && <AssignTenant adminUrdd={adminUrdd} />}
+
           {tab === "grant" && <GrantProjects adminUrdd={adminUrdd} />}
+
           {tab === "grantRepos" && <GrantRepos adminUrdd={adminUrdd} />}
+
+          {tab === "roles" && (
+            <RoleManager adminUrdd={adminUrdd} actorEmail={user.email} />
+          )}
+
+          {tab === "permissions" && (
+            <UserPermissions adminUrdd={adminUrdd} actorEmail={user.email} />
+          )}
         </div>
       </section>
     </>

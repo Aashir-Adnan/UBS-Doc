@@ -6161,6 +6161,45 @@ body.ubs-no-outlines .repo-row:hover {
   color: #90cdf4;
 }
 
+/* Follow-up affordances -------------------------------------------------- */
+.mw-chip--followup {
+  background: #ede9fe;
+  color: #5b21b6;
+  border: 1px solid #ddd6fe;
+}
+[data-theme="dark"] .mw-chip--followup {
+  background: rgba(139, 92, 246, 0.18);
+  color: #c4b5fd;
+  border-color: rgba(139, 92, 246, 0.35);
+}
+.mw-followup-cta {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--ifm-color-emphasis-300);
+}
+.mw-followup-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  color: var(--ifm-color-emphasis-700);
+}
+.mw-followup-link {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--ifm-color-primary);
+  text-align: left;
+}
+.mw-followup-link:hover {
+  text-decoration: underline;
+}
+.mw-followup-count {
+  font-size: 0.8rem;
+  color: var(--ifm-color-emphasis-700);
+  margin-left: 0.5rem;
+}
+
 /* Task status badges */
 .mw-status-badge {
   display: inline-block;
@@ -6367,6 +6406,16 @@ body.ubs-no-outlines .repo-row:hover {
   border-color: #4a90e2;
   background: #ebf4ff;
   outline: none;
+}
+/* Permission-gated: no update_meetings → uploads blocked (server enforces via 403) */
+.mw-dropzone--disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.mw-dropzone--disabled:hover,
+.mw-dropzone--disabled:focus {
+  border-color: #cbd5e0;
+  background: transparent;
 }
 
 .mw-context-file-list {
@@ -6775,9 +6824,21 @@ body.ubs-no-outlines .repo-row:hover {
 .mw-editable-cell:hover {
   border-bottom-color: var(--ifm-color-primary, #2563eb);
 }
+
+/* Permission-gated: no update_meetings → cell is read-only (server enforces via 403) */
+.mw-editable-cell--readonly {
+  cursor: not-allowed;
+  border-bottom-style: none;
+}
+
+.mw-editable-cell--readonly:hover {
+  border-bottom-color: transparent;
+}
+
 .mw-editable-placeholder {
   color: var(--ifm-color-emphasis-400, #adb5bd);
 }
+
 .mw-inline-input {
   border: 1px solid var(--ifm-color-primary, #2563eb);
   border-radius: 4px;
@@ -8094,4 +8155,130 @@ body.ubs-no-outlines .repo-row:hover {
 .tenant-perm-scope {
   opacity: 0.6;
   font-size: 0.65rem;
+}
+
+/* ========== User Permissions ========== */
+
+.up-role-defaults {
+  margin-bottom: 0.5rem;
+}
+
+.up-manual-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.up-manual-row input {
+  flex: 1;
+  border-radius: 0.5rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: var(--ifm-background-surface-color);
+  padding: 0.55rem 0.8rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.up-manual-row input:focus {
+  outline: none;
+  border-color: var(--ifm-color-primary);
+}
+
+.up-manual-row .tenant-submit {
+  margin: 0;
+}
+
+.up-perm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.up-perm-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 0.5rem;
+  background: var(--brand-primary-alpha-05);
+}
+
+.up-perm-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.up-perm-toggle input {
+  flex-shrink: 0;
+}
+
+.up-perm-name {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.up-perm-tags {
+  flex-shrink: 0;
+}
+
+.up-tag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 99px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.up-tag-role {
+  background: var(--brand-primary-alpha-14);
+  color: var(--ifm-color-primary);
+}
+
+.up-tag-granted {
+  background: rgba(46, 160, 67, 0.15);
+  color: var(--ifm-color-success);
+}
+
+.up-tag-revoked {
+  background: rgba(218, 54, 51, 0.15);
+  color: var(--ifm-color-danger);
+}
+
+.up-tag-none {
+  background: var(--ifm-color-emphasis-200);
+  color: var(--ifm-color-emphasis-600);
+}
+
+.up-reset-btn {
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: var(--ifm-background-surface-color);
+  color: var(--ifm-color-emphasis-700);
+  padding: 0.25rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.up-reset-btn:hover:not(:disabled) {
+  border-color: var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+}
+
+.up-reset-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }

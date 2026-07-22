@@ -8,9 +8,11 @@ Add one or more standalone services (addons) to an existing **upcoming or future
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| **POST** | `/api/guest/bookings/{bookingId}/services` | Add service addons |
-| **DELETE** | `/api/guest/bookings/{bookingId}/services` | Remove a service addon |
-| **PUT** | `/api/guest/bookings/{bookingId}/services/{serviceId}` | Reschedule addon slots |
+| **POST** | `/api/guest/bookings/services` | Add service addons |
+| **DELETE** | `/api/guest/bookings/services` | Remove a service addon |
+| **PUT** | `/api/guest/bookings/services` | Reschedule addon slots |
+
+All IDs (`booking_id`, `serviceId`) are passed in the **request body**, not the URL path.
 
 All endpoints use **AUTH_PLATFORM** (require a valid guest JWT).
 
@@ -28,7 +30,7 @@ Requires a valid guest JWT (`accessToken`). The guest's identity is resolved via
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `booking_id` | `number` | Yes | The existing booking to add services to (path parameter, mapped to body). |
+| `booking_id` | `number` | Yes | The existing booking to add services to. |
 | `addons` | `array` | Yes | Non-empty array of service addons to add. |
 | `addons[].serviceId` | `number` | Yes | The service to add. Must not be a stay-category service. |
 | `addons[].quantity` | `number` | No | Number of slots (default: 1). Capped by `max_quantity_per_booking` config. |
@@ -92,7 +94,7 @@ Requires a valid guest JWT (`accessToken`). The guest's identity is resolved via
 }
 ```
 
-The addon is created with `schedulingStatus: "unscheduled"`. The guest can schedule later via `PUT /guest/bookings/{id}/services/{serviceId}`.
+The addon is created with `schedulingStatus: "unscheduled"`. The guest can schedule later via `PUT /guest/bookings/services` with `booking_id` and `serviceId` in the body.
 
 ---
 
@@ -151,18 +153,18 @@ Returns the full v2 booking bundle with the updated services list, plus a `downP
 Every service addition (standalone or addon) requires a **20% down payment**. This applies to:
 
 - **New standalone bookings** (`POST /guest/bookings/service`) — 20% of the booking total.
-- **Addons to existing bookings** (`POST /guest/bookings/{id}/services`) — 20% of the added services total.
+- **Addons to existing bookings** (`POST /guest/bookings/services`) — 20% of the added services total.
 
 ### Sequence Diagram
 
 ```
 Guest App                        Backend                          Moyasar
    |                                |                                |
-   |-- POST /bookings/{id}/services -->                              |
-   |                                |  (insert booking_services,     |
+   |-- POST /bookings/services ------>                              |
+   |   { booking_id, addons }       |  (insert booking_services,     |
    |                                |   recompute total,             |
    |                                |   return downPayment info)     |
-   |<-- 200 { booking, downPayment } --                              |
+   |<-- 200  booking + downPayment --                                |
    |                                |                                |
    |  [Show payment screen with     |                                |
    |   downPayment.amount]          |                                |
@@ -192,10 +194,10 @@ Guest App                        Backend                          Moyasar
 
 ### Frontend Implementation Steps
 
-1. **Call the add-services API** — `POST /guest/bookings/{id}/services` with the desired addons.
+1. **Call the add-services API** — `POST /guest/bookings/services` with `booking_id` and addons in the body.
 2. **Check `downPayment.required`** in the response.
 3. **If required**, show a payment prompt to the guest:
-   - Display: "A down payment of **{downPayment.amount} {downPayment.currency}** (20%) is required for the added services."
+   - Display: "A down payment of **[downPayment.amount] [downPayment.currency]** (20%) is required for the added services."
    - Pre-fill the payment amount with `downPayment.amount`.
 4. **Initiate payment** — `POST /guest/payments/initiate`:
    ```json
@@ -245,24 +247,56 @@ The booking confirmation email is sent **after the first successful down payment
 | Stay-category services cannot be added as addons | `422 Stay services cannot be added as addons` |
 | Quantity must not exceed `max_quantity_per_booking` | `400 Maximum N booking(s) allowed for service "..."` |
 | `addons` must be a non-empty array | `400 addons must be a non-empty array` |
-| `booking_id` is required | `400 booking id is required (path param)` |
+| `booking_id` is required | `400 booking id is required` |
 | `tenant_id` is required | `400 tenant_id is required` |
 
 ---
 
 ## Remove Service — DELETE
 
-Removes a previously added service addon from a booking.
+Removes a previously added service addon from a booking. Supports three modes:
 
-### Request
+### Mode 1: Remove all instances of a service
+
+Removes every slot and the entire `booking_services` row for the given `serviceId`.
 
 ```json
 {
   "actionPerformerURDD": 16,
   "booking_id": 9060,
-  "booking_service_id": 145
+  "serviceId": 228
 }
 ```
+
+### Mode 2: Remove a specific scheduled slot
+
+Pass `slot_id` to remove one specific time slot. The `booking_services` quantity and total are decremented by one. If it was the last active slot, the entire service is removed.
+
+```json
+{
+  "actionPerformerURDD": 16,
+  "booking_id": 9060,
+  "serviceId": 228,
+  "slot_id": 1012
+}
+```
+
+The `slot_id` is returned in the booking response under `services[].sessions[].id` (or `meals[].id` / `transport.id`).
+
+**Example:** A guest booked 3 barber sessions (9:00, 10:00, 11:00). To remove only the 10:00 session, send the `slot_id` of that session. The other two remain active and the quantity drops from 3 to 2.
+
+### Response
+
+```json
+{
+  "booking_id": 9060,
+  "removed": 1,
+  "removedSlotId": 1012,
+  "remainingSlots": 2
+}
+```
+
+When `slot_id` is omitted, `removedSlotId` and `remainingSlots` are not included and `removed` reflects the number of `booking_services` rows deactivated.
 
 The booking total is recomputed after removal.
 
@@ -301,5 +335,6 @@ In practice, eligible categories include: spa, dining, room-service, barber, gym
 
 | Date | Change |
 |---|---|
+| 2026-07-20 | Added `slot_id` parameter to DELETE endpoint for targeted slot removal. A guest can now remove a specific scheduled session (e.g., the 10:00 barber slot) without affecting other slots of the same service. |
 | 2026-07-13 | Added 20% down payment requirement for added services. Response now includes `downPayment` object. Booking confirmation email moved to after first successful payment. |
 | 2026-06-14 | Initial documentation for add/remove/reschedule service addons on existing bookings. |

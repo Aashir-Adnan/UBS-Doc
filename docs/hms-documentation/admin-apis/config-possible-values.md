@@ -94,6 +94,7 @@ Writes return the query-resolver metadata (insert/update result). List/View retu
 | `is_default` | `boolean` | `true` when `config_value_num === 1`. |
 | `can_add_more_to_config` | `boolean` | `true` if the parent key's `value_type` permits adding more values. |
 | `can_delete` | `boolean` | `true` only if the parent config has more than one active value (else deletion is blocked). |
+| `hmsConfigPossibleValues_isKeyWide` | `0` \| `1` \| `2` | SHARED marker (§A.4): `0` explicit · `1` Case A (`'*'` → every category **and** packages) · `2` Case B (`service_categories`+`'*'` → every service category). FE shows the apply-to-this-vs-keep-shared dialog on edit/delete when `> 0`. |
 | `table_count` | `number` | Total row count (List only, for pagination — `pageSize: 50`). |
 
 `View` returns a single decorated row (same shape, without `table_count`).
@@ -110,9 +111,9 @@ Writes return the query-resolver metadata (insert/update result). List/View retu
 
 **Delete is a soft-delete** (`status = 'inactive'`) and is **blocked when the parent config has only one active value** — every config must keep at least one row for the form generator to bind to. Attempting it throws `MIN_POSSIBLE_VALUES`. Deleting an already-inactive row is a no-op.
 
-**Value normalization.** `config_possible_value` is always stored as JSON-valid text via the shared `toEmbeddedConfigValue` normalizer (multilingual → `{ "en": …, "ar": … }`, scalar → JSON-encoded), so reads parse cleanly.
+**Value normalization (§8.2 split).** `config_possible_value` is written through `splitConfigValueForWrite`: a **simple** `{ en, ar }` label stores the **bare `en`** and mirrors `ar` to `translated_entries` (`applyArTranslation`); a **structured** value (carrying `key`/`label`/`group`) is stored as the **whole object** (+ an object `translated_entries` copy). Reads reconstruct the `{ en, ar, … }` object via `localizedConfigValueSql`, so consumers still receive a real object. *(Historically all values were embedded whole via `toEmbeddedConfigValue`; that path is superseded by the split.)*
 
-**Read decoration.** List/View post-processes parse the stored JSON and add `is_default`, `can_add_more_to_config`, and `can_delete` flags so the frontend needs no extra queries.
+**Read decoration.** List/View post-processes reconstruct the value (`localizedConfigValueSql` in-query, `safeParse` fallback for legacy rows) and add `is_default`, `can_add_more_to_config`, and `can_delete` flags so the frontend needs no extra queries.
 
 **Tenant isolation.** Update / Delete run `makeTenantOwnershipPreProcess` so a tenant cannot mutate another tenant's rows (resolved via the row's `created_by` URDD → tenant chain).
 
@@ -126,4 +127,4 @@ Writes return the query-resolver metadata (insert/update result). List/View retu
 | `Src/Apis/ProjectSpecificApis/CustomConfigPossibleValues/CRUD_parameters.js` | Request field schema + `colMapper` |
 | `Src/HelperFunctions/PreProcessingFunctions/configKeyManagementPermission.js` | `requireAnyConfigKeyPermission` — RBAC gate for writes |
 | `Src/HelperFunctions/PreProcessingFunctions/tenantOwnership.js` | `makeTenantOwnershipPreProcess` — cross-tenant write guard |
-| `Src/HelperFunctions/PayloadFunctions/Governance/normalizeConfigValue.js` | `toEmbeddedConfigValue` — JSON-valid value normalization |
+| `Src/HelperFunctions/PayloadFunctions/Governance/configValueLocalization.js` | `splitConfigValueForWrite` / `applyArTranslation` / `localizedConfigValueSql` — §8.2 value split, `ar`→`translated_entries`, read reconstruction |

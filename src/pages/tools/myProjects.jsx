@@ -1,26 +1,35 @@
 import React from "react";
-import { Link } from "react-router-dom";
-import { useAuth } from "../../components/portal/authStore";
-import GoogleSignIn from "../../components/portal/GoogleSignIn";
-import MyProjects from "../../components/portal/tenantProjects/MyProjects";
-import { useActingUrdd } from "../../components/portal/tenantProjects/useActingUrdd";
+import Link from "@docusaurus/Link";
+import { useAuth } from "@site/src/components/portal/authStore";
+import PortalSignIn from "@site/src/components/portal/PortalSignIn";
+import { usePortalAccess } from "@site/src/components/portal/usePortalAccess";
+import AccessRestricted from "@site/src/components/portal/AccessRestricted";
+import MyProjects from "@site/src/components/portal/tenantProjects/MyProjects";
+import { useActingUrdd } from "@site/src/components/portal/tenantProjects/useActingUrdd";
 
 function MyProjectsContent() {
   const { user, signOut } = useAuth();
+  const { allowed: canAccessPortal, loading: accessLoading } =
+    usePortalAccess();
   const { activeOrg } = useActingUrdd();
 
-  if (!user) {
+  // This page never had the portal gate — it checked only that someone was
+  // signed in, which any Google account satisfies. The listing itself is
+  // tenant-scoped server-side, but the shell should not render either.
+  if (accessLoading) {
     return (
       <section className="portal-hero portal-hero-center">
-        <div className="portal-auth-card portal-auth-centered">
-          <h2 className="card-title">Sign in</h2>
-          <p className="card-subtitle">
-            Use your Google account to access your projects.
-          </p>
-          <GoogleSignIn />
-        </div>
+        <p>Loading...</p>
       </section>
     );
+  }
+
+  if (!user) {
+    return <PortalSignIn />;
+  }
+
+  if (!canAccessPortal) {
+    return <AccessRestricted email={user.email} onSignOut={signOut} />;
   }
 
   const orgLabel = activeOrg?.display_name || activeOrg?.org_name || "Personal";
