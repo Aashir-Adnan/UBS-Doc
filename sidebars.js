@@ -166,6 +166,20 @@ const sidebars = {
                 'hms-documentation/major-implementations/centralized-booking-pricing/centralized-booking-pricing',
               ],
             },
+            {
+              type: 'category',
+              label: 'Permission Manager',
+              items: [
+                'hms-documentation/major-implementations/permission-manager/permission-manager',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Seniority Scope',
+              items: [
+                'hms-documentation/major-implementations/seniority-scope/seniority-scope',
+              ],
+            },
           ],
         },
         {
@@ -451,6 +465,8 @@ const sidebars = {
                 'hms-documentation/tenant-governance/config-keys/config-keys-catalog/config-keys-catalog',
               ],
             },
+            'hms-documentation/tenant-governance/tenant-configs/tenant-configs',
+            'hms-documentation/tenant-governance/config-constraints/config-constraints',
             'hms-documentation/tenant-governance/permission-groups-permissions/permission-groups-permissions',
             'hms-documentation/tenant-governance/permission-descriptions/permission-descriptions',
             'hms-documentation/tenant-governance/original-to-clone-propagation/original-to-clone-propagation',
@@ -523,6 +539,14 @@ const sidebars = {
                 'hms-documentation/admin-apis/permissions-dropdown',
                 'hms-documentation/admin-apis/user-role-permission-array',
                 'hms-documentation/admin-apis/urdd-dropdown',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Validation',
+              items: [
+                'hms-documentation/admin-apis/validation-email',
+                'hms-documentation/admin-apis/validation-duplicate',
               ],
             },
           ],

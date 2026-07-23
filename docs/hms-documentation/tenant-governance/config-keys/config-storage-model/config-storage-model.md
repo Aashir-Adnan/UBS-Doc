@@ -132,11 +132,20 @@ In short: options + their translations travel together through the governance la
 
 Applied values on services/packages live in `hms_config` (`base_table='services'|'packages'`), written by the **CustomServices / CustomPackages** APIs (not the config-key admin API). The storage rule is **one scalar per row** — a selection of several values becomes several rows, never a JSON array — with the exact shape decided by the value's `is_input` flag and `value_type`:
 
+> **Tenant-scoped keys.** Four keys — `tax_profile`, `payment_timing`, `deposit_amount`, `pricing_rules` — were repointed to `target_table='tenants'` (`20260720_2`). Their applied value belongs to the **hotel/tenant** (`base_table='tenants'`, `record_id=<tenant_id>`) and is written via the [Tenant Configs](../../tenant-configs/tenant-configs.md) API, not CustomServices/CustomPackages. The same `is_input` storage rules below still apply (e.g. `tax_profile`/`pricing_rules` are `is_input=1` wrapped).
+
 | Kind | `is_input` | Stored shape |
 |---|---|---|
-| **Reference set** — a selection of option ids (`is_input=0`: dropdowns, checkboxes, keyword chips, `deliver_unit`, `base_currency`, …) | 0 | **exploded** — one bare id per row. Empty selection → a single `'[]'` row (never NULL — the read `JSON.parse`s it). |
+| **Reference set** — a selection of option ids (`is_input=0`: dropdowns, checkboxes, keyword chips, `deliver_unit`, `base_currency`, …) | 0 | **exploded** — one bare id per row. **Empty selection → NO row is stored** (clear-retires): the write retires the record's existing active rows for that key and stores nothing — never NULL, never an `'[]'` sentinel. (Legacy `'[]'` rows are still tolerated by readers as an empty selection.) |
 | **Single scalar** — `number` / `decimal` / `datetime` / `date` / `time` / `mm:dd:hh` / `number_spinner` / `*_api_dropdown` | 1 | the FE's one-element wrapper **collapses to a bare scalar** (`[7]` → `7`); one row. |
 | **Free text** — `text` / `text_area` / `email` / `tel` | 1 | bare `en`; `ar` mirrored to `translated_entries`; one row. |
 | **Wrapped** — `attachment`/media, `*_api_form` (`tax_profile`, `pricing_rules`), object-valued forms (`blackout_dates`, `allowed_regions`) | 1 | stays a **single wrapped array/object row** — `is_input=1` is a one-row read contract, so these are NOT exploded or unwrapped (e.g. media `[149,150]` → one `"[149,150]"` row). |
 
 Readers re-aggregate the exploded `is_input=0` rows per `(record_id, config_key_id)` back into a value array and resolve each id to its option value via the reader contract in §2; `is_input=1` reads the single representative row. This is the write-side counterpart to the option-storage model above — see the `normalizeConfigValue` / `splitConfigValueToRows` helpers in the CustomServices/CustomPackages writers.
+
+**Clear / delete = retire the whole set (no empty rows).** Two paths both leave the key with **no active row**:
+
+- **Update / create with an empty value** (`null`, `[]`, `""`, `{}`, or a blank `{en,ar}` bag → `isEmptyValue`): the writer **retires** the record's existing active rows for that key and stores **nothing** — no NULL, no `'[]'`. So an emptied config simply disappears from the active set instead of parking a placeholder row.
+- **Delete** (the FE sends one `hms_config.id`): the **whole `(record, config_key)` active row-set** it belongs to is soft-deleted — a single applied selection can span several exploded rows, and all of them go inactive.
+
+This mirrors the [Tenant Configs](../../tenant-configs/tenant-configs.md) clear-retires contract; `is_input=1` values are never JSON-wrapped and are cleared the same way.

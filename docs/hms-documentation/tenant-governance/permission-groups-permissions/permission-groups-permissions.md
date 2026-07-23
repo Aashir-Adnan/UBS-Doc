@@ -17,6 +17,8 @@ This document lists **every permission assigned to each governance permission gr
 
 > **Update 2026-07-09 (admin_code → bookings + service/booking-manager personas):** migration `20260709_4` grants the 10 **`*_admin_code`** perms (add/delete/export/filter/import/list/search/sort/update/view) to the **BOOKINGS functional group `PG-FN-BOOKINGS`** (40 → **50**) and to the persona groups **`PG-SERVICE-MGR`** (150 → **160**) and **`PG-BOOKING-MGR`** (36 → **46**) — global originals **and** every per-tenant clone (clone-aware). It also **backfills `PG-TENANT-ADMIN`**: the global already carried all 10, but ~half its per-tenant clones (27/55) were cloned before an earlier non-clone-aware grant and were missing them — now every clone carries the full 10. URDP materialization uses **two paths** because a functional group and a persona group reach holders differently: `PG-FN-BOOKINGS` fans out via its `rddp` link (Model B), whereas the persona groups materialize URDP **directly** (`syncUrddPermissions`, no reliable `rddp` link) — so their already-created holders are matched by each group's exclusive **signature perm** (`tenant_admin_dashboard` / `service_manager_dashboard` / `booking_manager_dashboard`). This refilled **81 existing persona URDDs** (Tenant-Admin + Service-Manager + Booking-Manager, incl. 8 Service-Manager legs the `rddp` path would have missed) so `permissionChecker` honours the grant for current users, not only new assignees.
 
+> **Update 2026-07-21 (`api_logs` + `hms_tenants_config` permission families):** three migrations add two new resources and grant them along strict tier lines. **(1) `api_logs` (FRAMEWORK tier, 5 perms).** `20260713_2` **Step 6** creates `list_api_logs` / `view_api_logs` / `delete_api_logs` / `export_api_logs` and grants them to **`PG-FRAMEWORK` only**; `20260720_3_add_api_logs_perms_to_pg_fn_logs` then creates the missing **`search_api_logs`** and grants the full five to **`PG-FRAMEWORK` (+1 net) AND the LOGS functional group `PG-FN-LOGS` (+5)** — mirroring the sibling `audit_logs` family, which both groups already hold. Neither group is cloned per tenant, so there are no clones to cover. These back the API Logs CRUD, which is gated on them. **(2) `hms_tenants_config` (TENANT tier, 4 perms).** `20260721_2_add_hms_tenants_config_perms_to_tenant_admin` creates `list_` / `view_` / `add_` / `delete_hms_tenants_config` and grants them to **`PG-TENANT-ADMIN` ONLY** — the global original **and every per-tenant clone** (clone-aware; dev: 1 global + 26 clones = 27 groups x 4 = 108 memberships). No other persona or functional group holds them. Note the deliberate tier split: the pre-existing `*_hms_config` family stays **`framework`** (the SaaS-Admin's platform-wide config catalogue), while `*_hms_tenants_config` is **`tenant`** — the hotel-facing counterpart a Tenant Admin owns. URDP materialization for `PG-TENANT-ADMIN` runs through **both** paths, since neither alone reaches every Tenant-Admin URDD: the `rddp` link (Model B) **and** the persona-direct path matched by the exclusive signature perm **`tenant_admin_dashboard`**; `PG-FN-LOGS` uses the `rddp` path, `PG-FRAMEWORK` the signature perm `saas_admin_dashboard`. All inserts are `NOT EXISTS`-guarded, so a holder reachable both ways is inserted once. Each migration also pre-seeds the Arabic `permission_description`.
+>
 > **Current governance totals (regenerated 2026-06-30 from `hms_db_10.0`, + `20260709_4`):** `PG-FRAMEWORK` 279, `PG-TENANT-MGMT` 512, `PG-TENANT-ADMIN` 518, `PG-SERVICE-MGR` **160**, `PG-STANDARD-GUEST` 0, `PG-BOOKING-MGR` **46**. Counts are active `permission_groups_permissions` rows with an active `permissions` row. The `import_*` family now mirrors `add_*` (create) — see the 2026-06-29 note above. Persona codes are the re-modelled `SYSTEM`/`TENANT`/`STANDARD` (role-disambiguated).
 
 ## 1. Permission groups overview
@@ -57,9 +59,9 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 ### Group 9 — `PG-FRAMEWORK`
 
 - **Status:** `active`
-- **Total active permissions:** 279
+- **Total active permissions:** 284
 
-**By tier:** framework: 206, tenant: 72, common: 1
+**By tier:** framework: 211, tenant: 72, common: 1 *(framework +5: the `api_logs` family — `20260713_2` Step 6 + `20260720_3`)*
 
 <details>
 <summary><b>framework</b> (206)</summary>
@@ -85,6 +87,7 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `add_templates`
 - `add_translated_entries`
 - `add_versions`
+- `delete_api_logs`
 - `delete_audit_logs`
 - `delete_crash_log`
 - `delete_currencies`
@@ -106,6 +109,7 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `delete_templates`
 - `delete_translated_entries`
 - `delete_versions`
+- `export_api_logs`
 - `export_audit_logs`
 - `export_crash_log`
 - `export_currencies`
@@ -167,6 +171,7 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `import_templates`
 - `import_translated_entries`
 - `import_versions`
+- `list_api_logs`
 - `list_audit_logs`
 - `list_crash_log`
 - `list_currencies`
@@ -188,6 +193,7 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `list_templates`
 - `list_translated_entries`
 - `list_versions`
+- `search_api_logs`
 - `search_audit_logs`
 - `search_crash_log`
 - `search_currencies`
@@ -249,6 +255,7 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `update_templates`
 - `update_translated_entries`
 - `update_versions`
+- `view_api_logs`
 - `view_audit_logs`
 - `view_crash_log`
 - `view_currencies`
@@ -910,9 +917,9 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 ### Group 11 — `PG-TENANT-ADMIN`
 
 - **Status:** `active`
-- **Total active permissions:** 518
+- **Total active permissions:** 522
 
-**By tier:** framework: 2, tenant: 370, service: 140, common: 6
+**By tier:** framework: 2, tenant: 374, service: 140, common: 6 *(tenant +4: the `hms_tenants_config` family added by `20260721_2`)*
 
 <details>
 <summary><b>framework</b> (2)</summary>
@@ -937,6 +944,7 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `add_device_otp`
 - `add_dynamic_attachments`
 - `add_guest_profiles`
+- `add_hms_tenants_config`
 - `add_memberships`
 - `add_messages`
 - `add_notifications`
@@ -973,6 +981,7 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `delete_device_otp`
 - `delete_dynamic_attachments`
 - `delete_guest_profiles`
+- `delete_hms_tenants_config`
 - `delete_memberships`
 - `delete_messages`
 - `delete_notifications`
@@ -1120,6 +1129,7 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `list_device_otp`
 - `list_dynamic_attachments`
 - `list_guest_profiles`
+- `list_hms_tenants_config`
 - `list_memberships`
 - `list_messages`
 - `list_notifications`
@@ -1269,6 +1279,7 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 - `view_device_otp`
 - `view_dynamic_attachments`
 - `view_guest_profiles`
+- `view_hms_tenants_config`
 - `view_memberships`
 - `view_messages`
 - `view_notifications`
