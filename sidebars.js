@@ -166,6 +166,13 @@ const sidebars = {
                 'hms-documentation/major-implementations/centralized-booking-pricing/centralized-booking-pricing',
               ],
             },
+            {
+              type: 'category',
+              label: 'Stage Unit Reservation',
+              items: [
+                'hms-documentation/major-implementations/stage-unit-reservation/stage-unit-reservation',
+              ],
+            },
           ],
         },
         {

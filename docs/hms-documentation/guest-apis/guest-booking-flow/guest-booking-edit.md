@@ -248,16 +248,34 @@ A `booking_modified` push notification and email are sent on every successful ed
 
 1. All existing `booking_items` (unit assignments) are cancelled (`item_status = 'cancelled'`, `status = 'inactive'`).
 2. Stay duration configs are re-validated (min/max stay, advance booking window, blackout dates).
-3. Room count is auto-inferred from party size vs `max_persons_per_booking` config.
+3. Room count is derived from the party size vs the **delivery unit capacity** (`delivery_units.capacity`): `roomCount = ceil(totalPersons / unitCapacity)`.
 4. New units are picked via `pickAvailableUnitForService` / `pickMultipleAvailableUnits`.
 5. New `booking_items` rows are inserted with the updated dates.
-6. The stay `booking_services` row is repriced: `nightlyPrice × nights × roomCount`.
+6. The stay `booking_services` row is repriced: `nightlyPrice * nights * roomCount`.
 
 ### Party Size Change Flow (Without Date Change)
 
-1. Per-room occupancy is validated against `max_persons_per_booking` and existing room count.
-2. If the party fits, `booking_items.guests` is updated to the new per-room occupancy.
-3. If the party exceeds capacity of current rooms, the guest must also change dates (which triggers unit re-pick with correct room count).
+1. The delivery unit capacity for the stay service is fetched (`MIN(delivery_units.capacity)` across active units).
+2. The needed room count is computed: `neededRooms = ceil(totalPersons / unitCapacity)`.
+3. If `neededRooms > currentRooms`:
+   - Existing `booking_items` are cancelled.
+   - New units are picked for the original date range with the new room count.
+   - `booking_services` stay quantity and pricing are updated to reflect the additional rooms.
+4. If the party fits within current rooms, only `booking_items.guests` is updated.
+5. If unit capacity is `NULL` (unlimited), room count is never scaled — stays at 1.
+
+### Party-Capacity Scaling
+
+Both the date-change and party-only paths use the same capacity source: `delivery_units.capacity` (the physical room occupancy limit). This is distinct from `max_persons_per_booking` (a policy-level config).
+
+The formula for room count is:
+
+```
+unitCapacity = MIN(delivery_units.capacity) for the stay service
+roomCount    = ceil(totalPersons / unitCapacity)
+```
+
+When the party exceeds `unitCapacity`, extra rooms are automatically provisioned and priced. The guest sees the updated total and any additional payment needed.
 
 ### Add Services Flow
 
@@ -292,7 +310,7 @@ After all changes are applied:
 | Advance booking minimum days | `advance_booking_min_days` | 400 |
 | Advance booking maximum days | `advance_booking_max_days` | 400 |
 | Blackout dates | `blackout_dates` | 400 |
-| Per-room person limit | `max_persons_per_booking` | 400 |
+| Party exceeds unit capacity | `delivery_units.capacity` | Auto-scales rooms (409 if not enough units) |
 | Room availability | Unit conflict detection | 409 |
 | Stay service cannot be removed | Hardcoded | 422 |
 | Addon must belong to same hotel | `tenant_id` match | 422 |
@@ -310,7 +328,7 @@ After all changes are applied:
 | 400 | Validation | `Check-out must be after check-in` |
 | 400 | Validation | `Check-in date cannot be in the past` |
 | 400 | Booking rule | `Minimum stay is N nights` |
-| 400 | Booking rule | `Maximum N person(s) per room. X guests need Y rooms — change dates to reassign units.` |
+| 409 | Capacity | `Not enough rooms available: need N, found M` (party exceeds capacity but insufficient units) |
 | 403 | Auth | `You can only edit your own bookings` |
 | 404 | Not found | `Booking not found` |
 | 409 | Availability | `No rooms available for the selected dates` |

@@ -251,7 +251,7 @@ PUT /api/guest/booking/edit
 | Field | Description | Effect |
 |---|---|---|
 | `checkIn` / `checkOut` | New stay dates | Re-validates availability, re-picks delivery units, recalculates pricing |
-| `adults` / `children` | Party size | Re-validates against `max_persons_per_booking`, auto-infers room count if party exceeds per-room capacity |
+| `adults` / `children` | Party size | Auto-scales room count when party exceeds delivery unit capacity (`delivery_units.capacity`), re-picks units and reprices |
 | `specialRequests` | Guest notes | Direct update, no side effects |
 | `addServices` | Array of service addons | Same as `POST /guest/booking/services` — validates, inserts, prices |
 | `removeServices` | Array of `bookingServiceId`s | Soft-deletes the service + its slots (stay services cannot be removed) |
@@ -331,15 +331,28 @@ additionalPaymentNeeded = max(0, requiredDownPayment − paidAmount)
 
 1. Existing `booking_items` (unit assignments) are cancelled.
 2. Availability is re-checked for the new date range.
-3. New units are picked and assigned.
-4. The stay `booking_services` row is repriced: `nightlyPrice × newNights × roomCount`.
-5. If the party exceeds per-room capacity, multiple rooms are auto-inferred.
+3. Room count is derived from party size vs delivery unit capacity: `roomCount = ceil(totalPersons / unitCapacity)`.
+4. New units are picked and assigned.
+5. The stay `booking_services` row is repriced: `nightlyPrice * newNights * roomCount`.
 
 ### What Happens When Party Size Changes (Without Date Change)
 
-1. `max_persons_per_booking` is validated against existing room count.
-2. If the party fits in the currently assigned rooms, `booking_items.guests` is updated.
-3. If the party exceeds capacity, the guest must also change dates (which triggers unit re-pick with the correct room count).
+1. The delivery unit capacity (`delivery_units.capacity`) is fetched for the stay service.
+2. Needed rooms are computed: `neededRooms = ceil(totalPersons / unitCapacity)`.
+3. If `neededRooms > currentRooms`: existing units are cancelled, new units are picked, and pricing is updated with the new room count.
+4. If the party fits within current rooms, only `booking_items.guests` is updated.
+5. If unit capacity is `NULL` (unlimited), room count stays at 1.
+
+### Party-Capacity Scaling
+
+The system uses `delivery_units.capacity` (physical room occupancy) to determine how many rooms are needed:
+
+```
+unitCapacity = MIN(delivery_units.capacity) for the stay service
+roomCount    = ceil(totalPersons / unitCapacity)
+```
+
+This is distinct from `max_persons_per_booking` (a policy config). When the party exceeds a single unit's capacity, extra rooms are automatically provisioned and priced. This applies to both date-change and party-only edits.
 
 ### Validation Rules
 
@@ -351,7 +364,7 @@ additionalPaymentNeeded = max(0, requiredDownPayment − paidAmount)
 | Advance booking window | `advance_booking_min_days` / `advance_booking_max_days` config | 400 |
 | Blackout dates | `blackout_dates` config | 400 |
 | Room availability | `pickAvailableUnitForService` / `pickMultipleAvailableUnits` | 409 |
-| Per-room person limit | `max_persons_per_booking` config | 400 |
+| Party exceeds unit capacity | `delivery_units.capacity` | Auto-scales rooms (409 if not enough units) |
 | Stay service cannot be removed | Hardcoded | 422 |
 | Addon must be same hotel | `tenant_id` match | 422 |
 
