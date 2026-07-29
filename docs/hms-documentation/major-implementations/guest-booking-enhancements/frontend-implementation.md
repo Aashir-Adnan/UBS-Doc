@@ -1,8 +1,8 @@
 # Guest Booking Enhancements — Frontend Implementation Guide
 
 **Date:** 2026-07-29
-**Audience:** Frontend developers (mobile app + web app)
-**Scope:** New response fields and API changes the frontend must consume.
+**Audience:** Guest-side frontend developers (mobile app + web app)
+**Scope:** New guest-facing response fields, endpoints, and UI requirements.
 
 ---
 
@@ -169,46 +169,17 @@ Allows a checked-in guest to extend their room booking checkout date.
 
 ---
 
-## 5. Publish Date Window — Date Picker Constraints
+## 5. Publish Date Window — Error Handling
 
-### Backend validation
-
-The backend now rejects bookings where:
-- Check-in is before `publish_start_datetime`
-- Check-out is after `publish_end_datetime`
-
-These configs are already available to the admin on service/package settings.
+The backend now rejects bookings where check-in/check-out falls outside the service's publish date window.
 
 **Frontend action required:**
-- No new response fields to consume — this is backend-only validation
-- The date picker should respect these constraints to prevent wasted API calls
-- If the backend returns a 400 with `"Check-in date cannot be before the service availability start date"` or `"Check-out date cannot be after the service availability end date"`, display the error message to the guest
+- If the backend returns a 400 with messages like `"Check-in date cannot be before the service availability start date"` or `"Check-out date cannot be after the service availability end date"`, display the error to the guest
+- No new response fields — this is server-side validation only
 
 ---
 
-## 6. Catalog Pricing — Recurrence
-
-### Admin-side change
-
-The catalog pricing form previously had a `conditions` JSON field. This has been replaced with a `recurrence` dropdown:
-
-| Value | Label |
-|---|---|
-| `once` | Once |
-| `weekly` | Weekly |
-| `monthly` | Monthly |
-| `yearly` | Yearly |
-
-**Frontend action required (admin panel):**
-- Replace the `conditions` text field in the catalog pricing CRUD form with a `recurrence` select dropdown
-- The `recurrence` field is optional (nullable)
-- The CRUD API parameter has changed from `catalogPricing_conditions` to `catalogPricing_recurrence`
-
-**No guest-side frontend changes needed** — pricing is resolved server-side.
-
----
-
-## 7. Summary of New Response Fields
+## 6. Summary of New Response Fields
 
 ### Service card / landing (minimal objects)
 
