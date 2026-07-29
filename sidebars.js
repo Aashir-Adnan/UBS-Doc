@@ -192,6 +192,7 @@ const sidebars = {
               label: 'Guest Booking Enhancements',
               items: [
                 'hms-documentation/major-implementations/guest-booking-enhancements/guest-booking-enhancements',
+                'hms-documentation/major-implementations/guest-booking-enhancements/frontend-implementation',
               ],
             },
           ],
