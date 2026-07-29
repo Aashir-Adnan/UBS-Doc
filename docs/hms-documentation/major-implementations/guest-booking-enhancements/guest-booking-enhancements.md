@@ -129,11 +129,12 @@ Created a new endpoint `POST /api/guest/booking/extend` with dedicated preproces
 ```
 
 **Validation flow:**
-1. Booking must be in `checked_in` status
-2. `extension_allowed` config must be `true` on the stay service
-3. Extension nights must not exceed `max_extension_length`
-4. Room must be available for the extension window (no conflicting `booking_items`)
-5. Price is calculated using base nightly rate adjusted by `extension_pricing_rule` (percentage)
+1. Booking must be an individual room booking (not a package booking — package bookings are rejected with 422)
+2. Booking must be in `checked_in` status
+3. `extension_allowed` config must be `true` on the stay service
+4. Extension nights must not exceed `max_extension_length`
+5. Room must be available for the extension window (no conflicting `booking_items`)
+6. Price is calculated using base nightly rate adjusted by `extension_pricing_rule` (percentage)
 
 **Relevant config keys:**
 | Key | Description |
@@ -197,28 +198,35 @@ The `catalog_pricing` table used a `conditions` JSON column storing recurrence i
 ## 7. Guest Age Constraints in Service Detail
 
 ### Problem
-Services have age-related configs (`adult_age_cutoff`, `child_age_brackets`, `guardian_required_age_cutoff`) that were not exposed to the frontend.
+Services needed `min_guest_age` and `max_guest_age` constraints exposed to the frontend so it can display age restrictions and validate guest eligibility.
 
 ### Solution
-Added these configs to the service detail object fetch and included them in the response.
+Created two new `hms_config_keys` — `min_guest_age` and `max_guest_age` — and added them to the service detail object (`buildServiceObjects`).
+
+**New config keys (hms_config_keys):**
+
+| config_key | config_name | value_type | target_table |
+|---|---|---|---|
+| `min_guest_age` | Minimum Guest Age | number | services |
+| `max_guest_age` | Maximum Guest Age | number | services |
 
 **Files modified:**
-- `Src/HelperFunctions/Guest/v2/serviceObjects.js` — fetches age configs, includes in response
+- `Src/HelperFunctions/Guest/v2/serviceObjects.js` — fetches `min_guest_age`, `max_guest_age` via `fetchGuestConfigs`, includes in response
 
 **New response fields:**
 ```json
 {
   "minGuestAge": 18,
-  "maxGuestAge": null,
-  "childAgeBrackets": [{"min": 0, "max": 5}, {"min": 6, "max": 12}]
+  "maxGuestAge": 65
 }
 ```
 
 | Field | Config Key | Description |
 |---|---|---|
-| `minGuestAge` | `adult_age_cutoff` | Minimum age for an adult guest |
-| `maxGuestAge` | `guardian_required_age_cutoff` | Age below which a guardian is required |
-| `childAgeBrackets` | `child_age_brackets` | JSON array of age bracket objects |
+| `minGuestAge` | `min_guest_age` | Minimum age for a guest to book this service |
+| `maxGuestAge` | `max_guest_age` | Maximum age for a guest to book this service |
+
+These are standalone config keys — not derived from other age-related configs. Admins set them per service in the hms_config system.
 
 ---
 
