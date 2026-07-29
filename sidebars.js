@@ -187,6 +187,13 @@ const sidebars = {
                 'hms-documentation/major-implementations/seniority-scope/seniority-scope',
               ],
             },
+            {
+              type: 'category',
+              label: 'Guest Booking Enhancements',
+              items: [
+                'hms-documentation/major-implementations/guest-booking-enhancements/guest-booking-enhancements',
+              ],
+            },
           ],
         },
         {
