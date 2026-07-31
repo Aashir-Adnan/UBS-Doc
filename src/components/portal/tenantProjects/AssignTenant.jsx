@@ -9,7 +9,7 @@ import PermissionNotice from './PermissionNotice';
 // would 403 never gets to submit.
 const EDIT_USERS_PERM = 'update_portal_users';
 
-export default function AssignTenant({ adminUrdd }) {
+export default function AssignTenant({ adminUrdd, defaultTenantId }) {
   const { has } = useActingPermissions();
   const canEdit = has(EDIT_USERS_PERM);
   const [members, setMembers] = useState([]);
@@ -17,7 +17,7 @@ export default function AssignTenant({ adminUrdd }) {
   const [loadError, setLoadError] = useState(null);
 
   const [targetUrdd, setTargetUrdd] = useState('');
-  const [tenantId, setTenantId] = useState('');
+  const [tenantId, setTenantId] = useState(defaultTenantId != null ? String(defaultTenantId) : '');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -34,6 +34,12 @@ export default function AssignTenant({ adminUrdd }) {
       .catch((e) => { if (!cancelled) setLoadError(e.message); });
     return () => { cancelled = true; };
   }, [adminUrdd]);
+
+  // Follow the System-tab org picker: preselect the chosen tenant as the
+  // destination (the admin can still change it).
+  useEffect(() => {
+    if (defaultTenantId != null) setTenantId(String(defaultTenantId));
+  }, [defaultTenantId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
