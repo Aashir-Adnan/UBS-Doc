@@ -1,16 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   createOrganization, joinOrganization, getMyOrganization,
   updateOrganization, addOrgMember, getOrgMembers,
   addRepoToOrg, getOrgRepos,
+  githubAuthorize, githubOrgs, githubRepos,
 } from './tenantApi';
 import { fetchUserUrdds, setActiveUrdd } from '@site/src/state/orgSlice';
+
+const GITHUB_MESSAGE_SOURCE = 'github-connect';
 
 // ── Friendly error mapper ────────────────────────────────────────────────────
 function friendlyError(msg) {
   if (!msg) return 'Something went wrong. Please try again.';
-  if (msg.includes('already created')) return 'You can only create one organization. Try joining an existing one instead.';
+  if (isExpiredConnection(msg)) return 'Your GitHub connection expired. Please click Connect again.';
   if (msg.includes('already exists')) return 'An organization with this name already exists. Please choose a different name.';
   if (msg.includes('Invalid organization')) return 'The organization name or passcode is incorrect. Please check and try again.';
   if (msg.includes("hasn't signed in")) return "This user hasn't signed in yet. They need to sign in with Google first.";
@@ -18,18 +21,371 @@ function friendlyError(msg) {
   return msg;
 }
 
+// A TTL-bound, single-use connection that the backend no longer accepts.
+function isExpiredConnection(msg) {
+  if (!msg) return false;
+  const m = msg.toLowerCase();
+  return m.includes('expired') || m.includes('invalid connection') || m.includes('connection not found');
+}
+
+// Normalise owned into an array. `org/mine` now returns owned as an array of
+// { id, organization_name, tenant_id }; tolerate the legacy single-object shape.
+function ownedOrgsOf(orgInfo) {
+  const owned = orgInfo?.owned;
+  if (Array.isArray(owned)) return owned;
+  if (owned && typeof owned === 'object') return [owned];
+  return [];
+}
+
+// Build a human import summary from imported/skipped.
+function importSummary(res) {
+  const imported = Array.isArray(res?.imported) ? res.imported : [];
+  const skipped = Array.isArray(res?.skipped) ? res.skipped : [];
+  const parts = [];
+  if (imported.length) parts.push(`${imported.length} imported`);
+  const byReason = {};
+  skipped.forEach((s) => {
+    const reason = s?.reason || 'skipped';
+    byReason[reason] = (byReason[reason] || 0) + 1;
+  });
+  Object.entries(byReason).forEach(([reason, n]) => parts.push(`${n} ${reason}`));
+  if (!parts.length) return null;
+  return parts.join(', ');
+}
+
+// ── Create-org wizard ────────────────────────────────────────────────────────
+// The wizard lives in a single React component, so its state survives the OAuth
+// popup round trip (the popup is a separate window; this component stays mounted
+// and receives the connection_id via postMessage).
+
+const STEPS = { DETAILS: 'details', CONNECT: 'connect', ORG: 'org', REPOS: 'repos' };
+
+function CreateOrgWizard({ email, onDone }) {
+  const dispatch = useDispatch();
+
+  const [step, setStep] = useState(STEPS.DETAILS);
+  const [orgName, setOrgName] = useState('');
+  const [passcode, setPasscode] = useState('');
+
+  const [connectionId, setConnectionId] = useState(null);
+  const [connecting, setConnecting] = useState(false);
+
+  const [orgs, setOrgs] = useState([]);
+  const [orgsLoading, setOrgsLoading] = useState(false);
+  const [githubOrg, setGithubOrg] = useState(null);
+
+  const [repos, setRepos] = useState([]);
+  const [reposLoading, setReposLoading] = useState(false);
+  const [selected, setSelected] = useState(() => new Set());
+
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+
+  const popupRef = useRef(null);
+
+  // Listen for the connection_id posted back by the hosted callback page.
+  useEffect(() => {
+    const handler = (event) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data;
+      if (!data || data.source !== GITHUB_MESSAGE_SOURCE) return;
+      setConnecting(false);
+      if (data.error) {
+        setError(friendlyError(data.error));
+        return;
+      }
+      if (data.connection_id) {
+        setError(null);
+        setConnectionId(data.connection_id);
+        setStep(STEPS.ORG);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const resetGithub = () => {
+    setConnectionId(null);
+    setOrgs([]);
+    setGithubOrg(null);
+    setRepos([]);
+    setSelected(new Set());
+  };
+
+  // Step 1 → 2
+  const handleDetailsNext = (e) => {
+    e.preventDefault();
+    setError(null);
+    if (!orgName.trim()) { setError('Organization name is required.'); return; }
+    if (passcode.trim().length < 4) { setError('Passcode must be at least 4 characters.'); return; }
+    setStep(STEPS.CONNECT);
+  };
+
+  // Step 2 — open the GitHub authorize URL as a popup.
+  const handleConnect = async () => {
+    setError(null);
+    resetGithub();
+    try {
+      setConnecting(true);
+      const res = await githubAuthorize(email);
+      const url = res?.url;
+      if (!url) { setConnecting(false); setError('Could not start GitHub authorization.'); return; }
+      const w = 720, h = 780;
+      const left = window.screenX + Math.max(0, (window.outerWidth - w) / 2);
+      const top = window.screenY + Math.max(0, (window.outerHeight - h) / 2);
+      popupRef.current = window.open(
+        url, 'github-connect',
+        `width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no`,
+      );
+      if (!popupRef.current) {
+        setConnecting(false);
+        setError('The popup was blocked. Please allow popups and try again.');
+      }
+    } catch (err) {
+      setConnecting(false);
+      setError(friendlyError(err.message));
+    }
+  };
+
+  // Load orgs when entering the org step.
+  useEffect(() => {
+    if (step !== STEPS.ORG || !connectionId) return;
+    let cancelled = false;
+    (async () => {
+      setError(null);
+      setOrgsLoading(true);
+      try {
+        const res = await githubOrgs(connectionId, email);
+        if (!cancelled) setOrgs(Array.isArray(res?.orgs) ? res.orgs : []);
+      } catch (err) {
+        if (!cancelled) setError(friendlyError(err.message));
+      } finally {
+        if (!cancelled) setOrgsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [step, connectionId, email]);
+
+  const handlePickOrg = (login) => {
+    setGithubOrg(login);
+    setRepos([]);
+    setSelected(new Set());
+    setStep(STEPS.REPOS);
+  };
+
+  // Load repos when entering the repos step.
+  useEffect(() => {
+    if (step !== STEPS.REPOS || !connectionId || !githubOrg) return;
+    let cancelled = false;
+    (async () => {
+      setError(null);
+      setReposLoading(true);
+      try {
+        const res = await githubRepos(connectionId, email, githubOrg);
+        if (!cancelled) setRepos(Array.isArray(res?.repos) ? res.repos : []);
+      } catch (err) {
+        if (!cancelled) setError(friendlyError(err.message));
+      } finally {
+        if (!cancelled) setReposLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [step, connectionId, githubOrg, email]);
+
+  const toggleRepo = (fullName) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(fullName)) next.delete(fullName); else next.add(fullName);
+      return next;
+    });
+  };
+
+  // Final submit — with or without GitHub.
+  const submit = async (withGithub) => {
+    setError(null);
+    setSuccess(null);
+    try {
+      setSubmitting(true);
+      const opts = withGithub
+        ? { connection_id: connectionId, github_org: githubOrg, selected: Array.from(selected) }
+        : undefined;
+      const res = await createOrganization(email, orgName.trim(), passcode.trim(), opts);
+
+      let msg = `Organization "${res.organization?.organization_name || orgName.trim()}" created.`;
+      if (withGithub) {
+        const summary = importSummary(res);
+        if (summary) msg += ` ${summary}.`;
+        if (res.import_error) msg += ` Repo import failed: ${res.import_error}`;
+      }
+      setSuccess(msg);
+
+      // Refresh the org slice so the new org's URDD appears in OrgSwitcher, then
+      // select it — no manual page reload needed.
+      await dispatch(fetchUserUrdds(email)).unwrap();
+      if (res.urdd_id) dispatch(setActiveUrdd(res.urdd_id));
+      if (onDone) onDone();
+    } catch (err) {
+      const m = err?.message;
+      setError(friendlyError(m));
+      // A dead connection can only be recovered by reconnecting.
+      if (withGithub && isExpiredConnection(m)) {
+        resetGithub();
+        setStep(STEPS.CONNECT);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="tenant-wizard">
+      <ol className="tenant-wizard-steps" aria-hidden="true">
+        {[
+          { k: STEPS.DETAILS, label: 'Details' },
+          { k: STEPS.CONNECT, label: 'Connect GitHub' },
+          { k: STEPS.ORG, label: 'Pick org' },
+          { k: STEPS.REPOS, label: 'Pick repos' },
+        ].map((s, i) => (
+          <li key={s.k} className={`tenant-wizard-step${step === s.k ? ' is-active' : ''}`}>
+            <span className="tenant-wizard-step-num">{i + 1}</span>
+            <span>{s.label}</span>
+          </li>
+        ))}
+      </ol>
+
+      {/* Step 1 — details */}
+      {step === STEPS.DETAILS && (
+        <form className="tenant-form" onSubmit={handleDetailsNext}>
+          <label className="tenant-field">
+            <span>Organization name</span>
+            <input type="text" value={orgName} onChange={(e) => setOrgName(e.target.value)}
+              placeholder="My Company" />
+          </label>
+          <label className="tenant-field">
+            <span>Passcode</span>
+            <input type="password" value={passcode} onChange={(e) => setPasscode(e.target.value)}
+              placeholder="Choose a passcode (min 4 chars)" />
+          </label>
+          <button type="submit" className="tenant-submit">Next</button>
+          {error && <p className="tenant-error">{error}</p>}
+        </form>
+      )}
+
+      {/* Step 2 — connect GitHub (optional) */}
+      {step === STEPS.CONNECT && (
+        <div className="tenant-form">
+          <p className="tenant-muted">
+            Connect a GitHub organization to import its repositories, or create the
+            organization without GitHub — you can add repositories later.
+          </p>
+          <div className="tenant-wizard-nav">
+            <button type="button" className="tenant-submit" disabled={connecting} onClick={handleConnect}>
+              {connecting ? 'Waiting for GitHub…' : 'Connect GitHub'}
+            </button>
+            <button type="button" className="tenant-ghost-btn" disabled={submitting}
+              onClick={() => submit(false)}>
+              {submitting ? 'Creating…' : 'Create without GitHub'}
+            </button>
+            <button type="button" className="tenant-ghost-btn" onClick={() => { setError(null); setStep(STEPS.DETAILS); }}>
+              Back
+            </button>
+          </div>
+          {error && <p className="tenant-error">{error}</p>}
+        </div>
+      )}
+
+      {/* Step 3 — pick org */}
+      {step === STEPS.ORG && (
+        <div className="tenant-form">
+          {orgsLoading ? (
+            <p className="tenant-muted">Loading your GitHub organizations…</p>
+          ) : orgs.length === 0 ? (
+            <p className="tenant-muted">No organizations found for this GitHub account.</p>
+          ) : (
+            <div className="tenant-members-list">
+              {orgs.map((o) => (
+                <button key={o.login} type="button" className="tenant-org-choice"
+                  onClick={() => handlePickOrg(o.login)}>
+                  {o.avatar_url
+                    ? <img src={o.avatar_url} alt="" className="tenant-member-img" />
+                    : <span className="tenant-member-initial">{o.login.charAt(0).toUpperCase()}</span>}
+                  <span className="tenant-member-name">{o.login}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="tenant-wizard-nav">
+            <button type="button" className="tenant-ghost-btn"
+              onClick={() => { setError(null); setStep(STEPS.CONNECT); }}>
+              Back
+            </button>
+          </div>
+          {error && <p className="tenant-error">{error}</p>}
+        </div>
+      )}
+
+      {/* Step 4 — pick repos */}
+      {step === STEPS.REPOS && (
+        <div className="tenant-form">
+          <p className="tenant-muted">
+            Select repositories to import from <strong>{githubOrg}</strong>.
+          </p>
+          {reposLoading ? (
+            <p className="tenant-muted">Loading repositories…</p>
+          ) : repos.length === 0 ? (
+            <p className="tenant-muted">No repositories found in this organization.</p>
+          ) : (
+            <div className="tenant-checkbox-list">
+              {repos.map((r) => (
+                <label key={r.full_name} className="tenant-checkbox-row">
+                  <input type="checkbox" checked={selected.has(r.full_name)}
+                    onChange={() => toggleRepo(r.full_name)} />
+                  <span>
+                    <span className="tenant-member-name">{r.full_name}</span>
+                    {r.private && <span className="tenant-repo-badge tenant-repo-badge-private">private</span>}
+                    {r.archived && <span className="tenant-repo-badge tenant-repo-badge-archived">archived</span>}
+                    {r.default_branch && <span className="tenant-repo-badge">{r.default_branch}</span>}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+          <div className="tenant-wizard-nav">
+            <button type="button" className="tenant-submit" disabled={submitting}
+              onClick={() => submit(true)}>
+              {submitting
+                ? 'Creating…'
+                : selected.size > 0
+                  ? `Create & import ${selected.size} repo${selected.size === 1 ? '' : 's'}`
+                  : 'Create organization'}
+            </button>
+            <button type="button" className="tenant-ghost-btn"
+              onClick={() => { setError(null); setStep(STEPS.ORG); }}>
+              Back
+            </button>
+          </div>
+          {error && <p className="tenant-error">{error}</p>}
+        </div>
+      )}
+
+      {success && <p className="tenant-success">{success}</p>}
+    </div>
+  );
+}
+
 // ── Sub-panels ───────────────────────────────────────────────────────────────
 
-function CreateJoinPanel({ email, orgInfo, onDone }) {
+function CreateJoinPanel({ email, onDone }) {
   const dispatch = useDispatch();
-  const [mode, setMode] = useState(orgInfo?.owned ? 'join' : 'create');
+  const [mode, setMode] = useState('create');
   const [orgName, setOrgName] = useState('');
   const [passcode, setPasscode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  const handleSubmit = async (e) => {
+  const handleJoin = async (e) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
@@ -38,17 +394,11 @@ function CreateJoinPanel({ email, orgInfo, onDone }) {
 
     try {
       setSubmitting(true);
-      let res;
-      if (mode === 'create') {
-        res = await createOrganization(email, orgName.trim(), passcode.trim());
-        setSuccess(`Organization "${res.organization?.organization_name}" created.`);
-      } else {
-        res = await joinOrganization(email, orgName.trim(), passcode.trim());
-        setSuccess(`Joined "${res.organization?.organization_name}".`);
-      }
+      const res = await joinOrganization(email, orgName.trim(), passcode.trim());
+      setSuccess(`Joined "${res.organization?.organization_name}".`);
       setOrgName('');
       setPasscode('');
-      const urdds = await dispatch(fetchUserUrdds(email)).unwrap();
+      await dispatch(fetchUserUrdds(email)).unwrap();
       if (res.urdd_id) dispatch(setActiveUrdd(res.urdd_id));
       if (onDone) onDone();
     } catch (err) {
@@ -61,45 +411,49 @@ function CreateJoinPanel({ email, orgInfo, onDone }) {
   return (
     <div>
       <div className="tenant-admin-tabs" style={{ marginBottom: '1rem' }}>
-        {!orgInfo?.owned && (
-          <button type="button" className={`tenant-tab${mode === 'create' ? ' tenant-tab-active' : ''}`}
-            onClick={() => { setMode('create'); setError(null); setSuccess(null); }}>
-            Create
-          </button>
-        )}
+        <button type="button" className={`tenant-tab${mode === 'create' ? ' tenant-tab-active' : ''}`}
+          onClick={() => { setMode('create'); setError(null); setSuccess(null); }}>
+          Create
+        </button>
         <button type="button" className={`tenant-tab${mode === 'join' ? ' tenant-tab-active' : ''}`}
           onClick={() => { setMode('join'); setError(null); setSuccess(null); }}>
           Join
         </button>
       </div>
-      <form className="tenant-form" onSubmit={handleSubmit}>
-        <label className="tenant-field">
-          <span>Organization name</span>
-          <input type="text" value={orgName} onChange={(e) => setOrgName(e.target.value)}
-            placeholder={mode === 'create' ? 'My Company' : 'Existing org name'} />
-        </label>
-        <label className="tenant-field">
-          <span>Passcode</span>
-          <input type="password" value={passcode} onChange={(e) => setPasscode(e.target.value)}
-            placeholder={mode === 'create' ? 'Choose a passcode (min 4 chars)' : 'Enter org passcode'} />
-        </label>
-        <button type="submit" className="tenant-submit" disabled={submitting}>
-          {submitting ? (mode === 'create' ? 'Creating...' : 'Joining...') : (mode === 'create' ? 'Create organization' : 'Join organization')}
-        </button>
-        {error && <p className="tenant-error">{error}</p>}
-        {success && <p className="tenant-success">{success}</p>}
-      </form>
+
+      {mode === 'create' ? (
+        <CreateOrgWizard email={email} onDone={onDone} />
+      ) : (
+        <form className="tenant-form" onSubmit={handleJoin}>
+          <label className="tenant-field">
+            <span>Organization name</span>
+            <input type="text" value={orgName} onChange={(e) => setOrgName(e.target.value)}
+              placeholder="Existing org name" />
+          </label>
+          <label className="tenant-field">
+            <span>Passcode</span>
+            <input type="password" value={passcode} onChange={(e) => setPasscode(e.target.value)}
+              placeholder="Enter org passcode" />
+          </label>
+          <button type="submit" className="tenant-submit" disabled={submitting}>
+            {submitting ? 'Joining...' : 'Join organization'}
+          </button>
+          {error && <p className="tenant-error">{error}</p>}
+          {success && <p className="tenant-success">{success}</p>}
+        </form>
+      )}
     </div>
   );
 }
 
-function SettingsPanel({ email, orgInfo, onDone }) {
-  const org = orgInfo?.owned;
+function SettingsPanel({ email, org, onDone }) {
   const [name, setName] = useState(org?.organization_name || '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const dispatch = useDispatch();
+
+  useEffect(() => { setName(org?.organization_name || ''); }, [org?.id]);
 
   if (!org) return <p className="tenant-muted">You haven't created an organization yet.</p>;
 
@@ -137,8 +491,7 @@ function SettingsPanel({ email, orgInfo, onDone }) {
   );
 }
 
-function MembersPanel({ email, orgInfo }) {
-  const org = orgInfo?.owned;
+function MembersPanel({ email, org }) {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [memberEmail, setMemberEmail] = useState('');
@@ -229,7 +582,7 @@ function MembersPanel({ email, orgInfo }) {
   );
 }
 
-function PermissionsPanel({ email }) {
+function PermissionsPanel() {
   const { urdds } = useSelector((s) => s.org);
 
   if (!urdds.length) return <p className="tenant-muted">No roles assigned yet.</p>;
@@ -260,8 +613,7 @@ function PermissionsPanel({ email }) {
   );
 }
 
-function ReposPanel({ email, orgInfo }) {
-  const org = orgInfo?.owned;
+function ReposPanel({ email, org }) {
   const [repos, setRepos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(null);
@@ -349,6 +701,7 @@ export default function OrganizationManager({ email, onOrgChanged }) {
   const [orgInfo, setOrgInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('org');
+  const [selectedOrgId, setSelectedOrgId] = useState(null);
 
   const loadOrg = async () => {
     if (!email) return;
@@ -365,13 +718,27 @@ export default function OrganizationManager({ email, onOrgChanged }) {
 
   useEffect(() => { loadOrg(); }, [email]);
 
+  const ownedOrgs = ownedOrgsOf(orgInfo);
+
+  // Keep a valid selected org for the owner-only panels.
+  useEffect(() => {
+    if (!ownedOrgs.length) { setSelectedOrgId(null); return; }
+    if (!ownedOrgs.some((o) => o.id === selectedOrgId)) {
+      setSelectedOrgId(ownedOrgs[0].id);
+    }
+  }, [orgInfo]);
+
+  const selectedOrg = ownedOrgs.find((o) => o.id === selectedOrgId) || ownedOrgs[0] || null;
+  const ownerPanel = tab === 'settings' || tab === 'members' || tab === 'repos';
+
   if (loading) return <p className="tenant-muted">Loading organization info...</p>;
 
   return (
     <div>
-      {orgInfo?.owned && (
+      {ownedOrgs.length > 0 && (
         <div className="tenant-info-box" style={{ marginBottom: '1rem' }}>
-          <strong>Your organization:</strong> {orgInfo.owned.organization_name}
+          <strong>Your organization{ownedOrgs.length > 1 ? 's' : ''}:</strong>{' '}
+          {ownedOrgs.map((o) => o.organization_name).join(', ')}
         </div>
       )}
 
@@ -385,12 +752,24 @@ export default function OrganizationManager({ email, onOrgChanged }) {
         ))}
       </div>
 
+      {/* Owner panels act on one org at a time — let the owner pick which. */}
+      {ownerPanel && ownedOrgs.length > 1 && (
+        <label className="tenant-field" style={{ maxWidth: 320, marginBottom: '1rem' }}>
+          <span>Organization</span>
+          <select value={selectedOrgId ?? ''} onChange={(e) => setSelectedOrgId(Number(e.target.value))}>
+            {ownedOrgs.map((o) => (
+              <option key={o.id} value={o.id}>{o.organization_name}</option>
+            ))}
+          </select>
+        </label>
+      )}
+
       <div className="portal-card">
-        {tab === 'org' && <CreateJoinPanel email={email} orgInfo={orgInfo} onDone={() => { loadOrg(); if (onOrgChanged) onOrgChanged(); }} />}
-        {tab === 'settings' && <SettingsPanel email={email} orgInfo={orgInfo} onDone={loadOrg} />}
-        {tab === 'members' && <MembersPanel email={email} orgInfo={orgInfo} />}
-        {tab === 'repos' && <ReposPanel email={email} orgInfo={orgInfo} />}
-        {tab === 'permissions' && <PermissionsPanel email={email} />}
+        {tab === 'org' && <CreateJoinPanel email={email} onDone={() => { loadOrg(); if (onOrgChanged) onOrgChanged(); }} />}
+        {tab === 'settings' && <SettingsPanel email={email} org={selectedOrg} onDone={loadOrg} />}
+        {tab === 'members' && <MembersPanel email={email} org={selectedOrg} />}
+        {tab === 'repos' && <ReposPanel email={email} org={selectedOrg} />}
+        {tab === 'permissions' && <PermissionsPanel />}
       </div>
     </div>
   );

@@ -48,7 +48,10 @@ export default function RoleManager({ adminUrdd, actorEmail }) {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await listPortalUsers();
+      // Scope the list to the acting org: the backend filters to this URDD's
+      // tenant for org admins. Re-runs when the active org changes (adminUrdd),
+      // so switching orgs in the switcher swaps the user list.
+      const res = await listPortalUsers(adminUrdd);
       setUsers(Array.isArray(res?.users) ? res.users : []);
       setRoles(Array.isArray(res?.roles) ? res.roles : []);
     } catch (e) {
@@ -56,7 +59,7 @@ export default function RoleManager({ adminUrdd, actorEmail }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [adminUrdd]);
 
   useEffect(() => { load(); }, [load]);
 

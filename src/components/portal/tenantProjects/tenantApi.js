@@ -158,8 +158,14 @@ export function provisionUser({
 // Response: { users: [{ id, email, name, photo_url, is_active, last_sign_in,
 //   created_at, role_id, role_name, urdd_id }], roles: [{ id, name }] }.
 // `urdd_id === null` means the user is pending (not provisioned).
-export function listPortalUsers() {
-  return tGet('/portal/users/list');
+//
+// Pass the acting URDD: the backend now scopes the list to that URDD's tenant for
+// org admins (super admins still see every user). Without it an org admin would
+// see every user in the system regardless of which org they are acting in. The
+// `roles` array already omits 'Platform Admin' — only Admin/Repository Manager/Dev
+// are returned.
+export function listPortalUsers(actionPerformerURDD) {
+  return tGet('/portal/users/list', { actionPerformerURDD });
 }
 
 // Set a portal user's role. The server checks for admin and 403s otherwise —
@@ -224,11 +230,52 @@ export function resetUserPermission(
   return tPost('/portal/permissions/reset', body);
 }
 
+// ---- GitHub org connect (OAuth) ---------------------------------------------
+// Plain JSON, tokenless — same transport as the other portal/org calls. The
+// OAuth user token never reaches the browser; we only ever hold an opaque,
+// single-use, email-bound, TTL-bound (~10 min) connection_id. GET params ride
+// the query string. See docs on the github-org-integration backend branch.
+
+// Get the GitHub authorize URL (already carries state, scope, client_id). Open
+// it as a POPUP so the create-org wizard state survives the round trip.
+export function githubAuthorize(email) {
+  return tGet('/portal/github/authorize', { email });
+}
+
+// Exchange the OAuth { code, state } (read from the callback page's query) for a
+// connection_id. Called from the hosted callback page, not the wizard.
+export function githubCallback(code, state) {
+  return tPost('/portal/github/callback', { code, state });
+}
+
+// List the GitHub orgs the connected user can see: [{ login, avatar_url }].
+export function githubOrgs(connection_id, email) {
+  return tGet('/portal/github/orgs', { connection_id, email });
+}
+
+// List repos in a chosen org:
+// [{ full_name, name, private, default_branch, clone_url, archived, pushed_at }].
+export function githubRepos(connection_id, email, org) {
+  return tGet('/portal/github/repos', { connection_id, email, org });
+}
+
 // ---- Organization management ------------------------------------------------
 
-// Create a new organization. Each user may create at most one.
-export function createOrganization(email, organization_name, passcode) {
-  return tPost('/portal/org/create', { email, organization_name, passcode });
+// Create a new organization. Pass `opts` to also connect a GitHub org and import
+// repos in one step: { connection_id, github_org, selected }. `selected` is an
+// array of `full_name` strings (e.g. "acme/web") — never URLs; the backend
+// re-validates each against the live org list. Omit `opts` entirely to create a
+// plain org without connecting GitHub. A user may own multiple organizations.
+// Returns { ok, organization, urdd_id, imported, skipped, import_error? }.
+export function createOrganization(email, organization_name, passcode, opts) {
+  const body = { email, organization_name, passcode };
+  if (opts) {
+    const { connection_id, github_org, selected } = opts;
+    if (connection_id) body.connection_id = connection_id;
+    if (github_org) body.github_org = github_org;
+    if (Array.isArray(selected)) body.selected = selected;
+  }
+  return tPost('/portal/org/create', body);
 }
 
 // Join an existing organization by name + passcode.
