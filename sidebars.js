@@ -199,6 +199,20 @@ const sidebars = {
         },
         {
           type: 'category',
+          label: 'Minor Implementations',
+          items: [
+            {
+              type: 'category',
+              label: 'Requires Stay Service Flag',
+              items: [
+                'hms-documentation/minor-implementations/requires-stay-service-flag/backend-implementation',
+                'hms-documentation/minor-implementations/requires-stay-service-flag/frontend-implementation',
+              ],
+            },
+          ],
+        },
+        {
+          type: 'category',
           label: 'Guest APIs',
           items: [
             'hms-documentation/guest-apis/guest-tenant-scoped-apis',
