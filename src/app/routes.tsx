@@ -18,6 +18,7 @@ import GithubSandbox from '../screens/GithubSandbox'
 import Meetings from '../screens/Meetings'
 import MeetingCreate from '../screens/MeetingCreate'
 import MeetingDetail from '../screens/MeetingDetail'
+import TenantAdmin from '../screens/TenantAdmin'
 
 const P = ({ name }: { name: string }) => <div style={{ padding: 40 }}>{name} — coming in its task</div>
 
@@ -57,7 +58,7 @@ export default function AppRoutes() {
         <Route path="/tools/myProjects" element={T(<MyProjects view="grid" />)} />
         <Route path="/tools/myProjects/view" element={T(<MyProjects view="detail" />)} />
         <Route path="/tools/repos" element={T(<Repositories />)} />
-        <Route path="/tools/tenantAdmin" element={T(<P name="tenant admin" />)} />
+        <Route path="/tools/tenantAdmin" element={T(<TenantAdmin />)} />
         <Route path="/docs/*" element={<P name="docs" />} />
         <Route path="*" element={<P name="404" />} />
       </Route>

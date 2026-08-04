@@ -7633,3 +7633,193 @@
   .mw-detail-screen .mw-stage-body { padding: 1rem 1rem 1.25rem; }
   .mw-detail-screen .mw-panel-header { padding: 1.25rem 1rem 1rem; }
 }
+
+/* ===== Tenant Admin design overrides (Task 15) ===== */
+/* src/screens/TenantAdmin.tsx wraps the unmodified tenantProjects/* component
+   tree (OrganizationManager, ProvisionUser, GrantProjects, GrantRepos,
+   RoleManager, UserPermissions, SystemPanel — logic and props carried forward
+   verbatim from the pre-migration src/pages/tools/tenantAdmin.jsx) in the
+   design's aurora/breadcrumb/stat-card chrome. The screen's own top-level tab
+   bar is built directly with Tailwind utilities in TenantAdmin.tsx, so the
+   rules below only retint the classes those inner components still render:
+   .tenant-tab (their own sub-tabs — Create/Join, System's sub-panel picker),
+   form fields/buttons, the members table (avatar/name/email/role/status), and
+   the permissions list — replacing the stale --brand-primary-alpha-* (old
+   teal/blue) look with the design's indigo, toward the mock's members-table
+   styling (design/UBS Dev Tools Portal (1)/src/screens/TenantAdmin.tsx). */
+
+/* Sub-tab pills (OrganizationManager's Create/Join + Settings/Members/Repos/
+   Permissions, SystemPanel's Assign/Roles/Grant/Grant repos/Permissions). */
+.tenant-admin-tabs { gap: 0.4rem; }
+
+.tenant-tab {
+  border-radius: 9999px;
+  border-color: rgba(79, 70, 229, 0.18);
+  background: transparent;
+  color: var(--ifm-color-emphasis-600);
+  font-weight: 600;
+}
+[data-theme='dark'] .tenant-tab { border-color: rgba(129, 140, 248, 0.22); }
+
+.tenant-tab:hover:not(.tenant-tab-active) {
+  border-color: rgba(79, 70, 229, 0.4);
+  background: rgba(79, 70, 229, 0.06);
+  color: var(--ifm-font-color-base);
+}
+[data-theme='dark'] .tenant-tab:hover:not(.tenant-tab-active) { background: rgba(79, 70, 229, 0.12); }
+
+.tenant-tab-active {
+  border-color: transparent;
+  background: #4F46E5;
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3), 0 4px 12px rgba(79, 70, 229, 0.18);
+}
+
+/* Info banner (SystemPanel's "System administration" note, OrganizationManager's
+   "Your organization(s)" summary) — previously unstyled text with no box. */
+.tenant-info-box {
+  border-radius: 12px;
+  border: 1px solid rgba(79, 70, 229, 0.16);
+  border-left: 3px solid #4F46E5;
+  background: rgba(79, 70, 229, 0.05);
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+}
+[data-theme='dark'] .tenant-info-box { background: rgba(129, 140, 248, 0.08); border-color: rgba(129, 140, 248, 0.2); }
+
+/* Form fields — round to the design's 12px input radius, indigo focus ring. */
+.tenant-field select,
+.tenant-field input,
+.up-manual-row input {
+  border-radius: 12px;
+  border-color: rgba(79, 70, 229, 0.18);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+[data-theme='dark'] .tenant-field select,
+[data-theme='dark'] .tenant-field input,
+[data-theme='dark'] .up-manual-row input {
+  border-color: rgba(129, 140, 248, 0.25);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tenant-field select:focus,
+.tenant-field input:focus,
+.up-manual-row input:focus {
+  border-color: #4F46E5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14);
+}
+
+.tenant-checkbox-list { border-radius: 12px; border-color: rgba(79, 70, 229, 0.14); }
+.tenant-checkbox-row input,
+.up-perm-toggle input { accent-color: #4F46E5; }
+
+/* RoleManager's role <select> carries its border/radius as an inline style
+   (JSX left untouched per the task brief), so an !important is needed here to
+   win over it — same escape hatch already used elsewhere in this file. */
+select[aria-label^='Role for'] {
+  border-radius: 12px !important;
+  border-color: rgba(79, 70, 229, 0.22) !important;
+}
+select[aria-label^='Role for']:focus {
+  border-color: #4F46E5 !important;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14);
+}
+
+/* Buttons — indigo pill, matching .btn-primary / .btn-outline-indigo. */
+.tenant-submit {
+  border-radius: 9999px;
+  border-color: transparent;
+  background: #4F46E5;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3), 0 4px 12px rgba(79, 70, 229, 0.18);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+}
+.tenant-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #3525CD;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35), 0 6px 16px rgba(79, 70, 229, 0.24);
+  opacity: 1;
+}
+
+.tenant-ghost-btn,
+.up-reset-btn {
+  border-radius: 9999px;
+  border-color: rgba(79, 70, 229, 0.22);
+  color: #4F46E5;
+}
+[data-theme='dark'] .tenant-ghost-btn,
+[data-theme='dark'] .up-reset-btn { border-color: rgba(129, 140, 248, 0.3); color: #A5B4FC; }
+
+.tenant-ghost-btn:hover:not(:disabled),
+.up-reset-btn:hover:not(:disabled) {
+  border-color: #4F46E5;
+  background: rgba(79, 70, 229, 0.08);
+  color: #4F46E5;
+}
+
+/* Members table — toward the mock's avatar / name / email / role chip / status
+   chip row (MEMBERS.map in the design AdminConsole). Real rows (RoleManager,
+   OrganizationManager's MembersPanel, GrantProjects/GrantRepos' target picker,
+   ReposPanel) don't carry a role name in every case, so this stays a generic
+   glass row + circular avatar rather than the mock's fixed 5-column grid. */
+.tenant-members-list { gap: 0.6rem; }
+
+.tenant-member-row {
+  border-radius: 14px;
+  border-color: rgba(79, 70, 229, 0.14);
+  background: var(--tile-bg, rgba(79, 70, 229, 0.035));
+  padding: 0.7rem 0.85rem;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+.tenant-member-row:hover {
+  border-color: rgba(79, 70, 229, 0.32);
+  box-shadow: 0 2px 14px rgba(79, 70, 229, 0.12);
+}
+
+.tenant-member-avatar {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #4F46E5, #6366F1);
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3);
+}
+
+.tenant-member-initial { font-size: 0.85rem; }
+
+.tenant-member-name { font-size: 0.85rem; }
+.tenant-member-email { font-size: 0.74rem; font-family: var(--ifm-font-family-monospace); }
+
+.tenant-member-badge {
+  padding: 0.2rem 0.6rem;
+  letter-spacing: 0.01em;
+}
+
+/* Owner/admin/"in org" — indigo-filled chip, mirrors the mock's Admin role chip. */
+.tenant-member-badge-owner {
+  background: #4F46E5;
+  color: #fff;
+}
+
+/* Plain member / inactive / pending — amber-tinted, mirrors the mock's
+   "Pending" status chip; also reads correctly for a plain "member" badge. */
+.tenant-member-badge-member {
+  background: rgba(217, 119, 6, 0.14);
+  color: #B45309;
+}
+[data-theme='dark'] .tenant-member-badge-member { background: rgba(251, 191, 36, 0.14); color: #FBBF24; }
+
+/* Permissions view — same glass-row treatment as the members table. */
+.tenant-perm-card,
+.up-perm-row {
+  border-radius: 14px;
+  border-color: rgba(79, 70, 229, 0.14);
+  background: var(--tile-bg, rgba(79, 70, 229, 0.035));
+}
+
+.tenant-perm-tag,
+.up-tag-role {
+  background: rgba(79, 70, 229, 0.12);
+  color: #4F46E5;
+}
+[data-theme='dark'] .tenant-perm-tag,
+[data-theme='dark'] .up-tag-role { background: rgba(129, 140, 248, 0.16); color: #A5B4FC; }
+
+.up-perm-name { color: var(--ifm-font-color-base); }
