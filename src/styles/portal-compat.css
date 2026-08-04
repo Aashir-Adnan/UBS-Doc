@@ -21,7 +21,6 @@
    ========================================================================== */
 :root {
   --brand-navy: #4F46E5;
-  --brand-blue: #3B7597;
   --brand-cyan: #6FD1D7;
   --brand-mint: #5DF8D8;
   --brand-primary-alpha-05: rgba(59,117,151,0.05);
@@ -36,7 +35,6 @@
   --brand-primary-mergeable-text: #1e3d54;
   --tile-bg: #eef2f6;
   --ifm-font-color-base: var(--ifm-color-content);
-  --ifm-heading-font-family: var(--ifm-font-family-base);
   --ifm-color-emphasis-50: #F8FAFC;
   --ifm-color-primary-rgb: 79, 70, 229;
   --ifm-color-warning-rgb: 245, 158, 11;

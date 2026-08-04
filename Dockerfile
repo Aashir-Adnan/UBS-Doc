@@ -3,9 +3,9 @@ WORKDIR /app
 
 # Install dependencies first for layer caching.
 COPY package*.json ./
-RUN npm install --legacy-peer-deps
+RUN npm install
 
-# Copy source and build docs site.
+# Copy source and build the Vite app.
 COPY . .
 
 # Incoming CI/CD build args (kept unchanged by name).
