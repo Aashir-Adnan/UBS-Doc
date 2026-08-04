@@ -20,9 +20,8 @@ import MeetingCreate from '../screens/MeetingCreate'
 import MeetingDetail from '../screens/MeetingDetail'
 import TenantAdmin from '../screens/TenantAdmin'
 import DocsPage from '../screens/DocsPage'
+import NotFound from '../screens/NotFound'
 import { flattenSidebar } from '../docs/sidebar'
-
-const P = ({ name }: { name: string }) => <div style={{ padding: 40 }}>{name} — coming in its task</div>
 
 // Wraps a /tools/* route element in the portal-access guard. Every /tools/*
 // page goes through this except the OAuth callback below, which must render
@@ -68,7 +67,7 @@ export default function AppRoutes() {
             old behaviour where any signed-in Google user could read them. */}
         <Route path="/docs" element={<Navigate to={`/docs/${DOCS_HOME}`} replace />} />
         <Route path="/docs/*" element={<DocsPage />} />
-        <Route path="*" element={<P name="404" />} />
+        <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
   )

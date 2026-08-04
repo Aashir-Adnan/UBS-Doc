@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm'
 import remarkFrontmatter from 'remark-frontmatter'
 import remarkMdxFrontmatter from 'remark-mdx-frontmatter'
 import remarkDirective from 'remark-directive'
+import rehypeSlug from 'rehype-slug'
 import path from 'node:path'
 import { remarkAdmonitions, normalizeAdmonitionTitles } from './src/docs/remarkAdmonitions'
 import { remarkDocLinks } from './src/docs/remarkDocLinks'
@@ -41,6 +42,7 @@ export default defineConfig({
           remarkAdmonitions,
           remarkDocLinks,
         ],
+        rehypePlugins: [rehypeSlug],
       }),
     },
     react(),

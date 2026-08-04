@@ -9,8 +9,13 @@
    them by name, so they are re-declared here to keep those rules working,
    per the "kept working as-is" mandate for this section.
    --brand-navy is retinted per the mandated old-brand-blue replacement
-   (#093C5D -> #4F46E5); every other value is carried over unchanged —
-   individual screen tasks own further re-tinting.
+   (#093C5D -> #4F46E5). The --brand-primary-alpha-* / -done-text /
+   -mergeable-text defaults are likewise retinted to the app's indigo
+   (rgba(79,70,229,*) light / rgba(129,140,248,*) dark — the same values the
+   GitHub-scoped override below re-declares on .gh-workspace/.gh-selector),
+   replacing the old blue/teal that was leaking into every consumer of these
+   properties (Repositories, Tenant Admin) outside the GitHub subtree. That
+   scoped override is now redundant but harmless and is left in place.
 
    A second group below (--ifm-color-emphasis-50, --ifm-link-color, etc.)
    are standard Infima derived variables that used to ship for free with
@@ -23,16 +28,16 @@
   --brand-navy: #4F46E5;
   --brand-cyan: #6FD1D7;
   --brand-mint: #5DF8D8;
-  --brand-primary-alpha-05: rgba(59,117,151,0.05);
-  --brand-primary-alpha-10: rgba(59,117,151,0.10);
-  --brand-primary-alpha-12: rgba(59,117,151,0.12);
-  --brand-primary-alpha-14: rgba(59,117,151,0.14);
-  --brand-primary-alpha-18: rgba(59,117,151,0.18);
-  --brand-primary-alpha-20: rgba(59,117,151,0.20);
-  --brand-primary-alpha-25: rgba(59,117,151,0.25);
-  --brand-primary-alpha-30: rgba(59,117,151,0.30);
-  --brand-primary-done-text: #1e3d54;
-  --brand-primary-mergeable-text: #1e3d54;
+  --brand-primary-alpha-05: rgba(79, 70, 229, 0.05);
+  --brand-primary-alpha-10: rgba(79, 70, 229, 0.10);
+  --brand-primary-alpha-12: rgba(79, 70, 229, 0.12);
+  --brand-primary-alpha-14: rgba(79, 70, 229, 0.14);
+  --brand-primary-alpha-18: rgba(79, 70, 229, 0.18);
+  --brand-primary-alpha-20: rgba(79, 70, 229, 0.20);
+  --brand-primary-alpha-25: rgba(79, 70, 229, 0.25);
+  --brand-primary-alpha-30: rgba(79, 70, 229, 0.30);
+  --brand-primary-done-text: #4338CA;
+  --brand-primary-mergeable-text: #4338CA;
   --tile-bg: #eef2f6;
   --ifm-font-color-base: var(--ifm-color-content);
   --ifm-color-emphasis-50: #F8FAFC;
@@ -46,16 +51,16 @@
 
 [data-theme='dark'] {
   --ifm-color-emphasis-50: rgba(255, 255, 255, 0.03);
-  --brand-primary-alpha-05: rgba(111,209,215,0.05);
-  --brand-primary-alpha-10: rgba(111,209,215,0.10);
-  --brand-primary-alpha-12: rgba(111,209,215,0.12);
-  --brand-primary-alpha-14: rgba(111,209,215,0.14);
-  --brand-primary-alpha-18: rgba(111,209,215,0.18);
-  --brand-primary-alpha-20: rgba(111,209,215,0.20);
-  --brand-primary-alpha-25: rgba(111,209,215,0.25);
-  --brand-primary-alpha-30: rgba(111,209,215,0.30);
-  --brand-primary-done-text: #aae8eb;
-  --brand-primary-mergeable-text: #aae8eb;
+  --brand-primary-alpha-05: rgba(129, 140, 248, 0.06);
+  --brand-primary-alpha-10: rgba(129, 140, 248, 0.10);
+  --brand-primary-alpha-12: rgba(129, 140, 248, 0.12);
+  --brand-primary-alpha-14: rgba(129, 140, 248, 0.14);
+  --brand-primary-alpha-18: rgba(129, 140, 248, 0.18);
+  --brand-primary-alpha-20: rgba(129, 140, 248, 0.20);
+  --brand-primary-alpha-25: rgba(129, 140, 248, 0.25);
+  --brand-primary-alpha-30: rgba(129, 140, 248, 0.30);
+  --brand-primary-done-text: #A5B4FC;
+  --brand-primary-mergeable-text: #A5B4FC;
   --tile-bg: #101e28;
 }
 

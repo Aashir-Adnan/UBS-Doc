@@ -51,7 +51,7 @@ This is a single Vite SPA — the two Docusaurus-era layers (docs site + custom-
 Two nested gates, both still present, now expressed as route wrappers instead of full-page repeated guards:
 
 1. **Site gate** (`SiteGate`, `src/components/guards/SiteGate.tsx`): wraps every route except the OAuth callback. Shows `SignIn` screen if no Google user; otherwise dispatches `fetchUserUrdds` and renders children inside `AppLayout` (sidebar + theme shell).
-2. **Tool gate** (`ToolGuard`, `src/components/guards/ToolGuard.tsx`): wraps each individual `/tools/*` route via the `T()` helper in `routes.tsx`. Uses `usePortalAccess()` (still backed by `isGranjurEmail()`-style allowlist logic) to show `AccessState kind="restricted"` for non-Granjur accounts.
+2. **Tool gate** (`ToolGuard`, `src/components/guards/ToolGuard.tsx`): wraps each individual `/tools/*` route via the `T()` helper in `routes.tsx`. Uses `usePortalAccess()` (`src/components/portal/usePortalAccess.js`) to show `AccessState kind="restricted"` unless the account is `@granjur.com` or has been provisioned into a tenant (a URDD with a non-null `tenant_id`).
 
 `/tools/github/callback` is the one route declared **outside** both gates — it must render with no Google session and no sidebar (OAuth popup/redirect target). See `src/screens/GithubCallback.jsx`.
 
@@ -117,7 +117,7 @@ Three separate mechanisms exist purely so ported Docusaurus-era code needs zero 
 | `/tools/tenantAdmin` | `TenantAdmin` | Assign Tenant lives under System only |
 | `/docs` | redirect | → `/docs/<first sidebar doc>` (`flattenSidebar()[0]`) |
 | `/docs/*` | `DocsPage` | site-gated only, no `ToolGuard` — any signed-in Google user can read docs |
-| `*` | 404 placeholder | |
+| `*` | `NotFound` | themed 404 card, matches `AccessState`'s design language |
 
 ## Adding a new tool screen
 

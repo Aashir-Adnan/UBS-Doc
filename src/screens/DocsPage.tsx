@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useState, type ComponentType } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { MDXProvider } from '@mdx-js/react'
 import { ArrowLeft, ArrowRight, FileQuestion } from 'lucide-react'
 import DocsSidebar from '../components/docs/DocsSidebar'
@@ -91,6 +91,31 @@ export default function DocsPage() {
   useEffect(() => {
     if (title) document.title = `${title} | UBS Docs`
   }, [title])
+
+  // Scroll to the heading named by the URL hash once it exists in the DOM.
+  // The doc body is lazy-loaded behind Suspense, so the target id may not be
+  // painted yet on the render where `hash` first appears — retry across a
+  // few frames instead of assuming the element is already there.
+  const { hash } = useLocation()
+  useEffect(() => {
+    if (!hash) return
+    const target = decodeURIComponent(hash.slice(1))
+    let cancelled = false
+    let attempts = 0
+    const tryScroll = () => {
+      if (cancelled) return
+      const el = document.getElementById(target)
+      if (el) {
+        el.scrollIntoView()
+        return
+      }
+      if (++attempts < 50) requestAnimationFrame(tryScroll)
+    }
+    tryScroll()
+    return () => {
+      cancelled = true
+    }
+  }, [hash, id])
 
   const crumbs = useMemo(
     () => ['Docs', ...(id ? id.split('/').map(docLabel) : [])],

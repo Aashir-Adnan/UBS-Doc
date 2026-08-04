@@ -19,7 +19,7 @@ export default function APIBuilder() {
   const { theme } = useTheme()
   const [tab, setTab] = useState<'configure' | 'output'>('configure')
   const [state, setState] = useState(DEFAULT_STATE)
-  const [copied, setCopied] = useState(false)
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const d = theme === 'dark'
 
   const update = (key: keyof typeof DEFAULT_STATE, value: unknown) =>
@@ -31,9 +31,11 @@ export default function APIBuilder() {
   const outputJs = useMemo(() => buildOutput(state), [state])
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(outputJs)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    navigator.clipboard.writeText(outputJs).then(
+      () => setCopyState('copied'),
+      () => setCopyState('failed'),
+    )
+    setTimeout(() => setCopyState('idle'), 2000)
   }
 
   const inputBase = c('input-base px-4 py-2.5 text-sm', d ? 'input-dark' : 'input-light')
@@ -331,18 +333,26 @@ export default function APIBuilder() {
                 onClick={handleCopy}
                 className={c(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border tr',
-                  copied
+                  copyState === 'copied'
                     ? d
                       ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/8'
                       : 'border-emerald-400 text-emerald-600 bg-emerald-50'
-                    : d
-                      ? 'border-indigo-500/22 text-white/45 hover:text-white'
-                      : 'border-slate-200 text-slate-500 hover:text-slate-700'
+                    : copyState === 'failed'
+                      ? d
+                        ? 'border-red-500/30 text-red-400 bg-red-500/8'
+                        : 'border-red-400 text-red-600 bg-red-50'
+                      : d
+                        ? 'border-indigo-500/22 text-white/45 hover:text-white'
+                        : 'border-slate-200 text-slate-500 hover:text-slate-700'
                 )}
               >
-                {copied ? (
+                {copyState === 'copied' ? (
                   <>
                     <Check size={12} /> Copied
+                  </>
+                ) : copyState === 'failed' ? (
+                  <>
+                    <Copy size={12} /> Copy failed
                   </>
                 ) : (
                   <>
