@@ -2,11 +2,11 @@
 
 **GET** `/api/guest/booking/constraints`
 
-Returns the configurable booking rules for a hotel's stay services. The frontend uses these values to constrain date pickers (min/max selectable range), guest count inputs, and show blackout periods.
+Returns the configurable booking rules and blackout dates for a hotel's services. The frontend uses these values to constrain date pickers (min/max selectable range), guest count inputs, and show blackout periods.
 
-**This API applies to all services and packages.** The scalar constraints (stay nights, advance booking window, persons per room) are per-service, while blackout dates are hotel-wide and block bookings across every service and package at the hotel. The frontend must silently fetch these constraints in the background and ensure they are loaded before entering any booking flow — room bookings, service bookings, and package bookings alike.
+**This API applies to all services and packages — not just stay/room services.** The scalar constraints (stay nights, advance booking window, persons per room) are per-service, while blackout dates are hotel-wide and block bookings across every service and package at the hotel. The frontend must silently fetch these constraints in the background and ensure they are loaded before entering any booking flow — room bookings, service bookings, and package bookings alike.
 
-If `serviceId` is provided, returns constraints for that single service. If omitted, returns constraints for all stay services at the hotel.
+If `serviceId` is provided, returns constraints for that single service. If omitted, returns constraints for all active services at the hotel.
 
 ---
 
@@ -29,7 +29,7 @@ This endpoint should be called as early as possible — ideally when the user la
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `hotelId` | `number` | Yes | The tenant ID of the hotel to fetch constraints for. |
-| `serviceId` | `number` | No | A specific stay service ID. If omitted, returns constraints for all stay services. |
+| `serviceId` | `number` | No | A specific service ID. If omitted, returns constraints for all active services at the hotel. |
 
 ---
 
@@ -143,7 +143,7 @@ The frontend should use these dates to:
 | `maxPersonsPerRoom` | Show a note or auto-calculate rooms needed when guest count exceeds this. |
 | `blackoutDates` | Disable or visually mark blackout windows in the check-in date picker across all booking flows (rooms, services, packages). |
 
-When multiple services are returned, scalar constraints (stay nights, advance booking, persons) may differ per room type. The frontend should apply the constraints matching the selected service. Blackout dates are the same across all services since they are hotel-wide.
+When multiple services are returned, scalar constraints may differ per service. The frontend should apply the constraints matching the selected service. Blackout dates are the same across all services since they are hotel-wide.
 
 ---
 
@@ -158,14 +158,14 @@ When multiple services are returned, scalar constraints (stay nights, advance bo
 }
 ```
 
-### No Stay Services Found (404)
+### No Services Found (404)
 
-Returned when the hotel has no active stay-category services, or the specified `serviceId` does not match a stay service at the hotel.
+Returned when the hotel has no active services, or the specified `serviceId` does not match an active service at the hotel.
 
 ```json
 {
   "statusCode": 404,
-  "message": "No stay services found for this hotel"
+  "message": "No active services found for this hotel"
 }
 ```
 
@@ -177,7 +177,7 @@ Returned when the hotel has no active stay-category services, or the specified `
 - **Blackout dates are tenant-level** — they are stored in `hms_config` with `base_table = 'tenants'` and apply to all services and packages at the hotel. There are no per-service blackout dates.
 - The `advanceBookingMinDays` and `advanceBookingMaxDays` checks only apply to the **check-in date**. When editing a booking and only changing the check-out date, these are not enforced server-side.
 - `blackoutDates` only blocks **check-in** on those dates — a stay that spans a blackout window (check-in before, check-out after) is allowed.
-- Different room types at the same hotel can have different scalar constraints (e.g. suites may allow longer stays than standard rooms).
+- Different services at the same hotel can have different scalar constraints (e.g. suites may allow longer stays than standard rooms).
 - Blackout entries with `active: false` in the config are filtered out automatically.
 
 ---
