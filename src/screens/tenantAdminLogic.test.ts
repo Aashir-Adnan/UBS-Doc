@@ -32,6 +32,25 @@ describe('deriveTabs', () => {
     expect(deriveTabs(false).some((t) => t.key === 'assign')).toBe(false);
     expect(deriveTabs(true).some((t) => t.key === 'assign')).toBe(false);
   });
+
+  it('returns a fresh array each call — mutating one result must not affect the next', () => {
+    const first = deriveTabs(false);
+    first.push({ key: 'system', label: 'System' }); // simulate a careless caller
+    first.sort(() => -1);
+
+    const second = deriveTabs(false);
+    expect(second).toHaveLength(6);
+    expect(second.some((t) => t.key === 'system')).toBe(false);
+    expect(second.map((t) => t.key)).toEqual([
+      'org', 'provision', 'grant', 'grantRepos', 'roles', 'permissions',
+    ]);
+
+    // Same guarantee for the super-admin branch.
+    const firstSuper = deriveTabs(true);
+    firstSuper.length = 0;
+    const secondSuper = deriveTabs(true);
+    expect(secondSuper).toHaveLength(7);
+  });
 });
 
 describe('shouldResetSystemTab', () => {
@@ -76,9 +95,16 @@ describe('computeMemberStats', () => {
       { urdd_id: 1, is_active: true },
       { urdd_id: 2, is_active: false },
       { urdd_id: null, is_active: true }, // pending, still active
-      { urdd_id: 3 }, // is_active omitted -> counts as active
+      { urdd_id: 3 }, // is_active omitted -> RoleManager's `!u.is_active` reads this as inactive
     ];
-    expect(computeMemberStats(members)).toEqual({ total: 4, active: 3, pending: 1 });
+    // active: only the two explicit `is_active: true` rows — RoleManager shows
+    // its "inactive" badge whenever `!u.is_active`, so undefined must NOT count.
+    expect(computeMemberStats(members)).toEqual({ total: 4, active: 2, pending: 1 });
+  });
+
+  it('is_active: 0 counts as inactive, same as RoleManager\'s !u.is_active check', () => {
+    const members = [{ urdd_id: 1, is_active: 0 as unknown as boolean }];
+    expect(computeMemberStats(members)).toEqual({ total: 1, active: 0, pending: 0 });
   });
 
   it('treats an empty list as all-zero, not null', () => {

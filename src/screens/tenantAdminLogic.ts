@@ -32,8 +32,11 @@ export const SYSTEM_TAB: OrgTab = { key: 'system', label: 'System' };
 
 // The whole tab-visibility decision, as a pure function of `isSuperAdmin`
 // (== !!activeOrg?.is_super_admin) — non-super-admins must NEVER see System.
+// Always returns a FRESH array (never the shared ORG_TABS reference) so a
+// caller mutating its result (e.g. sort/push) can never corrupt what the next
+// call — for a different acting user/org — sees.
 export function deriveTabs(isSuperAdmin: boolean): OrgTab[] {
-  return isSuperAdmin ? [...ORG_TABS, SYSTEM_TAB] : ORG_TABS;
+  return isSuperAdmin ? [...ORG_TABS, SYSTEM_TAB] : [...ORG_TABS];
 }
 
 // Mirrors the reset useEffect: never leave the super-admin-only tab selected
@@ -66,15 +69,23 @@ export interface MemberStats {
   pending: number;
 }
 
-// Total / Active / Pending counts from a listMembers(adminUrdd) response's
-// `members` array. `is_active` follows the same "only an explicit false counts
-// against you" convention RoleManager.jsx already uses (`!u.is_active` badge);
-// `pending` mirrors RoleManager's own `urdd_id === null` check verbatim.
+// Total / Active / Pending counts from a listPortalUsers(adminUrdd) response's
+// `users` array — the SAME org-scoped call RoleManager.jsx drives its rows
+// from. (listMembers(adminUrdd)'s rows are URDD rows: urdd_id is never null
+// there and is_active isn't a field at all, so it cannot answer either of
+// these — that mismatch was caught in review and is why this reads from
+// listPortalUsers instead.)
+//
+// `active` mirrors RoleManager's own inactive badge exactly: it renders
+// "inactive" whenever `!u.is_active`, i.e. is_active must be truthy to count
+// as active — undefined/0/false/null all count against it, same as there.
+// `pending` mirrors RoleManager's `urdd_id === null` check verbatim (an
+// explicit null, not "falsy" — 0 is a valid urdd_id and must not count).
 export function computeMemberStats(members: MemberLike[] | null | undefined): MemberStats | null {
   if (!members) return null;
   return {
     total: members.length,
-    active: members.filter((m) => m.is_active !== false).length,
+    active: members.filter((m) => !!m.is_active).length,
     pending: members.filter((m) => m.urdd_id === null).length,
   };
 }

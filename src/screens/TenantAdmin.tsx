@@ -4,7 +4,7 @@ import { c, card, txt, muted, Breadcrumb } from '../lib'
 import { useTheme } from '../app/ThemeContext'
 import { useAuthTyped as useAuth } from '../components/portal/authTypes'
 import { useActingUrdd } from '../components/portal/tenantProjects/useActingUrdd'
-import { listMembers, listTenants } from '../components/portal/tenantProjects/tenantApi'
+import { listPortalUsers, listTenants } from '../components/portal/tenantProjects/tenantApi'
 import {
   deriveTabs, shouldResetSystemTab, orgLabel, computeMemberStats,
 } from './tenantAdminLogic'
@@ -62,8 +62,14 @@ export default function TenantAdmin() {
   const { theme } = useTheme()
   const d = theme === 'dark'
   const { user, signOut } = useAuth()
-  const { urdd: adminUrdd, activeOrg, refetch } = useActingUrdd()
+  const { urdd: adminUrdd, activeOrg, refetch, status: orgStatus } = useActingUrdd()
   const [tab, setTab] = useState('org')
+
+  // True while useActingUrdd is still resolving the acting org/URDD (has not
+  // reached 'ready' or 'pending' yet) — used below to keep the stat cards in
+  // their loading skeleton instead of flashing a fabricated "0" before we
+  // actually know whether there is an acting org at all.
+  const orgResolving = orgStatus === 'idle' || orgStatus === 'loading'
 
   const isSuperAdmin = !!activeOrg?.is_super_admin
   const tabs = deriveTabs(isSuperAdmin)
@@ -82,24 +88,32 @@ export default function TenantAdmin() {
   const [membersLoading, setMembersLoading] = useState(true)
   const [membersError, setMembersError] = useState<string | null>(null)
 
+  // Sourced from listPortalUsers(adminUrdd) — the SAME org-scoped call
+  // RoleManager.jsx drives its rows from — not listMembers(adminUrdd): that
+  // endpoint's rows are URDD rows, where urdd_id is never null and is_active
+  // isn't a field at all, so it cannot answer either Active or Pending.
   const loadMembers = useCallback(() => {
     if (adminUrdd == null) {
+      // Not necessarily "no members" — useActingUrdd may still be resolving
+      // the acting org. Only settle into a real (non-loading) empty state
+      // once orgResolving is false, so the cards never flash "0 Total
+      // Members" before the org has finished loading.
       setMembers(null)
-      setMembersLoading(false)
+      setMembersLoading(orgResolving)
       return undefined
     }
     let cancelled = false
     setMembersLoading(true)
     setMembersError(null)
-    listMembers(adminUrdd)
+    listPortalUsers(adminUrdd)
       .then((res: any) => {
         if (cancelled) return
-        setMembers(Array.isArray(res?.members) ? res.members : [])
+        setMembers(Array.isArray(res?.users) ? res.users : [])
       })
       .catch((e: any) => { if (!cancelled) setMembersError(e?.message || 'Failed to load members'); })
       .finally(() => { if (!cancelled) setMembersLoading(false) })
     return () => { cancelled = true }
-  }, [adminUrdd])
+  }, [adminUrdd, orgResolving])
 
   useEffect(() => loadMembers(), [loadMembers])
 
@@ -156,9 +170,13 @@ export default function TenantAdmin() {
       }
       : {
         label: 'Organization',
+        // While the org is still resolving, isSuperAdmin reads false by
+        // default (activeOrg is null) — show the skeleton here too rather
+        // than a premature "—", which would otherwise flash before we know
+        // this branch is even the right one.
         value: activeOrgName || '—',
         sub: 'currently selected',
-        loading: false,
+        loading: orgResolving,
       },
   ]
 
@@ -206,8 +224,9 @@ export default function TenantAdmin() {
           {isSuperAdmin && ' Cross-organization tools live under the System tab.'}
         </p>
 
-        {/* Stats row — real listMembers/listTenants data, pulse-dot skeleton while
-            loading, "—" if the fetch fails (never a fabricated number). */}
+        {/* Stats row — real listPortalUsers/listTenants data, pulse-dot skeleton
+            while loading (including while the acting org itself is still
+            resolving), "—" if the fetch fails (never a fabricated number). */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           {statCards.map((s) => (
             <StatCard key={s.label} label={s.label} value={s.value} sub={s.sub} loading={s.loading} theme={theme} />
