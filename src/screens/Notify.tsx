@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, Upload, Download, X } from 'lucide-react'
 import { c, card, txt, muted, inputCls } from '../lib'
 import { useTheme } from '../app/ThemeContext'
@@ -53,7 +53,7 @@ function NotifyCard({ theme }: { theme: 'light' | 'dark' }) {
 
       setSent(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send email')
+      setError(`Error: ${err instanceof Error ? err.message : 'Failed to send email'}`)
     } finally {
       setLoading(false)
     }
@@ -130,7 +130,6 @@ function LucidCard({ theme }: { theme: 'light' | 'dark' }) {
   const d = theme === 'dark'
 
   const pickFile = (f: File | null | undefined) => {
-    if (downloadUrl) window.URL.revokeObjectURL(downloadUrl)
     setDownloadUrl(null)
     setResult('')
     setStatus('idle')
@@ -141,6 +140,15 @@ function LucidCard({ theme }: { theme: 'light' | 'dark' }) {
     pickFile(null)
     if (inputRef.current) inputRef.current.value = ''
   }
+
+  // Revoke the previous blob URL whenever it's replaced, and on unmount —
+  // the replay "Download sanitized file" button stays functional for as
+  // long as the URL is live (i.e. while this downloadUrl is the current one).
+  useEffect(() => {
+    return () => {
+      if (downloadUrl) window.URL.revokeObjectURL(downloadUrl)
+    }
+  }, [downloadUrl])
 
   // Verbatim from LucidSanitize.jsx's handleSubmit: same endpoint, FormData
   // shape, content-type sniffing, and download filename derivation.
@@ -182,8 +190,13 @@ function LucidCard({ theme }: { theme: 'light' | 'dark' }) {
         setStatus('done')
       } else {
         const text = await res.text()
-        setResult(text || (res.ok ? 'Done.' : 'Request failed.'))
-        setStatus('done')
+        if (res.ok) {
+          setResult(text || 'Done.')
+          setStatus('done')
+        } else {
+          setResult(text || 'Request failed.')
+          setStatus('error')
+        }
       }
     } catch (err) {
       setResult('Error: ' + (err instanceof Error ? err.message : String(err)))
