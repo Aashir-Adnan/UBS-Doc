@@ -15,6 +15,9 @@ import MyProjects from '../screens/MyProjects'
 import Repositories from '../screens/Repositories'
 import GitHub from '../screens/GitHub'
 import GithubSandbox from '../screens/GithubSandbox'
+import Meetings from '../screens/Meetings'
+import MeetingCreate from '../screens/MeetingCreate'
+import MeetingDetail from '../screens/MeetingDetail'
 
 const P = ({ name }: { name: string }) => <div style={{ padding: 40 }}>{name} — coming in its task</div>
 
@@ -41,7 +44,14 @@ export default function AppRoutes() {
         <Route path="/tools/github" element={T(<GitHub />)} />
         {/* URL-only: no sidebar entry, no hub card (Task 13). */}
         <Route path="/tools/github-sandbox" element={T(<GithubSandbox />)} />
-        <Route path="/tools/meetingWorkflow" element={T(<P name="meetings" />)} />
+        {/* Meetings (Task 14): the old page's `view` local state becomes URLs.
+            The bare path still lands on the list, so old bookmarks survive.
+            /create is declared before /:meetingId for readability — React
+            Router already ranks the static segment above the dynamic one.
+            Workflow stages stay INTERNAL to WorkflowPanel, not routes. */}
+        <Route path="/tools/meetingWorkflow" element={T(<Meetings />)} />
+        <Route path="/tools/meetingWorkflow/create" element={T(<MeetingCreate />)} />
+        <Route path="/tools/meetingWorkflow/:meetingId" element={T(<MeetingDetail />)} />
         <Route path="/tools/projects" element={T(<Projects view="grid" />)} />
         <Route path="/tools/projects/view" element={T(<Projects view="detail" />)} />
         <Route path="/tools/myProjects" element={T(<MyProjects view="grid" />)} />
