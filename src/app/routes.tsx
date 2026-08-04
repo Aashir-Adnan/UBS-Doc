@@ -7,6 +7,7 @@ import GithubCallback from '../screens/GithubCallback'
 import Home from '../screens/Home'
 import About from '../screens/About'
 import ToolsHub from '../screens/ToolsHub'
+import Notify from '../screens/Notify'
 
 const P = ({ name }: { name: string }) => <div style={{ padding: 40 }}>{name} — coming in its task</div>
 
@@ -27,8 +28,8 @@ export default function AppRoutes() {
         <Route path="/tools" element={T(<ToolsHub />)} />
         <Route path="/tools/database" element={T(<P name="database" />)} />
         <Route path="/tools/database/mapper" element={T(<P name="mapper" />)} />
-        <Route path="/tools/lucid" element={T(<P name="lucid" />)} />
-        <Route path="/tools/notify" element={T(<P name="notify" />)} />
+        <Route path="/tools/lucid" element={T(<Notify screen="lucid-sanitize" />)} />
+        <Route path="/tools/notify" element={T(<Notify screen="notify" />)} />
         <Route path="/tools/apiObject" element={T(<P name="api builder" />)} />
         <Route path="/tools/github" element={T(<P name="github" />)} />
         <Route path="/tools/github-sandbox" element={T(<P name="sandbox" />)} />
