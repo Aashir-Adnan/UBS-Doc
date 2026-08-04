@@ -241,6 +241,7 @@ export default function Root({ children }) {
 
 function AuthGate({ children }) {
   const { user } = useAuth();
+  const location = useLocation();
   const dispatch = useDispatch();
 
   useEffect(() => {
@@ -250,6 +251,15 @@ function AuthGate({ children }) {
       dispatch(clearOrg());
     }
   }, [user?.email, dispatch]);
+
+  // The GitHub OAuth callback is a redirect landing page and must run WITHOUT the
+  // site sign-in gate. GitHub's redirect (and the mobile flutter_web_auth_2 session
+  // in particular) arrives with no Google session, so gating it would block the flow.
+  // The page only reads code/state and bounces back (postMessage on web, ubsmobile://
+  // deep link on mobile); it never needs the signed-in user.
+  if (location.pathname.startsWith('/tools/github/callback')) {
+    return children;
+  }
 
   if (!user) {
     return (
