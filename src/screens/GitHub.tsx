@@ -1,28 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Bell, GitBranch, GitPullRequest, Plus, PanelLeft, ExternalLink, AlertTriangle, Check } from 'lucide-react'
-import { c, card, txt, muted, divider, chipIndigo, chipGray, chipMint, chipAmber } from '../lib'
+import { Bell, GitBranch, GitPullRequest, Plus, PanelLeft } from 'lucide-react'
+import { c, card, txt, muted, divider } from '../lib'
 import { useTheme } from '../app/ThemeContext'
 import { useAuthTyped } from '../components/portal/authTypes'
 import GithubWorkflow from '../components/portal/GithubWorkflow'
-import { listPullRequests } from '../components/portal/githubPrs'
 
 // Design chrome from design/UBS Dev Tools Portal (1)/src/screens/GitHub.tsx:
 // gradient H1, notification bell, and the Repositories | Issues | Pull
 // Requests | New Issue underline tab bar. Everything below the tab bar is the
 // untouched GithubWorkflow feature tree (repo selector, issue creator with the
 // [Agent Call] body format, issue status panel with bot blink lights, comment
-// threads, file explorer, 60s notification polling) — this screen only drives
-// its new optional `tab` prop and mirrors the state it exposes (selected repo,
-// notifications) for the header chrome. GithubWorkflow stays mounted across
-// tab switches so the selected repo and notification history survive.
+// threads, pull requests with ping-to-merge, file explorer, 60s notification
+// polling) — this screen only drives its new optional `tab` prop and mirrors
+// the state it exposes (selected repo, notifications) for the header chrome.
+// GithubWorkflow stays mounted across tab switches so the selected repo and
+// notification history survive.
 //
-// The one panel this screen renders itself is Pull Requests: a read-only list
-// built on ../components/portal/githubPrs.js, passed down as children and
-// slotted in place of GithubWorkflow's built-in PRs panel. The mock's
-// "Ping to merge" modal is out of scope and deliberately not built.
+// Every panel, including Pull Requests, is GithubWorkflow's own: functionality
+// parity over the pre-migration page comes first, and its PRs panel already
+// carries features the design mock does not show (per-PR changed files, ping
+// history, ping delete) alongside the mock's Ping to merge.
 
 type Tab = 'repos' | 'issues' | 'prs' | 'newissue'
-type PrFilter = 'Open' | 'Closed' | 'All'
 
 interface Repo { slug: string; name: string; owner: string; repo: string; branch?: string }
 
@@ -40,17 +39,6 @@ interface NotifState {
   items: NotifItem[]
   dismiss: (id: string) => void
   dismissAll: () => void
-}
-
-interface PullRequest {
-  number: number
-  title: string
-  branch?: string
-  state: string
-  draft: boolean
-  user?: string
-  url: string
-  updatedAt: string
 }
 
 const TABS: { key: Tab; label: string; Icon: typeof GitBranch | null }[] = [
@@ -136,11 +124,7 @@ export default function GitHub() {
           onRepoChange={handleRepoChange}
           onNotificationsChange={handleNotifications}
           onRequestTab={handleRequestTab}
-        >
-          {tab === 'prs' && repo
-            ? <PullRequestsPanel owner={repo.owner} repo={repo.repo} theme={theme} />
-            : null}
-        </GithubWorkflow>
+        />
       </div>
     </div>
   )
@@ -226,109 +210,5 @@ function NotificationBell({ notifs, theme }: { notifs: NotifState; theme: 'light
         </div>
       )}
     </div>
-  )
-}
-
-/* ── Pull Requests panel (read-only) ─────────────────────────────────────── */
-
-const FILTERS: PrFilter[] = ['Open', 'Closed', 'All']
-
-function PullRequestsPanel({ owner, repo, theme }: { owner: string; repo: string; theme: 'light' | 'dark' }) {
-  const d = theme === 'dark'
-  const [filter, setFilter] = useState<PrFilter>('Open')
-  const [prs, setPrs] = useState<PullRequest[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    listPullRequests(owner, repo, filter.toLowerCase() as 'open' | 'closed' | 'all')
-      .then((list: PullRequest[]) => { if (!cancelled) setPrs(list) })
-      .catch((e: Error) => { if (!cancelled) { setError(e.message); setPrs([]) } })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [owner, repo, filter])
-
-  return (
-    <div>
-      {/* Segmented filter — drives the refetch above */}
-      <div className={c('inline-flex p-1 rounded-xl mb-5', d ? 'bg-white/5' : 'bg-slate-100')}>
-        {FILTERS.map(f => (
-          <button key={f} type="button" onClick={() => setFilter(f)}
-            className={c('px-4 py-1.5 rounded-lg text-xs font-bold tr',
-              filter === f
-                ? d ? 'bg-indigo-500/30 text-indigo-300' : 'bg-white text-indigo-600 shadow-sm'
-                : d ? 'text-white/38' : 'text-slate-500')}>
-            {f}
-          </button>
-        ))}
-      </div>
-
-      {loading && (
-        <div className={c('flex items-center gap-2.5 text-sm', muted(theme))}>
-          <span className="status-spinner" /> Loading pull requests…
-        </div>
-      )}
-
-      {!loading && error && (
-        <div className={c(card(theme), 'p-5 flex items-start gap-2.5')}>
-          <AlertTriangle size={15} className="text-amber-400 shrink-0 mt-0.5" />
-          <p className="text-sm m-0 text-amber-400">Could not load pull requests: {error}</p>
-        </div>
-      )}
-
-      {!loading && !error && prs.length === 0 && (
-        <p className={c('text-sm', muted(theme))}>
-          No {filter === 'All' ? '' : filter.toLowerCase() + ' '}pull requests in {owner}/{repo}.
-        </p>
-      )}
-
-      {!loading && !error && prs.length > 0 && (
-        <div className="flex flex-col gap-4">
-          {prs.map(pr => <PrCard key={pr.number} pr={pr} theme={theme} />)}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function PrCard({ pr, theme }: { pr: PullRequest; theme: 'light' | 'dark' }) {
-  const d = theme === 'dark'
-  const isOpen = pr.state === 'open' && !pr.draft
-  const updated = pr.updatedAt
-    ? new Date(pr.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-    : ''
-
-  const bannerCls = pr.draft
-    ? d ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-700'
-    : isOpen
-      ? d ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-700'
-      : d ? 'bg-white/[0.04] text-white/45' : 'bg-slate-50 text-slate-500'
-
-  return (
-    <a href={pr.url} target="_blank" rel="noopener noreferrer"
-      className={c(card(theme), 'overflow-hidden block no-underline tr', d ? 'card-hover-dark' : 'card-hover-light')}>
-      <div className={c('px-5 py-2.5 text-xs font-bold flex items-center gap-2', bannerCls)}>
-        {pr.draft ? <AlertTriangle size={13} /> : isOpen ? <GitPullRequest size={13} /> : <Check size={13} />}
-        {pr.draft ? 'Draft' : isOpen ? 'Open' : 'Closed'}
-      </div>
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-4 mb-3">
-          <p className={c('font-bold text-sm m-0 leading-snug', txt(theme))}>{pr.title}</p>
-          <ExternalLink size={14} className={c('shrink-0 mt-0.5', muted(theme))} />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={c(pr.draft ? chipAmber(theme) : isOpen ? chipMint(theme) : chipGray(theme), 'mono')}>
-            {pr.branch || 'unknown branch'}
-          </span>
-          <span className={chipIndigo(theme)}>#{pr.number}</span>
-          <span className={c('text-xs', muted(theme))}>
-            {pr.user ? `${pr.user} · ` : ''}updated {updated}
-          </span>
-        </div>
-      </div>
-    </a>
   )
 }

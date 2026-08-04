@@ -961,10 +961,8 @@ function RepoWorkspace({
   // ── Task 13 (design shell) — all optional; omitted → original behaviour ──
   // controlledTab: parent owns the tab bar, this component only shows/hides
   // its existing panels. explorerOpen: parent owns the Explorer toggle.
-  // onRequestTab: lets an internal action (issue created) move the parent's
-  // tab. prsSlot: parent-rendered Pull Requests panel, replacing the built-in
-  // one while the parent drives the tabs.
-  controlledTab, explorerOpen = true, onRequestTab, prsSlot,
+  // onRequestTab: lets an internal action (issue created) move the parent's tab.
+  controlledTab, explorerOpen = true, onRequestTab,
 }) {
   const [tab, setTab] = useState('issues');
   const [displayTab, setDisplayTab] = useState('issues');
@@ -1078,14 +1076,14 @@ function RepoWorkspace({
                   onRefresh={() => setRefreshTick((t) => t + 1)} />
               </>
             )}
-            {activeTab === 'prs' && (prsSlot || (
+            {activeTab === 'prs' && (
               <>
                 <div className="gh-panel-header">
                   <h3 className="gh-panel-title">Pull Requests</h3>
                 </div>
                 <PRsPanel repo={repo} user={user} />
               </>
-            ))}
+            )}
             {activeTab === 'create' && (
               <>
                 <div className="gh-panel-header">
@@ -1174,10 +1172,9 @@ function RepoSelector({ onSelect }) {
  * @param {Function} [props.onRepoChange]  fires with the selected repo (or null)
  * @param {Function} [props.onNotificationsChange] exposes the notification list + dismiss handlers
  * @param {Function} [props.onRequestTab]  asks the parent to switch tabs
- * @param {React.ReactNode} [props.children] rendered in place of the built-in PRs panel
  */
 export default function GithubWorkflow({
-  user, tab, explorerOpen = true, onRepoChange, onNotificationsChange, onRequestTab, children,
+  user, tab, explorerOpen = true, onRepoChange, onNotificationsChange, onRequestTab,
 }) {
   const [selectedRepo, setSelectedRepo] = useState(null);
   const [notifications, setNotifications] = useState([]);
@@ -1216,7 +1213,6 @@ export default function GithubWorkflow({
       controlledTab={tab ? (tab === 'newissue' ? 'create' : tab) : undefined}
       explorerOpen={explorerOpen}
       onRequestTab={onRequestTab}
-      prsSlot={children}
     />
   );
 }

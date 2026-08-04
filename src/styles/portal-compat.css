@@ -7098,3 +7098,124 @@
 .gh-refresh-btn:hover {
   border-color: rgba(79, 70, 229, 0.5);
 }
+
+/* ── Pull Requests panel ── */
+/* This tab renders GithubWorkflow's own PRsPanel (ping to merge, ping history,
+   per-PR changed files) — functionality parity beats the read-only mock. Only
+   the card shell is nudged toward the design; the segmented Open|Closed|All
+   filter becomes the design's indigo pill. */
+.gh-pr-card {
+  border-radius: 16px;
+  border-color: rgba(79, 70, 229, 0.14);
+}
+.gh-pr-card:hover { border-color: rgba(79, 70, 229, 0.32); }
+.gh-pr-card--open { box-shadow: 0 4px 20px rgba(79, 70, 229, 0.12); }
+.gh-pr-card-header:hover { background: rgba(79, 70, 229, 0.05); }
+.gh-pr-card-body { border-top-color: rgba(79, 70, 229, 0.12); }
+
+.gh-prs-filter-btn {
+  border-color: transparent;
+  color: var(--ifm-color-emphasis-600);
+}
+.gh-prs-filter-btn:hover { border-color: rgba(79, 70, 229, 0.35); }
+.gh-prs-filter-btn--active {
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35), 0 4px 12px rgba(79, 70, 229, 0.25);
+}
+
+/* Ping-to-merge confirm modal. PingConfirmModal's .gh-modal-* classes never
+   had any CSS (missing pre-migration too), so an unstyled overlay would render
+   as a plain inline block now that this panel is the live PRs tab. Styled here
+   to the design's modal — markup untouched. */
+.gh-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.gh-modal {
+  width: 100%;
+  max-width: 420px;
+  padding: 1.75rem;
+  border-radius: 16px;
+  border: 1px solid rgba(79, 70, 229, 0.16);
+  background: var(--ifm-background-surface-color);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.28);
+  animation: slide-up 0.22s ease;
+}
+[data-theme='dark'] .gh-modal {
+  background: #0B1120;
+}
+
+.gh-modal-title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.gh-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 1.25rem;
+}
+
+.gh-modal-pr-title { margin: 0; font-size: 0.88rem; font-weight: 600; }
+
+.gh-modal-pr-meta {
+  margin: 0;
+  font-size: 0.75rem;
+  font-family: var(--ifm-font-family-monospace);
+  opacity: 0.6;
+}
+
+.gh-modal-description {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  opacity: 0.75;
+}
+
+.gh-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.gh-modal-cancel,
+.gh-modal-confirm {
+  flex: 1;
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.gh-modal-cancel {
+  border: 1px solid var(--ifm-color-emphasis-200);
+  background: transparent;
+  color: var(--ifm-color-emphasis-500);
+}
+.gh-modal-cancel:hover {
+  color: var(--ifm-font-color-base);
+  border-color: var(--ifm-color-emphasis-300);
+}
+
+.gh-modal-confirm {
+  border: 1px solid #4F46E5;
+  background: #4F46E5;
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3), 0 4px 12px rgba(79, 70, 229, 0.18);
+}
+.gh-modal-confirm:hover {
+  background: #3525CD;
+  border-color: #3525CD;
+}
