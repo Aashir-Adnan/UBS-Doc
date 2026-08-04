@@ -4,8 +4,14 @@
  * - Optional custom React component per project (rendered at /tools/projects/view?project=<slug>)
  */
 
-import BadarHMSView from '@site/src/components/projects/BadarHMSView';
-import QuranFlowMigrationView from '@site/src/components/migration_diagram';
+import { lazy } from 'react';
+
+// Code-split: these two custom views total 1350+ lines and are only needed on
+// /tools/projects/view?project=<slug>, never on the /tools/projects grid.
+// React.lazy + the <Suspense> at the render site (src/screens/Projects.tsx)
+// keeps them out of the main chunk entirely.
+const BadarHMSView = lazy(() => import('@site/src/components/projects/BadarHMSView'));
+const QuranFlowMigrationView = lazy(() => import('@site/src/components/migration_diagram'));
 
 /** @type {{ slug: string; name: string; description?: string; docPath: string; docLabel?: string; hasCustomView?: boolean }[]} */
 export const projects = [
@@ -31,7 +37,7 @@ export const projects = [
 /**
  * Resolve custom component for a project slug.
  * @param {string} slug - Project slug from projects[].slug
- * @returns {React.ComponentType | null}
+ * @returns {React.ComponentType<any> | null}
  */
 export function getProjectComponent(slug) {
   switch (slug) {

@@ -10,6 +10,8 @@ import ToolsHub from '../screens/ToolsHub'
 import Notify from '../screens/Notify'
 import APIBuilder from '../screens/APIBuilder'
 import DatabaseTools from '../screens/DatabaseTools'
+import Projects from '../screens/Projects'
+import MyProjects from '../screens/MyProjects'
 
 const P = ({ name }: { name: string }) => <div style={{ padding: 40 }}>{name} — coming in its task</div>
 
@@ -36,10 +38,10 @@ export default function AppRoutes() {
         <Route path="/tools/github" element={T(<P name="github" />)} />
         <Route path="/tools/github-sandbox" element={T(<P name="sandbox" />)} />
         <Route path="/tools/meetingWorkflow" element={T(<P name="meetings" />)} />
-        <Route path="/tools/projects" element={T(<P name="projects" />)} />
-        <Route path="/tools/projects/view" element={T(<P name="project view" />)} />
-        <Route path="/tools/myProjects" element={T(<P name="my projects" />)} />
-        <Route path="/tools/myProjects/view" element={T(<P name="my project view" />)} />
+        <Route path="/tools/projects" element={T(<Projects view="grid" />)} />
+        <Route path="/tools/projects/view" element={T(<Projects view="detail" />)} />
+        <Route path="/tools/myProjects" element={T(<MyProjects view="grid" />)} />
+        <Route path="/tools/myProjects/view" element={T(<MyProjects view="detail" />)} />
         <Route path="/tools/repos" element={T(<P name="repos" />)} />
         <Route path="/tools/tenantAdmin" element={T(<P name="tenant admin" />)} />
         <Route path="/docs/*" element={<P name="docs" />} />
