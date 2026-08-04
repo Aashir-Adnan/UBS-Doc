@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import AppLayout from './AppLayout'
 import SiteGate from '../components/guards/SiteGate'
 import ToolGuard from '../components/guards/ToolGuard'
@@ -19,6 +19,8 @@ import Meetings from '../screens/Meetings'
 import MeetingCreate from '../screens/MeetingCreate'
 import MeetingDetail from '../screens/MeetingDetail'
 import TenantAdmin from '../screens/TenantAdmin'
+import DocsPage from '../screens/DocsPage'
+import { flattenSidebar } from '../docs/sidebar'
 
 const P = ({ name }: { name: string }) => <div style={{ padding: 40 }}>{name} — coming in its task</div>
 
@@ -26,6 +28,9 @@ const P = ({ name }: { name: string }) => <div style={{ padding: 40 }}>{name} �
 // page goes through this except the OAuth callback below, which must render
 // with no gate at all.
 const T = (el: ReactNode) => <ToolGuard>{el}</ToolGuard>
+
+// Bare /docs has no page of its own — send it to the first doc in the tree.
+const DOCS_HOME = flattenSidebar()[0]
 
 export default function AppRoutes() {
   return (
@@ -59,7 +64,10 @@ export default function AppRoutes() {
         <Route path="/tools/myProjects/view" element={T(<MyProjects view="detail" />)} />
         <Route path="/tools/repos" element={T(<Repositories />)} />
         <Route path="/tools/tenantAdmin" element={T(<TenantAdmin />)} />
-        <Route path="/docs/*" element={<P name="docs" />} />
+        {/* Docs sit behind the site gate only — no ToolGuard, matching the
+            old behaviour where any signed-in Google user could read them. */}
+        <Route path="/docs" element={<Navigate to={`/docs/${DOCS_HOME}`} replace />} />
+        <Route path="/docs/*" element={<DocsPage />} />
         <Route path="*" element={<P name="404" />} />
       </Route>
     </Routes>

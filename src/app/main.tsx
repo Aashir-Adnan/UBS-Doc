@@ -6,6 +6,7 @@ import { env, installLegacyGlobals } from './env'
 import '../styles/design.css'
 import '../styles/tokens.css'
 import '../styles/portal-compat.css'
+import '../styles/docs.css'
 
 installLegacyGlobals(env)
 
