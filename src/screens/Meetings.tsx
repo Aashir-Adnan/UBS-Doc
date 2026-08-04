@@ -108,7 +108,9 @@ export default function Meetings() {
   const { ready, gateElement, actingUrdd, canCreate } = useMeetingGate()
 
   const [meetings, setMeetings] = useState<MeetingRow[]>([])
-  const [loading, setLoading] = useState(false)
+  // Starts true: the first paint happens before the fetch effect runs, and a
+  // false here would flash the "No meetings yet" empty state on every visit.
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [q, setQ] = useState('')
 
@@ -139,8 +141,11 @@ export default function Meetings() {
     ? meetings.filter((m) => (m.title || '').toLowerCase().includes(needle))
     : meetings
   // Mock counted status === 'Scheduled'; the real equivalent is a meeting that
-  // has not moved past stage 0 yet.
-  const upcoming = meetings.filter((m) => (m.current_stage ?? 0) === 0).length
+  // has not moved past stage 0 yet. Derived from `filtered`, not `meetings`, so
+  // both halves of the count line always describe the same set — the mock mixed
+  // a filtered total with an unfiltered breakdown, which reads as a bug once the
+  // search box has anything in it.
+  const upcoming = filtered.filter((m) => (m.current_stage ?? 0) === 0).length
 
   return (
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>

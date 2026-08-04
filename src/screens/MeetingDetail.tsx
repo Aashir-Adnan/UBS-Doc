@@ -70,9 +70,25 @@ export default function MeetingDetail() {
   const [error, setError] = useState<string | null>(null)
   const [blockReason, setBlockReason] = useState<string | null>(null)
   const [blocked, setBlocked] = useState(false)
+  // Bumped by the Retry action below to re-run the resolution effect. Keeping
+  // the fetch inside the effect (rather than lifting it into a callback) is
+  // what preserves the `cancelled` guard on unmount / meeting change.
+  const [reloadKey, setReloadKey] = useState(0)
+  const retry = useCallback(() => setReloadKey((k) => k + 1), [])
 
   useEffect(() => {
-    if (!ready || !meetingId || actingUrdd == null) return
+    // Not through the gate yet — gateElement is on screen, `loading` is
+    // irrelevant and this effect re-runs once `ready` flips.
+    if (!ready) return
+    // Through the gate but with nothing to fetch with. `ready` implies a
+    // resolved URDD, so this is the shouldn't-happen branch — but bailing out
+    // silently would leave `loading` true forever and pin the screen on
+    // "Loading meeting…", so terminate the loading state explicitly.
+    if (!meetingId || actingUrdd == null) {
+      setLoading(false)
+      setError(meetingId ? 'No active organization — could not resolve your access.' : 'No meeting id in the URL.')
+      return
+    }
     let cancelled = false
     setLoading(true)
     setError(null)
@@ -93,7 +109,7 @@ export default function MeetingDetail() {
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [ready, meetingId, actingUrdd])
+  }, [ready, meetingId, actingUrdd, reloadKey])
 
   // Old page: handleFollowUpCreated(newMeeting) → bail without an id, otherwise
   // select it and switch to the meeting view. Same guard, navigation instead of
@@ -111,6 +127,21 @@ export default function MeetingDetail() {
   const handleStageComplete = useCallback(() => {}, [])
 
   if (!ready) return <>{gateElement}</>
+
+  // A non-403 failure of the resolution GET (network blip, 500, malformed
+  // envelope) must NOT cost the user the whole workflow — that failure mode did
+  // not exist on the old page, where the meeting row arrived from the list in
+  // memory. WorkflowPanel needs nothing but `meeting_id`: it fetches its own
+  // detail bundle, each stage loads its own data, and it degrades to empty
+  // sections rather than throwing when the row is thin. So fall back to the id
+  // from the URL and keep the error visible above the panel.
+  //
+  // A 403 (`blocked`) deliberately does NOT get this treatment: the panel's own
+  // detail GET would 403 too, so it would only re-render the same block card
+  // one level deeper.
+  const fallbackMeeting: MeetingRow | null =
+    !loading && !blocked && error && meetingId ? { meeting_id: meetingId } : null
+  const panelMeeting = meeting ?? fallbackMeeting
 
   const title = meeting?.title || (loading ? 'Loading…' : 'Meeting')
 
@@ -152,16 +183,35 @@ export default function MeetingDetail() {
         )}
 
         {!loading && !blocked && error && (
-          <div className={c(card(theme), 'rounded-2xl px-8 py-12 text-center')}>
-            <h2 className={c('font-extrabold text-lg mb-2', txt(theme))}>Could not open this meeting</h2>
-            <p className={c('text-sm m-0', muted(theme))}>{error}</p>
-          </div>
+          panelMeeting ? (
+            /* Panel still rendered below — the error is a note, not a wall. */
+            <div className={c('rounded-xl px-4 py-3 mb-5 border flex items-start gap-3',
+              d ? 'bg-amber-500/10 border-amber-500/25' : 'bg-amber-50 border-amber-200')}>
+              <div className="flex-1">
+                <p className={c('text-sm font-semibold m-0 mb-1', d ? 'text-amber-300' : 'text-amber-700')}>
+                  Could not load this meeting&apos;s summary
+                </p>
+                <p className={c('text-xs m-0', muted(theme))}>
+                  {error} — the workflow below is loading its own data, so it may still work.
+                </p>
+              </div>
+              <button type="button" onClick={retry}
+                className={c('text-xs font-bold shrink-0 tr', d ? 'text-amber-300' : 'text-amber-700')}>
+                Retry
+              </button>
+            </div>
+          ) : (
+            <div className={c(card(theme), 'rounded-2xl px-8 py-12 text-center')}>
+              <h2 className={c('font-extrabold text-lg mb-2', txt(theme))}>Could not open this meeting</h2>
+              <p className={c('text-sm m-0', muted(theme))}>{error}</p>
+            </div>
+          )
         )}
 
-        {meeting && (
+        {panelMeeting && (
           <div className="mw-detail-screen">
             <WorkflowPanel
-              meeting={meeting}
+              meeting={panelMeeting}
               actingUrdd={actingUrdd}
               onStageComplete={handleStageComplete}
               onFollowUpCreated={handleFollowUpCreated}
