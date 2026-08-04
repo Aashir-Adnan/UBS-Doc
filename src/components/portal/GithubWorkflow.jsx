@@ -956,7 +956,16 @@ const WORKSPACE_TABS = [
   { id: 'create', label: '+ New Issue' },
 ];
 
-function RepoWorkspace({ repo, user, notifications, onNewNotification, onBack, onDismiss, onDismissAll }) {
+function RepoWorkspace({
+  repo, user, notifications, onNewNotification, onBack, onDismiss, onDismissAll,
+  // ── Task 13 (design shell) — all optional; omitted → original behaviour ──
+  // controlledTab: parent owns the tab bar, this component only shows/hides
+  // its existing panels. explorerOpen: parent owns the Explorer toggle.
+  // onRequestTab: lets an internal action (issue created) move the parent's
+  // tab. prsSlot: parent-rendered Pull Requests panel, replacing the built-in
+  // one while the parent drives the tabs.
+  controlledTab, explorerOpen = true, onRequestTab, prsSlot,
+}) {
   const [tab, setTab] = useState('issues');
   const [displayTab, setDisplayTab] = useState('issues');
   const [tabFading, setTabFading] = useState(false);
@@ -1005,8 +1014,13 @@ function RepoWorkspace({ repo, user, notifications, onNewNotification, onBack, o
 
   const handleIssueCreated = () => {
     handleTabChange('issues');
+    onRequestTab?.('issues');
     setRefreshTick((t) => t + 1);
   };
+
+  // Which panel is on screen: the parent's tab when it owns the tab bar,
+  // otherwise the internal fade-swapped one.
+  const activeTab = controlledTab || displayTab;
 
   return (
     <div className={`gh-workspace${entering ? ' gh-workspace--entering' : ''}`}>
@@ -1019,36 +1033,41 @@ function RepoWorkspace({ repo, user, notifications, onNewNotification, onBack, o
             {repo.owner}/{repo.repo}
           </span>
         </div>
-        <div className="gh-workspace-header-right">
-          <NotificationBell notifications={notifications} onDismiss={onDismiss} onDismissAll={onDismissAll} />
-          <div className="gh-view-tabs">
-            {ghTabIndicator && <div className="gh-view-tab-indicator" style={{ left: ghTabIndicator.left, width: ghTabIndicator.width }} />}
-            {WORKSPACE_TABS.map((t) => (
-              <button key={t.id} type="button"
-                ref={(el) => { ghTabRefs.current[t.id] = el; }}
-                className={`gh-view-tab${tab === t.id ? ' gh-view-tab--active' : ''}`}
-                onClick={() => handleTabChange(t.id)}>
-                {t.label}
-              </button>
-            ))}
+        {/* Bell + tab bar move up to the parent screen when it owns the tabs. */}
+        {!controlledTab && (
+          <div className="gh-workspace-header-right">
+            <NotificationBell notifications={notifications} onDismiss={onDismiss} onDismissAll={onDismissAll} />
+            <div className="gh-view-tabs">
+              {ghTabIndicator && <div className="gh-view-tab-indicator" style={{ left: ghTabIndicator.left, width: ghTabIndicator.width }} />}
+              {WORKSPACE_TABS.map((t) => (
+                <button key={t.id} type="button"
+                  ref={(el) => { ghTabRefs.current[t.id] = el; }}
+                  className={`gh-view-tab${tab === t.id ? ' gh-view-tab--active' : ''}`}
+                  onClick={() => handleTabChange(t.id)}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Sidebar + content layout */}
-      <div className="gh-workspace-body">
-        {/* Sidebar: file explorer always visible */}
-        <aside className="gh-sidebar">
-          <div className="gh-sidebar-title">Files</div>
-          <div className="gh-sidebar-explorer">
-            <FileExplorer owner={repo.owner} repo={repo.repo} onSelect={() => {}} selected={[]} />
-          </div>
-        </aside>
+      <div className={`gh-workspace-body${explorerOpen ? '' : ' gh-workspace-body--no-sidebar'}`}>
+        {/* Sidebar: file explorer (hideable by the parent screen) */}
+        {explorerOpen && (
+          <aside className="gh-sidebar">
+            <div className="gh-sidebar-title">Files</div>
+            <div className="gh-sidebar-explorer">
+              <FileExplorer owner={repo.owner} repo={repo.repo} onSelect={() => {}} selected={[]} />
+            </div>
+          </aside>
+        )}
 
         {/* Main content */}
         <main className="gh-workspace-main">
           <div className={`gh-tab-panel${tabFading ? ' gh-tab-panel--fading' : ''}`}>
-            {displayTab === 'issues' && (
+            {activeTab === 'issues' && (
               <>
                 <div className="gh-panel-header">
                   <h3 className="gh-panel-title">Open Agent Issues</h3>
@@ -1059,15 +1078,15 @@ function RepoWorkspace({ repo, user, notifications, onNewNotification, onBack, o
                   onRefresh={() => setRefreshTick((t) => t + 1)} />
               </>
             )}
-            {displayTab === 'prs' && (
+            {activeTab === 'prs' && (prsSlot || (
               <>
                 <div className="gh-panel-header">
                   <h3 className="gh-panel-title">Pull Requests</h3>
                 </div>
                 <PRsPanel repo={repo} user={user} />
               </>
-            )}
-            {displayTab === 'create' && (
+            ))}
+            {activeTab === 'create' && (
               <>
                 <div className="gh-panel-header">
                   <h3 className="gh-panel-title">New Agent Issue</h3>
@@ -1143,7 +1162,23 @@ function RepoSelector({ onSelect }) {
    Root
 ───────────────────────────────────────────── */
 
-export default function GithubWorkflow({ user }) {
+/**
+ * @param {object}   props
+ * @param {any}      props.user            signed-in user (email drives NotifyEmail matching)
+ * @param {'repos'|'issues'|'prs'|'newissue'} [props.tab]
+ *   Optional. When given, the parent owns the tab bar and this component only
+ *   shows/hides its existing panels ('repos' = the repo selector). Omitted →
+ *   the original self-contained behaviour (selector → workspace with its own
+ *   tab bar), which is what the sandbox and any legacy mount still get.
+ * @param {boolean}  [props.explorerOpen]  parent-controlled Files sidebar
+ * @param {Function} [props.onRepoChange]  fires with the selected repo (or null)
+ * @param {Function} [props.onNotificationsChange] exposes the notification list + dismiss handlers
+ * @param {Function} [props.onRequestTab]  asks the parent to switch tabs
+ * @param {React.ReactNode} [props.children] rendered in place of the built-in PRs panel
+ */
+export default function GithubWorkflow({
+  user, tab, explorerOpen = true, onRepoChange, onNotificationsChange, onRequestTab, children,
+}) {
   const [selectedRepo, setSelectedRepo] = useState(null);
   const [notifications, setNotifications] = useState([]);
 
@@ -1153,8 +1188,20 @@ export default function GithubWorkflow({ user }) {
   const dismissNotification = useCallback((id) => setNotifications((prev) => prev.filter((n) => n.id !== id)), []);
   const dismissAll = useCallback(() => setNotifications([]), []);
 
-  if (!selectedRepo) {
+  // Selection and notifications stay owned here (this component must stay
+  // mounted across tab switches or the selected repo would be lost); the
+  // parent screen only mirrors them for its own chrome.
+  useEffect(() => { onRepoChange?.(selectedRepo); }, [selectedRepo, onRepoChange]);
+  useEffect(() => {
+    onNotificationsChange?.({ items: notifications, dismiss: dismissNotification, dismissAll });
+  }, [notifications, dismissNotification, dismissAll, onNotificationsChange]);
+
+  if (tab === 'repos' || (!tab && !selectedRepo)) {
     return <RepoSelector onSelect={setSelectedRepo} />;
+  }
+
+  if (!selectedRepo) {
+    return <div className="gh-status-empty">Pick a repository first — open the Repositories tab.</div>;
   }
 
   return (
@@ -1166,6 +1213,10 @@ export default function GithubWorkflow({ user }) {
       onBack={() => setSelectedRepo(null)}
       onDismiss={dismissNotification}
       onDismissAll={dismissAll}
+      controlledTab={tab ? (tab === 'newissue' ? 'create' : tab) : undefined}
+      explorerOpen={explorerOpen}
+      onRequestTab={onRequestTab}
+      prsSlot={children}
     />
   );
 }

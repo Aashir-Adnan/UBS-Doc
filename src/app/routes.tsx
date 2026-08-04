@@ -13,6 +13,8 @@ import DatabaseTools from '../screens/DatabaseTools'
 import Projects from '../screens/Projects'
 import MyProjects from '../screens/MyProjects'
 import Repositories from '../screens/Repositories'
+import GitHub from '../screens/GitHub'
+import GithubSandbox from '../screens/GithubSandbox'
 
 const P = ({ name }: { name: string }) => <div style={{ padding: 40 }}>{name} — coming in its task</div>
 
@@ -36,8 +38,9 @@ export default function AppRoutes() {
         <Route path="/tools/lucid" element={T(<Notify screen="lucid-sanitize" />)} />
         <Route path="/tools/notify" element={T(<Notify screen="notify" />)} />
         <Route path="/tools/apiObject" element={T(<APIBuilder />)} />
-        <Route path="/tools/github" element={T(<P name="github" />)} />
-        <Route path="/tools/github-sandbox" element={T(<P name="sandbox" />)} />
+        <Route path="/tools/github" element={T(<GitHub />)} />
+        {/* URL-only: no sidebar entry, no hub card (Task 13). */}
+        <Route path="/tools/github-sandbox" element={T(<GithubSandbox />)} />
         <Route path="/tools/meetingWorkflow" element={T(<P name="meetings" />)} />
         <Route path="/tools/projects" element={T(<Projects view="grid" />)} />
         <Route path="/tools/projects/view" element={T(<Projects view="detail" />)} />

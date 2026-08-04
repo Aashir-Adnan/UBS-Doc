@@ -6962,3 +6962,139 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* ===== GitHub design overrides (Task 13) ===== */
+/* src/screens/GitHub.tsx wraps the unmodified GithubWorkflow component tree in
+   the design's shell (aurora background, gradient H1, notification bell, and
+   the Repositories | Issues | Pull Requests | New Issue underline tab bar).
+   GithubWorkflow's own markup is unchanged apart from the tab/explorer chrome
+   it now lets the screen own, so the rules below retint the classes it still
+   renders — workspace header, Files sidebar, repo selector, file tree, panel
+   headers — toward the design's glass/indigo look.
+
+   The two GitHub sections above (originally ~1439-3800) still resolve their
+   accents through the old-brand --brand-primary-alpha-* / --brand-primary-*-text
+   variables, which are defined in this file's :root as the pre-revamp blue and
+   teal (flagged in Task 6). Rather than editing ~39 call sites across the deep
+   widgets — blink lights, stage badges, comment threads, PR banners — those
+   custom properties are re-declared on the two GitHub roots below. Custom
+   properties inherit, so this retints the whole GitHub subtree to indigo and
+   nothing else: the other consumers (tenant projects, user permissions) keep
+   the existing values until their own tasks. */
+
+.gh-workspace,
+.gh-selector {
+  --brand-primary-alpha-05: rgba(79, 70, 229, 0.05);
+  --brand-primary-alpha-10: rgba(79, 70, 229, 0.10);
+  --brand-primary-alpha-12: rgba(79, 70, 229, 0.12);
+  --brand-primary-alpha-14: rgba(79, 70, 229, 0.14);
+  --brand-primary-alpha-18: rgba(79, 70, 229, 0.18);
+  --brand-primary-alpha-20: rgba(79, 70, 229, 0.20);
+  --brand-primary-alpha-25: rgba(79, 70, 229, 0.25);
+  --brand-primary-alpha-30: rgba(79, 70, 229, 0.30);
+  --brand-primary-done-text: #4338CA;
+  --brand-primary-mergeable-text: #4338CA;
+}
+
+[data-theme='dark'] .gh-workspace,
+[data-theme='dark'] .gh-selector {
+  --brand-primary-alpha-05: rgba(129, 140, 248, 0.06);
+  --brand-primary-alpha-10: rgba(129, 140, 248, 0.10);
+  --brand-primary-alpha-12: rgba(129, 140, 248, 0.12);
+  --brand-primary-alpha-14: rgba(129, 140, 248, 0.14);
+  --brand-primary-alpha-18: rgba(129, 140, 248, 0.18);
+  --brand-primary-alpha-20: rgba(129, 140, 248, 0.20);
+  --brand-primary-alpha-25: rgba(129, 140, 248, 0.25);
+  --brand-primary-alpha-30: rgba(129, 140, 248, 0.30);
+  --brand-primary-done-text: #A5B4FC;
+  --brand-primary-mergeable-text: #A5B4FC;
+}
+
+/* ── Repo selector (Repositories tab) ── */
+.gh-selector-search-wrap {
+  border-radius: 12px;
+  border-color: rgba(79, 70, 229, 0.18);
+  background: var(--ifm-background-surface-color);
+}
+.gh-selector-search-wrap:focus-within {
+  border-color: rgba(79, 70, 229, 0.55);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+/* --tile-bg is still the pre-revamp grey/teal fill, so the card background is
+   set explicitly to the design's glass card values instead. */
+.gh-repo-card {
+  border-radius: 16px;
+  border-color: rgba(79, 70, 229, 0.14);
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(15, 20, 36, 0.04), 0 4px 12px rgba(15, 20, 36, 0.04);
+}
+[data-theme='dark'] .gh-repo-card {
+  background: rgba(255, 255, 255, 0.036);
+  box-shadow: none;
+}
+.gh-repo-card:hover {
+  border-color: rgba(79, 70, 229, 0.45);
+  box-shadow: 0 4px 20px rgba(79, 70, 229, 0.14);
+}
+
+/* ── Workspace header ── */
+/* With the screen owning the tab bar and bell, the header keeps only the
+   back button + repo label, so it reads as a quiet strip above the body. */
+.gh-workspace-header {
+  border-bottom-color: rgba(79, 70, 229, 0.12);
+}
+
+.gh-back-btn {
+  border-radius: 9999px;
+  border-color: rgba(79, 70, 229, 0.2);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ifm-color-emphasis-500);
+}
+.gh-back-btn:hover {
+  border-color: rgba(79, 70, 229, 0.45);
+  background: rgba(79, 70, 229, 0.06);
+  color: var(--ifm-font-color-base);
+}
+
+.gh-workspace-repo-label {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.82rem;
+}
+
+/* ── Files sidebar (toggled from the screen header) ── */
+.gh-workspace-body--no-sidebar {
+  grid-template-columns: 1fr;
+}
+
+.gh-sidebar {
+  border-radius: 16px;
+  border-color: rgba(79, 70, 229, 0.14);
+}
+
+.gh-sidebar-title {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  opacity: 0.45;
+  border-bottom-color: rgba(79, 70, 229, 0.12);
+}
+
+.gh-tree-row:hover {
+  background: rgba(79, 70, 229, 0.08);
+}
+
+/* ── Panel chrome ── */
+.gh-panel-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.gh-refresh-btn {
+  border-radius: 10px;
+  border-color: rgba(79, 70, 229, 0.2);
+}
+.gh-refresh-btn:hover {
+  border-color: rgba(79, 70, 229, 0.5);
+}
