@@ -4,6 +4,9 @@ import AppLayout from './AppLayout'
 import SiteGate from '../components/guards/SiteGate'
 import ToolGuard from '../components/guards/ToolGuard'
 import GithubCallback from '../screens/GithubCallback'
+import Home from '../screens/Home'
+import About from '../screens/About'
+import ToolsHub from '../screens/ToolsHub'
 
 const P = ({ name }: { name: string }) => <div style={{ padding: 40 }}>{name} — coming in its task</div>
 
@@ -19,9 +22,9 @@ export default function AppRoutes() {
           must stay reachable with no Google session and no sidebar. */}
       <Route path="/tools/github/callback" element={<GithubCallback />} />
       <Route element={<SiteGate><AppLayout /></SiteGate>}>
-        <Route path="/" element={<P name="home" />} />
-        <Route path="/about" element={<P name="about" />} />
-        <Route path="/tools" element={T(<P name="tools hub" />)} />
+        <Route path="/" element={<Home />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/tools" element={T(<ToolsHub />)} />
         <Route path="/tools/database" element={T(<P name="database" />)} />
         <Route path="/tools/database/mapper" element={T(<P name="mapper" />)} />
         <Route path="/tools/lucid" element={T(<P name="lucid" />)} />
