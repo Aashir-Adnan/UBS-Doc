@@ -1,31 +1,41 @@
+import type { ReactNode } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import AppLayout from './AppLayout'
+import SiteGate from '../components/guards/SiteGate'
+import ToolGuard from '../components/guards/ToolGuard'
+import GithubCallback from '../screens/GithubCallback'
 
 const P = ({ name }: { name: string }) => <div style={{ padding: 40 }}>{name} — coming in its task</div>
+
+// Wraps a /tools/* route element in the portal-access guard. Every /tools/*
+// page goes through this except the OAuth callback below, which must render
+// with no gate at all.
+const T = (el: ReactNode) => <ToolGuard>{el}</ToolGuard>
 
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* OAuth callback: OUTSIDE gate and shell (Task 6) */}
-      <Route path="/tools/github/callback" element={<P name="callback" />} />
-      <Route element={<AppLayout />}>
+      {/* OAuth callback: OUTSIDE gate and shell (Task 6) — security-critical,
+          must stay reachable with no Google session and no sidebar. */}
+      <Route path="/tools/github/callback" element={<GithubCallback />} />
+      <Route element={<SiteGate><AppLayout /></SiteGate>}>
         <Route path="/" element={<P name="home" />} />
         <Route path="/about" element={<P name="about" />} />
-        <Route path="/tools" element={<P name="tools hub" />} />
-        <Route path="/tools/database" element={<P name="database" />} />
-        <Route path="/tools/database/mapper" element={<P name="mapper" />} />
-        <Route path="/tools/lucid" element={<P name="lucid" />} />
-        <Route path="/tools/notify" element={<P name="notify" />} />
-        <Route path="/tools/apiObject" element={<P name="api builder" />} />
-        <Route path="/tools/github" element={<P name="github" />} />
-        <Route path="/tools/github-sandbox" element={<P name="sandbox" />} />
-        <Route path="/tools/meetingWorkflow" element={<P name="meetings" />} />
-        <Route path="/tools/projects" element={<P name="projects" />} />
-        <Route path="/tools/projects/view" element={<P name="project view" />} />
-        <Route path="/tools/myProjects" element={<P name="my projects" />} />
-        <Route path="/tools/myProjects/view" element={<P name="my project view" />} />
-        <Route path="/tools/repos" element={<P name="repos" />} />
-        <Route path="/tools/tenantAdmin" element={<P name="tenant admin" />} />
+        <Route path="/tools" element={T(<P name="tools hub" />)} />
+        <Route path="/tools/database" element={T(<P name="database" />)} />
+        <Route path="/tools/database/mapper" element={T(<P name="mapper" />)} />
+        <Route path="/tools/lucid" element={T(<P name="lucid" />)} />
+        <Route path="/tools/notify" element={T(<P name="notify" />)} />
+        <Route path="/tools/apiObject" element={T(<P name="api builder" />)} />
+        <Route path="/tools/github" element={T(<P name="github" />)} />
+        <Route path="/tools/github-sandbox" element={T(<P name="sandbox" />)} />
+        <Route path="/tools/meetingWorkflow" element={T(<P name="meetings" />)} />
+        <Route path="/tools/projects" element={T(<P name="projects" />)} />
+        <Route path="/tools/projects/view" element={T(<P name="project view" />)} />
+        <Route path="/tools/myProjects" element={T(<P name="my projects" />)} />
+        <Route path="/tools/myProjects/view" element={T(<P name="my project view" />)} />
+        <Route path="/tools/repos" element={T(<P name="repos" />)} />
+        <Route path="/tools/tenantAdmin" element={T(<P name="tenant admin" />)} />
         <Route path="/docs/*" element={<P name="docs" />} />
         <Route path="*" element={<P name="404" />} />
       </Route>

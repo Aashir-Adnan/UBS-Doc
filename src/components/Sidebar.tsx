@@ -3,10 +3,11 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, BookOpen, Wrench, Info, Database, Map, Activity, Bell, Zap,
   FolderOpen, GitBranch, MessageSquare, FolderGit2, BarChart3, Shield,
-  ChevronDown, Sun, Moon, Server, Monitor, Bot, FolderKanban
+  Sun, Moon, Server, Monitor, Bot, FolderKanban
 } from 'lucide-react'
 import { c } from '../lib'
 import type { Theme } from '../types'
+import OrgSwitcher from './portal/tenantProjects/OrgSwitcher'
 
 interface SidebarProps {
   theme: Theme
@@ -86,16 +87,7 @@ export default function Sidebar({ theme, toggleTheme }: SidebarProps) {
           <div className={c('w-1.5 h-1.5 rounded-full ml-auto', 'bg-emerald-400')} style={{ boxShadow: '0 0 6px rgba(52,211,153,0.8)' }} />
         </div>
 
-        {/* Org switcher (static placeholder — Task 6 swaps in <OrgSwitcher/>) */}
-        <button className={c(
-          'w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold tr',
-          d
-            ? 'bg-indigo-500/10 border border-indigo-500/18 text-indigo-300 hover:bg-indigo-500/15'
-            : 'bg-indigo-50 border border-indigo-100 text-indigo-600 hover:bg-indigo-100'
-        )}>
-          <span>granjur.com</span>
-          <ChevronDown size={12} />
-        </button>
+        <OrgSwitcher />
       </div>
 
       {/* Primary nav */}

@@ -6424,25 +6424,38 @@
   margin: -0.2rem 0 0.3rem;
 }
 
+/* Task 6 restyle: match the design's Sidebar org pill — indigo-tinted bg,
+   rounded-xl (12px radius), 12px semibold text. Light/dark values lifted
+   directly from the design's bg-indigo-50/border-indigo-100/text-indigo-600
+   (light) and bg-indigo-500/10/border-indigo-500/18/text-indigo-300 (dark). */
 .ubs-org-switcher-btn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   width: 100%;
-  padding: 0.5rem 0.6rem;
-  border: 1px solid var(--ifm-color-emphasis-300);
-  border-radius: 0.6rem;
-  background: var(--brand-primary-alpha-05);
-  color: var(--ifm-font-color-base);
-  font-size: 0.8rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #E0E7FF;
+  border-radius: 0.75rem;
+  background: #EEF2FF;
+  color: #4F46E5;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   transition: border-color 160ms ease, background 160ms ease;
 }
 
 .ubs-org-switcher-btn:hover {
-  border-color: var(--ifm-color-primary);
-  background: var(--brand-primary-alpha-10);
+  background: #E0E7FF;
+}
+
+[data-theme='dark'] .ubs-org-switcher-btn {
+  border-color: rgba(99, 102, 241, 0.18);
+  background: rgba(99, 102, 241, 0.1);
+  color: #A5B4FC;
+}
+
+[data-theme='dark'] .ubs-org-switcher-btn:hover {
+  background: rgba(99, 102, 241, 0.15);
 }
 
 .ubs-org-switcher-icon {
@@ -6511,11 +6524,19 @@
 }
 
 .ubs-org-switcher-option:hover {
-  background: var(--brand-primary-alpha-10);
+  background: #EEF2FF;
 }
 
 .ubs-org-switcher-option.is-active {
-  background: var(--brand-primary-alpha-14);
+  background: #E0E7FF;
+}
+
+[data-theme='dark'] .ubs-org-switcher-option:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+[data-theme='dark'] .ubs-org-switcher-option.is-active {
+  background: rgba(99, 102, 241, 0.15);
 }
 
 .ubs-org-switcher-option-icon {
@@ -6805,6 +6826,35 @@
 .up-reset-btn:hover:not(:disabled) {
   border-color: var(--ifm-color-primary);
   color: var(--ifm-color-primary);
+}
+
+/* ===== SignIn design overrides (Task 6) ===== */
+/* GoogleSignIn.jsx renders its own `.google-button` (a generic, theme-driven
+   pill used elsewhere in the app). On the design SignIn screen it sits inside
+   a `.portal-google-btn` wrapper and must match the design's Google button
+   exactly: white bg, slate text, full width, fully rounded — regardless of
+   the app theme, because SignIn is always dark-styled. */
+.portal-google-btn .google-button {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+  background: #FFFFFF;
+  color: #1E293B;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  font-weight: 600;
+}
+
+.portal-google-btn .google-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.portal-google-btn .google-icon {
+  color: #4285F4;
+  font-weight: 800;
+}
+
+.portal-google-btn .google-signin-error {
+  color: #F87171;
 }
 
 .up-reset-btn:disabled {
