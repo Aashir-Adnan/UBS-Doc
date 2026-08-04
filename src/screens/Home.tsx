@@ -10,6 +10,7 @@ const DOCS = [
   { label: 'Frontend', sub: 'Portal architecture and conventions', icon: '🎨', to: '/docs/frontend/UBS-intro' },
   { label: 'Database', sub: 'Schema design and Lucidchart workflow', icon: '🗄️', to: '/docs/database/Lucidchart' },
   { label: 'Agents', sub: 'Agent-call issue format and workflow', icon: '🤖', to: '/docs/agents/agent-issue-format' },
+  { label: 'Projects — Badar HMS', sub: 'Opera PMS configuration reference', icon: '📁', to: '/docs/projects/badar-hms/Opera_Config' },
 ]
 
 const STORIES = [
