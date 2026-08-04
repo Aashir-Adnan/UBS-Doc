@@ -9,6 +9,7 @@ import About from '../screens/About'
 import ToolsHub from '../screens/ToolsHub'
 import Notify from '../screens/Notify'
 import APIBuilder from '../screens/APIBuilder'
+import DatabaseTools from '../screens/DatabaseTools'
 
 const P = ({ name }: { name: string }) => <div style={{ padding: 40 }}>{name} — coming in its task</div>
 
@@ -27,8 +28,8 @@ export default function AppRoutes() {
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<About />} />
         <Route path="/tools" element={T(<ToolsHub />)} />
-        <Route path="/tools/database" element={T(<P name="database" />)} />
-        <Route path="/tools/database/mapper" element={T(<P name="mapper" />)} />
+        <Route path="/tools/database" element={T(<DatabaseTools view="upload" />)} />
+        <Route path="/tools/database/mapper" element={T(<DatabaseTools view="mapper" />)} />
         <Route path="/tools/lucid" element={T(<Notify screen="lucid-sanitize" />)} />
         <Route path="/tools/notify" element={T(<Notify screen="notify" />)} />
         <Route path="/tools/apiObject" element={T(<APIBuilder />)} />
