@@ -4,6 +4,7 @@ import React, {
   useCallback,
   useRef,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { fetchTrackedRepos } from '@site/src/data/githubReposConfig';
 
 /* ─────────────────────────────────────────────
@@ -668,12 +669,17 @@ function PRRow({ pr, owner, repo, user }) {
 
   return (
     <>
-      {showConfirm && (
+      {/* Portalled to <body>: .gh-workspace sets `transform: translateY(0)`,
+          which makes it the containing block for `position: fixed`, so the
+          overlay would otherwise be scoped to the workspace box and centre
+          off-screen on long PR lists. The modal component itself is unchanged. */}
+      {showConfirm && typeof document !== 'undefined' && createPortal(
         <PingConfirmModal
           pr={pr}
           onConfirm={handlePingConfirmed}
           onCancel={() => setShowConfirm(false)}
-        />
+        />,
+        document.body,
       )}
 
       <div className={`gh-pr-card${open ? ' gh-pr-card--open' : ''}${isDraft ? ' gh-pr-card--draft' : ''}`}>
@@ -1193,26 +1199,42 @@ export default function GithubWorkflow({
     onNotificationsChange?.({ items: notifications, dismiss: dismissNotification, dismissAll });
   }, [notifications, dismissNotification, dismissAll, onNotificationsChange]);
 
-  if (tab === 'repos' || (!tab && !selectedRepo)) {
-    return <RepoSelector onSelect={setSelectedRepo} />;
-  }
+  const showSelector = tab === 'repos' || (!tab && !selectedRepo);
 
-  if (!selectedRepo) {
-    return <div className="gh-status-empty">Pick a repository first — open the Repositories tab.</div>;
-  }
-
+  // Once a repo is picked the workspace stays MOUNTED for the rest of the
+  // session — switching to the Repositories tab only hides it. Unmounting it
+  // would restart the 60s poll and wipe IssuesPanel's prevCommentCounts
+  // baselines, which would re-fire notifications for comments already seen.
+  // Only the workspace's own back button (setSelectedRepo(null)) tears it down,
+  // exactly as before this task.
   return (
-    <RepoWorkspace
-      repo={selectedRepo}
-      user={user}
-      notifications={notifications}
-      onNewNotification={addNotification}
-      onBack={() => setSelectedRepo(null)}
-      onDismiss={dismissNotification}
-      onDismissAll={dismissAll}
-      controlledTab={tab ? (tab === 'newissue' ? 'create' : tab) : undefined}
-      explorerOpen={explorerOpen}
-      onRequestTab={onRequestTab}
-    />
+    <>
+      {showSelector && <RepoSelector onSelect={setSelectedRepo} />}
+
+      {!showSelector && !selectedRepo && (
+        <div className="gh-status-empty">Pick a repository first — open the Repositories tab.</div>
+      )}
+
+      {selectedRepo && (
+        <div style={showSelector ? { display: 'none' } : undefined}>
+          {/* Keyed by repo so picking a DIFFERENT repo still remounts (fresh
+              issue list and fresh per-issue comment baselines, as before);
+              only tab switches now preserve the mount. */}
+          <RepoWorkspace
+            key={selectedRepo.slug || `${selectedRepo.owner}/${selectedRepo.repo}`}
+            repo={selectedRepo}
+            user={user}
+            notifications={notifications}
+            onNewNotification={addNotification}
+            onBack={() => setSelectedRepo(null)}
+            onDismiss={dismissNotification}
+            onDismissAll={dismissAll}
+            controlledTab={tab ? (tab === 'newissue' ? 'create' : tab) : undefined}
+            explorerOpen={explorerOpen}
+            onRequestTab={onRequestTab}
+          />
+        </div>
+      )}
+    </>
   );
 }

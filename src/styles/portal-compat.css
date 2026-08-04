@@ -7118,6 +7118,9 @@
   color: var(--ifm-color-emphasis-600);
 }
 .gh-prs-filter-btn:hover { border-color: rgba(79, 70, 229, 0.35); }
+/* Intentionally sets no background/border-color: the legacy rule above already
+   fills the active pill with --ifm-color-primary (now the design's indigo), so
+   this only layers the design's elevation on top. */
 .gh-prs-filter-btn--active {
   color: #fff;
   box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35), 0 4px 12px rgba(79, 70, 229, 0.25);
