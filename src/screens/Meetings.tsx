@@ -118,7 +118,11 @@ export default function Meetings() {
   // list (`listKey`) after create / stage completion; navigating back to this
   // route remounts the screen, so this effect is the replacement.
   const refresh = useCallback(async () => {
-    if (actingUrdd == null) return
+    // `ready` implies a resolved URDD, so this is the shouldn't-happen branch —
+    // but `loading` defaults to true, so returning without clearing it would
+    // leave the grid permanently blank (no cards, no empty state, no error).
+    // Terminate the loading state and let the normal empty state render.
+    if (actingUrdd == null) { setLoading(false); return }
     setLoading(true)
     setError(null)
     try {
