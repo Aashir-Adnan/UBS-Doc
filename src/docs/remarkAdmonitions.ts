@@ -12,23 +12,42 @@ const TYPES = new Set(['note', 'tip', 'info', 'warning', 'caution', 'danger'])
 // page as literal ':::tip Heads up' text. Most of this corpus uses the legacy
 // form, so the source is normalised before it reaches the MDX parser.
 const OPENER = /^(:{3,}\s*)([a-z]+)[ \t]+([^[\r\n][^\r\n]*?)[ \t]*$/i
+const FENCE = /^\s*(`{3,}|~{3,})(.*)$/
 
 export function normalizeAdmonitionTitles(source: string): string {
-  let inFence = false
+  // CommonMark fence rules, because a naive toggle desyncs on nested fences:
+  // a ```js block inside a ````md wrapper would otherwise be read as the
+  // wrapper's closer, exposing the sample's contents to rewriting. A fence
+  // only closes on the same character, a run at least as long as the opener,
+  // and no info string.
+  let fenceChar = ''
+  let fenceLen = 0
+
   return source.split('\n').map(raw => {
     // Keep any trailing \r so CRLF files round-trip unchanged.
     const cr = raw.endsWith('\r') ? '\r' : ''
     const line = cr ? raw.slice(0, -1) : raw
 
-    if (/^\s*(```|~~~)/.test(line)) {
-      inFence = !inFence
+    const f = FENCE.exec(line)
+    if (f) {
+      const marker = f[1]
+      if (!fenceChar) {
+        fenceChar = marker[0]
+        fenceLen = marker.length
+      } else if (marker[0] === fenceChar && marker.length >= fenceLen && f[2].trim() === '') {
+        fenceChar = ''
+        fenceLen = 0
+      }
       return raw
     }
-    if (inFence) return raw
+    if (fenceChar) return raw
 
     const m = OPENER.exec(line)
-    if (!m || !TYPES.has(m[2].toLowerCase())) return raw
-    return `${m[1]}${m[2]}[${m[3]}]${cr}`
+    const name = m?.[2].toLowerCase()
+    if (!m || !name || !TYPES.has(name)) return raw
+    // Lowercase the name on the way out: TYPES lookups in the remark plugin
+    // are case-sensitive, so `:::NOTE` would parse but never match.
+    return `${m[1]}${name}[${m[3]}]${cr}`
   }).join('\n')
 }
 

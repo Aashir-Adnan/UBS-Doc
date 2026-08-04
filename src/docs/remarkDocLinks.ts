@@ -12,9 +12,14 @@ export function remarkDocLinks() {
     if (!m) return
     const dir = path.posix.dirname(m[1])
     visit(tree, 'link', (node: { url: string }) => {
-      const match = node.url.match(/^(\.{1,2}\/[^#?]*)\.mdx?(#.*)?$/)
+      const match = node.url.match(/^([^#?]+)\.mdx?(#.*)?$/)
       if (!match) return
-      const resolved = path.posix.normalize(path.posix.join(dir, match[1]))
+      const target = match[1]
+      // Relative means relative — leave anything rooted, protocol-qualified
+      // (http:, mailto:) or protocol-relative (//host) untouched. Bare targets
+      // like `agents/agent-issue-format.md` are relative and do get rewritten.
+      if (/^(\/|[a-z][a-z0-9+.-]*:)/i.test(target)) return
+      const resolved = path.posix.normalize(path.posix.join(dir, target))
       node.url = `/docs/${resolved}${match[2] || ''}`
     })
   }

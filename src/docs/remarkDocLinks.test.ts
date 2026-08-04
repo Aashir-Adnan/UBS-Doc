@@ -29,6 +29,31 @@ describe('remarkDocLinks', () => {
     expect(out).toContain('/docs/intro/Node-Advantages#why')
   })
 
+  it('rewrites bare relative links with no ./ prefix', async () => {
+    const out = String(await compile(
+      { value: '[x](agents/agent-issue-format.md)', path: '/repo/docs/meeting-workflow-flow.md' },
+      { remarkPlugins: [remarkDocLinks] },
+    ))
+    expect(out).toContain('/docs/agents/agent-issue-format')
+  })
+
+  it('rewrites a bare sibling link from inside a subdirectory', async () => {
+    const out = String(await compile(
+      { value: '[x](tenancy.md#scoping)', path: '/repo/docs/backend/page.md' },
+      { remarkPlugins: [remarkDocLinks] },
+    ))
+    expect(out).toContain('/docs/backend/tenancy#scoping')
+  })
+
+  it('leaves mailto and protocol-relative links alone', async () => {
+    const out = String(await compile(
+      { value: '[x](mailto:someone@example.md) [y](//cdn.example.com/a.md)', path: '/repo/docs/backend/page.md' },
+      { remarkPlugins: [remarkDocLinks] },
+    ))
+    expect(out).toContain('mailto:someone@example.md')
+    expect(out).toContain('//cdn.example.com/a.md')
+  })
+
   it('handles .mdx targets and nested source dirs', async () => {
     const out = String(await compile(
       { value: '[x](./deep/child.mdx)', path: '/repo/docs/hms-documentation/admin-apis/page.mdx' },

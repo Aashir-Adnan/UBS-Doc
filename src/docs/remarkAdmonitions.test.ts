@@ -60,6 +60,35 @@ describe('normalizeAdmonitionTitles', () => {
       .toBe('```md\n:::note Example\n```\n:::tip[Real]\nbody\n:::')
   })
 
+  it('tracks nested fences of differing run length', () => {
+    // A ```js sample inside a ````md wrapper: the inner opener must not be
+    // mistaken for the outer fence's closer, or everything after it is
+    // treated as prose.
+    const src = '````md\n```js\n:::note Example For Docs\n```\n````\n:::tip Real\nx\n:::'
+    expect(normalizeAdmonitionTitles(src))
+      .toBe('````md\n```js\n:::note Example For Docs\n```\n````\n:::tip[Real]\nx\n:::')
+  })
+
+  it('does not let a tilde fence close a backtick fence', () => {
+    const src = '```\n~~~\n:::note Example\n```\n:::tip Real\nx\n:::'
+    expect(normalizeAdmonitionTitles(src))
+      .toBe('```\n~~~\n:::note Example\n```\n:::tip[Real]\nx\n:::')
+  })
+
+  it('lowercases the directive name so the remark plugin matches', () => {
+    expect(normalizeAdmonitionTitles(':::NOTE Heads Up\nx\n:::'))
+      .toBe(':::note[Heads Up]\nx\n:::')
+  })
+
+  it('compiles an uppercase legacy admonition end to end', async () => {
+    const out = String(await compile(
+      normalizeAdmonitionTitles(':::NOTE Heads Up\nx\n:::'),
+      { remarkPlugins: [remarkDirective, remarkAdmonitions] },
+    ))
+    expect(out).toContain('admonition-note')
+    expect(out).toContain('Heads Up')
+  })
+
   it('preserves CRLF line endings', () => {
     expect(normalizeAdmonitionTitles(':::warning Careful\r\nbody\r\n:::\r\n'))
       .toBe(':::warning[Careful]\r\nbody\r\n:::\r\n')
