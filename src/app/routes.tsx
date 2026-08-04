@@ -12,6 +12,7 @@ import APIBuilder from '../screens/APIBuilder'
 import DatabaseTools from '../screens/DatabaseTools'
 import Projects from '../screens/Projects'
 import MyProjects from '../screens/MyProjects'
+import Repositories from '../screens/Repositories'
 
 const P = ({ name }: { name: string }) => <div style={{ padding: 40 }}>{name} — coming in its task</div>
 
@@ -42,7 +43,7 @@ export default function AppRoutes() {
         <Route path="/tools/projects/view" element={T(<Projects view="detail" />)} />
         <Route path="/tools/myProjects" element={T(<MyProjects view="grid" />)} />
         <Route path="/tools/myProjects/view" element={T(<MyProjects view="detail" />)} />
-        <Route path="/tools/repos" element={T(<P name="repos" />)} />
+        <Route path="/tools/repos" element={T(<Repositories />)} />
         <Route path="/tools/tenantAdmin" element={T(<P name="tenant admin" />)} />
         <Route path="/docs/*" element={<P name="docs" />} />
         <Route path="*" element={<P name="404" />} />

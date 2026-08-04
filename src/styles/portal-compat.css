@@ -6857,6 +6857,107 @@
   color: #F87171;
 }
 
+/* ===== Repositories design overrides (Task 12) ===== */
+/* src/screens/Repositories.jsx wraps the unmodified ReposTab/FeaturesTab
+   component tree (ported from src/pages/tools/repos.jsx) in the design's
+   aurora/breadcrumb chrome. These rules retint and reshape the existing
+   .repo-row / .feat-* / .slide-tabs classes toward the design mock — markup
+   in Repositories.jsx is unchanged except for the two wrapper classes below
+   (.repo-screen-header, .repo-top-tabs, .repo-pull-btn) needed to attach
+   them. Only the Repo row / Features panel / Sliding tabs sections are
+   retinted here — the GitHub workspace's own .gh-view-tabs / .gh-tree-row /
+   .gh-comment etc. sections are Task 13's, left untouched. */
+
+/* Screen header row: gradient H1 + the "Pull all repos" action, shown only
+   while the Repositories tab is active (design's RepositoriesView header). */
+.repo-screen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.repo-pull-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 12px;
+  border: 1px solid rgba(79, 70, 229, 0.2);
+  background: transparent;
+  color: var(--ifm-color-emphasis-500);
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease;
+  white-space: nowrap;
+}
+.repo-pull-btn:hover:not(:disabled) {
+  color: var(--ifm-font-color-base);
+  border-color: rgba(79, 70, 229, 0.45);
+}
+.repo-pull-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Segmented pill switch for the top-level Repositories | Features tabs,
+   scoped to .repo-top-tabs so FeatureRow's own SlidingTabs instance
+   (Details/Platforms/Projects, size="sm") keeps the plain underline style —
+   only the two-tab screen-level switch gets the design's rounded-full
+   indigo-pill treatment. */
+.repo-top-tabs .slide-tabs {
+  display: inline-flex;
+  gap: 0;
+  padding: 4px;
+  border-radius: 9999px;
+  border-bottom: none;
+  background: var(--ifm-color-emphasis-100);
+  margin-bottom: 0;
+}
+[data-theme='dark'] .repo-top-tabs .slide-tabs { background: rgba(255, 255, 255, 0.05); }
+
+.repo-top-tabs .slide-tab {
+  position: relative;
+  z-index: 1;
+  padding: 0.4rem 1.25rem;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.repo-top-tabs .slide-tab.is-active { color: #fff; }
+
+.repo-top-tabs .slide-tab-indicator {
+  top: 4px;
+  bottom: 4px;
+  height: auto;
+  border-radius: 9999px;
+  background: #4F46E5;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35), 0 4px 12px rgba(79, 70, 229, 0.25);
+}
+
+/* Repo row / Features panel — glass card + indigo retint, replacing the
+   stale --brand-primary-alpha-* (old teal/blue) usages flagged for this
+   section. */
+.repo-row,
+.feat-row {
+  border-color: rgba(79, 70, 229, 0.14);
+  background: var(--tile-bg);
+  backdrop-filter: blur(6px);
+}
+.repo-row:hover { box-shadow: 0 2px 16px rgba(79, 70, 229, 0.16); }
+
+.feat-panel { border-top-color: rgba(79, 70, 229, 0.14); }
+.repo-expand-inner--inset { border-top-color: rgba(79, 70, 229, 0.14); }
+
+.feat-path-link {
+  border-color: rgba(79, 70, 229, 0.22);
+  background: rgba(79, 70, 229, 0.06);
+  color: #4F46E5;
+}
+.feat-path-link:hover {
+  background: rgba(79, 70, 229, 0.14);
+  border-color: #4F46E5;
+}
+
 .up-reset-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
