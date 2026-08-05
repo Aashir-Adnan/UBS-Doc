@@ -98,6 +98,9 @@ export default function AnoAI({ className = '', opacity = 1 }: Props) {
     scene.add(mesh)
 
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    // Static (reduced-motion) render: jump mid-animation — frame 0 is nearly
+    // black, which reads as "no background" rather than a calmer one.
+    if (prefersReduced) material.uniforms.iTime.value = 12
 
     let frameId: number
     const animate = () => {

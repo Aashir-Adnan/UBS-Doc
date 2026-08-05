@@ -264,17 +264,20 @@ function PreMeetingStage({ meeting, detail, onDone, actingUrdd, canAI, canEdit }
       )}
       <ContextFilesPanel meetingId={meeting.meeting_id} actingUrdd={actingUrdd} canEdit={canEdit} />
       <StatusBar message={error} type="error" />
-      <button
-        className="mw-btn mw-btn--primary"
-        onClick={run}
-        disabled={busy || !canAI}
-        type="button"
-        style={{ marginTop: '0.75rem' }}
-        title={canAI ? undefined : "You need the 'run_meeting_ai' permission to generate notes."}
-      >
-        {busy ? 'Generating…' : hasContent ? 'Regenerate Notes' : 'Generate Pre-Meeting Notes'}
-      </button>
-      {busy && <GeneratingLoader label="Generating notes" />}
+      {busy ? (
+        <GeneratingLoader label="Generating notes" />
+      ) : (
+        <button
+          className="mw-btn mw-btn--primary"
+          onClick={run}
+          disabled={!canAI}
+          type="button"
+          style={{ marginTop: '0.75rem' }}
+          title={canAI ? undefined : "You need the 'run_meeting_ai' permission to generate notes."}
+        >
+          {hasContent ? 'Regenerate Notes' : 'Generate Pre-Meeting Notes'}
+        </button>
+      )}
       {hasContent && (
         <div className="mw-note-editor" style={{ marginTop: '1.25rem' }}>
           <div className="mw-note-editor-header">
@@ -382,29 +385,32 @@ function AnalyzeStage({ meeting, detail, onDone, actingUrdd, canAI }) {
       )}
       <StatusBar message={error} type="error" />
 
-      <div className="mw-btn-row">
-        <button
-          className="mw-btn mw-btn--primary"
-          onClick={run}
-          disabled={busy || clarifyBusy || reviseBusy || !canAI}
-          type="button"
-          title={canAI ? undefined : "You need the 'run_meeting_ai' permission to run analysis."}
-        >
-          {busy ? 'Analyzing…' : result ? 'Re-run Analysis' : 'Run MTA Analysis'}
-        </button>
-        {busy && <GeneratingLoader label="Analyzing" />}
-        {result && (
+      {busy ? (
+        <GeneratingLoader label="Analyzing" />
+      ) : (
+        <div className="mw-btn-row">
           <button
-            className="mw-btn mw-btn--ghost"
-            onClick={runClarify}
-            disabled={busy || clarifyBusy || reviseBusy || !canAI}
+            className="mw-btn mw-btn--primary"
+            onClick={run}
+            disabled={clarifyBusy || reviseBusy || !canAI}
             type="button"
-            title={canAI ? undefined : "You need the 'run_meeting_ai' permission to generate clarifying questions."}
+            title={canAI ? undefined : "You need the 'run_meeting_ai' permission to run analysis."}
           >
-            {clarifyBusy ? 'Generating questions…' : 'Prompt Claude for Clarity'}
+            {result ? 'Re-run Analysis' : 'Run MTA Analysis'}
           </button>
-        )}
-      </div>
+          {result && (
+            <button
+              className="mw-btn mw-btn--ghost"
+              onClick={runClarify}
+              disabled={clarifyBusy || reviseBusy || !canAI}
+              type="button"
+              title={canAI ? undefined : "You need the 'run_meeting_ai' permission to generate clarifying questions."}
+            >
+              {clarifyBusy ? 'Generating questions…' : 'Prompt Claude for Clarity'}
+            </button>
+          )}
+        </div>
+      )}
 
       {result && (
         <div className="mw-result">
@@ -583,30 +589,33 @@ function TasksStage({ meeting, detail, onDone, actingUrdd, canAI, canEdit }) {
       </p>
       <StatusBar message={error} type="error" />
 
-      <div className="mw-btn-row">
-        <button
-          className="mw-btn mw-btn--primary"
-          onClick={generate}
-          disabled={busy || approveBusy || !canAI}
-          type="button"
-          title={canAI ? undefined : "You need the 'run_meeting_ai' permission to generate tasks."}
-        >
-          {busy ? 'Generating…' : tasks?.length ? 'Regenerate Tasks' : 'Generate Tasks'}
-        </button>
-        {busy && <GeneratingLoader label="Generating tasks" />}
-        <button className="mw-btn mw-btn--ghost" onClick={refresh} disabled={busy || approveBusy} type="button">
-          Refresh
-        </button>
-        <button
-          className="mw-btn mw-btn--ghost"
-          onClick={() => setShowAddForm((v) => !v)}
-          disabled={!canEdit}
-          type="button"
-          title={canEdit ? undefined : "You need the 'update_meetings' permission to add tasks."}
-        >
-          {showAddForm ? 'Cancel' : '+ Add Task'}
-        </button>
-      </div>
+      {busy ? (
+        <GeneratingLoader label="Generating tasks" />
+      ) : (
+        <div className="mw-btn-row">
+          <button
+            className="mw-btn mw-btn--primary"
+            onClick={generate}
+            disabled={approveBusy || !canAI}
+            type="button"
+            title={canAI ? undefined : "You need the 'run_meeting_ai' permission to generate tasks."}
+          >
+            {tasks?.length ? 'Regenerate Tasks' : 'Generate Tasks'}
+          </button>
+          <button className="mw-btn mw-btn--ghost" onClick={refresh} disabled={approveBusy} type="button">
+            Refresh
+          </button>
+          <button
+            className="mw-btn mw-btn--ghost"
+            onClick={() => setShowAddForm((v) => !v)}
+            disabled={!canEdit}
+            type="button"
+            title={canEdit ? undefined : "You need the 'update_meetings' permission to add tasks."}
+          >
+            {showAddForm ? 'Cancel' : '+ Add Task'}
+          </button>
+        </div>
+      )}
 
       {showAddForm && (
         <div className="mw-add-task-form">
@@ -835,16 +844,19 @@ function ReportStage({ meeting, detail, onDone, actingUrdd, canAI, canEdit, canC
         Claude generates concise notes and fills the fixed HTML report template — including the full transcript. Review and edit notes below, then rebuild the HTML.
       </p>
       <StatusBar message={error} type="error" />
-      <button
-        className="mw-btn mw-btn--primary"
-        onClick={generate}
-        disabled={busy || !canAI}
-        type="button"
-        title={canAI ? undefined : "You need the 'run_meeting_ai' permission to generate the report."}
-      >
-        {busy ? 'Generating Report…' : report ? 'Regenerate HTML Report' : 'Generate HTML Report'}
-      </button>
-      {busy && <GeneratingLoader label="Generating report" />}
+      {busy ? (
+        <GeneratingLoader label="Generating report" />
+      ) : (
+        <button
+          className="mw-btn mw-btn--primary"
+          onClick={generate}
+          disabled={!canAI}
+          type="button"
+          title={canAI ? undefined : "You need the 'run_meeting_ai' permission to generate the report."}
+        >
+          {report ? 'Regenerate HTML Report' : 'Generate HTML Report'}
+        </button>
+      )}
       {report && (
         <div className="mw-report-area">
           <NoteEditor
