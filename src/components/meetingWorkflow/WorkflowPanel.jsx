@@ -3,6 +3,7 @@ import { marked } from 'marked';
 import { mwGet, mwPost, mwPostForm } from './api';
 import NoteEditor from './NoteEditor';
 import LiveTranscribeStage from './LiveTranscribeStage';
+import GeneratingLoader from '../ui/generating-loader';
 import { useActingPermissions } from '@site/src/components/portal/tenantProjects/useActingPermissions';
 
 // Stages: removed Approve (merged into Tasks) and Issue Sync
@@ -273,6 +274,7 @@ function PreMeetingStage({ meeting, detail, onDone, actingUrdd, canAI, canEdit }
       >
         {busy ? 'Generating…' : hasContent ? 'Regenerate Notes' : 'Generate Pre-Meeting Notes'}
       </button>
+      {busy && <GeneratingLoader label="Generating notes" />}
       {hasContent && (
         <div className="mw-note-editor" style={{ marginTop: '1.25rem' }}>
           <div className="mw-note-editor-header">
@@ -390,6 +392,7 @@ function AnalyzeStage({ meeting, detail, onDone, actingUrdd, canAI }) {
         >
           {busy ? 'Analyzing…' : result ? 'Re-run Analysis' : 'Run MTA Analysis'}
         </button>
+        {busy && <GeneratingLoader label="Analyzing" />}
         {result && (
           <button
             className="mw-btn mw-btn--ghost"
@@ -590,6 +593,7 @@ function TasksStage({ meeting, detail, onDone, actingUrdd, canAI, canEdit }) {
         >
           {busy ? 'Generating…' : tasks?.length ? 'Regenerate Tasks' : 'Generate Tasks'}
         </button>
+        {busy && <GeneratingLoader label="Generating tasks" />}
         <button className="mw-btn mw-btn--ghost" onClick={refresh} disabled={busy || approveBusy} type="button">
           Refresh
         </button>
@@ -840,6 +844,7 @@ function ReportStage({ meeting, detail, onDone, actingUrdd, canAI, canEdit, canC
       >
         {busy ? 'Generating Report…' : report ? 'Regenerate HTML Report' : 'Generate HTML Report'}
       </button>
+      {busy && <GeneratingLoader label="Generating report" />}
       {report && (
         <div className="mw-report-area">
           <NoteEditor

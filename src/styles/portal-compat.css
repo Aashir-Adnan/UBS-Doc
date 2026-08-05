@@ -7826,3 +7826,77 @@ select[aria-label^='Role for']:focus {
 [data-theme='dark'] .up-tag-role { background: rgba(129, 140, 248, 0.16); color: #A5B4FC; }
 
 .up-perm-name { color: var(--ifm-font-color-base); }
+
+/* ===== Fancy gradient primary buttons (skin parity with .btn-primary) ===== */
+/* Visual skin only — padding/font-size stay with each class. Mirrors the
+   .btn-primary treatment in design.css. */
+.tenant-submit,
+.mw-btn--primary {
+  --fb-g0: #7C5CFA;
+  --fb-g50: #5B50F0;
+  --fb-g100: #4F8AF3;
+  --fb-shine-top: #E9D1FF;
+  --fb-shine-bottom: #ADF0FF;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  border: none;
+  border-radius: 999px;
+  color: #fff;
+  text-shadow: 0 0.5px 0.5px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(to bottom,
+    var(--fb-g0) 0%, var(--fb-g50) 50%, var(--fb-g100) 100%);
+  box-shadow:
+    0 4px 12px rgba(9, 12, 60, 0.15),
+    0 2px 8px rgba(9, 12, 60, 0.15),
+    inset 0 1px 1px rgba(233, 209, 255, 0.2),
+    inset 0 -1px 3px rgba(137, 222, 246, 0.3);
+}
+.tenant-submit::before,
+.mw-btn--primary::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  transform: translateX(-50%);
+  width: 96px;
+  height: 6px;
+  border-radius: inherit;
+  background: var(--fb-shine-top);
+  opacity: 0.6;
+  filter: blur(6px);
+  transition: opacity 0.25s;
+  pointer-events: none;
+}
+.tenant-submit::after,
+.mw-btn--primary::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  transform: translateX(-50%);
+  width: 92px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fb-shine-bottom);
+  opacity: 0.75;
+  filter: blur(6px);
+  transition: opacity 0.25s, transform 0.25s;
+  pointer-events: none;
+}
+.tenant-submit:hover:not(:disabled),
+.mw-btn--primary:hover:not(:disabled) {
+  background: linear-gradient(to bottom,
+    var(--fb-g0) 0%, var(--fb-g50) 50%, var(--fb-g100) 100%);
+  transform: translateY(-1px);
+}
+.tenant-submit:hover:not(:disabled)::after,
+.mw-btn--primary:hover:not(:disabled)::after {
+  opacity: 1;
+  transform: translateX(-50%) scale(1.25);
+}
+.tenant-submit:disabled,
+.mw-btn--primary:disabled {
+  opacity: 0.55;
+  transform: none;
+}

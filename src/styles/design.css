@@ -88,20 +88,122 @@ body {
 }
 
 /* ─── Buttons ────────────────────────────────────────────────── */
+/* Fancy gradient primary button (adapted to the indigo theme). The original
+   snippet used an inner <span> for its shine layers; our buttons carry icons
+   and utility padding directly, so the two shines live on the button's own
+   pseudo-elements instead. */
 .btn-primary {
-  background: #4F46E5;
-  box-shadow: 0 1px 3px rgba(79,70,229,0.3), 0 4px 12px rgba(79,70,229,0.18);
-  color: white;
-  border-radius: 9999px;
+  --fb-g0: #7C5CFA;
+  --fb-g50: #5B50F0;
+  --fb-g100: #4F8AF3;
+  --fb-shine-top: #E9D1FF;
+  --fb-shine-bottom: #ADF0FF;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  color: #fff;
   font-weight: 700;
-  transition: all 0.16s ease;
+  border-radius: 9999px;
+  text-shadow: 0 0.5px 0.5px rgba(0, 0, 0, 0.2);
+  background-image: linear-gradient(to bottom,
+    var(--fb-g0) 0%, var(--fb-g50) 50%, var(--fb-g100) 100%);
+  box-shadow:
+    0 4px 12px rgba(9, 12, 60, 0.15),
+    0 2px 8px rgba(9, 12, 60, 0.15),
+    0 1px 3px rgba(9, 12, 60, 0.1),
+    inset 0 1px 1px rgba(233, 209, 255, 0.2),
+    inset 0 -1px 3px rgba(137, 222, 246, 0.3);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
 }
-.btn-primary:hover {
-  background: #3525CD;
-  box-shadow: 0 1px 3px rgba(79,70,229,0.35), 0 6px 16px rgba(79,70,229,0.24);
-  transform: translateY(-1px);
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  transform: translateX(-50%);
+  width: 96px;
+  height: 6px;
+  border-radius: inherit;
+  background: var(--fb-shine-top);
+  opacity: 0.6;
+  filter: blur(6px);
+  transition: opacity 0.25s;
+  will-change: transform;
+  pointer-events: none;
 }
-.btn-primary:active { transform: translateY(0); background: #3525CD; box-shadow: 0 1px 3px rgba(79,70,229,0.25); }
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  transform: translateX(-50%);
+  width: 92px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fb-shine-bottom);
+  opacity: 0.75;
+  filter: blur(6px);
+  transition: opacity 0.25s, transform 0.25s;
+  will-change: transform;
+  pointer-events: none;
+}
+.btn-primary:hover { transform: translateY(-1px); }
+.btn-primary:hover::before { opacity: 0.9; }
+.btn-primary:hover::after { opacity: 1; transform: translateX(-50%) scale(1.25); }
+.btn-primary:active { transform: translateY(0); filter: brightness(0.94); }
+.btn-primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+/* ─── Generating loader (AI note/analysis/task/report generation) ───── */
+.gen-loader {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 180px;
+  height: 180px;
+  margin: 1.25rem auto;
+  font-size: 1.1em;
+  font-weight: 300;
+  color: var(--ifm-color-content, #fff);
+  border-radius: 50%;
+  user-select: none;
+}
+.gen-loader-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  animation: gen-loader-rotate 2s linear infinite;
+  z-index: 0;
+}
+@keyframes gen-loader-rotate {
+  0% {
+    transform: rotate(90deg);
+    box-shadow: 0 10px 20px 0 #fff inset, 0 20px 30px 0 #AD5FFF inset, 0 60px 60px 0 #4F46E5 inset;
+  }
+  50% {
+    transform: rotate(270deg);
+    box-shadow: 0 10px 20px 0 #fff inset, 0 20px 10px 0 #06B6D4 inset, 0 40px 60px 0 #311E80 inset;
+  }
+  100% {
+    transform: rotate(450deg);
+    box-shadow: 0 10px 20px 0 #fff inset, 0 20px 30px 0 #AD5FFF inset, 0 60px 60px 0 #4F46E5 inset;
+  }
+}
+.gen-loader-letter {
+  display: inline-block;
+  opacity: 0.4;
+  transform: translateY(0);
+  animation: gen-loader-letter 2s infinite;
+  z-index: 1;
+}
+@keyframes gen-loader-letter {
+  0%, 100% { opacity: 0.4; transform: translateY(0); }
+  20% { opacity: 1; transform: scale(1.15); }
+  40% { opacity: 0.7; transform: translateY(0); }
+}
 
 .btn-outline-indigo {
   border: 1.5px solid #4F46E5;
