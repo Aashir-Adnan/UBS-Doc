@@ -12,6 +12,23 @@ import type { Theme } from '../types'
 
 const ORDER = flattenSidebar()
 
+// One stable lazy component per doc id, cached at module level. Creating the
+// lazy() inside render (even under useMemo) breaks router navigations: they
+// run in startTransition, a suspended transition render never commits, so the
+// memo is discarded and every retry manufactures a fresh lazy() with a fresh
+// promise — the transition suspends forever and the old doc stays on screen.
+const LAZY_DOCS = new Map<string, ComponentType>()
+export function docComponent(id: string): ComponentType | null {
+  const loader = DOC_MODULES[id]
+  if (!loader) return null
+  let Doc = LAZY_DOCS.get(id)
+  if (!Doc) {
+    Doc = lazy(async () => ({ default: (await loader()).default }))
+    LAZY_DOCS.set(id, Doc)
+  }
+  return Doc
+}
+
 function NotFound({ id, theme }: { id: string; theme: Theme }) {
   return (
     <div className={c(card(theme), 'p-10 text-center')}>
@@ -67,11 +84,7 @@ export default function DocsPage() {
   const d = theme === 'dark'
   const id = (useParams()['*'] || '').replace(/\/+$/, '')
   const loader = DOC_MODULES[id]
-
-  const Doc = useMemo<ComponentType | null>(
-    () => (loader ? lazy(async () => ({ default: (await loader()).default })) : null),
-    [id],
-  )
+  const Doc = docComponent(id)
 
   // Frontmatter comes from the same (bundler-cached) module the lazy component
   // resolves, so this costs one extra promise, not a second download.
