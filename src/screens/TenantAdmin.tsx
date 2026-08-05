@@ -4,6 +4,7 @@ import { c, card, txt, muted, Breadcrumb } from '../lib'
 import { useTheme } from '../app/ThemeContext'
 import { useAuthTyped as useAuth } from '../components/portal/authTypes'
 import { useActingUrdd } from '../components/portal/tenantProjects/useActingUrdd'
+import AuroraText from '../components/ui/aurora-text'
 import { listPortalUsers, listTenants } from '../components/portal/tenantProjects/tenantApi'
 import {
   deriveTabs, shouldResetSystemTab, orgLabel, computeMemberStats,
@@ -190,8 +191,8 @@ export default function TenantAdmin() {
             design's title + permission-gated amber pill layout. */}
         <div className="flex items-start justify-between gap-6 mb-4">
           <div>
-            <h1 className="grad-text font-extrabold mb-1.5" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
-              Organization Admin
+            <h1 className="font-extrabold mb-1.5" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
+              <AuroraText>Organization Admin</AuroraText>
             </h1>
             <p className={c('text-sm font-medium', muted(theme))}>
               Manage{' '}

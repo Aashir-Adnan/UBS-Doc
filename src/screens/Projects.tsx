@@ -4,6 +4,7 @@ import { FolderOpen, ExternalLink } from 'lucide-react'
 import { c, card, txt, muted, Breadcrumb } from '../lib'
 import { useTheme } from '../app/ThemeContext'
 import AccessState from '../components/guards/AccessState'
+import AuroraText from '../components/ui/aurora-text'
 import { projects, getProjectComponent } from '../data/projectsConfig'
 
 interface Props { view: 'grid' | 'detail' }
@@ -33,7 +34,7 @@ function ProjectsGrid({ theme }: { theme: 'light' | 'dark' }) {
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
       <div className="max-w-[1240px] mx-auto px-10 py-12">
         <Breadcrumb items={['UBS', 'Dev Tools', 'Projects']} theme={theme} />
-        <h1 className="grad-text font-extrabold mb-8" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>Projects</h1>
+        <h1 className="font-extrabold mb-8" style={{ fontSize: 40, letterSpacing: '-0.025em' }}><AuroraText>Projects</AuroraText></h1>
         <div className="grid grid-cols-3 gap-5">
           {projects.map((p) => (
             <div key={p.slug} className={c(card(theme), 'p-6 group tr rounded-2xl', d ? 'card-hover-dark' : 'card-hover-light')}>

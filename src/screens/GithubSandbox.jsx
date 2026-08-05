@@ -1,6 +1,7 @@
 import { c, muted, Breadcrumb } from '../lib'
 import { useTheme } from '../app/ThemeContext'
 import GithubWorkflowSandbox from '../components/portal/GithubWorkflowSandbox'
+import AuroraText from '../components/ui/aurora-text'
 
 // Ported from src/pages/tools/github-sandbox.jsx (pre-migration): the same
 // SandboxContent body and the same hardcoded SANDBOX_USER, with the old
@@ -29,8 +30,8 @@ export default function GithubSandbox() {
       <div className="max-w-[1240px] mx-auto px-10 py-10">
         <Breadcrumb items={['UBS', 'Dev Tools', 'GitHub', 'Sandbox']} theme={theme} />
 
-        <h1 className="grad-text font-extrabold" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
-          GitHub Workflow Sandbox
+        <h1 className="font-extrabold" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
+          <AuroraText>GitHub Workflow Sandbox</AuroraText>
         </h1>
         <p className={c('text-sm font-medium mb-8', muted(theme))}>
           Browse repositories and dispatch agent tasks as GitHub issues. Signed in as{' '}

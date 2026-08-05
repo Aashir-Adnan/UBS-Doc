@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Upload, ZoomIn, ZoomOut, Maximize2, Check, ArrowRight, AlertCircle } from 'lucide-react'
 import { c, card, txt, muted, Breadcrumb } from '../lib'
 import { useTheme } from '../app/ThemeContext'
+import AuroraText from '../components/ui/aurora-text'
 import { API_BASE_URL } from '../components/portal/config'
 import SQLERDVisualizer from '../components/portal/SQLERDVisualizer'
 import { parseSqlDump } from '../utils/sqlParser'
@@ -131,7 +132,7 @@ function UploadView({ theme }: { theme: Theme }) {
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
       <div className="max-w-[900px] mx-auto px-10 py-12">
         <Breadcrumb items={['UBS', 'Dev Tools', 'Database']} theme={theme} />
-        <h1 className="grad-text font-extrabold mb-8" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>Database Tools</h1>
+        <h1 className="font-extrabold mb-8" style={{ fontSize: 40, letterSpacing: '-0.025em' }}><AuroraText>Database Tools</AuroraText></h1>
 
         <div className="grid grid-cols-2 gap-6">
           {/* Upload card */}

@@ -3,6 +3,7 @@ import { Bell, GitBranch, GitPullRequest, Plus, PanelLeft } from 'lucide-react'
 import { c, card, txt, muted, divider } from '../lib'
 import { useTheme } from '../app/ThemeContext'
 import { useAuthTyped } from '../components/portal/authTypes'
+import AuroraText from '../components/ui/aurora-text'
 import GithubWorkflow from '../components/portal/GithubWorkflow'
 
 // Design chrome from design/UBS Dev Tools Portal (1)/src/screens/GitHub.tsx:
@@ -77,8 +78,8 @@ export default function GitHub() {
       <div className="max-w-[1240px] mx-auto px-10 pt-10 pb-0">
         <Breadcrumbs theme={theme} repo={repo} />
         <div className="flex items-center justify-between gap-4">
-          <h1 className="grad-text font-extrabold" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
-            GitHub Workspace
+          <h1 className="font-extrabold" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
+            <AuroraText>GitHub Workspace</AuroraText>
           </h1>
           <div className="flex items-center gap-1.5">
             {tab !== 'repos' && repo && (

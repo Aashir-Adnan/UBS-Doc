@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { c, card, txt, muted, Breadcrumb } from '../lib'
 import { useTheme } from '../app/ThemeContext'
 import { useActingUrdd } from '../components/portal/tenantProjects/useActingUrdd'
+import AuroraText from '../components/ui/aurora-text'
 import MyProjectsList from '../components/portal/tenantProjects/MyProjects'
 import ProjectDetail from '../components/portal/tenantProjects/ProjectDetail'
 
@@ -35,7 +36,7 @@ function MyProjectsGrid({ theme }: { theme: 'light' | 'dark' }) {
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
       <div className="max-w-[900px] mx-auto px-10 py-12">
         <Breadcrumb items={['UBS', 'Dev Tools', 'My Projects']} theme={theme} />
-        <h1 className="grad-text font-extrabold mb-2" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>My Projects</h1>
+        <h1 className="font-extrabold mb-2" style={{ fontSize: 40, letterSpacing: '-0.025em' }}><AuroraText>My Projects</AuroraText></h1>
         <p className={c('text-sm font-medium mb-8', muted(theme))}>
           Projects available under <strong className={txt(theme)}>{orgLabel}</strong>.
         </p>
@@ -54,7 +55,7 @@ function MyProjectDetailView({ theme }: { theme: 'light' | 'dark' }) {
       <div className="max-w-[900px] mx-auto px-10 py-12">
         <Breadcrumb items={['UBS', 'Dev Tools', 'My Projects', 'Project']} theme={theme} />
         <div className="flex items-center justify-between mb-6">
-          <h1 className="grad-text font-extrabold" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>Project</h1>
+          <h1 className="font-extrabold" style={{ fontSize: 40, letterSpacing: '-0.025em' }}><AuroraText>Project</AuroraText></h1>
           <button onClick={() => navigate('/tools/myProjects')}
             className={c('text-xs font-semibold tr', d ? 'text-white/30 hover:text-white/60' : 'text-slate-400 hover:text-indigo-600')}>
             &larr; My Projects

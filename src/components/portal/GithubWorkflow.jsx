@@ -6,6 +6,8 @@ import React, {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { fetchTrackedRepos } from '@site/src/data/githubReposConfig';
+import { useTheme } from '../../app/ThemeContext';
+import SearchInput from '../ui/search-input';
 
 /* ─────────────────────────────────────────────
    GitHub API helpers
@@ -1113,6 +1115,7 @@ function RepoWorkspace({
 ───────────────────────────────────────────── */
 
 function RepoSelector({ onSelect }) {
+  const { theme } = useTheme();
   const [search, setSearch] = useState('');
   const [repos, setRepos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1133,9 +1136,7 @@ function RepoSelector({ onSelect }) {
   return (
     <div className="gh-selector">
       <div className="gh-selector-search-wrap">
-        <span className="gh-selector-search-icon">🔍</span>
-        <input className="gh-selector-search" placeholder="Search repositories…"
-          value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />
+        <SearchInput value={search} onChange={setSearch} placeholder="Search repositories…" width={288} theme={theme} />
       </div>
       {loading && <div className="gh-status-loading">Loading repositories…</div>}
       {error && <div className="gh-explorer-error">Could not load repos: {error}</div>}

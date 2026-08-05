@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { c, muted, Breadcrumb } from '../lib'
 import { useTheme } from '../app/ThemeContext'
 import { useMeetingGate } from './meetingGate'
+import AuroraText from '../components/ui/aurora-text'
 import CreateMeeting from '../components/meetingWorkflow/CreateMeeting'
 
 // Design chrome from design/UBS Dev Tools Portal (1)/src/screens/CreateMeeting.tsx
@@ -41,8 +42,8 @@ export default function MeetingCreate() {
 
         <div className="flex items-end justify-between gap-4 mb-9 flex-wrap">
           <div>
-            <h1 className="grad-text font-extrabold mb-2" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
-              New Meeting
+            <h1 className="font-extrabold mb-2" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
+              <AuroraText>New Meeting</AuroraText>
             </h1>
             <p className={c('text-sm font-medium', muted(theme))}>
               Schedule a meeting and pick the repositories and features it covers.

@@ -3,6 +3,8 @@ import { c, muted, Breadcrumb } from '../lib'
 import { useTheme } from '../app/ThemeContext'
 import { API_BASE_URL } from '../components/portal/config'
 import { useActingUrdd } from '../components/portal/tenantProjects/useActingUrdd'
+import AuroraText from '../components/ui/aurora-text'
+import SearchInput from '../components/ui/search-input'
 
 // Ported from src/pages/tools/repos.jsx (pre-migration): the entire
 // ReposManager/ReposContent component tree below the old Layout/auth-guard
@@ -681,6 +683,7 @@ function FeatureSummaryRow({ item }) {
 }
 
 function FeaturesTab() {
+  const { theme } = useTheme();
   const [features, setFeatures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -712,9 +715,8 @@ function FeaturesTab() {
         </div>
         <button type="button" className="gh-refresh-btn" onClick={load} title="Refresh">↻</button>
       </div>
-      <div style={{ marginBottom: '1rem' }}>
-        <input className="gh-form-input" placeholder="Search features…" value={search}
-          onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: 340 }} />
+      <div className="mb-5">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search features…" width={288} theme={theme} />
       </div>
       {loading && <div className="gh-status-loading">Loading features…</div>}
       {error && <div className="gh-explorer-error">{error}</div>}
@@ -764,7 +766,7 @@ export default function Repositories() {
         <Breadcrumb items={['UBS', 'Dev Tools', 'Repositories']} theme={theme} />
 
         <div className="repo-screen-header">
-          <h1 className="grad-text font-extrabold" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>Repositories</h1>
+          <h1 className="font-extrabold" style={{ fontSize: 40, letterSpacing: '-0.025em' }}><AuroraText>Repositories</AuroraText></h1>
           {tab === 'repos' && (
             <button type="button" className="repo-pull-btn" onClick={handlePull} disabled={pulling}>
               {pulling ? <><span className="status-spinner" /> Pulling…</> : '⬇ Pull all repos'}

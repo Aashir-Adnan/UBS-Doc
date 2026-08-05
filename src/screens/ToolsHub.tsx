@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom'
 import { Database, Map, Activity, Bell, Zap, FolderOpen, GitBranch, MessageSquare, FolderGit2, BarChart3, Shield, LogOut } from 'lucide-react'
-import { c, txt, muted } from '../lib'
+import { c, muted } from '../lib'
 import { useTheme } from '../app/ThemeContext'
 import { useAuthTyped } from '../components/portal/authTypes'
+import AuroraText from '../components/ui/aurora-text'
 
 const TOOLS = [
   { label: 'Database', desc: 'Upload and inspect SQL schemas', Icon: Database, route: '/tools/database', from: '#4F46E5', to: '#6366F1' },
@@ -32,8 +33,8 @@ export default function ToolsHub() {
         <div className="flex items-start justify-between mb-10">
           <div>
             <p className="section-kicker text-indigo-500 mb-3">Dev Tools Portal</p>
-            <h1 className={c('font-extrabold mb-2', txt(theme))} style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
-              Welcome, {firstName} 👋
+            <h1 className="font-extrabold mb-2" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
+              <AuroraText>Welcome, {firstName}</AuroraText> <span style={{ WebkitTextFillColor: 'initial' }}>👋</span>
             </h1>
             <p className={c('text-sm font-medium', muted(theme))}>What are you building today?</p>
           </div>
