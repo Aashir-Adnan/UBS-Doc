@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { Bell, Search, ChevronRight, ChevronDown, GitBranch, GitPullRequest, Plus, X, Check,
+import { Bell, ChevronRight, ChevronDown, GitBranch, GitPullRequest, Plus, X, Check,
   AlertTriangle, File, Folder, FolderOpen } from 'lucide-react'
+import AuroraText from '../components/ui/aurora-text'
+import SearchInput from '../components/ui/search-input'
 import { c, card, txt, muted, divider, inputCls, chipMint, chipIndigo, chipAmber, chipGray, Breadcrumb } from '../lib'
 import type { Screen, Theme } from '../types'
 
@@ -132,8 +134,8 @@ export default function GitHub({ navigate, theme }: Props) {
       <div className="max-w-[1240px] mx-auto px-10 pt-10 pb-0">
         <Breadcrumb items={['UBS', 'Dev Tools', 'GitHub']} theme={theme} />
         <div className="flex items-center justify-between mb-0">
-          <h1 className="grad-text font-extrabold" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
-            GitHub Workspace
+          <h1 className="font-extrabold" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
+            <AuroraText>GitHub Workspace</AuroraText>
           </h1>
           <div className="relative">
             <button className={c('p-2.5 rounded-xl tr', d ? 'hover:bg-white/6 text-white/50' : 'hover:bg-slate-100 text-slate-400')}>
@@ -181,11 +183,8 @@ export default function GitHub({ navigate, theme }: Props) {
           {/* ── Repos ─────────────────────────────────────── */}
           {tab === 'repos' && (
             <div>
-              <div className={c('flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border text-sm w-72 mb-5',
-                d ? 'bg-white/5 border-indigo-500/20 text-white' : 'bg-white border-slate-200')}>
-                <Search size={14} className={muted(theme)} />
-                <input value={repoQ} onChange={e => setRepoQ(e.target.value)} placeholder="Search repositories…"
-                  className="bg-transparent outline-none flex-1 text-inherit text-sm placeholder-slate-400" />
+              <div className="mb-5">
+                <SearchInput value={repoQ} onChange={setRepoQ} placeholder="Search repositories…" width={288} theme={theme} />
               </div>
               <div className="grid grid-cols-3 gap-4">
                 {filteredRepos.map((r, i) => (

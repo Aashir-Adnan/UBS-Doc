@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { Upload, ZoomIn, ZoomOut, Maximize2, Check, ArrowRight } from 'lucide-react'
+import AuroraText from '../components/ui/aurora-text'
 import { c, card, txt, muted, Breadcrumb } from '../lib'
 import type { Theme } from '../types'
 
@@ -190,7 +191,7 @@ export default function DatabaseTools({ theme }: Props) {
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
       <div className="max-w-[900px] mx-auto px-10 py-12">
         <Breadcrumb items={['UBS', 'Dev Tools', 'Database']} theme={theme} />
-        <h1 className="grad-text font-extrabold mb-8" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>Database Tools</h1>
+        <h1 className="font-extrabold mb-8" style={{ fontSize: 40, letterSpacing: '-0.025em' }}><AuroraText>Database Tools</AuroraText></h1>
 
         <div className="grid grid-cols-2 gap-6">
           {/* Upload card */}

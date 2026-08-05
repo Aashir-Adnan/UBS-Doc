@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Copy, Check, HelpCircle } from 'lucide-react'
+import AuroraText from '../components/ui/aurora-text'
 import { c, card, txt, muted, divider, Breadcrumb, Checkbox, Toggle } from '../lib'
 import type { Theme } from '../types'
 
@@ -58,8 +59,8 @@ export default function APIBuilder({ theme }: Props) {
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
       <div className="max-w-[860px] mx-auto px-10 py-12">
         <Breadcrumb items={['UBS', 'Dev Tools', 'API Object Builder']} theme={theme} />
-        <h1 className="grad-text font-extrabold mb-6" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
-          API Object Builder
+        <h1 className="font-extrabold mb-6" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
+          <AuroraText>API Object Builder</AuroraText>
         </h1>
 
         {/* Segment control */}

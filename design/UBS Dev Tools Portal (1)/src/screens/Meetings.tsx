@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Search, Plus, ChevronRight } from 'lucide-react'
+import { Plus, ChevronRight } from 'lucide-react'
+import AuroraText from '../components/ui/aurora-text'
+import SearchInput from '../components/ui/search-input'
 import { c, card, txt, muted, sub, divider, Breadcrumb, chipMint, chipAmber, chipIndigo, chipGray } from '../lib'
 import type { Screen, Theme } from '../types'
 
@@ -28,24 +30,15 @@ export default function Meetings({ navigate, theme }: Props) {
 
         <div className="flex items-end justify-between mb-8">
           <div>
-            <h1 className="grad-text font-extrabold mb-2" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
-              Meetings
+            <h1 className="font-extrabold mb-2" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
+              <AuroraText>Meetings</AuroraText>
             </h1>
             <p className={c('text-sm font-medium', muted(theme))}>
               {filtered.length} meetings · {MEETINGS.filter(m => m.status === 'Scheduled').length} upcoming
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {/* Search */}
-            <div className={c(
-              'flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border text-sm',
-              d ? 'bg-white/5 border-indigo-500/20 text-white' : 'bg-white border-slate-200 text-slate-700'
-            )}>
-              <Search size={14} className={muted(theme)} />
-              <input value={q} onChange={e => setQ(e.target.value)}
-                placeholder="Search meetings…"
-                className="bg-transparent outline-none w-52 text-inherit placeholder-inherit text-sm" />
-            </div>
+            <SearchInput value={q} onChange={setQ} placeholder="Search meetings…" width={260} theme={theme} />
             <button onClick={() => navigate('meetings-create')}
               className="btn-primary flex items-center gap-2 px-5 py-2.5 text-sm">
               <Plus size={14} /> New Meeting

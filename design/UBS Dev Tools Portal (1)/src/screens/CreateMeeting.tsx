@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ChevronLeft, Check, Calendar, Clock } from 'lucide-react'
+import AuroraText from '../components/ui/aurora-text'
 import { c, card, txt, muted, divider, inputCls, Breadcrumb, Checkbox } from '../lib'
 import type { Screen, Theme } from '../types'
 
@@ -51,8 +52,8 @@ export default function CreateMeeting({ navigate, theme }: Props) {
       <div className="max-w-[1240px] mx-auto px-10 py-12">
         <Breadcrumb items={['UBS', 'Dev Tools', 'Meetings', 'New Meeting']} theme={theme} />
 
-        <h1 className="grad-text font-extrabold mb-9" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
-          New Meeting
+        <h1 className="font-extrabold mb-9" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
+          <AuroraText>New Meeting</AuroraText>
         </h1>
 
         <div className="grid grid-cols-2 gap-8">

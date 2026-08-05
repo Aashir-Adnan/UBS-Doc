@@ -1,3 +1,5 @@
+import BorderBeam from '../components/ui/border-beam'
+import AuroraText from '../components/ui/aurora-text'
 import type { Theme } from '../types'
 import type { Screen } from '../types'
 
@@ -9,7 +11,8 @@ export default function SignIn({ navigate }: Props) {
 
       <div className="relative z-10 w-full max-w-[440px]">
         {/* Card */}
-        <div className="card-dark rounded-3xl p-10">
+        <div className="card-dark rounded-3xl p-10 relative overflow-hidden">
+          <BorderBeam duration={5} colorFrom="#4F46E5" colorTo="#10B981" />
           {/* Logo */}
           <div className="flex justify-center mb-9">
             <div className="relative">
@@ -26,9 +29,9 @@ export default function SignIn({ navigate }: Props) {
             </div>
           </div>
 
-          <h1 className="text-white font-extrabold text-[32px] text-center mb-2"
+          <h1 className="font-extrabold text-[32px] text-center mb-2"
             style={{ letterSpacing: '-0.025em', lineHeight: 1.1 }}>
-            Sign in to UBS
+            <AuroraText>Sign in to UBS</AuroraText>
           </h1>
           <p className="text-white/48 text-sm text-center mb-8 font-medium">
             Your team's developer operations hub

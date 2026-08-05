@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Check, Upload, Download, X } from 'lucide-react'
+import AuroraText from '../components/ui/aurora-text'
 import { c, card, txt, muted, inputCls, Breadcrumb } from '../lib'
 import type { Theme } from '../types'
 
@@ -22,7 +23,7 @@ function NotifyCard({ theme }: { theme: Theme }) {
       <div className={c('w-full max-w-[520px]', card(theme), 'rounded-3xl p-9')}>
         <div className="mb-7">
           <p className="section-kicker text-indigo-500 mb-2">Dev Tools / Notify</p>
-          <h1 className="grad-text font-extrabold mb-1" style={{ fontSize: 34, letterSpacing: '-0.025em' }}>Report a Bug</h1>
+          <h1 className="font-extrabold mb-1" style={{ fontSize: 34, letterSpacing: '-0.025em' }}><AuroraText>Report a Bug</AuroraText></h1>
           <p className={c('text-sm font-medium', muted(theme))}>Or request a new feature for the UBS Dev Tools Portal.</p>
         </div>
 
@@ -83,7 +84,7 @@ function LucidCard({ theme }: { theme: Theme }) {
       <div className={c('w-full max-w-[520px]', card(theme), 'rounded-3xl p-9')}>
         <div className="mb-7">
           <p className="section-kicker text-indigo-500 mb-2">Dev Tools / Lucid Sanitize</p>
-          <h1 className="grad-text font-extrabold mb-1" style={{ fontSize: 34, letterSpacing: '-0.025em' }}>Lucid Sanitize</h1>
+          <h1 className="font-extrabold mb-1" style={{ fontSize: 34, letterSpacing: '-0.025em' }}><AuroraText>Lucid Sanitize</AuroraText></h1>
           <p className={c('text-sm font-medium', muted(theme))}>Clean and sanitize Lucidchart export files.</p>
         </div>
 

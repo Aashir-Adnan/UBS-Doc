@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AlertCircle, Check, Lock, Clock, Shield } from 'lucide-react'
+import AuroraText from '../components/ui/aurora-text'
 import { c, card, txt, muted, divider, inputCls, chipMint, chipAmber, chipRed, chipIndigo, chipViolet, chipGray, Breadcrumb } from '../lib'
 import type { Screen, Theme } from '../types'
 
@@ -50,8 +51,8 @@ function AdminConsole({ theme }: { theme: Theme }) {
         {/* Page header */}
         <div className="flex items-start justify-between mb-8">
           <div>
-            <h1 className="grad-text font-extrabold mb-1.5" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
-              Admin Console
+            <h1 className="font-extrabold mb-1.5" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
+              <AuroraText>Admin Console</AuroraText>
             </h1>
             <p className={c('text-sm font-medium', muted(theme))}>
               granjur.com &mdash; {MEMBERS.length} members

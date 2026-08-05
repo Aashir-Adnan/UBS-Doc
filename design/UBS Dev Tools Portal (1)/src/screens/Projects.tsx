@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { FolderOpen, ChevronRight, Plus, ChevronDown, Search, ExternalLink } from 'lucide-react'
+import { FolderOpen, ChevronRight, Plus, ChevronDown, ExternalLink } from 'lucide-react'
+import AuroraText from '../components/ui/aurora-text'
+import SearchInput from '../components/ui/search-input'
 import { c, card, txt, muted, divider, inputCls, chipMint, chipAmber, chipRed, chipIndigo, chipGray, Breadcrumb, Checkbox } from '../lib'
 import type { Screen, Theme } from '../types'
 
@@ -49,7 +51,7 @@ function ProjectsGrid({ theme }: { theme: Theme }) {
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
       <div className="max-w-[1240px] mx-auto px-10 py-12">
         <Breadcrumb items={['UBS', 'Dev Tools', 'Projects']} theme={theme} />
-        <h1 className="grad-text font-extrabold mb-8" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>Projects</h1>
+        <h1 className="font-extrabold mb-8" style={{ fontSize: 40, letterSpacing: '-0.025em' }}><AuroraText>Projects</AuroraText></h1>
         <div className="grid grid-cols-3 gap-5">
           {PROJECTS.map((p, i) => (
             <div key={i} className={c(card(theme), 'p-6 group cursor-pointer tr rounded-2xl', d ? 'card-hover-dark' : 'card-hover-light')}>
@@ -96,7 +98,7 @@ function MyProjectsView({ theme }: { theme: Theme }) {
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
       <div className="max-w-[900px] mx-auto px-10 py-12">
         <Breadcrumb items={['UBS', 'Dev Tools', 'My Projects']} theme={theme} />
-        <h1 className="grad-text font-extrabold mb-8" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>My Projects</h1>
+        <h1 className="font-extrabold mb-8" style={{ fontSize: 40, letterSpacing: '-0.025em' }}><AuroraText>My Projects</AuroraText></h1>
         <div className="grid grid-cols-2 gap-5">
           {MY_PROJECTS.map((p, i) => (
             <div key={i} className={c(card(theme), 'p-6 rounded-2xl')}>
@@ -138,7 +140,7 @@ function RepositoriesView({ theme }: { theme: Theme }) {
       <div className="max-w-[900px] mx-auto px-10 py-12">
         <Breadcrumb items={['UBS', 'Dev Tools', 'Repositories']} theme={theme} />
         <div className="flex items-center justify-between mb-6">
-          <h1 className="grad-text font-extrabold" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>Repositories</h1>
+          <h1 className="font-extrabold" style={{ fontSize: 40, letterSpacing: '-0.025em' }}><AuroraText>Repositories</AuroraText></h1>
           {tab === 'repos' && (
             <button className={c('flex items-center gap-2 text-xs font-semibold px-3.5 py-2 rounded-xl border tr',
               d ? 'border-indigo-500/20 text-white/40 hover:text-white hover:border-indigo-500/40' : 'border-slate-200 text-slate-400 hover:text-slate-700')}>
@@ -214,11 +216,8 @@ function RepositoriesView({ theme }: { theme: Theme }) {
 
         {tab === 'features' && (
           <div>
-            <div className={c('flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border text-sm w-72 mb-5',
-              d ? 'bg-white/5 border-indigo-500/20' : 'bg-white border-slate-200')}>
-              <Search size={14} className={muted(theme)} />
-              <input value={featureQ} onChange={e => setFeatureQ(e.target.value)} placeholder="Search features…"
-                className="bg-transparent outline-none flex-1 text-sm" style={{ color: 'inherit' }} />
+            <div className="mb-5">
+              <SearchInput value={featureQ} onChange={setFeatureQ} placeholder="Search features…" width={288} theme={theme} />
             </div>
             <div className="flex flex-col gap-3">
               {FEATURES.filter(f => f.name.toLowerCase().includes(featureQ.toLowerCase())).map((f, i) => (

@@ -1,4 +1,5 @@
 import { ArrowRight, BookOpen, Wrench, ChevronRight, Zap, Shield, Globe, Code2, GitBranch, BarChart3 } from 'lucide-react'
+import AuroraText from '../components/ui/aurora-text'
 import { c, card, txt, muted, sub, divider, Breadcrumb } from '../lib'
 import type { Screen, Theme } from '../types'
 
@@ -58,9 +59,10 @@ export default function Home({ navigate, theme }: Props) {
           )}
 
           <p className="section-kicker text-indigo-500 mb-4">Internal Developer Platform</p>
-          <h1 className="grad-text font-extrabold mb-5"
-            style={{ fontSize: 52, letterSpacing: '-0.03em', lineHeight: 1.08, maxWidth: 640 }}>
-            Build faster,<br />ship with confidence.
+          <h1 className="font-extrabold mb-5"
+            style={{ fontSize: 52, letterSpacing: '-0.03em', lineHeight: 1.08, maxWidth: 640, color: 'inherit' }}>
+            <span className={txt(theme)}>Build faster,</span><br />
+            <AuroraText>ship with confidence.</AuroraText>
           </h1>
           <p className={c('text-[17px] mb-9 leading-relaxed max-w-xl font-medium', sub(theme))}>
             The UBS Dev Tools Portal unifies your team's engineering workflows — from AI-powered meetings to GitHub, databases, and API generation — in one command center.
