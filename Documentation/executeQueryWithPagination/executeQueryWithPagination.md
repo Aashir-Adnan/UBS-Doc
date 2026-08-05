@@ -112,20 +112,9 @@ If pagination is disabled, the framework executes the query normally without app
 
 # 7. High-Level Architecture
 
-The following diagram illustrates how pagination integrates with the request processing pipeline.
+The High-Level Architecture diagram is available at the following location:
 
-```mermaid
-flowchart TD
-    A[Client Request] --> B[Query Resolver]
-    B --> C{Pagination Enabled?}
-    C -->|Yes| D[Execute Query With Pagination]
-    C -->|No| G[Execute SQL Query]
-    D --> F[Generate Final SQL Query]
-    F --> G
-    G --> H[(Database)]
-    H --> I[Retrieve Results]
-    I --> J[Return Response]
-```
+`Documentation/executeQueryWithPagination/executeQueryWithPagination Diagrams/High-Level Architecture.`
 
 The Query Resolver determines whether pagination is enabled for the current API. If enabled, the request is processed through `executeQueryWithPagination()`. Otherwise, the framework executes the query using the standard query execution mechanism.
 
@@ -139,26 +128,9 @@ Instead of executing the original SQL query directly, the framework analyzes the
 
 ## Query Processing Flow
 
-```mermaid
-flowchart TD
+The Query Processing Flow diagram is available at the following location:
 
-    A[Client Request] --> B[Query Resolver]
-    B --> C{Pagination Enabled?}
-
-    C -->|Yes| D[Execute Query With Pagination]
-    C -->|No| K[Execute Query]
-
-    D --> F[Read Pagination Parameters]
-    F --> G[Apply Search]
-    G --> H[Apply Filters]
-    H --> I[Apply Sorting]
-    I --> J[Generate Final SQL Query]
-    J --> K[Execute Query]
-
-    K --> L[(Database)]
-    L --> M[Return Results]
-
-```
+`Documentation/executeQueryWithPagination/executeQueryWithPagination Diagrams/Query Processing Flow`
 
 The query execution process consists of the following stages.
 
@@ -184,23 +156,9 @@ This improves performance, reduces network traffic, and provides a better user e
 
 ## Pagination Flow
 
-```mermaid
-flowchart TD
+The Pagination Flow diagram is available at the following location:
 
-    A[Receive Request]
-
-    --> B[Read Page Number]
-
-    --> C[Read Page Size]
-
-    --> D[Calculate Offset]
-
-    --> E[Apply LIMIT]
-
-    --> F[Execute Query]
-
-    --> G[Return Current Page]
-```
+`Documentation/executeQueryWithPagination/executeQueryWithPagination Diagrams/Pagination Flow`
 
 ### Pagination Parameters
 
@@ -224,23 +182,9 @@ If no filters are provided, the original query is executed without modification.
 
 ## Filtering Flow
 
-```mermaid
-flowchart TD
+The Filtering Flow diagram is available at the following location:
 
-    A[Receive Request]
-
-    --> B{Filters Provided?}
-
-    B -->|Yes| C[Build SQL Conditions]
-
-    B -->|No| D[Skip Filtering]
-
-    C --> E[Append Conditions to SQL Query]
-
-    D --> F[Continue Query Generation]
-
-    E --> F
-```
+`Documentation/executeQueryWithPagination/executeQueryWithPagination Diagrams/Filtering Flow`
 
 Filtering allows APIs to return only the information required by the client while reducing unnecessary database processing.
 
@@ -256,23 +200,9 @@ If no sorting information is provided, the original query order is preserved.
 
 ## Sorting Flow
 
-```mermaid
-flowchart TD
+The Sorting Flow diagram is available at the following location:
 
-    A[Receive Request]
-
-    --> B{Sorting Requested?}
-
-    B -->|Yes| C[Validate Sort Column]
-
-    C --> D[Apply ORDER BY]
-
-    B -->|No| E[Skip Sorting]
-
-    D --> F[Continue Query Generation]
-
-    E --> F
-```
+`Documentation/executeQueryWithPagination/executeQueryWithPagination Diagrams/Sorting Flow`
 
 The framework supports both ascending and descending sorting.
 
@@ -288,23 +218,9 @@ If no search keyword is provided, the search step is skipped.
 
 ## Search Flow
 
-```mermaid
-flowchart TD
+The Search Flow diagram is available at the following location:
 
-    A[Receive Search Keyword]
-
-    --> B{Keyword Provided?}
-
-    B -->|Yes| C[Generate Search Conditions]
-
-    C --> D[Append Search Query]
-
-    B -->|No| E[Skip Search]
-
-    D --> F[Continue Query Generation]
-
-    E --> F
-```
+`Documentation/executeQueryWithPagination/executeQueryWithPagination Diagrams/Search Flow`
 
 Searching improves data retrieval by allowing users to quickly locate records without specifying multiple filter conditions.
 
@@ -322,18 +238,9 @@ This allows developers to enable advanced query processing through configuration
 
 ## Query Resolver Flow
 
-```mermaid
-flowchart TD
-    A["API Request"] --> B["Read API Configuration"]
+The Query Resolver Flow diagram is available at the following location:
 
-    B --> C{"Pagination Enabled?"}
-
-    C -- Yes --> D["executeQueryWithPagination()"]
-    C -- No --> E["executeQuery()"]
-
-    D --> F["Return Response"]
-    E --> F
-```
+`Documentation/executeQueryWithPagination/executeQueryWithPagination Diagrams/Query Resolver Flow`
 
 ---
 
@@ -347,19 +254,9 @@ This ensures that every query is executed through a valid database connection.
 
 ## Database Connection Flow
 
-```mermaid
-flowchart TD
+The Database Connection Flow diagram is available at the following location:
 
-    A[Start Query Execution]
-
-    --> B[Request Database Connection]
-
-    --> C[Validate Connection]
-
-    --> D[Execute SQL Query]
-
-    --> E[Release Connection]
-```
+`Documentation/executeQueryWithPagination/executeQueryWithPagination Diagrams/Database Connection Flow`
 
 The connection lifecycle consists of the following stages.
 
@@ -390,21 +287,9 @@ Each enabled feature contributes to the final SQL query that is executed.
 
 ## SQL Query Construction Flow
 
-```mermaid
-flowchart TD
+The SQL Query Construction Flow diagram is available at the following location:
 
-    A[Base SQL Query]
-
-    --> B[Apply Search]
-
-    --> C[Apply Filters]
-
-    --> D[Apply Sorting]
-
-    --> E[Apply Pagination]
-
-    --> F[Generate Final SQL Query]
-```
+`Documentation/executeQueryWithPagination/executeQueryWithPagination Diagrams/SQL Query Construction Flow`
 
 This approach allows a single base query to support multiple request variations without requiring developers to manually construct SQL statements.
 
@@ -442,17 +327,9 @@ This provides a consistent API interface while allowing the database schema to r
 
 ## Column Mapping Process
 
-```mermaid
-flowchart TD
+The Column Mapping Process diagram is available at the following location:
 
-    A[Client Field Name]
-
-    --> B[Lookup Column Mapping]
-
-    --> C[Database Column Name]
-
-    --> D[Generate SQL Query]
-```
+`Documentation/executeQueryWithPagination/executeQueryWithPagination Diagrams/Column Mapping Process`
 
 Column mapping improves flexibility by separating the API interface from the database implementation.
 
@@ -468,13 +345,9 @@ The pagination engine focuses on query construction, while the query execution c
 
 ## Query Execution Flow
 
-```mermaid
-flowchart TD
-    A["Final SQL Query"] --> B["executeQuery()"]
-    B --> C["Database"]
-    C --> D["Fetch Records"]
-    D --> E["Return Results"]
-```
+The Query Execution Flow diagram is available at the following location:
+
+`Documentation/executeQueryWithPagination/executeQueryWithPagination Diagrams/Query Execution Flow`
 
 Separating query generation from query execution improves modularity and allows both components to be reused throughout the framework.
 
@@ -490,21 +363,9 @@ For example, the `UserRolePermissionArray` API retrieves role and permission rec
 
 ## Post Processing Flow
 
-```mermaid
-flowchart TD
+The Post Processing Flow diagram is available at the following location:
 
-    A[Database Results]
-
-    --> B{Post Process Function?}
-
-    B -->|Yes| C[Transform Data]
-
-    B -->|No| D[Keep Original Data]
-
-    C --> E[Return Response]
-
-    D --> E
-```
+`Documentation/executeQueryWithPagination/executeQueryWithPagination Diagrams/Post Processing Flow`
 
 Post processing allows APIs to return responses that are easier for clients to consume without modifying the original SQL query.
 
@@ -609,12 +470,13 @@ The pagination engine is one component of the overall framework architecture.
 
 The following documents explain the remaining components.
 
-| Document                               | Description                                                        |
-| -------------------------------------- | ------------------------------------------------------------------ |
-| Server Startup + Bootstrap             | Explains how the framework initializes before processing requests. |
-| Middleware Pipeline and API Processing | Describes how requests move through the middleware pipeline.       |
-| API Creation Process                   | Explains how API Objects are created and configured.               |
-| Encryption & Decryption Flow           | Explains how encrypted requests and responses are processed.       |
+| Document                                | Description                                                                                                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Server Startup + Bootstrap              | Explains how the framework initializes before processing requests.                                                                               |
+| Middleware Pipeline and API Processing  | Describes how requests move through the middleware pipeline.                                                                                     |
+| API Creation Process                    | Explains how API Objects are created and configured.                                                                                             |
+| Encryption & Decryption Flow            | Explains how encrypted requests and responses are processed.                                                                                     |
+| **executeQueryWithPagination Diagrams** | The Draw.io diagrams for the pagination engine are available in `Documentation/executeQueryWithPagination/executeQueryWithPagination Diagrams/`. |
 
 ---
 

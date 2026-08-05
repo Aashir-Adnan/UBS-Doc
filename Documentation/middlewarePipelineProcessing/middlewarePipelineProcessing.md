@@ -128,24 +128,9 @@ At the end of this stage, the framework has:
 - Attached any renewed access token.
 - Returned the completed response to the client.
 
----
+The Client Request Processing diagram is available at the following location:
 
-### Pipeline Summary
-
-```mermaid
-graph TD
-    A["Client Request"] --> B["Stage 1: PreProcessing"]
-    B --> C["Load API Object"]
-    C --> D["Prepare Request"]
-    D --> E["Stage 2: Processing"]
-    E --> F["Authentication & Permission Check"]
-    F --> G["Parameter Validation"]
-    G --> H["Execute Business Logic / Database Query"]
-    H --> I["Stage 3: PostProcessing"]
-    I --> J["Prepare Response"]
-    J --> K["Encrypt Response - Optional"]
-    K --> L["Return Response"]
-```
+`Documentation/middlewarePipelineProcessing/middlewarePipelineProcessing Diagrams/client_request_processing`
 
 ---
 
@@ -188,6 +173,19 @@ If an error occurs during request processing, the framework:
 4. Formats the response using the appropriate SCC code.
 5. Returns a consistent error response to the client.
 
+### Debugging Workflow for the Pipeline
+
+If a request is failing as it travels through the `middlewareHandler`, use the terminal logs and the three shared state objects to trace the execution.
+
+1. **Locate the Failure Point (The `errorSource`):**
+   When the pipeline crashes, the terminal console prints a color-coded trace containing the `errorSource`. Because the pipeline runs sequentially, if `parameterValidator` throws an error, you immediately know that PreProcessing (Stage 1) succeeded, but the request never reached `queryResolverHandler`.
+2. **Inspect the `apiObject` (The Rulebook):**
+   If a middleware behaves incorrectly (e.g., trying to validate an OTP when it shouldn't), the API Object configuration is likely wrong. Temporarily log `apiObject.config` in the pipeline right before the failing middleware runs to verify the feature flags.
+3. **Inspect the `decryptedPayload` (The Workbench):**
+   A common mistake is assuming client data is available in `req.body` or `req.query`. Remember that the pipeline moves cleaned and decrypted data into `decryptedPayload`. If `parameterValidator` or `queryResolverHandler` fails, log `decryptedPayload` to verify the data was correctly carried over from Stage 1.
+4. **Verify the `payload` (The Shipping Box):**
+   If the API executes successfully but the client receives an empty response, the issue is in Stage 3 (PostProcessing). Verify that the `postProcessHandler` correctly mapped the final database results or custom function returns into `payload.return`.
+
 ---
 
 ## 5. Memory Management (Cleanup Phase)
@@ -223,17 +221,11 @@ Memory cleanup provides several benefits:
 - Improves application stability.
 - Helps maintain consistent performance when processing many requests.
 
-### Cleanup Flow
+The Memory Cleanup Process diagram is available at the following location:
 
-The following diagram summarizes how the framework releases memory after a request has been processed.
+`Documentation/middlewarePipelineProcessing/middlewarePipelineProcessing Diagrams/memory_cleanup_process`
 
-```mermaid
-flowchart TD
-    A[Request Completed] --> B[Clear Temporary Data]
-    B --> C[Run cleanupMemory]
-    C --> D[Release Unused Objects]
-    D --> E[Garbage Collector Frees Memory]
-```
+---
 
 ## 6. The Complete Pipeline Flow
 
@@ -247,51 +239,9 @@ The request passes through three main stages:
 
 After the response is sent, the framework performs memory cleanup to release temporary objects. If an error occurs at any stage, the remaining pipeline is skipped, the error is logged, and a standardized error response is returned to the client.
 
-```mermaid
-flowchart TD
-    Client([Client Request]) --> MH[middlewareHandler]
+The Request Processing Flow diagram is available at the following location:
 
-    subgraph STAGE1["Stage 1: PreProcessing"]
-        direction TB
-        F1[getApiObjectHandler] --> F2[handleVersionCheckingHandler]
-        F2 --> F3[apiGeneratorHandler]
-        F3 --> F4[platformConfigHandler]
-        F4 --> F5[encryptionHandler]
-        F5 --> F6[requestMethodValidator]
-    end
-
-    subgraph STAGE2["Stage 2: Processing"]
-        direction TB
-        P1[execReqProcessFuncs] --> P2[accessTokenValidator]
-        P2 --> P3[otpVerificationHandler]
-        P3 --> P4[permissionHandler]
-        P4 --> P5[fileHandlerExecutor]
-        P5 --> P6[parameterValidator]
-        P6 --> P7[preProcessHandler]
-        P7 --> P8[queryResolverHandler]
-    end
-
-    subgraph STAGE3["Stage 3: PostProcessing"]
-        direction TB
-        O1[postProcessHandler] --> O2[responseSender]
-    end
-
-    subgraph CLEANUP["Memory Cleanup"]
-        direction TB
-        C1[Clear Temporary Data] --> C2[Run cleanupMemory]
-    end
-
-    MH --> F1
-    F6 --> P1
-    P8 --> O1
-    O2 --> Res([Return Response])
-    Res --> C1
-
-    F1 -. Error .-> ERR[Log Error & Return Standardized Error Response]
-    P1 -. Error .-> ERR
-    O1 -. Error .-> ERR
-    ERR --> C1
-```
+`Documentation/middlewarePipelineProcessing/middlewarePipelineProcessing Diagrams/request_processing_flow.drawio`
 
 ### Flow Summary
 
@@ -302,7 +252,9 @@ flowchart TD
 5. The framework releases temporary memory after the request is completed.
 6. If an error occurs at any stage, the pipeline stops, logs the error, returns a standardized error response, and performs memory cleanup.
 
-## 7. Quick Reference Checklist
+---
+
+## 8. Quick Reference Checklist
 
 When debugging or expanding the middleware pipeline, keep this checklist in mind:
 
@@ -313,20 +265,21 @@ When debugging or expanding the middleware pipeline, keep this checklist in mind
 
 ---
 
-## 8. Related Documentation
+## 9. Related Documentation
 
 The following documents provide additional details about different parts of the request processing framework.
 
-| Document                       | Description                                                                                             |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| **API Creation Process**       | Explains how to create API Objects and how they are discovered and executed by the middleware pipeline. |
-| **Encryption Flow**            | Explains how the `encryptionHandler` encrypts and decrypts request and response data.                   |
-| **executeQueryWithPagination** | Describes how the Query Resolver generates and executes paginated database queries.                     |
-| **Query Resolver**             | Explains how SQL placeholders are resolved and database queries are prepared before execution.          |
+| Document                         | Description                                                                                                                |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --- |
+| **API Creation Process**         | Explains how to create API Objects and how they are discovered and executed by the middleware pipeline.                    |
+| **Encryption Flow**              | Explains how the `encryptionHandler` encrypts and decrypts request and response data.                                      |
+| **executeQueryWithPagination**   | Describes how the Query Resolver generates and executes paginated database queries.                                        |
+| **Query Resolver**               | Explains how SQL placeholders are resolved and database queries are prepared before execution.                             |
+| **Middleware Pipeline Diagrams** | The Draw.io diagrams are available in `Documentation/middlewarePipelineProcessing/middlewarePipelineProcessing Diagrams/`. |     |
 
 ---
 
-## 9. Code References
+## 10. Code References
 
 The following files contain the primary implementation of the middleware pipeline.
 
@@ -337,8 +290,6 @@ The following files contain the primary implementation of the middleware pipelin
 | **Error Formatter (`createMiddlewareError`)** | Creates standardized error objects used throughout the middleware pipeline.    | `Services/Middlewares/config.js`             |
 | **SCC Logger (`LogError`)**                   | Formats, logs, and returns standardized error responses using SCC codes.       | `Services/Integrations/Database/Errorlog.js` |
 | **Memory Cleanup (`cleanupMemory`)**          | Releases temporary objects after request processing to reduce memory usage.    | `Services/Middlewares/middlewares.js`        |
-
----
 
 ---
 

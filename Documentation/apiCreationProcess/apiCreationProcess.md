@@ -22,7 +22,7 @@ The framework reads this object and automatically handles the entire request lif
 
 ---
 
-## 2. Two Types of API Objects
+# 2. Two Types of API Objects
 
 The framework supports two distinct types of API objects. The type chosen depends on the complexity of the feature being implemented.
 
@@ -67,21 +67,15 @@ Src/Apis/
 
 ---
 
-## 3. How the Framework Discovers APIs (URL-to-Object Resolution)
+# 3. How the Framework Discovers APIs (URL-to-Object Resolution)
 
 This is the most important concept to understand. **Routes are not manually registered for each API.** The framework uses a single dynamic route that catches all `/api/*` requests and automatically resolves the correct API Object from the URL.
 
 ### The Resolution Flow
 
-```mermaid
-flowchart TD
-    A[Client sends request to<br/><b>POST /api/crud/users</b>] --> B[Dynamic Router catches<br/>all /api/* requests]
-    B --> C["Middleware extracts path:<br/><b>crud/users</b>"]
-    C --> D["Converts path to object name:<br/><b>CrudUsers_object</b>"]
-    D --> E{"Does <b>global.CrudUsers_object</b><br/>exist?"}
-    E -- Yes --> F[Load the API Object and<br/>continue the pipeline]
-    E -- No --> G["Return 404 Error:<br/><b>API Object not found</b>"]
-```
+The API Object Handling diagram is available at:
+
+`Documentation/apiCreationProcess/apiCreationProcess Diagrams/api_object_handling`
 
 ### The Naming Convention (Critical!)
 
@@ -109,32 +103,13 @@ The resolution happens inside `Services/Middlewares/config.js` in the `getApiObj
 
 ---
 
-## 4. The API Object Structure (Anatomy)
+# 4. The API Object Structure (Anatomy)
 
 Every API Object, whether Default CRUD or ProjectSpecific, follows the same nested structure. Understanding this structure is essential.
 
-```mermaid
-graph TD
-    subgraph "API Object (global.Entity_object)"
-        TN["templateName<br/><i>(optional — links to a base template)</i>"]
-        V[versions]
-        V --> VD[versionData — Array]
-        VD --> STAR["'*' — Wildcard version<br/><i>(matches all versions)</i>"]
-        STAR --> STEPS["steps — Array"]
-        STEPS --> STEP1["Step Object"]
+The API Object Structure diagram is available at:
 
-        subgraph "Step Object"
-            direction TB
-            CFG["<b>config</b><br/>Features, Encryption,<br/>Verification flags"]
-            DATA["<b>data</b><br/>Parameters, Query Payloads,<br/>Pre/Post Process Functions"]
-            RESP["<b>response</b><br/>Success & Error messages"]
-        end
-
-        STEP1 --> CFG
-        STEP1 --> DATA
-        STEP1 --> RESP
-    end
-```
+`Documentation/apiCreationProcess/apiCreationProcess Diagrams/api_object_structure`
 
 Every incoming API request is processed using this API Object structure. During request execution, the framework reads the configuration, data, and response sections to determine how the API should be processed.
 
@@ -201,7 +176,7 @@ response: {
 
 ---
 
-## 5. Creating a Default CRUD API (Step-by-Step)
+# 5. Creating a Default CRUD API (Step-by-Step)
 
 A Default CRUD API is for standard database table operations. The framework automatically generates the Create, Read (List and View), Update, and Delete operations from the SQL queries defined in the API Object.
 
@@ -577,75 +552,19 @@ global.PortalUsersList_object = {
 };
 ```
 
-The following diagram summarizes how a ProjectSpecific API is executed.
+The ProjectSpecific API execution flow is available at:
 
-```mermaid
-flowchart TD
-
-A[Client Request]
-
---> B[Load ProjectSpecific API Object]
-
---> C[Execute postProcessFunction]
-
---> D[Run Custom Business Logic]
-
---> E[Return Response]
-```
+`Documentation/apiCreationProcess/apiCreationProcess Diagrams/client_request_flow.drawio`
 
 When a request reaches this API, the framework automatically executes the `listUsers()` function, which performs the required business logic and returns the response to the client.
 
-## 7. CRUD Workflow Diagram
+---
 
-The following diagram shows the complete lifecycle of a CRUD API request from client to response.
+# 7. CRUD Workflow
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Router as Dynamic Router<br/>(Src/Routes/dynamicRoutes.js)
-    participant MW as Middleware Pipeline<br/>(Services/Middlewares/)
-    participant Resolver as API Object Resolver<br/>(getApiObject)
-    participant Template as Template Merger<br/>(deepMerge)
-    participant Generator as API Generator<br/>(apiObjectGenerator)
-    participant QR as Query Resolver
-    participant DB as Database Layer
-    participant Resp as Response Sender
+The CRUD API request sequence diagram is available at:
 
-    Client->>Router: POST /api/crud/users
-
-    Note over Router: Catches all /api/* requests<br/>via middlewareHandler
-
-    Router->>MW: Enter Middleware Pipeline
-
-    rect rgb(45, 50, 80)
-    Note over MW,Template: Stage 1 — PreProcessing
-    MW->>Resolver: Extract path → "CrudUsers_object"
-    Resolver->>Resolver: Lookup global.CrudUsers_object
-    Resolver->>Template: Merge with Crud_Template
-    Template->>Generator: Determine operation from HTTP method<br/>(POST → Add, GET → List/View, etc.)
-    Generator->>MW: Return fully configured API Object
-    MW->>MW: Decrypt request body (if encryption enabled)
-    MW->>MW: Validate HTTP method is allowed
-    end
-
-    rect rgb(50, 70, 50)
-    Note over MW,QR: Stage 2 — Processing
-    MW->>MW: Validate Access Token (if enabled)
-    MW->>MW: Check Permissions (if configured)
-    MW->>MW: Validate Parameters
-    MW->>MW: Run preProcessFunctions
-    MW->>QR: Resolve query placeholders<br/>(replace {{tableEntity_email}} with actual values)
-    QR->>DB: Execute final SQL query
-    DB-->>QR: Return query results
-    end
-
-    rect rgb(80, 50, 50)
-    Note over MW,Resp: Stage 3 — PostProcessing
-    MW->>MW: Run postProcessFunction (if any)
-    MW->>Resp: Encrypt response (if enabled)
-    Resp-->>Client: Return HTTP response with data
-    end
-```
+`Documentation/apiCreationProcess/apiCreationProcess Diagrams/api_crud_users_flow_sequence`
 
 ### Workflow Explanation
 
@@ -708,7 +627,7 @@ The CRUD request is processed in three main stages: **PreProcessing**, **Process
 
 ---
 
-## 8. Anti-Pattern: What NOT to Do
+# 8. Anti-Pattern: What NOT to Do
 
 The following example demonstrates an **incorrect** approach to implementing an API in this framework. Business logic should **never** be written directly inside Express route handlers. Instead, all request processing should be defined through API Objects and executed by the framework's middleware pipeline.
 
@@ -752,7 +671,40 @@ Always define a `global.*_object` inside `Src/Apis/` and allow the framework to 
 
 ---
 
-# 9. Quick Reference Checklist
+# 9. Error Handling and Debugging Steps
+
+When creating APIs using the Object-Based Pattern, most errors stem from configuration mismatches rather than runtime logic. Debugging should focus on verifying the structure, naming, and data flow of your API Object.
+
+### Common Errors and Solutions
+
+| Symptom / Error                            | Probable Cause                                                                           | How to Fix                                                                                                                                                                                                                                                                    |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **404 API Object Not Found**               | The framework cannot resolve the URL to a global object name.                            | 1. Ensure the `global.Name_object` exactly matches the PascalCase conversion of the route.<br>2. Verify the API file is being imported/required during server startup.<br>3. Check if the file was placed in the correct `Default` or `ProjectSpecificApis` folder structure. |
+| **Missing Parameter Errors**               | The client payload doesn't match the definitions in `CRUD_parameters.js`.                | 1. Verify the `source` is correct (e.g., `req.body` vs `req.query`).<br>2. Ensure the parameter `type` matches the incoming data.<br>3. Check if a field is incorrectly marked as `required: true`.                                                                           |
+| **SQL Syntax / Placeholder Error**         | The Query Resolver failed to replace `{{placeholder}}` values before database execution. | 1. Ensure the `{{dynamicKey}}` used in your `queryPayload` exactly matches the `dynamicKey` string defined in `CRUD_parameters.js`.<br>2. Verify that `preProcessFunctions` are not malforming the input data.                                                                |
+| **ProjectSpecific API Returns Empty/Null** | The custom `postProcessFunction` did not return the expected data format.                | 1. Ensure your custom function explicitly `return`s the final result.<br>2. Verify `query.queryPayload` is set to `null` so the framework knows to rely on your custom function instead of the CRUD generator.                                                                |
+| **API Ignored Custom Config**              | The custom configurations were overwritten by the default template.                      | Ensure your custom flags in the `config` or `data` sections are structured correctly so `deepMerge()` applies them over the `templateName` defaults.                                                                                                                          |
+
+### Debugging Workflow for API Creation
+
+When an API you just created isn't working as expected, follow these steps to isolate the issue:
+
+1. **Verify the Registration:**
+   The first step is always ensuring the framework actually sees your API. Check the server startup logs to confirm your `global.*_object` was loaded into memory. If it's a ProjectSpecific API, ensure its route structure doesn't conflict with a Default CRUD namespace.
+
+2. **Check the Template Merge:**
+   If your API is loading but ignoring your settings (e.g., expecting an access token when you disabled it), the `Crud_Template` might be incorrectly overwriting your object. Log the final resolved `apiObject` in the pipeline to verify that your specific configurations successfully merged over the template defaults.
+
+3. **Validate the Parameter Mapping:**
+   If SQL queries fail or insert `NULL` values, the disconnect is usually between the parameter definitions and the query string. Map the journey of the variable to ensure no typos exist:
+   _Client Input_ ➔ _`CRUD_parameters.js` (`name` & `source`)_ ➔ _`dynamicKey`_ ➔ _SQL `{{dynamicKey}}` placeholder_.
+
+4. **Isolate Custom Business Logic:**
+   If a ProjectSpecific API is failing, isolate your `postProcessFunction`. Log the `decryptedPayload` at the very start of your custom function to ensure the middleware pipeline successfully handed off the cleaned and validated data before you execute your custom database queries.
+
+---
+
+# 10. Quick Reference Checklist
 
 Use the following checklist whenever a new API is created.
 
@@ -778,21 +730,22 @@ Use the following checklist whenever a new API is created.
 
 ---
 
-# 10. Related Documentation
+# 11. Related Documentation
 
 The following documents provide additional details about the framework.
 
-| Document                       | Description                                                                                      |
-| ------------------------------ | ------------------------------------------------------------------------------------------------ |
-| **Middleware Pipeline**        | Explains how requests pass through the framework's three middleware stages.                      |
-| **Server Startup & Bootstrap** | Describes how API Objects are discovered and registered during server startup.                   |
-| **Encryption Flow**            | Explains how request and response encryption are configured and processed.                       |
-| **executeQueryWithPagination** | Describes how paginated SQL queries are generated and executed.                                  |
-| **Query Resolver**             | Explains how SQL placeholders are replaced with validated request values before query execution. |
+| Document                       | Description                                                                                                          |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- | --- |
+| **Middleware Pipeline**        | Explains how requests pass through the framework's three middleware stages.                                          |
+| **Server Startup & Bootstrap** | Describes how API Objects are discovered and registered during server startup.                                       |
+| **Encryption Flow**            | Explains how request and response encryption are configured and processed.                                           |
+| **executeQueryWithPagination** | Describes how paginated SQL queries are generated and executed.                                                      |
+| **Query Resolver**             | Explains how SQL placeholders are replaced with validated request values before query execution.                     |
+| **API Creation Diagrams**      | Draw.io diagrams for this document are available in `Documentation/apiCreationProcess/apiCreationProcess Diagrams/`. |     |
 
 ---
 
-# 11. Code References
+# 12. Code References
 
 The following files contain the primary implementation of the API framework and can be referred to for understanding each stage of the API lifecycle.
 
@@ -810,7 +763,7 @@ The following files contain the primary implementation of the API framework and 
 
 ---
 
-## Conclusion
+# Conclusion
 
 The CSAAS Backend framework follows an **Object-Based API Architecture**, where every API is defined as a configuration object instead of traditional Express route handlers.
 
