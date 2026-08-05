@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight } from 'lucide-react'
+import { Folder, FolderOpen } from 'lucide-react'
 import { SIDEBAR, docLabel, categoryPathFor, type SidebarNode } from '../../docs/sidebar'
 import { c, card } from '../../lib'
 import type { Theme } from '../../types'
@@ -56,14 +56,12 @@ export default function DocsSidebar({ activeId, theme }: { activeId: string; the
             onClick={() => setOpen(prev => ({ ...prev, [key]: !prev[key] }))}
             style={pad}
             className={c(
-              'docs-tree-link flex items-center gap-1.5 font-semibold',
+              'docs-tree-link docs-tree-cat font-semibold',
               d ? 'text-white/70 hover:bg-white/5' : 'text-slate-700 hover:bg-slate-50',
             )}>
-            <ChevronRight
-              size={12}
-              className="shrink-0 tr"
-              style={{ transform: isOpen ? 'rotate(90deg)' : 'none' }}
-            />
+            {isOpen
+              ? <FolderOpen size={13} className="shrink-0 text-indigo-400" />
+              : <Folder size={13} className={c('shrink-0', d ? 'text-white/40' : 'text-slate-400')} />}
             <span className="min-w-0 flex-1">{node.label}</span>
           </button>
           {isOpen && renderNodes(node.items, key, depth + 1)}

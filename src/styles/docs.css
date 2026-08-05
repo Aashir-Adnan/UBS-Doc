@@ -52,3 +52,5 @@
 .docs-tree { scrollbar-gutter: stable; }
 .docs-tree-link { display: block; width: 100%; text-align: left; border-radius: 8px;
   padding: 0.3rem 0.55rem; font-size: 0.78rem; line-height: 1.4; transition: all 0.16s ease; }
+/* Category rows carry a folder icon — lay icon + label out inline. */
+.docs-tree-cat { display: flex; align-items: center; gap: 0.4rem; }
