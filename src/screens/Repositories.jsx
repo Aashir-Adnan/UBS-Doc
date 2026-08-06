@@ -762,11 +762,11 @@ export default function Repositories() {
 
   return (
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
-      <div className="max-w-[900px] mx-auto px-10 py-12">
+      <div className="max-w-[900px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-12">
         <Breadcrumb items={['UBS', 'Dev Tools', 'Repositories']} theme={theme} />
 
         <div className="repo-screen-header">
-          <h1 className="font-extrabold" style={{ fontSize: 40, letterSpacing: '-0.025em' }}><AuroraText>Repositories</AuroraText></h1>
+          <h1 className="font-extrabold screen-title"><AuroraText>Repositories</AuroraText></h1>
           {tab === 'repos' && (
             <button type="button" className="repo-pull-btn" onClick={handlePull} disabled={pulling}>
               {pulling ? <><span className="status-spinner" /> Pulling…</> : '⬇ Pull all repos'}

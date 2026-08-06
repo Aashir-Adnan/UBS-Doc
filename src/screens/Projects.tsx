@@ -32,10 +32,10 @@ function ProjectsGrid({ theme }: { theme: 'light' | 'dark' }) {
   const d = theme === 'dark'
   return (
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
-      <div className="max-w-[1240px] mx-auto px-10 py-12">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-12">
         <Breadcrumb items={['UBS', 'Dev Tools', 'Projects']} theme={theme} />
-        <h1 className="font-extrabold mb-8" style={{ fontSize: 40, letterSpacing: '-0.025em' }}><AuroraText>Projects</AuroraText></h1>
-        <div className="grid grid-cols-3 gap-5">
+        <h1 className="font-extrabold mb-8 screen-title"><AuroraText>Projects</AuroraText></h1>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {projects.map((p) => (
             <div key={p.slug} className={c(card(theme), 'p-6 group tr rounded-2xl', d ? 'card-hover-dark' : 'card-hover-light')}>
               <div className="flex items-center gap-3 mb-4">
@@ -87,7 +87,7 @@ function ProjectView({ theme }: { theme: 'light' | 'dark' }) {
   if (!project) {
     return (
       <div className={c('min-h-full flex items-center justify-center p-8', d ? 'aurora-dark' : 'aurora-light')}>
-        <div className={c('w-[420px] text-center', card(theme), 'rounded-3xl px-10 py-12')}>
+        <div className={c('w-full max-w-[420px] text-center', card(theme), 'rounded-3xl px-4 sm:px-6 lg:px-10 py-8 lg:py-12')}>
           <h2 className={c('font-extrabold text-xl mb-2.5', txt(theme))}>Project not found</h2>
           <p className={c('text-sm leading-relaxed mb-6', muted(theme))}>
             {slug ? `No project with slug "${slug}".` : 'Specify a project with ?project=<slug>.'}
@@ -103,9 +103,9 @@ function ProjectView({ theme }: { theme: 'light' | 'dark' }) {
   if (!CustomComponent) {
     return (
       <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
-        <div className="max-w-[900px] mx-auto px-10 py-12">
+        <div className="max-w-[900px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-12">
           <Breadcrumb items={crumb} theme={theme} />
-          <div className={c(card(theme), 'rounded-3xl px-10 py-12 text-center')}>
+          <div className={c(card(theme), 'rounded-3xl px-4 sm:px-6 lg:px-10 py-8 lg:py-12 text-center')}>
             <h2 className={c('font-extrabold text-xl mb-2.5', txt(theme))}>{project.name}</h2>
             <p className={c('text-sm leading-relaxed mb-6', muted(theme))}>
               This project does not have a custom view yet.
@@ -129,7 +129,7 @@ function ProjectView({ theme }: { theme: 'light' | 'dark' }) {
 
   return (
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
-      <div className="max-w-[1240px] mx-auto px-10 py-12">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-12">
         <Breadcrumb items={crumb} theme={theme} />
         <div className={c(card(theme), 'p-6 rounded-2xl')}>
           <Suspense fallback={<AccessState kind="loading" />}>

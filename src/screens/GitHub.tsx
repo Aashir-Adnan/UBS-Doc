@@ -75,10 +75,10 @@ export default function GitHub() {
   return (
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
       {/* Header */}
-      <div className="max-w-[1240px] mx-auto px-10 pt-10 pb-0">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10 pt-6 lg:pt-10 pb-0">
         <Breadcrumbs theme={theme} repo={repo} />
         <div className="flex items-center justify-between gap-4">
-          <h1 className="font-extrabold" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
+          <h1 className="font-extrabold screen-title">
             <AuroraText>GitHub Workspace</AuroraText>
           </h1>
           <div className="flex items-center gap-1.5">
@@ -101,7 +101,7 @@ export default function GitHub() {
       </div>
 
       {/* Tab bar + workspace */}
-      <div className="max-w-[1240px] mx-auto px-10 py-6">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10 py-6">
         <div className={c('flex border-b mb-5', d ? 'border-indigo-500/12' : 'border-slate-200')}>
           {TABS.map(t => (
             <button key={t.key} type="button" onClick={() => setTab(t.key)}
@@ -181,7 +181,7 @@ function NotificationBell({ notifs, theme }: { notifs: NotifState; theme: 'light
       )}
 
       {open && (
-        <div className={c(card(theme), 'absolute right-0 top-12 w-[320px] z-40 overflow-hidden slide-up')}>
+        <div className={c(card(theme), 'absolute right-0 top-12 w-[min(320px,calc(100vw-2rem))] z-40 overflow-hidden slide-up')}>
           <div className={c('flex items-center justify-between px-4 py-2.5 border-b', divider(theme))}>
             <span className={c('section-kicker', d ? 'text-white/28' : 'text-slate-300')}>Notifications</span>
             {count > 0 && (

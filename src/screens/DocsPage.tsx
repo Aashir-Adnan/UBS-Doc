@@ -137,14 +137,14 @@ export default function DocsPage() {
 
   return (
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
-      <div className="max-w-[1480px] mx-auto px-10 py-12 flex gap-8 items-start">
+      <div className="max-w-[1480px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-12 flex flex-col lg:flex-row gap-5 lg:gap-8 items-stretch lg:items-start">
         <DocsSidebar activeId={id} theme={theme} />
 
         <div className="min-w-0 flex-1">
           <Breadcrumb items={crumbs} theme={theme} />
           {Doc ? (
             <>
-              <div className={c(card(theme), 'p-9')}>
+              <div className={c(card(theme), 'p-5 sm:p-7 lg:p-9')}>
                 <MDXProvider components={MDX_COMPONENTS}>
                   <article className="docs-prose">
                     <Suspense fallback={<p className={c('text-sm', sub(theme))}>Loading…</p>}>

@@ -29,12 +29,12 @@ export default function ToolsHub() {
 
   return (
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
-      <div className="max-w-[1240px] mx-auto px-10 py-12">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-12">
         {/* Hero */}
-        <div className="flex items-start justify-between mb-10">
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-10">
           <div>
             <p className="section-kicker text-indigo-500 mb-3">Dev Tools Portal</p>
-            <h1 className="font-extrabold mb-2" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
+            <h1 className="font-extrabold mb-2 screen-title">
               <AuroraText>Welcome, {firstName}</AuroraText> <span style={{ WebkitTextFillColor: 'initial' }}>👋</span>
             </h1>
             <p className={c('text-sm font-medium', muted(theme))}>
@@ -51,7 +51,7 @@ export default function ToolsHub() {
         </div>
 
         {/* Grid */}
-        <div className="grid grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {TOOLS.map((t, i) => (
             <ToolCard key={i} {...t} dark={d} navigate={navigate} />
           ))}

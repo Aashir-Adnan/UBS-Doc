@@ -73,7 +73,7 @@ export function useMeetingGate(): MeetingGate {
     gateElement = (
       <div className={c('min-h-full flex items-center justify-center p-8',
         theme === 'dark' ? 'aurora-dark' : 'aurora-light')}>
-        <div className={c('w-[380px] text-center', card(theme), 'rounded-3xl px-10 py-12')}>
+        <div className={c('w-[380px] text-center', card(theme), 'rounded-3xl px-4 sm:px-6 lg:px-10 py-8 lg:py-12')}>
           <h2 className={c('font-extrabold text-xl mb-2.5', txt(theme))}>Could not resolve your access</h2>
           <p className={c('text-sm leading-relaxed', muted(theme))}>{String(idError ?? '')}</p>
         </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Folder, FolderOpen } from 'lucide-react'
+import { ChevronRight, Folder, FolderOpen } from 'lucide-react'
 import { SIDEBAR, docLabel, categoryPathFor, type SidebarNode } from '../../docs/sidebar'
 import { c, card } from '../../lib'
 import type { Theme } from '../../types'
@@ -18,6 +18,8 @@ function openSeed(activeId: string): Record<string, boolean> {
 export default function DocsSidebar({ activeId, theme }: { activeId: string; theme: Theme }) {
   const d = theme === 'dark'
   const [open, setOpen] = useState<Record<string, boolean>>(() => openSeed(activeId))
+  // Mobile-only: whether the whole tree is expanded (see the aside below).
+  const [treeOpen, setTreeOpen] = useState(false)
 
   // Following a prev/next button or an in-prose link changes the active doc
   // without remounting — re-open its ancestors, but keep what the user opened.
@@ -70,13 +72,36 @@ export default function DocsSidebar({ activeId, theme }: { activeId: string; the
     })
 
   return (
+    // Below lg this is a full-width collapsible panel above the article (a
+    // 280px sticky rail beside the prose leaves no readable column on a
+    // phone); the tree starts collapsed so the doc itself is what you land on.
+    // At lg+ it is the sticky rail and `treeOpen` is irrelevant.
     <aside
-      className={c(card(theme), 'docs-tree p-3 shrink-0 self-start sticky overflow-y-auto')}
-      style={{ width: 280, top: 24, maxHeight: 'calc(100vh - 48px)' }}>
-      <p className={c('section-kicker px-2 pb-2', d ? 'text-white/30' : 'text-slate-400')}>
+      className={c(
+        card(theme),
+        'docs-tree p-3 w-full lg:w-[280px] shrink-0 self-stretch lg:self-start lg:sticky overflow-y-auto',
+      )}
+      style={{ top: 24 }}>
+      <button
+        type="button"
+        onClick={() => setTreeOpen(o => !o)}
+        aria-expanded={treeOpen}
+        className={c(
+          'lg:hidden w-full flex items-center justify-between gap-2 px-2 py-1 rounded-lg',
+          d ? 'text-white/70' : 'text-slate-700',
+        )}
+      >
+        <span className={c('section-kicker', d ? 'text-white/30' : 'text-slate-400')}>
+          Documentation
+        </span>
+        <ChevronRight size={13} className="tr" style={{ transform: treeOpen ? 'rotate(90deg)' : 'none' }} />
+      </button>
+      <p className={c('section-kicker px-2 pb-2 hidden lg:block', d ? 'text-white/30' : 'text-slate-400')}>
         Documentation
       </p>
-      <nav className="flex flex-col gap-0.5">{renderNodes(SIDEBAR)}</nav>
+      <nav className={c('flex-col gap-0.5', treeOpen ? 'flex pt-2 lg:pt-0' : 'hidden lg:flex')}>
+        {renderNodes(SIDEBAR)}
+      </nav>
     </aside>
   )
 }

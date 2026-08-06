@@ -3,13 +3,16 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, BookOpen, Wrench, Info, Database, Map, Activity, Bell, Zap,
   FolderOpen, GitBranch, MessageSquare, FolderGit2, BarChart3, Shield,
-  Sun, Moon, Server, Monitor, Bot, FolderKanban
+  Sun, Moon, Server, Monitor, Bot, FolderKanban, X
 } from 'lucide-react'
 import { c } from '../lib'
 import type { Theme } from '../types'
 import OrgSwitcher from './portal/tenantProjects/OrgSwitcher'
 
 interface SidebarProps {
+  /** Drawer state below lg; ignored at lg+ where the rail is permanent. */
+  open?: boolean
+  onClose?: () => void
   theme: Theme
   toggleTheme: () => void
 }
@@ -60,7 +63,7 @@ const DOCS: NavItem[] = [
   { to: '/docs/projects/badar-hms/Opera_Config', label: 'Projects', Icon: FolderKanban },
 ]
 
-export default function Sidebar({ theme, toggleTheme }: SidebarProps) {
+export default function Sidebar({ theme, toggleTheme, open = false, onClose }: SidebarProps) {
   const d = theme === 'dark'
   const { pathname } = useLocation()
   const navigate = useNavigate()
@@ -70,12 +73,19 @@ export default function Sidebar({ theme, toggleTheme }: SidebarProps) {
   const subNavItems = showTools ? TOOLS : showDocs ? DOCS : null
 
   return (
-    <aside className={c(
-      'fixed left-0 top-0 bottom-0 w-60 flex flex-col z-40 overflow-hidden',
-      d ? 'aurora-panel-dark border-r border-sky-500/10' : 'bg-white border-r border-slate-100'
-    )}>
+    <aside
+      // Off-canvas below lg (slides in over the scrim), permanent rail at lg+.
+      // `overflow-y-auto` because on a short phone in landscape the nav is
+      // taller than the viewport.
+      aria-hidden={!open ? undefined : false}
+      className={c(
+        'fixed left-0 top-0 bottom-0 w-60 max-w-[85vw] flex flex-col z-40 overflow-hidden',
+        'transition-transform duration-200 ease-out lg:transition-none',
+        open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+        d ? 'aurora-panel-dark border-r border-sky-500/10' : 'bg-white border-r border-slate-100'
+      )}>
       {/* Brand + org switcher */}
-      <div className="px-4 pt-5 pb-3">
+      <div className="px-4 pt-5 pb-3 shrink-0">
         <div className="flex items-center gap-2.5 mb-4 px-1">
           <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-extrabold text-xs shrink-0"
             style={{ background: '#4F46E5' }}>
@@ -85,6 +95,15 @@ export default function Sidebar({ theme, toggleTheme }: SidebarProps) {
             UBS
           </span>
           <div className={c('w-1.5 h-1.5 rounded-full ml-auto', 'bg-emerald-400')} style={{ boxShadow: '0 0 6px rgba(52,211,153,0.8)' }} />
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close navigation"
+            className={c('lg:hidden -mr-1 p-1 rounded-lg tr',
+              d ? 'text-white/50 hover:bg-white/8' : 'text-slate-400 hover:bg-slate-100')}
+          >
+            <X size={16} />
+          </button>
         </div>
 
         <OrgSwitcher />

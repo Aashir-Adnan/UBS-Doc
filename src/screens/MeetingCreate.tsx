@@ -37,12 +37,12 @@ export default function MeetingCreate() {
 
   return (
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
-      <div className="max-w-[1240px] mx-auto px-10 py-12">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-12">
         <Breadcrumb items={['UBS', 'Dev Tools', 'Meetings', 'New Meeting']} theme={theme} />
 
         <div className="flex items-end justify-between gap-4 mb-9 flex-wrap">
           <div>
-            <h1 className="font-extrabold mb-2" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
+            <h1 className="font-extrabold mb-2 screen-title">
               <AuroraText>New Meeting</AuroraText>
             </h1>
             <p className={c('text-sm font-medium', muted(theme))}>

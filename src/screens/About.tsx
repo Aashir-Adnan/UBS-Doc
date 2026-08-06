@@ -16,7 +16,7 @@ export default function About() {
 
   return (
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
-      <div className="max-w-[1240px] mx-auto px-10 py-12">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-12">
         <Breadcrumb items={['UBS', 'About']} theme={theme} />
 
         <div className={c(card(theme), 'p-8 max-w-xl')}>

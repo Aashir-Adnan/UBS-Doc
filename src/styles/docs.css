@@ -54,3 +54,21 @@
   padding: 0.3rem 0.55rem; font-size: 0.78rem; line-height: 1.4; transition: all 0.16s ease; }
 /* Category rows carry a folder icon — lay icon + label out inline. */
 .docs-tree-cat { display: flex; align-items: center; gap: 0.4rem; }
+
+/* Mobile: the tree is a collapsible panel above the article, so it must not
+   inherit the rail's viewport-height cap. The cap returns at lg. */
+.docs-tree { max-height: 60vh; }
+@media (min-width: 1024px) { .docs-tree { max-height: calc(100vh - 48px); } }
+
+/* Docs prose on narrow screens: long code/paths must scroll inside their own
+   box rather than widening the page. */
+@media (max-width: 640px) {
+  .docs-prose { font-size: 0.9rem; }
+  .docs-prose h1 { font-size: 1.5rem; }
+  .docs-prose h2 { font-size: 1.2rem; }
+  .docs-prose h3 { font-size: 1.05rem; }
+  .docs-prose pre { font-size: 11.5px; padding: 0.75rem 0.85rem; border-radius: 12px; }
+  .docs-prose ul, .docs-prose ol { padding-left: 1.1rem; }
+}
+.docs-prose { overflow-wrap: anywhere; }
+.docs-prose pre, .docs-prose table { max-width: 100%; }

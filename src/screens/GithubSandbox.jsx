@@ -27,10 +27,10 @@ export default function GithubSandbox() {
 
   return (
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
-      <div className="max-w-[1240px] mx-auto px-10 py-10">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
         <Breadcrumb items={['UBS', 'Dev Tools', 'GitHub', 'Sandbox']} theme={theme} />
 
-        <h1 className="font-extrabold" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
+        <h1 className="font-extrabold screen-title">
           <AuroraText>GitHub Workflow Sandbox</AuroraText>
         </h1>
         <p className={c('text-sm font-medium mb-8', muted(theme))}>

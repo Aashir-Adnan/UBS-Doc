@@ -189,15 +189,15 @@ export default function TenantAdmin() {
 
   return (
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
-      <div className="max-w-[1100px] mx-auto px-10 py-10">
+      <div className="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
         <Breadcrumb items={['UBS', 'Dev Tools', 'Tenant Admin']} theme={theme} />
 
         {/* Page header — copy preserved from the pre-migration hero (manage-THIS-org
             framing, super-admin System note, signed-in-as + sign-out) inside the
             design's title + permission-gated amber pill layout. */}
-        <div className="flex items-start justify-between gap-6 mb-4">
+        <div className="flex flex-wrap items-start justify-between gap-4 sm:gap-6 mb-4">
           <div>
-            <h1 className="font-extrabold mb-1.5" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
+            <h1 className="font-extrabold mb-1.5 screen-title">
               <AuroraText>Organization Admin</AuroraText>
             </h1>
             <p className={c('text-sm font-medium', muted(theme))}>

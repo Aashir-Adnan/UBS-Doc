@@ -50,9 +50,9 @@ export default function APIBuilder() {
 
   return (
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
-      <div className="max-w-[860px] mx-auto px-10 py-12">
+      <div className="max-w-[860px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-12">
         <Breadcrumb items={['UBS', 'Dev Tools', 'API Object Builder']} theme={theme} />
-        <h1 className="font-extrabold mb-6" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
+        <h1 className="font-extrabold mb-6 screen-title">
           <AuroraText>API Object Builder</AuroraText>
         </h1>
 
@@ -106,7 +106,7 @@ export default function APIBuilder() {
 
             {/* Features */}
             <Section title="Features">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {(
                   [
                     { key: 'multistep', label: 'Multistep' },
@@ -174,7 +174,7 @@ export default function APIBuilder() {
 
             {/* Request metadata */}
             <Section title="Request Configuration">
-              <div className="grid grid-cols-3 gap-3 mb-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
                 <div>
                   <label className={c('section-kicker block mb-1.5', d ? 'text-white/25' : 'text-slate-300')}>Method</label>
                   <select value={state.requestMethod} onChange={(e) => update('requestMethod', e.target.value)} className={inputBase}>
@@ -251,7 +251,7 @@ export default function APIBuilder() {
                       <HelpCircle size={12} className={muted(theme)} />
                       <div
                         className={c(
-                          'absolute left-5 top-0 z-20 w-52 px-3 py-2.5 rounded-xl text-xs leading-relaxed pointer-events-none',
+                          'absolute left-5 top-0 z-20 w-52 max-w-[calc(100vw-3rem)] px-3 py-2.5 rounded-xl text-xs leading-relaxed pointer-events-none',
                           'opacity-0 group-hover/tip:opacity-100 tr',
                           d ? 'bg-[#151C30] border border-indigo-500/25 text-white/60' : 'bg-white border border-slate-200 text-slate-500 shadow-lg'
                         )}
@@ -299,7 +299,7 @@ export default function APIBuilder() {
                   <HelpCircle size={12} className={muted(theme)} />
                   <div
                     className={c(
-                      'absolute left-5 top-0 z-20 w-56 px-3 py-2.5 rounded-xl text-xs leading-relaxed pointer-events-none',
+                      'absolute left-5 top-0 z-20 w-56 max-w-[calc(100vw-3rem)] px-3 py-2.5 rounded-xl text-xs leading-relaxed pointer-events-none',
                       'opacity-0 group-hover/tip:opacity-100 tr',
                       d ? 'bg-[#151C30] border border-indigo-500/25 text-white/60' : 'bg-white border border-slate-200 text-slate-500 shadow-lg'
                     )}

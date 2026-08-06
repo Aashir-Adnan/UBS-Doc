@@ -130,9 +130,9 @@ function UploadView({ theme }: { theme: Theme }) {
 
   return (
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
-      <div className="max-w-[900px] mx-auto px-10 py-12">
+      <div className="max-w-[900px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-12">
         <Breadcrumb items={['UBS', 'Dev Tools', 'Database']} theme={theme} />
-        <h1 className="font-extrabold mb-8" style={{ fontSize: 40, letterSpacing: '-0.025em' }}><AuroraText>Database Tools</AuroraText></h1>
+        <h1 className="font-extrabold mb-8 screen-title"><AuroraText>Database Tools</AuroraText></h1>
 
         <div className="grid grid-cols-2 gap-6">
           {/* Upload card */}

@@ -668,3 +668,15 @@ body {
   white-space: nowrap;
   border: 0;
 }
+
+/* ─── Responsive typography ──────────────────────────────────── */
+/* Screen H1s were fixed 40px inline, which overflowed narrow phones. clamp()
+   scales between a readable mobile size and the design's desktop size without
+   needing a breakpoint per screen. */
+.screen-title { font-size: clamp(1.65rem, 6.5vw, 2.5rem); letter-spacing: -0.025em; line-height: 1.15; }
+.screen-title-sm { font-size: clamp(1.4rem, 5.5vw, 2.125rem); letter-spacing: -0.025em; line-height: 1.2; }
+.hero-title { font-size: clamp(2rem, 8.5vw, 3.25rem); letter-spacing: -0.03em; line-height: 1.08; }
+
+/* Long unbroken strings (repo slugs, emails, file paths, generated JS) are the
+   other common source of horizontal overflow on phones. */
+.break-anywhere { overflow-wrap: anywhere; word-break: break-word; }

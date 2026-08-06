@@ -147,7 +147,7 @@ export default function MeetingDetail() {
 
   return (
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
-      <div className="max-w-[1240px] mx-auto px-10 py-10">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
         <div className="flex items-center justify-between gap-4 mb-6">
           <nav className="flex items-center gap-1.5">
             {['UBS', 'Dev Tools', 'Meetings', title].map((item, i, all) => (

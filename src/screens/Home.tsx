@@ -50,7 +50,7 @@ export default function Home() {
 
   return (
     <div className={c('min-h-full', bgCls)}>
-      <div className="max-w-[1240px] mx-auto px-10 py-12">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-12">
         <Breadcrumb items={['UBS', 'Home']} theme={theme} />
 
         {/* Hero ─────────────────────────────────────────────── */}
@@ -64,15 +64,14 @@ export default function Home() {
           <p className="section-kicker text-indigo-500 mb-4">
             <TextAnimate by="character">Internal Developer Platform</TextAnimate>
           </p>
-          <h1 className="font-extrabold mb-5"
-            style={{ fontSize: 52, letterSpacing: '-0.03em', lineHeight: 1.08, maxWidth: 640, color: 'inherit' }}>
+          <h1 className="font-extrabold mb-5 hero-title" style={{ maxWidth: 640, color: 'inherit' }}>
             <span className={txt(theme)}>Build faster,</span><br />
             <AuroraText>ship with confidence.</AuroraText>
           </h1>
           <p className={c('text-[17px] mb-9 leading-relaxed max-w-xl font-medium', sub(theme))}>
             The UBS Dev Tools Portal unifies your team's engineering workflows — from AI-powered meetings to GitHub, databases, and API generation — in one command center.
           </p>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button onClick={() => navigate('/docs/backend/UBS-intro')}
               className="btn-primary flex items-center gap-2.5 px-6 py-3 text-sm">
               <BookOpen size={15} /> Explore Documentation <ArrowRight size={14} />
@@ -85,7 +84,7 @@ export default function Home() {
         </div>
 
         {/* Content grid ──────────────────────────────────────── */}
-        <div className="grid grid-cols-[1fr_340px] gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 lg:gap-8 items-start">
           {/* Docs list */}
           <div className={c(card(theme), 'overflow-hidden')}>
             <div className={c('px-6 py-4 border-b flex items-center justify-between', divider(theme))}>
