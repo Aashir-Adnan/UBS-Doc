@@ -102,22 +102,18 @@ export default function UserPresenceAvatar({
 
       const dx = prev.left - rect.left
       const dy = prev.top - rect.top
-      const dw = prev.width - rect.width
-      if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(dw) < 1) return
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return
 
-      // Group pills also change width as avatars enter/leave them, so their
-      // keyframes carry width; avatars only ever translate.
-      const isGroup = key.startsWith('group:')
+      // Transform only — never width. Animating a group pill's width makes the
+      // avatar row inside it re-wrap on every frame once the row is wide enough
+      // to break, so avatars jump between lines mid-flight and the whole group
+      // bounces. The pill takes its new width immediately (a snap nobody reads
+      // as motion) and only the avatars travel.
       el.animate(
-        isGroup
-          ? [
-            { transform: `translate(${dx}px, ${dy}px)`, width: `${prev.width}px` },
-            { transform: 'translate(0px, 0px)', width: `${rect.width}px` },
-          ]
-          : [
-            { transform: `translate(${dx}px, ${dy}px)` },
-            { transform: 'translate(0px, 0px)' },
-          ],
+        [
+          { transform: `translate(${dx}px, ${dy}px)` },
+          { transform: 'translate(0px, 0px)' },
+        ],
         { duration: FLIP_MS, easing: FLIP_EASE },
       )
     })
@@ -149,6 +145,11 @@ export default function UserPresenceAvatar({
         <div
           ref={register(`group:${kind}`)}
           className={c('upa-group', leaving === kind && 'upa-group--leaving')}
+          // Half the avatar height plus the pill's padding: a perfect stadium
+          // while the avatars fit on one line, and a cleanly rounded rectangle
+          // once the row wraps — where a flat 999px would clamp to half the
+          // *box* height and bulge into a blob.
+          style={{ borderRadius: Math.round(size / 2) + 4 }}
         >
           <div className="upa-row" style={{ marginRight: -Math.round(size * 0.22) }}>
             {group.map((user) => {
@@ -203,7 +204,12 @@ export default function UserPresenceAvatar({
       {present.length === 0 && emptyActiveLabel ? (
         <div className="upa-group-wrap">
           <span className="upa-group-label">{activeLabel}</span>
-          <div className="upa-empty" style={{ height: size + 4 }}>{emptyActiveLabel}</div>
+          <div
+            className="upa-empty"
+            style={{ height: size + 4, borderRadius: Math.round(size / 2) + 4 }}
+          >
+            {emptyActiveLabel}
+          </div>
         </div>
       ) : (
         renderGroup(present, 'active', activeLabel)
