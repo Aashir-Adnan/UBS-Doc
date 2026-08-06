@@ -1,0 +1,12 @@
+graph TD
+    A["Client Request"] --> B["Stage 1: PreProcessing"]
+    B --> C["Load API Object"]
+    C --> D["Prepare Request"]
+    D --> E["Stage 2: Processing"]
+    E --> F["Authentication & Permission Check"]
+    F --> G["Parameter Validation"]
+    G --> H["Execute Business Logic / Database Query"]
+    H --> I["Stage 3: PostProcessing"]
+    I --> J["Prepare Response"]
+    J --> K["Encrypt Response - Optional"]
+    K --> L["Return Response"]

@@ -1,0 +1,19 @@
+flowchart TD
+
+A[Read Required Permission]
+
+--> B[Read providedPermissions]
+
+--> C{Permission Found in JWT?}
+
+C -->|Yes| D[Grant Access]
+
+C -->|No| E[Generate SQL Query]
+
+E --> F[Query Database]
+
+F --> G{Permission Found?}
+
+G -->|Yes| H[Generate permission_results]
+
+G -->|No| I[403 Forbidden]

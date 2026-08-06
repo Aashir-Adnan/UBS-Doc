@@ -1,0 +1,17 @@
+sequenceDiagram
+
+participant Client
+participant API as Authentication API
+participant JWT as JWT Service
+participant FW as Framework
+
+Client->>API: Login Request
+API->>JWT: Generate JWT Token
+JWT-->>Client: Access Token
+
+Client->>FW: API Request + Access Token
+
+FW->>JWT: Validate Token
+JWT-->>FW: Token Valid
+
+FW->>FW: Continue API Processing

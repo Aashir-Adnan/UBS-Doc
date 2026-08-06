@@ -554,7 +554,7 @@ global.PortalUsersList_object = {
 
 The ProjectSpecific API execution flow is available at:
 
-`Documentation/apiCreationProcess/apiCreationProcess Diagrams/client_request_flow.drawio`
+`Documentation/apiCreationProcess/apiCreationProcess Diagrams/client_request_flow`
 
 When a request reaches this API, the framework automatically executes the `listUsers()` function, which performs the required business logic and returns the response to the client.
 

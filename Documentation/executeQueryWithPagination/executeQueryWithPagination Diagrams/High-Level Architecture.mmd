@@ -1,0 +1,10 @@
+flowchart TD
+    A[Client Request] --> B[Query Resolver]
+    B --> C{Pagination Enabled?}
+    C -->|Yes| D[Execute Query With Pagination]
+    C -->|No| G[Execute SQL Query]
+    D --> F[Generate Final SQL Query]
+    F --> G
+    G --> H[(Database)]
+    H --> I[Retrieve Results]
+    I --> J[Return Response]

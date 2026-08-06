@@ -1,0 +1,7 @@
+flowchart TD
+    A[Client sends request to<br/><b>POST /api/crud/users</b>] --> B[Dynamic Router catches<br/>all /api/* requests]
+    B --> C["Middleware extracts path:<br/><b>crud/users</b>"]
+    C --> D["Converts path to object name:<br/><b>CrudUsers_object</b>"]
+    D --> E{"Does <b>global.CrudUsers_object</b><br/>exist?"}
+    E -- Yes --> F[Load the API Object and<br/>continue the pipeline]
+    E -- No --> G["Return 404 Error:<br/><b>API Object not found</b>"]

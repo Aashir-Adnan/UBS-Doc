@@ -1,0 +1,13 @@
+flowchart TD
+
+A[Authorization Middleware]
+
+--> B[Read API Permission]
+
+--> C[Call permissionChecker]
+
+--> D[Validate Permission]
+
+--> E[Generate permission_results]
+
+--> F[Continue Middleware Pipeline]

@@ -1,0 +1,5 @@
+flowchart TD
+    A[Request Completed] --> B[Clear Temporary Data]
+    B --> C[Run cleanupMemory]
+    C --> D[Release Unused Objects]
+    D --> E[Garbage Collector Frees Memory]

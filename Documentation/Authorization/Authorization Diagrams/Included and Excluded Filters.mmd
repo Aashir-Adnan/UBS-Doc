@@ -1,0 +1,6 @@
+flowchart TD
+    A["Permission Found"] --> B["Read included_id"]
+    B --> C["JSON.parse()"]
+    C --> D["Read excluded_id"]
+    D --> E["Build permission_results"]
+    E --> F["Continue Request"]

@@ -1,0 +1,45 @@
+flowchart TD
+
+    A[Client Sends Request]
+
+    --> B[Access Token]
+
+    --> C[permissionChecker]
+
+    --> D[checkExpiration]
+
+    --> E[verifyToken]
+
+    --> F[JWT Verify Signature]
+
+    --> G{Signature Valid?}
+
+    G -->|No| X[Authentication Error]
+
+    G -->|Yes| H[Decode JWT Payload]
+
+    --> I[Check Token Expiration]
+
+    I -->|Expired| X
+
+    I -->|Valid| J[nearExpiry]
+
+    --> K[Decoded Payload]
+
+    --> L[Extract providedPermissions]
+
+    --> M{Required Permission Found?}
+
+    M -->|Yes| N[Grant Access]
+
+    M -->|No| O[Database Permission Validation]
+
+    O --> P{Permission Found?}
+
+    P -->|Yes| N
+
+    P -->|No| Q[403 Forbidden]
+
+    N --> R[Generate permission_results]
+
+    --> S[Continue Middleware Pipeline]

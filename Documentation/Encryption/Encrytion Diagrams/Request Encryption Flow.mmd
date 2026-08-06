@@ -1,0 +1,19 @@
+flowchart TD
+
+    A[Client Sends Encrypted Request]
+
+    --> B[Receive Request]
+
+    --> C[Extract Encrypted Payload]
+
+    --> D[Decrypt Using Framework Secret Key]
+
+    --> E[Extract Encryption Details]
+
+    --> F[Generate Final Encryption Key]
+
+    --> G[Decrypt Request Payload]
+
+    --> H[Pass Decrypted Payload to Middleware Pipeline]
+
+    --> I[API Processing]

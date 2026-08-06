@@ -1,0 +1,45 @@
+sequenceDiagram
+    participant Client
+    participant Router as Dynamic Router<br/>(Src/Routes/dynamicRoutes.js)
+    participant MW as Middleware Pipeline<br/>(Services/Middlewares/)
+    participant Resolver as API Object Resolver<br/>(getApiObject)
+    participant Template as Template Merger<br/>(deepMerge)
+    participant Generator as API Generator<br/>(apiObjectGenerator)
+    participant QR as Query Resolver
+    participant DB as Database Layer
+    participant Resp as Response Sender
+
+    Client->>Router: POST /api/crud/users
+
+    Note over Router: Catches all /api/* requests<br/>via middlewareHandler
+
+    Router->>MW: Enter Middleware Pipeline
+
+    rect rgb(45, 50, 80)
+    Note over MW,Template: Stage 1 — PreProcessing
+    MW->>Resolver: Extract path → "CrudUsers_object"
+    Resolver->>Resolver: Lookup global.CrudUsers_object
+    Resolver->>Template: Merge with Crud_Template
+    Template->>Generator: Determine operation from HTTP method<br/>(POST → Add, GET → List/View, etc.)
+    Generator->>MW: Return fully configured API Object
+    MW->>MW: Decrypt request body (if encryption enabled)
+    MW->>MW: Validate HTTP method is allowed
+    end
+
+    rect rgb(50, 70, 50)
+    Note over MW,QR: Stage 2 — Processing
+    MW->>MW: Validate Access Token (if enabled)
+    MW->>MW: Check Permissions (if configured)
+    MW->>MW: Validate Parameters
+    MW->>MW: Run preProcessFunctions
+    MW->>QR: Resolve query placeholders<br/>(replace {{tableEntity_email}} with actual values)
+    QR->>DB: Execute final SQL query
+    DB-->>QR: Return query results
+    end
+
+    rect rgb(80, 50, 50)
+    Note over MW,Resp: Stage 3 — PostProcessing
+    MW->>MW: Run postProcessFunction (if any)
+    MW->>Resp: Encrypt response (if enabled)
+    Resp-->>Client: Return HTTP response with data
+    end

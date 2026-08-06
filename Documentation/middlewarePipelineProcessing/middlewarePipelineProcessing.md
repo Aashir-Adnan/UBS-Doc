@@ -241,7 +241,7 @@ After the response is sent, the framework performs memory cleanup to release tem
 
 The Request Processing Flow diagram is available at the following location:
 
-`Documentation/middlewarePipelineProcessing/middlewarePipelineProcessing Diagrams/request_processing_flow.drawio`
+`Documentation/middlewarePipelineProcessing/middlewarePipelineProcessing Diagrams/request_processing_flow`
 
 ### Flow Summary
 

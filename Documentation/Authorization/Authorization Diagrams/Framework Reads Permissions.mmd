@@ -1,0 +1,15 @@
+flowchart TD
+
+    A[Load API Object]
+
+    --> B[Read requestMetaData.permission]
+
+    --> C{Permission Configured?}
+
+    C -->|Yes| D[Start Authorization]
+
+    C -->|No| E[Skip Authorization]
+
+    D --> F[Continue Middleware]
+
+    E --> F
