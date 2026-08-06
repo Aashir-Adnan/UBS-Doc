@@ -5,6 +5,7 @@ import { useTheme } from '../app/ThemeContext'
 import { useAuthTyped as useAuth } from '../components/portal/authTypes'
 import { useActingUrdd } from '../components/portal/tenantProjects/useActingUrdd'
 import AuroraText from '../components/ui/aurora-text'
+import NumberTicker from '../components/ui/number-ticker'
 import { listPortalUsers, listTenants } from '../components/portal/tenantProjects/tenantApi'
 import {
   deriveTabs, shouldResetSystemTab, orgLabel, computeMemberStats,
@@ -34,9 +35,12 @@ interface MemberRow {
   urdd_id?: number | string | null
 }
 
+// `value` is a number for the count cards (animated by NumberTicker) and a
+// string for the text ones ("—" on a failed fetch, the org name for the
+// non-super-admin fourth card), so a failure never counts up from zero.
 function StatCard({
   label, value, sub, loading, theme,
-}: { label: string; value: string; sub: string; loading?: boolean; theme: Theme }) {
+}: { label: string; value: string | number; sub: string; loading?: boolean; theme: Theme }) {
   const d = theme === 'dark'
   return (
     <div className={c(card(theme), 'rounded-2xl px-5 py-4 min-w-0')}>
@@ -52,7 +56,9 @@ function StatCard({
           ))}
         </div>
       ) : (
-        <p className={c('font-extrabold text-2xl mb-0.5 truncate', txt(theme))}>{value}</p>
+        <p className={c('font-extrabold text-2xl mb-0.5 truncate', txt(theme))}>
+          {typeof value === 'number' ? <NumberTicker value={value} /> : value}
+        </p>
       )}
       <p className={c('text-xs truncate', muted(theme))}>{sub}</p>
     </div>
@@ -146,26 +152,26 @@ export default function TenantAdmin() {
   const statCards = [
     {
       label: 'Total Members',
-      value: membersError ? '—' : String(memberStats?.total ?? 0),
+      value: membersError ? '—' : (memberStats?.total ?? 0),
       sub: membersError ? 'Failed to load' : 'in this organization',
       loading: membersLoading,
     },
     {
       label: 'Active',
-      value: membersError ? '—' : String(memberStats?.active ?? 0),
+      value: membersError ? '—' : (memberStats?.active ?? 0),
       sub: membersError ? 'Failed to load' : 'active accounts',
       loading: membersLoading,
     },
     {
       label: 'Pending',
-      value: membersError ? '—' : String(memberStats?.pending ?? 0),
+      value: membersError ? '—' : (memberStats?.pending ?? 0),
       sub: membersError ? 'Failed to load' : 'awaiting provision',
       loading: membersLoading,
     },
     isSuperAdmin
       ? {
         label: 'Tenants',
-        value: tenantsError ? '—' : String(tenantsCount ?? 0),
+        value: tenantsError ? '—' : (tenantsCount ?? 0),
         sub: tenantsError ? 'Failed to load' : 'across the platform',
         loading: tenantsLoading,
       }

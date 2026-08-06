@@ -4,6 +4,7 @@ import { c, muted } from '../lib'
 import { useTheme } from '../app/ThemeContext'
 import { useAuthTyped } from '../components/portal/authTypes'
 import AuroraText from '../components/ui/aurora-text'
+import TextAnimate from '../components/ui/text-animate'
 
 const TOOLS = [
   { label: 'Database', desc: 'Upload and inspect SQL schemas', Icon: Database, route: '/tools/database', from: '#4F46E5', to: '#6366F1' },
@@ -36,7 +37,9 @@ export default function ToolsHub() {
             <h1 className="font-extrabold mb-2" style={{ fontSize: 40, letterSpacing: '-0.025em' }}>
               <AuroraText>Welcome, {firstName}</AuroraText> <span style={{ WebkitTextFillColor: 'initial' }}>👋</span>
             </h1>
-            <p className={c('text-sm font-medium', muted(theme))}>What are you building today?</p>
+            <p className={c('text-sm font-medium', muted(theme))}>
+              <TextAnimate by="character" delay={0.25}>What are you building today?</TextAnimate>
+            </p>
           </div>
           <button onClick={signOut}
             className={c(

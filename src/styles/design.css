@@ -637,3 +637,34 @@ body {
   background: linear-gradient(180deg, #0d0b1f, #080614, #110f2e);
   border: 1px solid transparent;
 }
+
+/* ─── TextAnimate (blur-in-up reveal) ────────────────────────── */
+.text-animate-part {
+  display: inline-block;
+  white-space: pre;
+  opacity: 0;
+  filter: blur(8px);
+  transform: translateY(0.35em);
+  /* Gradient headings (.aurora-text) clip their background to the text, so the
+     parts must not introduce their own fill — inherit keeps the gradient. */
+  -webkit-text-fill-color: inherit;
+}
+.text-animate-in {
+  animation: text-animate-blur-in-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes text-animate-blur-in-up {
+  to { opacity: 1; filter: blur(0); transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .text-animate-part { opacity: 1; filter: none; transform: none; animation: none; }
+}
+/* Visually hidden, still read by screen readers. */
+.sr-only-text {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -13,6 +13,10 @@
   --ifm-color-danger: #EF4444;
   --ifm-background-color: #FAF8FF;
   --ifm-background-surface-color: #FFFFFF;
+  /* Floating overlays (dropdowns, popovers, context menus) must OCCLUDE the
+     content behind them, so they need an opaque fill — unlike the glassy
+     --ifm-background-surface-color that inline cards use in dark mode. */
+  --ubs-overlay-surface: #FFFFFF;
   --ifm-color-content: #0F172A;
   --ifm-color-emphasis-0: #FFFFFF;
   --ifm-color-emphasis-100: #F1F5F9;
@@ -31,6 +35,7 @@
 [data-theme='dark'] {
   --ifm-background-color: #04070F;
   --ifm-background-surface-color: rgba(255, 255, 255, 0.04);
+  --ubs-overlay-surface: #0C1122;
   --ifm-color-content: #F1F5F9;
   --ifm-color-emphasis-0: #04070F;
   --ifm-color-emphasis-100: rgba(255, 255, 255, 0.06);

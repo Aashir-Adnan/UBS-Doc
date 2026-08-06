@@ -3,6 +3,7 @@ import { ArrowRight, BookOpen, Wrench, ChevronRight, Zap, Shield, Globe, GitBran
 import { c, card, txt, muted, sub, divider, Breadcrumb } from '../lib'
 import { useTheme } from '../app/ThemeContext'
 import AuroraText from '../components/ui/aurora-text'
+import TextAnimate from '../components/ui/text-animate'
 
 const DOCS = [
   { label: 'Framework Features', sub: 'Core capabilities of the UBS platform', icon: '🚀', to: '/docs/intro/UBS_Framework_Features' },
@@ -60,7 +61,9 @@ export default function Home() {
               style={{ background: 'radial-gradient(ellipse, rgba(79,70,229,0.18) 0%, transparent 70%)', filter: 'blur(32px)' }} />
           )}
 
-          <p className="section-kicker text-indigo-500 mb-4">Internal Developer Platform</p>
+          <p className="section-kicker text-indigo-500 mb-4">
+            <TextAnimate by="character">Internal Developer Platform</TextAnimate>
+          </p>
           <h1 className="font-extrabold mb-5"
             style={{ fontSize: 52, letterSpacing: '-0.03em', lineHeight: 1.08, maxWidth: 640, color: 'inherit' }}>
             <span className={txt(theme)}>Build faster,</span><br />

@@ -7904,3 +7904,26 @@ select[aria-label^='Role for']:focus {
   opacity: 0.55;
   transform: none;
 }
+
+/* ===== Floating overlay surfaces (dropdown visibility fix) ===== */
+/* These are absolutely/fixed-positioned menus. They previously inherited
+   --ifm-background-surface-color, which is a 4%-white glass fill in dark mode,
+   so page content showed straight through them. Overlays get the opaque
+   --ubs-overlay-surface instead; inline cards keep the glass. */
+.ubs-org-switcher-menu,
+.ss-dropdown,
+.gh-notif-dropdown,
+.erd-context-menu,
+.erd-context-menu-submenu {
+  background: var(--ubs-overlay-surface);
+}
+[data-theme='dark'] .ubs-org-switcher-menu,
+[data-theme='dark'] .ss-dropdown,
+[data-theme='dark'] .gh-notif-dropdown,
+[data-theme='dark'] .erd-context-menu,
+[data-theme='dark'] .erd-context-menu-submenu {
+  border-color: rgba(79, 70, 229, 0.28);
+  box-shadow:
+    0 0 0 0.5px rgba(14, 165, 233, 0.1) inset,
+    0 12px 36px rgba(0, 0, 0, 0.62);
+}
