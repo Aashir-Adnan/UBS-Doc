@@ -7927,3 +7927,63 @@ select[aria-label^='Role for']:focus {
     0 0 0 0.5px rgba(14, 165, 233, 0.1) inset,
     0 12px 36px rgba(0, 0, 0, 0.62);
 }
+
+/* ===== Native <select> option lists ===== */
+/* Chrome paints the popup with the <select>'s own background/colour. In dark
+   mode the fields are a translucent white fill over a light OS popup surface,
+   and the options inherited the light body text colour — white on white. Pin
+   both explicitly: the popup is a light surface in either theme, so the text
+   is dark in either theme. */
+select option,
+select optgroup {
+  background-color: #FFFFFF;
+  color: #0F1424;
+}
+
+/* ===== Tenant Admin: glass views ===== */
+/* Same treatment as .mw-detail-screen .mw-panel — a light tint with a soft
+   blur rather than card-dark's heavier 20px blur, so the aurora shader shows
+   through the tab body. Light mode keeps the design's white card. */
+.tenant-admin-screen .tenant-admin-panel {
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(15, 20, 36, 0.04), 0 4px 12px rgba(15, 20, 36, 0.04);
+}
+[data-theme='dark'] .tenant-admin-screen .tenant-admin-panel {
+  border-color: rgba(79, 70, 229, 0.18);
+  background: rgba(10, 14, 30, 0.30);
+  backdrop-filter: blur(10px) saturate(1.3);
+  -webkit-backdrop-filter: blur(10px) saturate(1.3);
+  box-shadow:
+    0 0 0 0.5px rgba(14, 165, 233, 0.08) inset,
+    0 4px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Panels nested inside the glass body (OrganizationManager's members card,
+   UserPermissions' pending card) would otherwise stack a second opaque
+   surface on top of it. They keep their border and lose their fill. */
+.tenant-admin-screen .tenant-admin-panel .portal-card {
+  background: rgba(79, 70, 229, 0.04);
+  border-color: rgba(79, 70, 229, 0.14);
+  box-shadow: none;
+}
+[data-theme='dark'] .tenant-admin-screen .tenant-admin-panel .portal-card {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(129, 140, 248, 0.18);
+}
+
+/* The stat cards above the tabs follow the same glass so the whole screen
+   reads as one material. */
+[data-theme='dark'] .tenant-admin-screen .card-dark {
+  background: rgba(10, 14, 30, 0.30);
+  backdrop-filter: blur(10px) saturate(1.3);
+  -webkit-backdrop-filter: blur(10px) saturate(1.3);
+  border-color: rgba(79, 70, 229, 0.18);
+  box-shadow:
+    0 0 0 0.5px rgba(14, 165, 233, 0.08) inset,
+    0 4px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* The user pickers replaced their <select> with UserPresenceAvatar, so the
+   .tenant-field wrapper is now a plain block rather than a labelled control. */
+.tenant-field > .upa-root { margin-top: 0.15rem; }

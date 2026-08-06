@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { listMembers, listAvailableProjects, getGrants, grantProjects } from './tenantApi';
 import { useActingPermissions } from './useActingPermissions';
 import PermissionNotice from './PermissionNotice';
+import UserPresenceAvatar from '../../ui/user-presence-avatar';
+import { membersToPresence, toggleSingle } from './memberPresence';
 
 // Admin → Grant projects (§3.4 + §7.3/§7.4). Pick a target user, show the
 // projects available in *their* tenant as a checkbox list pre-checked from their
@@ -154,20 +156,17 @@ export default function GrantProjects({ adminUrdd }) {
 
       {loadError && <p className="tenant-error">Failed to load members: {loadError}</p>}
 
-      <label className="tenant-field">
+      <div className="tenant-field">
         <span>User</span>
-        <select value={targetUrdd} onChange={(e) => setTargetUrdd(e.target.value)}>
-          <option value="">Select a user…</option>
-          {members.map((m) => (
-            <option key={m.urdd_id} value={m.urdd_id}>
-              {(m.first_name || m.last_name)
-                ? `${m.first_name || ''} ${m.last_name || ''}`.trim()
-                : m.username || m.email}
-              {` — URDD #${m.urdd_id} · tenant #${m.tenant_id}`}
-            </option>
-          ))}
-        </select>
-      </label>
+        <UserPresenceAvatar
+          users={membersToPresence(members)}
+          activeIds={targetUrdd ? [String(targetUrdd)] : []}
+          onToggle={(u) => setTargetUrdd((prev) => toggleSingle(prev, u.id))}
+          activeLabel="Selected"
+          inactiveLabel="Members"
+          emptyActiveLabel="Pick a member to grant projects to"
+        />
+      </div>
 
       {selectedMember && (
         <>

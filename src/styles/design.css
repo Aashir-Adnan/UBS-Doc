@@ -680,3 +680,130 @@ body {
 /* Long unbroken strings (repo slugs, emails, file paths, generated JS) are the
    other common source of horizontal overflow on phones. */
 .break-anywhere { overflow-wrap: anywhere; word-break: break-word; }
+
+/* ─── User presence avatars ──────────────────────────────────── */
+/* Port of animate-ui's community `user-presence-avatar`: two pills of
+   overlapping avatars (present in colour, absent greyscaled) with the FLIP
+   move between them driven from src/components/ui/user-presence-avatar.tsx.
+   Upstream's neutral-300 / neutral-700 pill is retinted indigo to match the
+   rest of the revamp. */
+
+.upa-root {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.1rem 1.35rem;
+}
+
+.upa-group-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.upa-group-label {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ifm-color-emphasis-500);
+  padding-left: 0.35rem;
+}
+
+.upa-group {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  max-width: 100%;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(79, 70, 229, 0.14);
+}
+[data-theme='dark'] .upa-group { background: rgba(129, 140, 248, 0.2); }
+/* The group an avatar is leaving drops below the other one, so the avatar
+   travels underneath the destination pill instead of over it. */
+.upa-group--leaving { z-index: 1; }
+
+.upa-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 3px;
+}
+
+.upa-avatar {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 3px solid rgba(79, 70, 229, 0.14);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4F46E5, #6366F1);
+  color: #fff;
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, filter 0.3s ease, opacity 0.3s ease;
+}
+[data-theme='dark'] .upa-avatar { border-color: rgba(129, 140, 248, 0.2); }
+
+.upa-avatar:hover:not(:disabled),
+.upa-avatar:focus-visible {
+  z-index: 5;
+  outline: none;
+  box-shadow: 0 0 0 2px #4F46E5, 0 6px 18px rgba(79, 70, 229, 0.3);
+}
+
+.upa-avatar--muted { filter: grayscale(1); opacity: 0.62; }
+.upa-avatar--muted:hover:not(:disabled) { filter: grayscale(0.35); opacity: 0.9; }
+.upa-avatar--locked { cursor: default; }
+
+.upa-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+
+.upa-initials {
+  font-size: 0.78em;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  user-select: none;
+}
+
+/* Tooltip — upstream uses the animate-ui Tooltip primitive; this is the same
+   affordance in CSS so no extra runtime is pulled in. */
+.upa-tip {
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 10px;
+  background: var(--ubs-overlay-surface);
+  border: 1px solid rgba(79, 70, 229, 0.22);
+  box-shadow: 0 8px 24px rgba(9, 12, 60, 0.22);
+  white-space: nowrap;
+  text-align: left;
+  opacity: 0;
+  transform: translate(-50%, 4px);
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+.upa-avatar:hover .upa-tip,
+.upa-avatar:focus-visible .upa-tip { opacity: 1; transform: translate(-50%, 0); }
+
+.upa-tip-name { font-size: 0.76rem; font-weight: 700; color: var(--ifm-font-color-base); }
+.upa-tip-sub { font-size: 0.68rem; color: var(--ifm-color-emphasis-600); }
+
+.upa-empty {
+  display: flex;
+  align-items: center;
+  padding: 0 1rem;
+  border-radius: 999px;
+  border: 1px dashed rgba(79, 70, 229, 0.3);
+  font-size: 0.76rem;
+  color: var(--ifm-color-emphasis-500);
+}

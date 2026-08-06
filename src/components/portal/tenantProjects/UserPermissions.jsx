@@ -9,6 +9,8 @@ import {
 } from './tenantApi';
 import { useActingPermissions } from './useActingPermissions';
 import PermissionNotice from './PermissionNotice';
+import UserPresenceAvatar from '../../ui/user-presence-avatar';
+import { membersToPresence, toggleSingle } from './memberPresence';
 
 // Admin → Permissions. View and override one portal user's permissions on top of
 // their role defaults.
@@ -213,20 +215,17 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
 
       {/* Target picker */}
       {adminUrdd != null && members.length > 0 ? (
-        <label className="tenant-field">
+        <div className="tenant-field">
           <span>User</span>
-          <select value={selectedUrdd} onChange={(e) => setSelectedUrdd(e.target.value)}>
-            <option value="">Select a user…</option>
-            {members.map((m) => (
-              <option key={m.urdd_id} value={m.urdd_id}>
-                {(m.first_name || m.last_name)
-                  ? `${m.first_name || ''} ${m.last_name || ''}`.trim()
-                  : m.username || m.email}
-                {m.email ? ` (${m.email})` : ''}
-              </option>
-            ))}
-          </select>
-        </label>
+          <UserPresenceAvatar
+            users={membersToPresence(members)}
+            activeIds={selectedUrdd ? [String(selectedUrdd)] : []}
+            onToggle={(u) => setSelectedUrdd((prev) => toggleSingle(prev, u.id))}
+            activeLabel="Selected"
+            inactiveLabel="Members"
+            emptyActiveLabel="Pick a member to inspect their permissions"
+          />
+        </div>
       ) : (
         <div className="tenant-field">
           <span>User email</span>

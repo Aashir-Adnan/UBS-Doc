@@ -188,7 +188,7 @@ export default function TenantAdmin() {
   ]
 
   return (
-    <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
+    <div className={c('tenant-admin-screen min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
       <div className="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
         <Breadcrumb items={['UBS', 'Dev Tools', 'Tenant Admin']} theme={theme} />
 
@@ -261,7 +261,10 @@ export default function TenantAdmin() {
           ))}
         </div>
 
-        <div className={c(card(theme), 'rounded-2xl p-6')}>
+        {/* tenant-admin-panel gets the same lighter glass the meeting detail
+            panel uses, so the aurora shader reads through the tab body instead
+            of it sitting on the page as a flat slab. */}
+        <div className={c(card(theme), 'tenant-admin-panel rounded-2xl p-6')}>
           {tab === 'org' && (
             <OrganizationManager email={user?.email} onOrgChanged={refetch} />
           )}
