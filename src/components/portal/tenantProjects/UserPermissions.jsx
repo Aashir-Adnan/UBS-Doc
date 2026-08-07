@@ -9,6 +9,8 @@ import {
 } from './tenantApi';
 import { useActingPermissions } from './useActingPermissions';
 import PermissionNotice from './PermissionNotice';
+import UserPresenceAvatar from '../../ui/user-presence-avatar';
+import { membersToPresence, toggleSingle } from './memberPresence';
 
 // Admin → Permissions. View and override one portal user's permissions on top of
 // their role defaults.
@@ -49,7 +51,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
   useEffect(() => {
     let cancelled = false;
     setCatalogLoading(true);
-    permissionsCatalog(actorEmail, adminUrdd)
+    permissionsCatalog(adminUrdd)
       .then((res) => {
         if (cancelled) return;
         setCatalog({
@@ -60,7 +62,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
       .catch((e) => { if (!cancelled) setCatalogError(e.message); })
       .finally(() => { if (!cancelled) setCatalogLoading(false); });
     return () => { cancelled = true; };
-  }, [actorEmail, adminUrdd]);
+  }, [adminUrdd]);
 
   // Load members for the dropdown when an admin URDD is available.
   useEffect(() => {
@@ -87,7 +89,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
       if (portalUserId == null) {
         throw new Error('Could not resolve this user’s portal id (have they signed in?).');
       }
-      const res = await getUserPermissions(actorEmail, portalUserId, adminUrdd);
+      const res = await getUserPermissions(adminUrdd, portalUserId);
       setTarget({
         portalUserId,
         email,
@@ -115,7 +117,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
   const reloadTarget = async () => {
     if (!target?.portalUserId) return;
     try {
-      const res = await getUserPermissions(actorEmail, target.portalUserId, adminUrdd);
+      const res = await getUserPermissions(adminUrdd, target.portalUserId);
       setTarget((t) => (t ? {
         ...t,
         pending: !!res?.pending,
@@ -132,7 +134,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
     setNotice(null);
     try {
       setSavingName(permName);
-      await setUserPermission(actorEmail, target.portalUserId, permName, nextActive, adminUrdd);
+      await setUserPermission(adminUrdd, target.portalUserId, permName, nextActive);
       setNotice(`${permName} ${nextActive ? 'granted' : 'revoked'}.`);
       await reloadTarget();
     } catch (e) {
@@ -148,7 +150,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
     setNotice(null);
     try {
       setSavingName(permName);
-      await resetUserPermission(actorEmail, target.portalUserId, permName, adminUrdd);
+      await resetUserPermission(adminUrdd, target.portalUserId, permName);
       setNotice(`${permName} reset to role default.`);
       await reloadTarget();
     } catch (e) {
@@ -213,20 +215,17 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
 
       {/* Target picker */}
       {adminUrdd != null && members.length > 0 ? (
-        <label className="tenant-field">
+        <div className="tenant-field">
           <span>User</span>
-          <select value={selectedUrdd} onChange={(e) => setSelectedUrdd(e.target.value)}>
-            <option value="">Select a user…</option>
-            {members.map((m) => (
-              <option key={m.urdd_id} value={m.urdd_id}>
-                {(m.first_name || m.last_name)
-                  ? `${m.first_name || ''} ${m.last_name || ''}`.trim()
-                  : m.username || m.email}
-                {m.email ? ` (${m.email})` : ''}
-              </option>
-            ))}
-          </select>
-        </label>
+          <UserPresenceAvatar
+            users={membersToPresence(members)}
+            activeIds={selectedUrdd ? [String(selectedUrdd)] : []}
+            onToggle={(u) => setSelectedUrdd((prev) => toggleSingle(prev, u.id))}
+            activeLabel="Selected"
+            inactiveLabel="Members"
+            emptyActiveLabel="Pick a member to inspect their permissions"
+          />
+        </div>
       ) : (
         <div className="tenant-field">
           <span>User email</span>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { mwPost } from './api';
 import { listTenantRepos } from './tenantRepos';
 import { API_BASE_URL } from '@site/src/components/portal/config';
+import UserPresenceAvatar from '@site/src/components/ui/user-presence-avatar';
 
 const REPOS_BASE = `${API_BASE_URL}/api/tracked`;
 const USERS_BASE = `${API_BASE_URL}/api/portal/users`;
@@ -116,31 +117,29 @@ function ParticipantsPicker({ selectedEmails, onToggle, currentUserEmail }) {
         onChange={(e) => setSearch(e.target.value)}
         style={{ marginBottom: '0.5rem' }}
       />
-      <div className="mw-participants-list">
-        {filtered.map((u) => {
-          const selected = selectedEmails.includes(u.email);
-          const isSelf = u.email === currentUserEmail;
-          return (
-            <button
-              key={u.email}
-              type="button"
-              className={`mw-participant-tile${selected ? ' mw-participant-tile--selected' : ''}`}
-              onClick={() => !isSelf && onToggle(u)}
-              disabled={isSelf}
-              title={isSelf ? 'You are always included' : u.email}
-            >
-              {u.photo_url
-                ? <img src={u.photo_url} className="mw-participant-avatar" alt="" />
-                : <span className="mw-participant-initials">{(u.name || u.email)[0].toUpperCase()}</span>
-              }
-              <span className="mw-participant-name">{u.name || u.email}</span>
-              {isSelf && <span className="mw-participant-you">you</span>}
-              {selected && !isSelf && <span className="mw-participant-check">✓</span>}
-            </button>
-          );
-        })}
-        {filtered.length === 0 && <p className="mw-empty">No users found.</p>}
-      </div>
+      {/* The tile list is now the UserPresenceAvatar group: "In this meeting"
+          holds the selected people in colour, "Available" holds everyone else
+          greyscaled, and clicking an avatar animates it between the two. Same
+          state and same onToggle contract as the tiles it replaces — you are
+          locked into the meeting exactly as the disabled self-tile was. */}
+      <UserPresenceAvatar
+        users={filtered.map((u) => ({
+          id: u.email,
+          name: u.name || u.email,
+          subtitle: u.name ? u.email : undefined,
+          photoUrl: u.photo_url,
+          locked: u.email === currentUserEmail,
+          lockedHint: 'You are always included',
+        }))}
+        activeIds={filtered
+          .filter((u) => selectedEmails.includes(u.email) || u.email === currentUserEmail)
+          .map((u) => u.email)}
+        onToggle={(p) => onToggle(users.find((u) => u.email === p.id) || { email: p.id })}
+        activeLabel="In this meeting"
+        inactiveLabel="Available"
+        emptyActiveLabel="Pick people below to invite them"
+      />
+      {filtered.length === 0 && <p className="mw-empty">No users found.</p>}
     </div>
   );
 }

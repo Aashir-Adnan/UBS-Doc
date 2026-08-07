@@ -1,0 +1,74 @@
+/* ========== Docs prose ==========
+   Typography for MDX-rendered documentation. Everything is driven by the
+   Infima-compat tokens in tokens.css so light/dark follow the app theme. */
+
+.docs-prose { font-size: 0.95rem; line-height: 1.75; }
+.docs-prose h1 { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 1rem; }
+.docs-prose h2 { font-size: 1.35rem; font-weight: 700; margin: 2rem 0 0.75rem; }
+.docs-prose h3 { font-size: 1.1rem; font-weight: 700; margin: 1.5rem 0 0.5rem; }
+.docs-prose p { margin: 0.75rem 0; }
+.docs-prose a { color: var(--ifm-color-primary); text-decoration: none; }
+.docs-prose a:hover { text-decoration: underline; }
+.docs-prose ul, .docs-prose ol { padding-left: 1.4rem; margin: 0.75rem 0; }
+.docs-prose li { margin: 0.3rem 0; }
+.docs-prose code { font-family: var(--ifm-font-family-monospace); font-size: 0.85em;
+  background: var(--ifm-color-emphasis-100); border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 6px; padding: 0.1em 0.35em; }
+.docs-prose pre { background: #030509; color: #A5B4FC; border-radius: 16px;
+  padding: 1rem 1.25rem; overflow-x: auto; font-size: 12.5px; line-height: 1.75; }
+.docs-prose pre code { background: none; border: none; padding: 0; color: inherit; }
+.docs-prose table { border-collapse: collapse; width: 100%; margin: 1rem 0; display: block; overflow-x: auto; }
+.docs-prose th, .docs-prose td { border: 1px solid var(--ifm-color-emphasis-200); padding: 0.5rem 0.75rem; text-align: left; }
+.docs-prose th { background: var(--ifm-color-emphasis-100); font-weight: 700; }
+.docs-prose blockquote { border-left: 3px solid var(--ifm-color-primary); margin: 1rem 0;
+  padding: 0.25rem 1rem; color: var(--ifm-color-emphasis-600); }
+.docs-prose img { max-width: 100%; border-radius: 12px; }
+
+/* Headings deeper than h3 and the rules between sections. */
+.docs-prose h4 { font-size: 1rem; font-weight: 700; margin: 1.25rem 0 0.4rem; }
+.docs-prose h5, .docs-prose h6 { font-size: 0.9rem; font-weight: 700; margin: 1rem 0 0.35rem; }
+.docs-prose hr { border: 0; border-top: 1px solid var(--ifm-color-emphasis-200); margin: 2rem 0; }
+.docs-prose ul ul, .docs-prose ol ol, .docs-prose ul ol, .docs-prose ol ul { margin: 0.25rem 0; }
+
+/* Prism block: the theme supplies colours inline, so only geometry here. */
+.docs-prose pre.docs-code { margin: 1rem 0; border-radius: 16px; padding: 1rem 1.25rem;
+  overflow-x: auto; font-family: var(--ifm-font-family-monospace); font-size: 12.5px;
+  line-height: 1.75; border: 1px solid var(--ifm-color-emphasis-200); }
+
+/* ========== Admonitions ==========
+   Emitted by src/docs/remarkAdmonitions.ts from Docusaurus `:::type` blocks. */
+
+.admonition { border-radius: 12px; padding: 0.85rem 1rem; margin: 1rem 0; border: 1px solid; }
+.admonition-title { font-weight: 800; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 0.35rem; }
+.admonition-note, .admonition-info { border-color: rgba(79,70,229,0.3); background: rgba(79,70,229,0.07); }
+.admonition-tip { border-color: rgba(16,185,129,0.35); background: rgba(16,185,129,0.08); }
+.admonition-warning, .admonition-caution { border-color: rgba(245,158,11,0.35); background: rgba(245,158,11,0.08); }
+.admonition-danger { border-color: rgba(239,68,68,0.35); background: rgba(239,68,68,0.08); }
+.admonition > :first-child { margin-top: 0; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* ========== Docs sidebar tree ========== */
+
+.docs-tree { scrollbar-gutter: stable; }
+.docs-tree-link { display: block; width: 100%; text-align: left; border-radius: 8px;
+  padding: 0.3rem 0.55rem; font-size: 0.78rem; line-height: 1.4; transition: all 0.16s ease; }
+/* Category rows carry a folder icon — lay icon + label out inline. */
+.docs-tree-cat { display: flex; align-items: center; gap: 0.4rem; }
+
+/* Mobile: the tree is a collapsible panel above the article, so it must not
+   inherit the rail's viewport-height cap. The cap returns at lg. */
+.docs-tree { max-height: 60vh; }
+@media (min-width: 1024px) { .docs-tree { max-height: calc(100vh - 48px); } }
+
+/* Docs prose on narrow screens: long code/paths must scroll inside their own
+   box rather than widening the page. */
+@media (max-width: 640px) {
+  .docs-prose { font-size: 0.9rem; }
+  .docs-prose h1 { font-size: 1.5rem; }
+  .docs-prose h2 { font-size: 1.2rem; }
+  .docs-prose h3 { font-size: 1.05rem; }
+  .docs-prose pre { font-size: 11.5px; padding: 0.75rem 0.85rem; border-radius: 12px; }
+  .docs-prose ul, .docs-prose ol { padding-left: 1.1rem; }
+}
+.docs-prose { overflow-wrap: anywhere; }
+.docs-prose pre, .docs-prose table { max-width: 100%; }

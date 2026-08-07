@@ -35,6 +35,19 @@ export default function GoogleSignIn() {
       setRuntimeError(error);
     });
   }, []);
+
+  // Runtime keys only OVERRIDE the build-time Firebase config; when the fetch
+  // fails the app falls back to it and sign-in still works. Surfacing the
+  // backend's error text on the sign-in card gives the person signing in
+  // something they can't act on, so it goes to the console instead — where it
+  // stays diagnosable for whoever is configuring the backend or the env.
+  useEffect(() => {
+    if (runtimeStatus === "failed" && runtimeError) {
+      console.warn(
+        `[runtime keys] ${runtimeError} — falling back to build-time config; sign-in is unaffected.`
+      );
+    }
+  }, [runtimeStatus, runtimeError]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const handleSignIn = async () => {
@@ -89,11 +102,6 @@ export default function GoogleSignIn() {
               : "Continue with Google"}
         </span>
       </button>
-      {runtimeStatus === "failed" && runtimeError && (
-        <p className="google-signin-error" role="alert">
-          {runtimeError}
-        </p>
-      )}
       {error && (
         <p className="google-signin-error" role="alert">
           {error}
