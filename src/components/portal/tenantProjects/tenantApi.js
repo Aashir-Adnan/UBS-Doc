@@ -195,39 +195,29 @@ export function setUserRole({ user_id, role_id, actionPerformerURDD, actor_email
 // All permissions + each role's default group.
 // Response: { permissions: [{permission_id, permission_name}],
 //   groups: [{role_id, role_name, permissions: [name...]}] }.
-export function permissionsCatalog(actor_email, actionPerformerURDD) {
-  const params = { actor_email };
-  if (actionPerformerURDD != null) params.actionPerformerURDD = actionPerformerURDD;
-  return tGet('/portal/permissions/catalog', params);
+// Gated on update_permissions by the framework — authorize by actionPerformerURDD
+// (the acting admin's URDD in the active org), not email.
+export function permissionsCatalog(actionPerformerURDD) {
+  return tGet('/portal/permissions/catalog', { actionPerformerURDD });
 }
 
 // One user's effective permissions. `portal_user_id` is portal_users.id (NOT a
 // urdd_id). Response: { user, pending, permissions: [{permission_id,
 //   permission_name, source, status, from_role}] }. If pending is true the user
 // has no assignment yet.
-export function getUserPermissions(actor_email, portal_user_id, actionPerformerURDD) {
-  const params = { actor_email, portal_user_id };
-  if (actionPerformerURDD != null) params.actionPerformerURDD = actionPerformerURDD;
-  return tGet('/portal/permissions/user', params);
+export function getUserPermissions(actionPerformerURDD, portal_user_id) {
+  return tGet('/portal/permissions/user', { actionPerformerURDD, portal_user_id });
 }
 
 // Grant (active:true) or revoke (active:false) one permission — written as a
 // source=manual override that survives later role changes.
-export function setUserPermission(
-  actor_email, portal_user_id, permission_name, active, actionPerformerURDD,
-) {
-  const body = { actor_email, portal_user_id, permission_name, active };
-  if (actionPerformerURDD != null) body.actionPerformerURDD = actionPerformerURDD;
-  return tPost('/portal/permissions/set', body);
+export function setUserPermission(actionPerformerURDD, portal_user_id, permission_name, active) {
+  return tPost('/portal/permissions/set', { actionPerformerURDD, portal_user_id, permission_name, active });
 }
 
 // Drop the manual override and fall back to the role default.
-export function resetUserPermission(
-  actor_email, portal_user_id, permission_name, actionPerformerURDD,
-) {
-  const body = { actor_email, portal_user_id, permission_name };
-  if (actionPerformerURDD != null) body.actionPerformerURDD = actionPerformerURDD;
-  return tPost('/portal/permissions/reset', body);
+export function resetUserPermission(actionPerformerURDD, portal_user_id, permission_name) {
+  return tPost('/portal/permissions/reset', { actionPerformerURDD, portal_user_id, permission_name });
 }
 
 // ---- GitHub org connect (OAuth) ---------------------------------------------
@@ -296,32 +286,36 @@ export function getUserUrdds(email) {
   return tGet('/portal/users/urdds', { email });
 }
 
+// Org management is gated on update_repos / update_projects / update_portal_users by
+// the framework — authorize by actionPerformerURDD (the caller's URDD in the org being
+// managed), not email.
+
 // Add a project to an organization (sets project.tenant_id, updates member perms).
-export function addProjectToOrg(email, org_id, project_id) {
-  return tPost('/portal/org/addproject', { email, org_id, project_id });
+export function addProjectToOrg(actionPerformerURDD, org_id, project_id) {
+  return tPost('/portal/org/addproject', { actionPerformerURDD, org_id, project_id });
 }
 
 // Update organization name.
-export function updateOrganization(email, org_id, organization_name) {
-  return tPost('/portal/org/update', { email, org_id, organization_name });
+export function updateOrganization(actionPerformerURDD, org_id, organization_name) {
+  return tPost('/portal/org/update', { actionPerformerURDD, org_id, organization_name });
 }
 
 // Add a member to an organization by their email.
-export function addOrgMember(email, org_id, member_email) {
-  return tPost('/portal/org/addmember', { email, org_id, member_email });
+export function addOrgMember(actionPerformerURDD, org_id, member_email) {
+  return tPost('/portal/org/addmember', { actionPerformerURDD, org_id, member_email });
 }
 
 // List members of an organization.
-export function getOrgMembers(email, org_id) {
-  return tGet('/portal/org/members', { email, org_id });
+export function getOrgMembers(actionPerformerURDD, org_id) {
+  return tGet('/portal/org/members', { actionPerformerURDD, org_id });
 }
 
 // Add a repo to an organization.
-export function addRepoToOrg(email, org_id, repo_id) {
-  return tPost('/portal/org/addrepo', { email, org_id, repo_id });
+export function addRepoToOrg(actionPerformerURDD, org_id, repo_id) {
+  return tPost('/portal/org/addrepo', { actionPerformerURDD, org_id, repo_id });
 }
 
 // List repos (all + which are in the org).
-export function getOrgRepos(email, org_id) {
-  return tGet('/portal/org/repos', { email, org_id });
+export function getOrgRepos(actionPerformerURDD, org_id) {
+  return tGet('/portal/org/repos', { actionPerformerURDD, org_id });
 }
