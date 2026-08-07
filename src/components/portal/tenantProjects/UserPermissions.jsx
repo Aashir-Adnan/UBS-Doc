@@ -51,7 +51,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
   useEffect(() => {
     let cancelled = false;
     setCatalogLoading(true);
-    permissionsCatalog(actorEmail, adminUrdd)
+    permissionsCatalog(adminUrdd)
       .then((res) => {
         if (cancelled) return;
         setCatalog({
@@ -62,7 +62,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
       .catch((e) => { if (!cancelled) setCatalogError(e.message); })
       .finally(() => { if (!cancelled) setCatalogLoading(false); });
     return () => { cancelled = true; };
-  }, [actorEmail, adminUrdd]);
+  }, [adminUrdd]);
 
   // Load members for the dropdown when an admin URDD is available.
   useEffect(() => {
@@ -89,7 +89,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
       if (portalUserId == null) {
         throw new Error('Could not resolve this user’s portal id (have they signed in?).');
       }
-      const res = await getUserPermissions(actorEmail, portalUserId, adminUrdd);
+      const res = await getUserPermissions(adminUrdd, portalUserId);
       setTarget({
         portalUserId,
         email,
@@ -117,7 +117,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
   const reloadTarget = async () => {
     if (!target?.portalUserId) return;
     try {
-      const res = await getUserPermissions(actorEmail, target.portalUserId, adminUrdd);
+      const res = await getUserPermissions(adminUrdd, target.portalUserId);
       setTarget((t) => (t ? {
         ...t,
         pending: !!res?.pending,
@@ -134,7 +134,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
     setNotice(null);
     try {
       setSavingName(permName);
-      await setUserPermission(actorEmail, target.portalUserId, permName, nextActive, adminUrdd);
+      await setUserPermission(adminUrdd, target.portalUserId, permName, nextActive);
       setNotice(`${permName} ${nextActive ? 'granted' : 'revoked'}.`);
       await reloadTarget();
     } catch (e) {
@@ -150,7 +150,7 @@ export default function UserPermissions({ adminUrdd, actorEmail }) {
     setNotice(null);
     try {
       setSavingName(permName);
-      await resetUserPermission(actorEmail, target.portalUserId, permName, adminUrdd);
+      await resetUserPermission(adminUrdd, target.portalUserId, permName);
       setNotice(`${permName} reset to role default.`);
       await reloadTarget();
     } catch (e) {
