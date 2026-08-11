@@ -3,24 +3,16 @@ import { useAuth } from "./authStore";
 import { initFirebase } from "./firebase";
 import { useState, useEffect } from "react";
 import { store } from "@site/src/state/store";
-import { API_BASE_URL } from "./config";
-
-async function persistSignIn({ uid, email, name, photoURL }) {
-  try {
-    await fetch(`${API_BASE_URL}/api/portal/users/signin`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ google_uid: uid, email, name, photo_url: photoURL }),
-    });
-  } catch (_) {
-    // Non-fatal — sign-in still succeeds even if DB upsert fails
-  }
-}
 
 const provider = new GoogleAuthProvider();
 
 export default function GoogleSignIn() {
-  const { setUser } = useAuth();
+  // The portal session is established by AuthProvider's onAuthStateChanged
+  // handler, which exchanges the Firebase ID token for the framework access
+  // token before it reports the user as signed in. This component only opens
+  // the popup — it deliberately does not setUser, because doing so would let
+  // the app start making API calls before a token exists.
+  const { authError } = useAuth();
   const [runtimeStatus, setRuntimeStatus] = useState(
     () => store.getState().runtimeKeys.status
   );
@@ -61,27 +53,24 @@ export default function GoogleSignIn() {
     try {
       setLoading(true);
       setError(null);
-      const result = await signInWithPopup(auth, provider);
-      const { user } = result;
-      const idToken = await user.getIdToken();
-
-      const userData = {
-        uid: user.uid,
-        email: user.email ?? null,
-        name: user.displayName ?? user.email ?? null,
-        photoURL: user.photoURL ?? null,
-      };
-      setUser(userData);
-      persistSignIn(userData);
+      await signInWithPopup(auth, provider);
+      // Leave `loading` set: AuthProvider now takes over to exchange the ID
+      // token, and this card unmounts once that succeeds. Clearing it here
+      // would flash the button back for the length of the exchange.
     } catch (e) {
+      setLoading(false);
       // Keep the UI silent on "popup closed by user", but surface other failures.
       if (e?.code !== "auth/popup-closed-by-user") {
         setError(e?.message || "Firebase sign-in failed");
       }
-    } finally {
-      setLoading(false);
     }
   };
+
+  // The exchange failing (or a session expiring) leaves the card mounted, so
+  // give the button back.
+  useEffect(() => {
+    if (authError) setLoading(false);
+  }, [authError]);
   
   return (
     <div className="google-signin-wrap">
@@ -102,9 +91,9 @@ export default function GoogleSignIn() {
               : "Continue with Google"}
         </span>
       </button>
-      {error && (
+      {(error || authError) && (
         <p className="google-signin-error" role="alert">
-          {error}
+          {error || authError}
         </p>
       )}
     </div>

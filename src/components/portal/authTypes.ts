@@ -20,6 +20,8 @@ export interface AuthContextValue {
   setUser: (user: AuthUser | null) => void
   signOut: () => Promise<void>
   loading: boolean
+  /** Sign-in or session-expiry message, surfaced on the sign-in card. */
+  authError: string | null
 }
 
 export const useAuthTyped = useAuthUntyped as unknown as () => AuthContextValue
