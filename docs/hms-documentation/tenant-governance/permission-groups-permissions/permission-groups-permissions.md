@@ -932,7 +932,7 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 
 <details>
 <summary><b>tenant</b> (370)</summary>
-<!-- manage_checkin / manage_checkout added by migration 20260713_2 -->
+{/* manage_checkin / manage_checkout added by migration 20260713_2 */}
 - `manage_checkin`
 - `manage_checkout`
 
@@ -1506,11 +1506,11 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 
 <details>
 <summary><b>tenant</b> (24)</summary>
-<!-- manage_checkin / manage_checkout added by migration 20260713_2 -->
+{/* manage_checkin / manage_checkout added by migration 20260713_2 */}
 - `manage_checkin`
 - `manage_checkout`
 
-<!-- admin_code family added by migration 20260709_4 -->
+{/* admin_code family added by migration 20260709_4 */}
 - `add_admin_code`
 - `delete_admin_code`
 - `export_admin_code`
@@ -1690,11 +1690,11 @@ The global governance originals in detail. Per-tenant clones of `PG-TENANT-ADMIN
 
 <details>
 <summary><b>tenant</b> (24)</summary>
-<!-- manage_checkin / manage_checkout added by migration 20260713_2 -->
+{/* manage_checkin / manage_checkout added by migration 20260713_2 */}
 - `manage_checkin`
 - `manage_checkout`
 
-<!-- admin_code family added by migration 20260709_4 -->
+{/* admin_code family added by migration 20260709_4 */}
 - `add_admin_code`
 - `delete_admin_code`
 - `export_admin_code`

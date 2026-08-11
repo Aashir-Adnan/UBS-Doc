@@ -1,0 +1,56 @@
+/* Infima-compat variables re-tinted to the Figma design palette.
+   Ported JSX components and portal-compat.css depend on these names. */
+:root {
+  --ifm-color-primary: #4F46E5;
+  --ifm-color-primary-dark: #3E35D9;
+  --ifm-color-primary-darker: #3525CD;
+  --ifm-color-primary-darkest: #2A1DA8;
+  --ifm-color-primary-light: #6366F1;
+  --ifm-color-primary-lighter: #818CF8;
+  --ifm-color-primary-lightest: #A5B4FC;
+  --ifm-color-success: #10B981;
+  --ifm-color-warning: #F59E0B;
+  --ifm-color-danger: #EF4444;
+  --ifm-background-color: #FAF8FF;
+  --ifm-background-surface-color: #FFFFFF;
+  /* Floating overlays (dropdowns, popovers, context menus) must OCCLUDE the
+     content behind them, so they need an opaque fill — unlike the glassy
+     --ifm-background-surface-color that inline cards use in dark mode. */
+  --ubs-overlay-surface: #FFFFFF;
+  --ifm-color-content: #0F172A;
+  --ifm-color-emphasis-0: #FFFFFF;
+  --ifm-color-emphasis-100: #F1F5F9;
+  --ifm-color-emphasis-200: #E2E8F0;
+  --ifm-color-emphasis-300: #CBD5E1;
+  --ifm-color-emphasis-400: #94A3B8;
+  --ifm-color-emphasis-500: #64748B;
+  --ifm-color-emphasis-600: #475569;
+  --ifm-color-emphasis-700: #334155;
+  --ifm-color-emphasis-800: #1E293B;
+  --ifm-color-emphasis-900: #0F172A;
+  --ifm-color-emphasis-1000: #020617;
+  --ifm-font-family-base: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --ifm-font-family-monospace: 'JetBrains Mono', monospace;
+}
+[data-theme='dark'] {
+  --ifm-background-color: #04070F;
+  --ifm-background-surface-color: rgba(255, 255, 255, 0.04);
+  --ubs-overlay-surface: #0C1122;
+  --ifm-color-content: #F1F5F9;
+  --ifm-color-emphasis-0: #04070F;
+  --ifm-color-emphasis-100: rgba(255, 255, 255, 0.06);
+  --ifm-color-emphasis-200: rgba(255, 255, 255, 0.10);
+  --ifm-color-emphasis-300: rgba(255, 255, 255, 0.16);
+  --ifm-color-emphasis-400: rgba(255, 255, 255, 0.30);
+  --ifm-color-emphasis-500: rgba(255, 255, 255, 0.45);
+  --ifm-color-emphasis-600: rgba(255, 255, 255, 0.60);
+  --ifm-color-emphasis-700: rgba(255, 255, 255, 0.72);
+  --ifm-color-emphasis-800: rgba(255, 255, 255, 0.85);
+  --ifm-color-emphasis-900: #F1F5F9;
+  --ifm-color-emphasis-1000: #FFFFFF;
+}
+body {
+  background: var(--ifm-background-color);
+  color: var(--ifm-color-content);
+  font-family: var(--ifm-font-family-base);
+}
