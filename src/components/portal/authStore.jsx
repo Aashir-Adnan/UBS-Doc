@@ -81,7 +81,16 @@ export function AuthProvider({ children }) {
 
     return () => {
       unsubStore();
-      if (unsubAuthRef.current) unsubAuthRef.current();
+      if (unsubAuthRef.current) {
+        unsubAuthRef.current();
+        // Must be nulled, not just called: trySubscribe treats a non-null ref
+        // as "already listening". StrictMode runs mount → cleanup → mount in
+        // dev, so leaving the stale unsubscribe here made the second mount
+        // early-return and the provider never listened again. That was
+        // survivable while GoogleSignIn called setUser itself; now that the
+        // session is established from this callback, it hung sign-in outright.
+        unsubAuthRef.current = null;
+      }
     };
   }, [trySubscribe]);
 
