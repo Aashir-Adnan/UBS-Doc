@@ -72,13 +72,10 @@
 
 /* ── Main content ──────────────────────────────────────────────────────── */
 .docs-content {
-  min-width: 0; /* let wide children (tables, code) scroll internally
-                   instead of stretching the grid track */
   max-width: 900px;
   width: 100%;
   margin: 0 auto;
   padding: 0 8px;
-
   overflow-x: auto;
   scroll-behavior: smooth;
 }
@@ -366,4 +363,37 @@
   .repo-select-title {
     font-size: 1.4rem;
   }
+}
+
+.docs-layout.diagram-layout {
+  grid-template-columns: 300px minmax(0, 1fr);
+  max-width: 1600px;
+}
+
+/* Give the Mermaid document the complete available content width */
+.docs-layout.diagram-layout .docs-content {
+  max-width: none;
+  width: 100%;
+  min-width: 0;
+  padding: 0 16px;
+  overflow-x: auto;
+}
+
+/* Mermaid viewer should use the available content area */
+.docs-layout.diagram-layout .mermaid-diagram {
+  width: 100%;
+  max-width: 100%;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  box-sizing: border-box;
+  padding: 20px;
+}
+
+/* Do not shrink the actual Mermaid SVG */
+.docs-layout.diagram-layout .mermaid-diagram svg {
+  max-width: none !important;
+  width: auto !important;
+  height: auto !important;
 }

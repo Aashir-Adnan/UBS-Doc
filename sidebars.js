@@ -38,7 +38,6 @@ const sidebars = {
       items: [
         'backend/UBS-intro',
         'backend/tenancy',
-        'backend/roles-permissions',
         {
           type: 'category',
           label: 'Github Workflows',
@@ -114,12 +113,11 @@ const sidebars = {
               label: 'Payment & Refund Flow',
               items: [
                 'hms-documentation/major-implementations/payment-and-refund/payment-and-refund',
-                'hms-documentation/major-implementations/payment-and-refund/overflow-refund-cron',
               ],
             },
             {
               type: 'category',
-              label: 'Front Desk Check-In & Check-Out',
+              label: 'Front Desk Checkout',
               items: [
                 'hms-documentation/major-implementations/front-desk-checkout/front-desk-checkout',
               ],
@@ -133,37 +131,9 @@ const sidebars = {
             },
             {
               type: 'category',
-              label: 'Email Validation Pipeline',
-              items: [
-                'hms-documentation/major-implementations/email-validation/email-validation',
-              ],
-            },
-            {
-              type: 'category',
               label: 'Access Token Security',
               items: [
                 'hms-documentation/major-implementations/access-token-security/access-token-security',
-              ],
-            },
-            {
-              type: 'category',
-              label: 'Booking Changes Pipeline',
-              items: [
-                'hms-documentation/major-implementations/booking-changes-pipeline/booking-changes-pipeline',
-              ],
-            },
-            {
-              type: 'category',
-              label: 'Landmarks, Cities, Regions and Hotels',
-              items: [
-                'hms-documentation/major-implementations/landmarks-cities-regions-hotels/landmarks-cities-regions-hotels',
-              ],
-            },
-            {
-              type: 'category',
-              label: 'Centralized Booking Pricing',
-              items: [
-                'hms-documentation/major-implementations/centralized-booking-pricing/centralized-booking-pricing',
               ],
             },
           ],
@@ -192,7 +162,6 @@ const sidebars = {
               label: 'Guest Booking Flow',
               items: [
                 'hms-documentation/guest-apis/guest-booking-flow/guest-booking-flow',
-                'hms-documentation/guest-apis/guest-booking-flow/guest-booking-edit',
                 'hms-documentation/guest-apis/guest-booking-flow/booking-management',
               ],
             },
@@ -381,13 +350,6 @@ const sidebars = {
             },
             {
               type: 'category',
-              label: 'Guest Booking Constraints',
-              items: [
-                'hms-documentation/guest-apis/guest-booking-constraints/guest-booking-constraints',
-              ],
-            },
-            {
-              type: 'category',
               label: 'Guest Review',
               items: [
                 'hms-documentation/guest-apis/guest-review/guest-review',
@@ -447,7 +409,6 @@ const sidebars = {
               label: 'Config Keys',
               items: [
                 'hms-documentation/tenant-governance/config-keys/config-keys',
-                'hms-documentation/tenant-governance/config-keys/config-storage-model/config-storage-model',
                 'hms-documentation/tenant-governance/config-keys/config-keys-catalog/config-keys-catalog',
               ],
             },

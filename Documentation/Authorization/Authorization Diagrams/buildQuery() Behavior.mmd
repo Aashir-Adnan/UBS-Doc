@@ -1,6 +1,0 @@
-flowchart TD
-    A["buildQuery()"] --> B{"Login Request?"}
-    B -->|Yes| C["Generate Query Using Email"]
-    B -->|No| D["Generate Query Using URDD"]
-    C --> E["Return SQL"]
-    D --> E

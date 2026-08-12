@@ -220,16 +220,6 @@ function CheckList({
   );
 }
 
-// mwGet throws the raw response body as the Error message.
-function readableError(message) {
-  try {
-    const parsed = JSON.parse(message);
-    return parsed?.message || parsed?.payload || message;
-  } catch {
-    return message;
-  }
-}
-
 function ScopePicker({
   actingUrdd,
   selectedRepoIds,
@@ -243,42 +233,16 @@ function ScopePicker({
   const [error, setError] = useState(null);
   const [repoSearch, setRepoSearch] = useState("");
   const [featSearch, setFeatSearch] = useState("");
-  const [reposError, setReposError] = useState(null);
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setReposError(null);
-
-    // Loaded independently so one failure can't take out the other.
-    // /repos/tenant/list is permission-gated (needs list_repos) and can 403 for a
-    // user without repo access — that must degrade only the repo column, never
-    // block the whole Create Meeting form.
-    const reposDone = listTenantRepos(actingUrdd)
-      .then((r) => {
-        if (!cancelled) setRepos(r);
+    // Tenant-scoped repo list — the user can only pick repos in their tenant.
+    Promise.all([listTenantRepos(actingUrdd), fetchAllFeatures()])
+      .then(([r, f]) => {
+        setRepos(r);
+        setFeatures(f);
       })
-      .catch((e) => {
-        if (cancelled) return;
-        setRepos([]);
-        setReposError(readableError(e.message));
-      });
-
-    const featuresDone = fetchAllFeatures()
-      .then((f) => {
-        if (!cancelled) setFeatures(f);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e.message);
-      });
-
-    Promise.all([reposDone, featuresDone]).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
-
-    return () => {
-      cancelled = true;
-    };
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
   }, [actingUrdd]);
 
   if (loading) return <div className="mw-scope-loading">Loading…</div>;
@@ -316,29 +280,21 @@ function ScopePicker({
             <span className="mw-scope-badge">{selectedRepoIds.length}</span>
           )}
         </p>
-        {reposError ? (
-          <div className="mw-field-error">
-            Could not load repos: {reposError}
-          </div>
-        ) : (
-          <>
-            <input
-              className="mw-input mw-input--sm"
-              placeholder="Filter…"
-              value={repoSearch}
-              onChange={(e) => setRepoSearch(e.target.value)}
-            />
-            <CheckList
-              items={repos}
-              selectedIds={selectedRepoIds}
-              onToggle={onRepoToggle}
-              getLabel={(r) => r.name}
-              getId={(r) => r.id}
-              getSubLabel={(r) => r.branch || "main"}
-              search={repoSearch}
-            />
-          </>
-        )}
+        <input
+          className="mw-input mw-input--sm"
+          placeholder="Filter…"
+          value={repoSearch}
+          onChange={(e) => setRepoSearch(e.target.value)}
+        />
+        <CheckList
+          items={repos}
+          selectedIds={selectedRepoIds}
+          onToggle={onRepoToggle}
+          getLabel={(r) => r.name}
+          getId={(r) => r.id}
+          getSubLabel={(r) => r.branch || "main"}
+          search={repoSearch}
+        />
       </div>
 
       <div className="mw-scope-col">
@@ -416,7 +372,6 @@ export default function CreateMeeting({
   onCreated,
   onCancel,
   userEmail,
-  canCreate = true,
 }) {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
@@ -575,12 +530,7 @@ export default function CreateMeeting({
                 <button
                   className="mw-btn mw-btn--primary"
                   type="submit"
-                  disabled={busy || !canCreate}
-                  title={
-                    canCreate
-                      ? undefined
-                      : "You need the 'add_meetings' permission to create meetings."
-                  }
+                  disabled={busy}
                 >
                   {busy ? "Creating…" : "Create Meeting"}
                 </button>

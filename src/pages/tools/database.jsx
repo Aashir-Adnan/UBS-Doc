@@ -1,17 +1,15 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../components/portal/authStore";
-import PortalSignIn from "../../components/portal/PortalSignIn";
+import GoogleSignIn from "../../components/portal/GoogleSignIn";
 import FileUpload from "../../components/portal/FileUpload";
-import { usePortalAccess } from "@site/src/components/portal/usePortalAccess";
-import AccessRestricted from "@site/src/components/portal/AccessRestricted";
+import { isGranjurEmail } from "../../utils/isGranjurEmail";
 
 function DatabaseToolsContent() {
   const { user, signOut, loading } = useAuth();
-  const { allowed: canAccessPortal, loading: accessLoading } =
-    usePortalAccess();
+  const canAccessPortal = !!user && isGranjurEmail(user?.email);
 
-  if (loading || accessLoading) {
+  if (loading) {
     return (
       <section className="portal-hero portal-hero-center">
         <p>Loading...</p>
@@ -20,11 +18,37 @@ function DatabaseToolsContent() {
   }
 
   if (!user) {
-    return <PortalSignIn />;
+    return (
+      <section className="portal-hero portal-hero-center">
+        <div className="portal-auth-card portal-auth-centered">
+          <h2 className="card-title">Sign in</h2>
+          <p className="card-subtitle">
+            Use your Google account to access Granjur Dev tools.
+          </p>
+          <GoogleSignIn />
+          <p className="card-helper">
+            Use your organization&apos;s @granjur.com account for full access.
+          </p>
+        </div>
+      </section>
+    );
   }
 
   if (!canAccessPortal) {
-    return <AccessRestricted email={user.email} onSignOut={signOut} />;
+    return (
+      <section className="portal-hero portal-hero-center">
+        <div className="portal-auth-card portal-auth-centered">
+          <h2 className="card-title">Access restricted</h2>
+          <p className="card-subtitle">
+            This portal is limited to @granjur.com accounts.
+          </p>
+          <p className="card-helper">
+            You are currently signed in as <strong>{user.email}</strong>. Please
+            sign out and use your Granjur workspace account.
+          </p>
+        </div>
+      </section>
+    );
   }
 
   return (

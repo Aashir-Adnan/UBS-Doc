@@ -5,6 +5,39 @@
    follow a GitHub-Dark-style palette with layered surfaces
    instead of a flat black-on-white inversion.
    ============================================================ */
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --md-text: #333333;
   --md-heading: #111827;
@@ -76,6 +109,7 @@
   line-height: 1.8;
   font-size: 16px;
   color: var(--md-text);
+  font-family: "Inter", sans-serif;
 }
 
 .markdown-body h1,
@@ -84,6 +118,7 @@
 .markdown-body h4,
 .markdown-body h5,
 .markdown-body h6 {
+  font-family: "Inter", sans-serif;
   color: var(--md-heading);
 }
 
@@ -125,7 +160,8 @@
 
 .markdown-body a {
   color: var(--md-link);
-  text-decoration: color 0.2s ease;
+  text-decoration: none;
+  transition: color 0.2s ease;
 }
 
 .markdown-body a:hover {
@@ -259,4 +295,180 @@
   border-color: var(--md-link);
 
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.ascii-diagram {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+
+  font-family: "Courier New", monospace !important;
+  font-size: 12px;
+  line-height: 1.45;
+
+  white-space: pre;
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  letter-spacing: 0;
+  word-spacing: 0;
+  font-variant-ligatures: none;
+
+  padding: 20px;
+  margin: 16px 0;
+
+  border-radius: 8px;
+}
+
+.ascii-diagram code {
+  font-family: "Courier New", monospace !important;
+  font-size: inherit;
+  white-space: pre;
+}
+
+/* ============================================================
+   Mermaid diagrams
+   Single source of truth for BOTH:
+   - diagrams embedded in .md content (MarkdownViewer)
+   - standalone .mmd diagrams (MermaidViewer)
+   ============================================================ */
+
+.mermaid-diagram {
+  width: 100%;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.mermaid-diagram svg {
+  max-width: none !important;
+  width: 110% !important;
+  height: auto !important;
+  overflow: visible !important;
+  max-width: none !important;
+  width: 110% !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+.mermaid-diagram foreignObject {
+  overflow: visible !important;
+}
+
+.mermaid-diagram .nodeLabel,
+.mermaid-diagram .label,
+.mermaid-diagram .edgeLabel {
+  overflow: visible !important;
+  line-height: 1.4 !important;
+}
+
+.mermaid-diagram .node .label foreignObject {
+  overflow: visible !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+/* ============================================================
+   Mermaid diagrams — Dark Mode
+   ============================================================ */
+
+[data-theme="dark"] .mermaid-diagram {
+  background: var(--md-code-bg);
+  border-radius: 8px;
+}
+
+[data-theme="dark"] .mermaid-diagram svg {
+  background: transparent !important;
+}
+
+/* Body / label / note / edge text */
+[data-theme="dark"] .mermaid-diagram .nodeLabel,
+[data-theme="dark"] .mermaid-diagram .label,
+[data-theme="dark"] .mermaid-diagram .edgeLabel,
+[data-theme="dark"] .mermaid-diagram .messageText,
+[data-theme="dark"] .mermaid-diagram .loopText,
+[data-theme="dark"] .mermaid-diagram .noteText,
+[data-theme="dark"] .mermaid-diagram tspan {
+  fill: var(--md-text) !important;
+  color: var(--md-text) !important;
+}
+
+/* Mermaid draws a small rect behind edge labels — match the panel bg
+   instead of leaving it default white/transparent */
+[data-theme="dark"] .mermaid-diagram .edgeLabel rect {
+  fill: var(--md-code-bg) !important;
+  opacity: 0.9;
+}
+
+/* Flowchart nodes */
+[data-theme="dark"] .mermaid-diagram .node rect,
+[data-theme="dark"] .mermaid-diagram .node polygon,
+[data-theme="dark"] .mermaid-diagram .node circle,
+[data-theme="dark"] .mermaid-diagram .node ellipse {
+  fill: var(--md-code-bg) !important;
+  stroke: var(--md-link) !important;
+  stroke-width: 1px;
+}
+
+/* Sequence diagram participants */
+[data-theme="dark"] .mermaid-diagram .actor {
+  fill: var(--md-code-bg) !important;
+  stroke: var(--md-link) !important;
+}
+
+[data-theme="dark"] .mermaid-diagram .actor-line {
+  stroke: var(--md-secondary-text) !important;
+}
+
+/* Activation bars */
+[data-theme="dark"] .mermaid-diagram .activation0,
+[data-theme="dark"] .mermaid-diagram .activation1,
+[data-theme="dark"] .mermaid-diagram .activation2 {
+  fill: var(--md-code-bg) !important;
+  stroke: var(--md-link) !important;
+}
+
+/* Arrows / connections */
+[data-theme="dark"] .mermaid-diagram .edgePath path,
+[data-theme="dark"] .mermaid-diagram .flowchart-link,
+[data-theme="dark"] .mermaid-diagram .messageLine0,
+[data-theme="dark"] .mermaid-diagram .messageLine1 {
+  stroke: var(--md-secondary-text) !important;
+}
+
+/* Arrow heads */
+[data-theme="dark"] .mermaid-diagram marker path {
+  fill: var(--md-secondary-text) !important;
+  stroke: var(--md-secondary-text) !important;
+}
+
+/* Notes */
+[data-theme="dark"] .mermaid-diagram .note {
+  fill: var(--md-code-bg) !important;
+  stroke: var(--md-link) !important;
+}
+
+/* Loop / alt / opt boxes (sequence diagrams) */
+[data-theme="dark"] .mermaid-diagram .loopLine {
+  stroke: var(--md-border) !important;
+}
+
+[data-theme="dark"] .mermaid-diagram .labelBox {
+  fill: var(--md-code-bg) !important;
+  stroke: var(--md-border) !important;
+}
+
+/* Subgraphs / clusters */
+[data-theme="dark"] .mermaid-diagram .cluster rect {
+  fill: var(--md-code-bg) !important;
+  stroke: var(--md-border) !important;
+}
+
+[data-theme="dark"] .mermaid-diagram .cluster-label,
+[data-theme="dark"] .mermaid-diagram .cluster-label text {
+  fill: var(--md-heading) !important;
+  color: var(--md-heading) !important;
 }

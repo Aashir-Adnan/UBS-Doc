@@ -1,17 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { listMembers, listTenants, assignTenant } from './tenantApi';
-import { useActingPermissions } from './useActingPermissions';
-import PermissionNotice from './PermissionNotice';
 
 // Admin → Assign tenant (§3.3). Pick a user (target_urdd_id) and a tenant, then
-// POST /projects/tenant/assign, which is gated on update_portal_users. The lists
-// stay readable without it; only the write path is closed off, so a caller who
-// would 403 never gets to submit.
-const EDIT_USERS_PERM = 'update_portal_users';
-
+// POST /projects/tenant/assign. Admin authorization is enforced server-side
+// (a non-admin actor gets HTTP 403); this UI guard is cosmetic.
 export default function AssignTenant({ adminUrdd }) {
-  const { has } = useActingPermissions();
-  const canEdit = has(EDIT_USERS_PERM);
   const [members, setMembers] = useState([]);
   const [tenants, setTenants] = useState([]);
   const [loadError, setLoadError] = useState(null);
@@ -39,9 +32,6 @@ export default function AssignTenant({ adminUrdd }) {
     e.preventDefault();
     setResult(null);
     setError(null);
-    // Belt and braces: a disabled submit button doesn't reliably stop implicit
-    // submission (Enter in a field) in every browser.
-    if (!canEdit) return;
     if (!targetUrdd || !tenantId) {
       setError('Pick a user and a tenant.');
       return;
@@ -68,22 +58,11 @@ export default function AssignTenant({ adminUrdd }) {
 
   return (
     <form className="tenant-form" onSubmit={handleSubmit}>
-      {!canEdit && (
-        <PermissionNotice
-          permission={EDIT_USERS_PERM}
-          action="assigning a user to a tenant"
-        />
-      )}
-
       {loadError && <p className="tenant-error">Failed to load lists: {loadError}</p>}
 
       <label className="tenant-field">
         <span>User</span>
-        <select
-          value={targetUrdd}
-          disabled={!canEdit}
-          onChange={(e) => setTargetUrdd(e.target.value)}
-        >
+        <select value={targetUrdd} onChange={(e) => setTargetUrdd(e.target.value)}>
           <option value="">Select a user…</option>
           {members.map((m) => (
             <option key={m.urdd_id} value={m.urdd_id}>
@@ -99,11 +78,7 @@ export default function AssignTenant({ adminUrdd }) {
 
       <label className="tenant-field">
         <span>Tenant</span>
-        <select
-          value={tenantId}
-          disabled={!canEdit}
-          onChange={(e) => setTenantId(e.target.value)}
-        >
+        <select value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
           <option value="">Select a tenant…</option>
           {tenants.map((t) => (
             <option key={t.tenant_id} value={t.tenant_id}>
@@ -114,7 +89,7 @@ export default function AssignTenant({ adminUrdd }) {
         </select>
       </label>
 
-      <button type="submit" className="tenant-submit" disabled={submitting || !canEdit}>
+      <button type="submit" className="tenant-submit" disabled={submitting}>
         {submitting ? 'Assigning…' : 'Assign tenant'}
       </button>
 

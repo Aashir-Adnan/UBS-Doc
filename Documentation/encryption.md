@@ -70,9 +70,20 @@ During request processing, the framework decrypts incoming request data before e
 
 The following diagram provides a high-level overview of how encrypted requests are processed within the framework.
 
-The Encryption Architecture diagram is available at the following location:
+```mermaid
+flowchart LR
 
-`Documentation/Encryption/Encryption Diagrams/Encryption Architecture`
+    A[Client]
+    --> B[Encryption Handler]
+
+    B --> C[Middleware Pipeline]
+
+    C --> D[API Processing]
+
+    D --> E[Response Sender]
+
+    E --> F[Client]
+```
 
 ---
 
@@ -124,9 +135,27 @@ The decryption process is handled by the platform encryption middleware, which e
 
 ## Request Encryption Flow
 
-The Request Encryption Flow diagram is available at the following location:
+```mermaid
+flowchart TD
 
-`Documentation/Encryption/Encryption Diagrams/Request Encryption Flow`
+    A[Client Sends Encrypted Request]
+
+    --> B[Receive Request]
+
+    --> C[Extract Encrypted Payload]
+
+    --> D[Decrypt Using Framework Secret Key]
+
+    --> E[Extract Encryption Details]
+
+    --> F[Generate Final Encryption Key]
+
+    --> G[Decrypt Request Payload]
+
+    --> H[Pass Decrypted Payload to Middleware Pipeline]
+
+    --> I[API Processing]
+```
 
 The request processing sequence consists of the following stages.
 
@@ -162,9 +191,35 @@ Only the components enabled in the API configuration are included.
 
 ## Encryption Key Generation Flow
 
-The Encryption Key Generation Flow diagram is available at the following location:
+```mermaid
+flowchart TD
 
-`Documentation/Encryption/Encryption Diagrams/Encryption Key Generation Flow`
+    A[Start]
+
+    --> B[Create Encryption Key]
+
+    --> C{Access Token Enabled?}
+
+    C -->|Yes| D[Append Access Token]
+    C -->|No| E
+
+    D --> E{Plain Key Enabled?}
+
+    E -->|Yes| F[Append Plain Key]
+    E -->|No| G
+
+    F --> G{Platform Encryption Enabled?}
+
+    G -->|Yes| H[Retrieve Platform Key]
+
+    H --> I[Append Platform Key]
+
+    G -->|No| J[Generate Final Encryption Key]
+
+    I --> J
+
+    J --> K[Decrypt Request Payload]
+```
 
 The final encryption key may contain one or more of the following values depending on the API configuration.
 
@@ -186,9 +241,25 @@ If encryption is enabled for the API, the response payload is encrypted using th
 
 ## Response Encryption Flow
 
-The Response Encryption Flow diagram is available at the following location:
+```mermaid
+flowchart TD
 
-`Documentation/Encryption/Encryption Diagrams/Response Encryption Flow`
+    A[API Processing Complete]
+
+    --> B[Generate Response]
+
+    --> C{Encryption Enabled?}
+
+    C -->|Yes| D[Encrypt Response Payload]
+
+    C -->|No| E[Return Plain Response]
+
+    D --> F[Send Encrypted Response]
+
+    E --> G[Client Receives Response]
+
+    F --> G
+```
 
 The response process consists of the following stages.
 
@@ -213,9 +284,26 @@ JWT authentication is independent of AES encryption. However, if the API configu
 
 ## JWT Authentication Flow
 
-The JWT Authentication Flow diagram is available at the following location:
+```mermaid
+sequenceDiagram
 
-`Documentation/Encryption/Encryption Diagrams/JWT Authentication Flow`
+    participant Client
+    participant Authentication API
+    participant JWT Service
+    participant Framework
+
+    Client->>Authentication API: Login Request
+    Authentication API->>JWT Service: Generate JWT Token
+    JWT Service-->>Client: Access Token
+
+    Client->>Framework: API Request + Access Token
+
+    Framework->>JWT Service: Validate Token
+
+    JWT Service-->>Framework: Token Valid
+
+    Framework->>Framework: Continue API Processing
+```
 
 The JWT authentication process consists of the following stages.
 
@@ -241,15 +329,35 @@ The AES utility performs both encryption and decryption operations using the gen
 
 ## AES Encryption Flow
 
-The AES Encryption Flow diagram is available at the following location:
+```mermaid
+flowchart TD
 
-`Documentation/Encryption/Encryption Diagrams/AES Encryption Flow`
+    A[Plain Payload]
+
+    --> B[Generate Encryption Key]
+
+    --> C[AES Encryption]
+
+    --> D[Encrypted Payload]
+
+    --> E[Transmit Data]
+```
 
 ## AES Decryption Flow
 
-The AES Decryption Flow diagram is available at the following location:
+```mermaid
+flowchart TD
 
-`Documentation/Encryption/Encryption Diagrams/AES Decryption Flow`
+    A[Encrypted Payload]
+
+    --> B[Receive Encryption Key]
+
+    --> C[AES Decryption]
+
+    --> D[Plain Payload]
+
+    --> E[Continue Request Processing]
+```
 
 ### JWT vs AES
 

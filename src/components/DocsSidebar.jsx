@@ -6,12 +6,14 @@ import { buildSidebarTree } from "./buildSidebarTree";
 import { getSidebar } from "../services/DocumentationService";
 
 function containsCurrentPage(node, pathname) {
-  if (node.files.some((file) => pathname === `/docs/${file.slug}`)) {
+  const currentPath = decodeURIComponent(pathname);
+
+  if (node.files.some((file) => currentPath === `/docs/${file.slug}`)) {
     return true;
   }
 
   return Object.values(node.folders).some((folder) =>
-    containsCurrentPage(folder, pathname),
+    containsCurrentPage(folder, currentPath),
   );
 }
 

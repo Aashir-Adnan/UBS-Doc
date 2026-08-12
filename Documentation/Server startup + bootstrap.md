@@ -74,13 +74,40 @@ Only after all initialization steps complete successfully does the framework beg
 
 # 6. Server Startup Flow
 
-The Server Startup Flow diagram is maintained separately
+```mermaid
+flowchart TD
 
-**Diagram Location:**
+    A([Start Application])
+    --> B[Load Environment Variables]
 
-`Documentation/ServerStartup_Bootstrap/ServerStartup_Bootstrap Diagrams/Server Startup Flow`
+    B --> C[Initialize Logger]
 
-The diagram illustrates the complete server startup sequence from application startup to a fully initialized server.
+    C --> D[Initialize API Modules]
+
+    D --> E[Run Database Migrations]
+
+    E --> F[Import Documentation]
+
+    F --> G[Export Database Schema]
+
+    G --> H{Pull Repositories?}
+
+    H -->|Enabled| I[Pull Repositories]
+    H -->|Disabled| J[Skip Repository Synchronization]
+
+    I --> K[Initialize Cron Jobs]
+    J --> K
+
+    K --> L[Initialize Express Application]
+
+    L --> M[Apply Global Middleware]
+
+    M --> N[Register Application Routes]
+
+    N --> O[Start HTTP Server]
+
+    O --> P([Server Ready])
+```
 
 # 7. High-Level Startup Sequence
 
@@ -323,9 +350,14 @@ This approach prevents the framework from running with incomplete initialization
 
 The Src/Bootstrap/ module contains the core bootstrap components responsible for preparing the framework before the Express application is initialized.
 
-The Bootstrap Components diagram can be found in the following file:
-
-`Documentation/ServerStartup_Bootstrap/`Documentation/ServerStartup_Bootstrap Diagrams/Bootstrap Components`
+```mermaid
+flowchart LR
+    A[env.js]
+    --> B[filesystem.js]
+    --> C[startup.js]
+    --> D[cron.js]
+    --> E[Bootstrap Complete]
+```
 
 Instead of placing all initialization logic inside `server.js`, the framework separates startup responsibilities into individual bootstrap components. Each component performs a specific task during application initialization, making the startup process modular, maintainable, and easier to understand.
 
@@ -533,11 +565,29 @@ The exported application is then imported by `Src/server.js`, where it begins li
 
 # 10.9 Express Initialization Flow
 
-The Express Initialization Flow diagram is available at the following location:
+```mermaid
+flowchart TD
 
-`Documentation/ServerStartup_Bootstrap/ServerStartup_Bootstrap/Express initialization flow`
+A[Create Express Application]
 
-The diagram illustrates the sequence used to configure the Express application before the HTTP server starts.
+--> B[Apply Global Middleware]
+
+--> C[Register Deployment Routes]
+
+--> D[Register Dynamic API Routes]
+
+--> E[Register Webhook Routes]
+
+--> F[Register Upload Routes]
+
+--> G[Register Root Route]
+
+--> H[Export Express Application]
+
+--> I[server.js starts HTTP Server]
+```
+
+---
 
 # 10.10 Summary
 
@@ -602,15 +652,14 @@ The startup process prepares the framework but does not process client requests.
 
 The following documents describe the remaining stages of the framework:
 
-| Document                               | Description                                                                                                                                        |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Middleware Pipeline and API Processing | Explains how incoming requests are processed after the server starts.                                                                              |
-| API Creation Process                   | Explains how new APIs are created and registered within the framework.                                                                             |
-| Query Resolver                         | Describes how framework queries are executed.                                                                                                      |
-| Database Layer                         | Explains how the framework connects to the database, executes queries, and manages database interactions.                                          |
-| Encryption Flow                        | Explains the framework's encryption and decryption process.                                                                                        |
-| executeQueryWithPagination             | Describes pagination, filtering, sorting, and query execution features.                                                                            |
-| Server Startup Diagrams                | The diagrams for the startup flow and bootstrap process are available in `Documentation/ServerStartup_Bootstrap/ServerStartup_Bootstrap Diagrams`. |
+| Document                               | Description                                                                                               |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Middleware Pipeline and API Processing | Explains how incoming requests are processed after the server starts.                                     |
+| API Creation Process                   | Explains how new APIs are created and registered within the framework.                                    |
+| Query Resolver                         | Describes how framework queries are executed.                                                             |
+| Database Layer                         | Explains how the framework connects to the database, executes queries, and manages database interactions. |
+| Encryption Flow                        | Explains the framework's encryption and decryption process.                                               |
+| executeQueryWithPagination             | Describes pagination, filtering, sorting, and query execution features.                                   |
 
 ---
 

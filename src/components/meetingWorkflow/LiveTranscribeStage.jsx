@@ -38,7 +38,7 @@ function NoteInput({ elapsedSec, onAdd }) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function LiveTranscribeStage({ meeting, detail, onDone, actingUrdd, canAI = true }) {
+export default function LiveTranscribeStage({ meeting, detail, onDone }) {
   const savedMeeting = detail?.meeting || {};
   const hasExistingTranscript = !!(savedMeeting.transcript || meeting.transcript);
 
@@ -76,7 +76,6 @@ export default function LiveTranscribeStage({ meeting, detail, onDone, actingUrd
       fd.append('audio', blob, `segment_${segIdx}.webm`);
       fd.append('meeting_id', meeting.meeting_id);
       fd.append('segment_index', segIdx);
-      fd.append('actionPerformerURDD', actingUrdd);
       const data = await mwPostForm('/meeting/workflow/transcribe', fd);
       const transcript = data.transcriptPreview || data.transcript || '(no speech detected)';
       setSegments((prev) => prev.map((s) =>
@@ -242,7 +241,6 @@ export default function LiveTranscribeStage({ meeting, detail, onDone, actingUrd
       meeting_notes: segmentMap,
       timed_notes: timedNotes,
       total_duration_sec: elapsedRef.current,
-      actionPerformerURDD: actingUrdd,
     };
   }
 
@@ -328,13 +326,7 @@ export default function LiveTranscribeStage({ meeting, detail, onDone, actingUrd
 
       {/* ── Controls ── */}
       {phase === 'idle' && (
-        <button
-          className="mw-btn mw-btn--primary lt-record-btn"
-          onClick={startRecording}
-          disabled={!canAI}
-          type="button"
-          title={canAI ? undefined : "You need the 'run_meeting_ai' permission to transcribe meetings."}
-        >
+        <button className="mw-btn mw-btn--primary lt-record-btn" onClick={startRecording} type="button">
           <span className="lt-rec-dot lt-rec-dot--idle" /> {hasExistingTranscript ? 'Re-record Meeting' : 'Start Recording'}
         </button>
       )}
@@ -363,9 +355,8 @@ export default function LiveTranscribeStage({ meeting, detail, onDone, actingUrd
           <button
             className="mw-btn mw-btn--primary"
             onClick={runAnalysis}
-            disabled={isProcessing || !canAI}
+            disabled={isProcessing}
             type="button"
-            title={canAI ? undefined : "You need the 'run_meeting_ai' permission to analyze the meeting."}
           >
             {isProcessing ? 'Analyzing with Claude…' : 'Analyze with Claude'}
           </button>

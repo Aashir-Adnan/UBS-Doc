@@ -66,6 +66,9 @@ function DynamicMarkdown() {
 
       const { type, content: fileContent } = document;
 
+      console.log("DOCUMENT TYPE:", type);
+      console.log("DOCUMENT CONTENT:", fileContent);
+
       const cleanedContent =
         type === "md"
           ? fileContent.replace(/^---[\s\S]*?---\n?/, "")
@@ -88,7 +91,7 @@ function DynamicMarkdown() {
               id: generateHeadingId(text),
             };
           });
-      } else {
+      } else if (type === "html") {
         const parser = new DOMParser();
         const doc = parser.parseFromString(cleanedContent, "text/html");
 
@@ -102,6 +105,9 @@ function DynamicMarkdown() {
             };
           },
         );
+      } else if (type === "mmd") {
+        // Mermaid diagrams do not have document headings
+        extractedHeadings = [];
       }
 
       setHeadings(extractedHeadings);
@@ -188,7 +194,7 @@ function DynamicMarkdown() {
   }
 
   return (
-    <div className="docs-layout">
+    <div className={`docs-layout ${docType === "mmd" ? "diagram-layout" : ""}`}>
       {/* Repository Switcher */}
       <div className="docs-repository-switcher">
         <label htmlFor="repository-select">Repository:</label>
@@ -222,16 +228,17 @@ function DynamicMarkdown() {
         </div>
       </main>
 
-      {/* TOC */}
-      <aside className="docs-toc">
-        <h3>Table of Contents</h3>
+      {docType !== "mmd" && (
+        <aside className="docs-toc">
+          <h3>Table of Contents</h3>
 
-        {headings.map((heading) => (
-          <div key={heading.id}>
-            <a href={`#${heading.id}`}>{heading.text}</a>
-          </div>
-        ))}
-      </aside>
+          {headings.map((heading) => (
+            <div key={heading.id}>
+              <a href={`#${heading.id}`}>{heading.text}</a>
+            </div>
+          ))}
+        </aside>
+      )}
     </div>
   );
 }

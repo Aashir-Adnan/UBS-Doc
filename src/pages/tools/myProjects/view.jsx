@@ -1,32 +1,39 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "@site/src/components/portal/authStore";
-import PortalSignIn from "@site/src/components/portal/PortalSignIn";
-import { usePortalAccess } from "@site/src/components/portal/usePortalAccess";
-import AccessRestricted from "@site/src/components/portal/AccessRestricted";
-import ProjectDetail from "@site/src/components/portal/tenantProjects/ProjectDetail";
+import { useAuth } from "../../../components/portal/authStore";
+import GoogleSignIn from "../../../components/portal/GoogleSignIn";
+import { isGranjurEmail } from "../../../utils/isGranjurEmail";
+import ProjectDetail from "../../../components/portal/tenantProjects/ProjectDetail";
 
 function ProjectViewContent() {
   const { user } = useAuth();
-  const { allowed: canAccessPortal, loading: accessLoading } =
-    usePortalAccess();
+  const canAccessPortal = !!user && isGranjurEmail(user?.email);
 
-  // Access now depends on a fetch, so there is a window where the answer is
-  // unknown. Render neither the project nor a rejection during it.
-  if (accessLoading) {
+  if (!user) {
     return (
       <section className="portal-hero portal-hero-center">
-        <p>Loading...</p>
+        <div className="portal-auth-card portal-auth-centered">
+          <h2 className="card-title">Sign in</h2>
+          <p className="card-subtitle">
+            Use your Google account to access Granjur Dev tools.
+          </p>
+          <GoogleSignIn />
+        </div>
       </section>
     );
   }
 
-  if (!user) {
-    return <PortalSignIn />;
-  }
-
   if (!canAccessPortal) {
-    return <AccessRestricted email={user.email} />;
+    return (
+      <section className="portal-hero portal-hero-center">
+        <div className="portal-auth-card portal-auth-centered">
+          <h2 className="card-title">Access restricted</h2>
+          <p className="card-subtitle">
+            This portal is limited to @granjur.com accounts.
+          </p>
+        </div>
+      </section>
+    );
   }
 
   return (
