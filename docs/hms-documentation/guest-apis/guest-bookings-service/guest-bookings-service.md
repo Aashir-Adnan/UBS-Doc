@@ -22,7 +22,7 @@ Uses **AUTH_PLATFORM** — requires a valid guest JWT (`accessToken`). The guest
 | `hotelId` | `number` | No | Hotel/tenant ID. If omitted, derived from the service record. |
 | `quantity` | `number` | No | Number of times to book this service (default: 1). Capped by the service's `max_quantity_per_booking` config. Price = unit price × quantity. |
 | `sessions` | `array` | No | For session-based services (spa, barber, gym). Each entry: `{ date, slot }`. |
-| `meals` | `array` | No | For dining/room-service. Each entry: `{ date, mealType }`. |
+| `meals` | `array` | No | For dining/room-service. Each entry: `{ date, mealType, slot? }`. `slot` is `"HH:MM-HH:MM"` (e.g. `"10:30-12:00"`). |
 | `transport` | `object` | No | For transport services: `{ tripType, pickupDateTime, pickupLocation, dropoffLocation, passengers }`. |
 | `adults` | `number` | No | Number of guests (default: 1). |
 | `specialRequests` | `string` | No | Free-text special requests. |
@@ -38,12 +38,14 @@ Uses **AUTH_PLATFORM** — requires a valid guest JWT (`accessToken`). The guest
   "actionPerformerURDD": 16,
   "serviceId": 76,
   "meals": [
-    { "date": "2026-07-02", "mealType": "breakfast" }
+    { "date": "2026-07-02", "mealType": "breakfast", "slot": "10:30-12:00" }
   ],
   "adults": 2,
   "specialRequests": "Window seat please"
 }
 ```
+
+The `slot` field is optional. When provided, `scheduled_start` and `scheduled_end` in `booking_service_slots` are stored as full datetimes (e.g. `2026-07-02 10:30:00` and `2026-07-02 12:00:00`). When omitted, `scheduled_start` is the date only and `scheduled_end` is `null`.
 
 ### Example: Barber appointment with slot
 
@@ -343,7 +345,7 @@ Only services where `standaloneBookable: true` in the service catalog (`GET /gue
 
 | Category | Scheduling Field | Slot Shape | Form Values Stored |
 |---|---|---|---|
-| Dining / Room Service | `meals[]` | `{ date, mealType }` → one slot per meal | `meal_type` |
+| Dining / Room Service | `meals[]` | `{ date, mealType, slot? }` → one slot per meal. `slot` (`"HH:MM-HH:MM"`) sets `scheduled_start`/`scheduled_end` as full datetimes. | `meal_type` |
 | Transport | `transport` | `{ pickupDateTime, tripType, ... }` → single slot | `trip_type`, `pickup_location`, `dropoff_location`, `passengers` |
 | Spa / Barber / Gym / Other | `sessions[]` | `{ date, slot:"HH:MM-HH:MM" }` → one slot per session | None |
 | Any (no scheduling) | None | Single unscheduled slot | None |
@@ -466,6 +468,7 @@ node Services/SysScripts/TestScripts/sim/guestServiceBookingCheckInOut.js
 | Date | Change |
 |---|---|
 | 2026-07-13 | Response now includes `downPayment` object (20% of total). Booking confirmation email moved to after first successful payment. See [Add Services to Booking](./add-services-to-booking.md) for full addon + payment flow. |
+| 2026-08-13 | Dining/room-service `meals[]` now accepts optional `slot` field (`"HH:MM-HH:MM"`). When provided, `booking_service_slots.scheduled_start` and `scheduled_end` are stored as full datetimes instead of date-only. Applies to both standalone bookings and package bookings. Sim test: `guestDiningSlotTimestamps.js`. |
 | 2026-06-14 | Added `quantity` parameter for multi-quantity service bookings. Price = unit price × quantity. Controlled by `max_quantity_per_booking` hms_config key (default: 1). Quantity > provided scheduling entries creates remaining slots as unscheduled. |
 | 2026-06-12 | Booking status defaults to `confirmed` (removed `confirmation_mode` dependency). Only `requires_approval: true` produces `pending`. Added Kids Center example. Added warning about scheduling fields vs formData. |
 | 2026-06-10 | Fixed #263: `checkIn`/`checkOut` now derived for all standalone service types (spa, barber, transport), not just dining. `summariseDates` handles mobile format (`sessions[].date`, `transport.pickupDateTime`). Explicit `checkIn`/`checkOut` in request body honored as fallback. Single-day bookings mirror `checkIn` → `checkOut`. |

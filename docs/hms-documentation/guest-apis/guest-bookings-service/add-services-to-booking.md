@@ -35,7 +35,7 @@ Requires a valid guest JWT (`accessToken`). The guest's identity is resolved via
 | `addons[].serviceId` | `number` | Yes | The service to add. Must not be a stay-category service. |
 | `addons[].quantity` | `number` | No | Number of slots (default: 1). Capped by `max_quantity_per_booking` config. |
 | `addons[].sessions` | `array` | No | For session-based services. Each: `{ date, slot }`. |
-| `addons[].meals` | `array` | No | For dining/room-service. Each: `{ date, mealType }`. |
+| `addons[].meals` | `array` | No | For dining/room-service. Each: `{ date, mealType, slot? }`. `slot` is `"HH:MM-HH:MM"` (e.g. `"10:30-12:00"`) for precise time scheduling. |
 | `addons[].transport` | `object` | No | For transport: `{ tripType, pickupDateTime, pickupLocation, dropoffLocation, passengers }`. |
 
 ### Example: Add a spa session to a room booking
@@ -65,7 +65,7 @@ Requires a valid guest JWT (`accessToken`). The guest's identity is resolved via
     {
       "serviceId": 76,
       "meals": [
-        { "date": "2026-07-15", "mealType": "dinner" }
+        { "date": "2026-07-15", "mealType": "dinner", "slot": "19:00-21:00" }
       ]
     },
     {
@@ -335,6 +335,7 @@ In practice, eligible categories include: spa, dining, room-service, barber, gym
 
 | Date | Change |
 |---|---|
+| 2026-08-13 | Dining/room-service `meals[]` now accepts optional `slot` field (`"HH:MM-HH:MM"`) for precise time scheduling in `booking_service_slots`. |
 | 2026-07-20 | Added `slot_id` parameter to DELETE endpoint for targeted slot removal. A guest can now remove a specific scheduled session (e.g., the 10:00 barber slot) without affecting other slots of the same service. |
 | 2026-07-13 | Added 20% down payment requirement for added services. Response now includes `downPayment` object. Booking confirmation email moved to after first successful payment. |
 | 2026-06-14 | Initial documentation for add/remove/reschedule service addons on existing bookings. |
