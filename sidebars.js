@@ -500,6 +500,7 @@ const sidebars = {
             'hms-documentation/tenant-governance/permission-descriptions/permission-descriptions',
             'hms-documentation/tenant-governance/original-to-clone-propagation/original-to-clone-propagation',
             'hms-documentation/tenant-governance/deferred-delete-probation/deferred-delete-probation',
+            'hms-documentation/tenant-governance/cascade-restore/cascade-restore',
             'hms-documentation/tenant-governance/tenant-lifecycle-cron/tenant-lifecycle-cron',
           ],
         },
