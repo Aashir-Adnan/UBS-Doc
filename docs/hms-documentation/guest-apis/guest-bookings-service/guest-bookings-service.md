@@ -269,6 +269,17 @@ Returns the full v2 booking bundle — same shape as `/bookings/room` and `/book
   "reviewCount": 0,
   "viewers": { "count": 0, "avatars": [] },
   "schedulingStatus": "complete",
+  "slots": {
+    "type": "meals",
+    "items": [
+      {
+        "id": 1234,
+        "date": "2026-07-02",
+        "mealType": "breakfast",
+        "status": "scheduled"
+      }
+    ]
+  },
   "services": [],
   "formValues": null,
   "pricing": {
@@ -321,6 +332,66 @@ After creating the booking, the frontend should prompt the guest to pay the down
 The booking confirmation email is sent **after the first successful down payment**, not at booking creation. The guest will not receive a confirmation email until payment is secured.
 :::
 
+### `slots` Object
+
+The `slots` object surfaces the primary service's scheduling details for standalone service bookings. It is `null` for room and package bookings.
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `string` | The slot kind: `"meals"`, `"sessions"`, or `"transport"`. Determined by the service's category slug. |
+| `items` | `array` or `object` | The slot entries. Array for `meals`/`sessions`, object for `transport`. |
+
+The `type` value determines the shape of each entry in `items`:
+
+**`type: "meals"`** (dining / room-service):
+
+```json
+{
+  "type": "meals",
+  "items": [
+    { "id": 1234, "date": "2026-07-02", "mealType": "breakfast", "status": "scheduled" }
+  ]
+}
+```
+
+**`type: "sessions"`** (spa / barber / gym / other):
+
+```json
+{
+  "type": "sessions",
+  "items": [
+    { "id": 1235, "date": "2026-07-02", "slot": "15:00-16:00", "status": "scheduled" }
+  ]
+}
+```
+
+**`type: "transport"`**:
+
+```json
+{
+  "type": "transport",
+  "items": {
+    "tripType": "airport_pickup",
+    "pickupDateTime": "2026-07-02 14:00:00",
+    "pickupLocation": "King Abdulaziz International Airport",
+    "dropoffLocation": "Hotel Main Entrance",
+    "passengers": null
+  }
+}
+```
+
+| Item field | Appears in | Description |
+|---|---|---|
+| `id` | meals, sessions | The `slot_id` from `booking_service_slots`. Use this for targeted slot removal or reschedule. |
+| `date` | meals, sessions | Scheduled date (`YYYY-MM-DD`). `null` if unscheduled. |
+| `mealType` | meals | The meal type (e.g. `"breakfast"`, `"lunch"`, `"dinner"`). |
+| `slot` | sessions | Time range (`"HH:MM-HH:MM"`). `null` if unscheduled or time not provided. |
+| `status` | meals, sessions | `"scheduled"` or `"unscheduled"`. |
+| `tripType` | transport | Trip type (e.g. `"airport_pickup"`). |
+| `pickupDateTime` | transport | Pickup datetime. |
+| `pickupLocation` | transport | Pickup location. |
+| `dropoffLocation` | transport | Drop-off location. |
+
 ### Key Response Fields
 
 | Field | Description |
@@ -328,6 +399,7 @@ The booking confirmation email is sent **after the first successful down payment
 | `bookingType` | Always `"individual_service"` for standalone service bookings. |
 | `tag` | Category slug of the booked service (e.g. `"dining"`, `"barber"`, `"spa"`, `"transport"`). |
 | `schedulingStatus` | `"complete"` if all slots are scheduled, `"unscheduled"` if booked without timing, `"partial"` if mixed. |
+| `slots` | Primary service scheduling details. `null` for room/package bookings. See `slots` Object below. |
 | `services` | Addon services array. Empty if no addons were added. |
 | `package` | Always `null` for standalone service bookings. |
 | `room` | Always `null` (no unit assignment for non-stay services). |
@@ -468,7 +540,7 @@ node Services/SysScripts/TestScripts/sim/guestServiceBookingCheckInOut.js
 | Date | Change |
 |---|---|
 | 2026-07-13 | Response now includes `downPayment` object (20% of total). Booking confirmation email moved to after first successful payment. See [Add Services to Booking](./add-services-to-booking.md) for full addon + payment flow. |
-| 2026-08-13 | Dining/room-service `meals[]` now accepts optional `slot` field (`"HH:MM-HH:MM"`). When provided, `booking_service_slots.scheduled_start` and `scheduled_end` are stored as full datetimes instead of date-only. Applies to both standalone bookings and package bookings. Sim test: `guestDiningSlotTimestamps.js`. |
+| 2026-08-13 | Added top-level `slots` object to standalone service booking responses. Contains `type` (`"meals"`, `"sessions"`, or `"transport"`) and `items` (the scheduled slot entries). Previously, primary service slots were only stored in the DB but not returned in the response. Also: dining/room-service `meals[]` now accepts optional `slot` field (`"HH:MM-HH:MM"`) — when provided, `booking_service_slots.scheduled_start` and `scheduled_end` are stored as full datetimes. `children` field now accepted and stored. |
 | 2026-06-14 | Added `quantity` parameter for multi-quantity service bookings. Price = unit price × quantity. Controlled by `max_quantity_per_booking` hms_config key (default: 1). Quantity > provided scheduling entries creates remaining slots as unscheduled. |
 | 2026-06-12 | Booking status defaults to `confirmed` (removed `confirmation_mode` dependency). Only `requires_approval: true` produces `pending`. Added Kids Center example. Added warning about scheduling fields vs formData. |
 | 2026-06-10 | Fixed #263: `checkIn`/`checkOut` now derived for all standalone service types (spa, barber, transport), not just dining. `summariseDates` handles mobile format (`sessions[].date`, `transport.pickupDateTime`). Explicit `checkIn`/`checkOut` in request body honored as fallback. Single-day bookings mirror `checkIn` → `checkOut`. |

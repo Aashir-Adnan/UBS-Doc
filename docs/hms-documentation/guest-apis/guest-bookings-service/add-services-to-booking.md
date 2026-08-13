@@ -111,6 +111,12 @@ Returns the full v2 booking bundle with the updated services list, plus a `downP
   "status": "confirmed",
   "amount": 375,
   "paidAmount": 60,
+  "slots": {
+    "type": "meals",
+    "items": [
+      { "id": 501, "date": "2026-07-15", "mealType": "dinner", "status": "scheduled" }
+    ]
+  },
   "services": [
     {
       "serviceId": 55,
