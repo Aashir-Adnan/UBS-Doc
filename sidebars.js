@@ -287,6 +287,7 @@ const sidebars = {
               items: [
                 'hms-documentation/guest-apis/guest-bookings-service/guest-bookings-service',
                 'hms-documentation/guest-apis/guest-bookings-service/add-services-to-booking',
+                'hms-documentation/guest-apis/guest-bookings-service/slot-scheduling',
               ],
             },
             {
