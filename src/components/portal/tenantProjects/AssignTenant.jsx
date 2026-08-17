@@ -1,16 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import { listMembers, listTenants, assignTenant } from './tenantApi';
+import React, { useEffect, useState } from "react";
+import { listMembers, listTenants, assignTenant } from "./tenantApi";
+import { useActingPermissions } from "./useActingPermissions";
 
-// Admin → Assign tenant (§3.3). Pick a user (target_urdd_id) and a tenant, then
-// POST /projects/tenant/assign. Admin authorization is enforced server-side
-// (a non-admin actor gets HTTP 403); this UI guard is cosmetic.
-export default function AssignTenant({ adminUrdd }) {
+const EDIT_USERS_PERM = "update_portal_users";
+
+export default function AssignTenant({ adminUrdd, defaultTenantId }) {
+  const { has } = useActingPermissions();
+  const canEdit = has(EDIT_USERS_PERM);
+
   const [members, setMembers] = useState([]);
   const [tenants, setTenants] = useState([]);
   const [loadError, setLoadError] = useState(null);
 
-  const [targetUrdd, setTargetUrdd] = useState('');
-  const [tenantId, setTenantId] = useState('');
+  const [targetUrdd, setTargetUrdd] = useState("");
+  const [tenantId, setTenantId] = useState(
+    defaultTenantId != null ? String(defaultTenantId) : "",
+  );
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -24,21 +29,35 @@ export default function AssignTenant({ adminUrdd }) {
         setMembers(Array.isArray(m?.members) ? m.members : []);
         setTenants(Array.isArray(t?.tenants) ? t.tenants : []);
       })
-      .catch((e) => { if (!cancelled) setLoadError(e.message); });
-    return () => { cancelled = true; };
+      .catch((e) => {
+        if (!cancelled) setLoadError(e.message);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [adminUrdd]);
+
+  // Follow the System-tab org picker: preselect the chosen tenant as the
+  // destination (the admin can still change it).
+  useEffect(() => {
+    if (defaultTenantId != null) setTenantId(String(defaultTenantId));
+  }, [defaultTenantId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setResult(null);
     setError(null);
     if (!targetUrdd || !tenantId) {
-      setError('Pick a user and a tenant.');
+      setError("Pick a user and a tenant.");
       return;
     }
     try {
       setSubmitting(true);
-      const res = await assignTenant(adminUrdd, Number(targetUrdd), Number(tenantId));
+      const res = await assignTenant(
+        adminUrdd,
+        Number(targetUrdd),
+        Number(tenantId),
+      );
       setResult(res);
     } catch (err) {
       setError(err.message);
@@ -58,19 +77,24 @@ export default function AssignTenant({ adminUrdd }) {
 
   return (
     <form className="tenant-form" onSubmit={handleSubmit}>
-      {loadError && <p className="tenant-error">Failed to load lists: {loadError}</p>}
+      {loadError && (
+        <p className="tenant-error">Failed to load lists: {loadError}</p>
+      )}
 
       <label className="tenant-field">
         <span>User</span>
-        <select value={targetUrdd} onChange={(e) => setTargetUrdd(e.target.value)}>
+        <select
+          value={targetUrdd}
+          onChange={(e) => setTargetUrdd(e.target.value)}
+        >
           <option value="">Select a user…</option>
           {members.map((m) => (
             <option key={m.urdd_id} value={m.urdd_id}>
-              {(m.first_name || m.last_name)
-                ? `${m.first_name || ''} ${m.last_name || ''}`.trim()
+              {m.first_name || m.last_name
+                ? `${m.first_name || ""} ${m.last_name || ""}`.trim()
                 : m.username || m.email}
               {` — URDD #${m.urdd_id}`}
-              {m.email ? ` (${m.email})` : ''}
+              {m.email ? ` (${m.email})` : ""}
             </option>
           ))}
         </select>
@@ -89,8 +113,12 @@ export default function AssignTenant({ adminUrdd }) {
         </select>
       </label>
 
-      <button type="submit" className="tenant-submit" disabled={submitting}>
-        {submitting ? 'Assigning…' : 'Assign tenant'}
+      <button
+        type="submit"
+        className="tenant-submit"
+        disabled={submitting || !canEdit}
+      >
+        {submitting ? "Assigning…" : "Assign tenant"}
       </button>
 
       {error && <p className="tenant-error">{error}</p>}

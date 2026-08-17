@@ -207,7 +207,7 @@ GET /api/guest/search/filter?hotelId=16&filters=[{"key":"is_featured","value":"t
 }
 ```
 
-Items are returned in the same shape as the [Guest Landing](../guest-landing/guest-landing.md) endpoint. When `detailed=true`, each item includes the full detail shape (formSchema, operatingHours, cancellation_info, termsAndConditions, etc.).
+Items are returned in the same shape as the [Guest Landing](../guest-services/guest-services.md) endpoint. When `detailed=true`, each item includes the full detail shape (formSchema, operatingHours, cancellation_info, termsAndConditions, etc.).
 
 ### Empty Results (200)
 

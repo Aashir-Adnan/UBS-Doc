@@ -46,6 +46,23 @@
 > uncategorized/NULL); the generic `dashboard` stays `common`. This moves **only**
 > `permission_category` — descriptions are untouched. Live active category breakdown refreshed
 > in §1.1.
+>
+> **Update 2026-07-21 (two new resources — `api_logs` + `hms_tenants_config`).** Three
+> migrations add nine permissions that follow these conventions unchanged (standard
+> `<verb>_<resource>` names, plain-language descriptions, and the Arabic description pre-seeded
+> into `translated_entries` by the migration itself so the runtime translator skips them):
+>
+> | migration | permissions | tier |
+> |---|---|---|
+> | `20260713_2…checkin_checkout…` (Step 6) | `list` / `view` / `delete` / `export_api_logs` | `framework` |
+> | `20260720_3_add_api_logs_perms_to_pg_fn_logs` | `search_api_logs` | `framework` |
+> | `20260721_2_add_hms_tenants_config_perms_to_tenant_admin` | `list` / `view` / `add` / `delete_hms_tenants_config` | `tenant` |
+>
+> Both resources are registered in the §2.2 label tables below. Note the deliberate tier split:
+> **`api_logs` is `framework`** (the platform's own request/response log, sibling of
+> `audit_logs`), while **`hms_tenants_config` is `tenant`** — the hotel-facing counterpart of the
+> framework-tier `hms_config` catalogue, so a Tenant Admin owns it. Who receives them is covered
+> in the Permission Groups → Permissions reference (2026-07-21 note).
 
 ---
 
@@ -150,6 +167,7 @@ wording must still be plain.
 
 | resource | label |
 |---|---|
+| `api_logs` | API request/response log records |
 | `audit_logs` | activity audit records (who changed what) |
 | `crash_log` | application crash records |
 | `currencies` | currencies |
@@ -206,6 +224,7 @@ wording must still be plain.
 | `dynamic_attachments` | form-based file uploads |
 | `guest_booking_history` | a guest's past bookings |
 | `guest_profiles` | guest profiles |
+| `hms_tenants_config` | the hotel's own setting values |
 | `memberships` | guest memberships |
 | `messages` | chat messages |
 | `notifications` | notifications |

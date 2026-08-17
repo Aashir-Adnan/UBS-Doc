@@ -167,11 +167,153 @@ export function provisionUser({
   return tPost("/portal/users/provision", body);
 }
 
+// ---- Portal user roles (admin) ----------------------------------------------
+
+// List portal users plus the roles that exist. This is the ONLY list the role
+// screen is driven from — its `id` is portal_users.id, a different id space from
+// the urdd_id returned by /tenants/members.
+// Response: { users: [{ id, email, name, photo_url, is_active, last_sign_in,
+//   created_at, role_id, role_name, urdd_id }], roles: [{ id, name }] }.
+// `urdd_id === null` means the user is pending (not provisioned).
+//
+// Pass the acting URDD: the backend now scopes the list to that URDD's tenant for
+// org admins (super admins still see every user). Without it an org admin would
+// see every user in the system regardless of which org they are acting in. The
+// `roles` array already omits 'Platform Admin' — only Admin/Repository Manager/Dev
+// are returned.
+export function listPortalUsers(actionPerformerURDD) {
+  return tGet("/portal/users/list", { actionPerformerURDD });
+}
+
+// Set a portal user's role. The server checks for admin and 403s otherwise —
+// note that check is defense-in-depth, not authentication: the actor identity
+// below is not verified against an access token.
+//   user_id             — the TARGET's portal_users.id (from listPortalUsers)
+//   role_id             — the new role id (from the `roles` array)
+//   actionPerformerURDD — the acting ADMIN's urdd_id (the actor, not the target)
+//   actor_email         — the acting admin's email; accepted in place of the URDD,
+//                         and the only identity a not-yet-provisioned admin has.
+// Response: { user: { id, email, name, role_name } }.
+export function setUserRole({
+  user_id,
+  role_id,
+  actionPerformerURDD,
+  actor_email,
+}) {
+  const body = { user_id, role_id };
+  if (actionPerformerURDD != null)
+    body.actionPerformerURDD = actionPerformerURDD;
+  if (actor_email) body.actor_email = actor_email;
+  return tPost("/portal/users/role", body);
+}
+
+// ---- Portal permissions (admin) ---------------------------------------------
+// Gated on the caller holding update_permissions. Each call carries the acting
+// URDD when available, with actor_email as the fallback for a caller that has no
+// urdd yet — sending only the email makes the backend authorize against the
+// actor's DEFAULT urdd instead of the one the UI is acting as. Transport-only:
+// the endpoints are unencrypted and need no access token, same as the other
+// portal calls — do NOT add platformCrypto or runtime-keys logic here.
+
+// All permissions + each role's default group.
+// Response: { permissions: [{permission_id, permission_name}],
+//   groups: [{role_id, role_name, permissions: [name...]}] }.
+export function permissionsCatalog(actor_email, actionPerformerURDD) {
+  const params = { actor_email };
+  if (actionPerformerURDD != null)
+    params.actionPerformerURDD = actionPerformerURDD;
+  return tGet("/portal/permissions/catalog", params);
+}
+
+// One user's effective permissions. `portal_user_id` is portal_users.id (NOT a
+// urdd_id). Response: { user, pending, permissions: [{permission_id,
+//   permission_name, source, status, from_role}] }. If pending is true the user
+// has no assignment yet.
+export function getUserPermissions(
+  actor_email,
+  portal_user_id,
+  actionPerformerURDD,
+) {
+  const params = { actor_email, portal_user_id };
+  if (actionPerformerURDD != null)
+    params.actionPerformerURDD = actionPerformerURDD;
+  return tGet("/portal/permissions/user", params);
+}
+
+// Grant (active:true) or revoke (active:false) one permission — written as a
+// source=manual override that survives later role changes.
+export function setUserPermission(
+  actor_email,
+  portal_user_id,
+  permission_name,
+  active,
+  actionPerformerURDD,
+) {
+  const body = { actor_email, portal_user_id, permission_name, active };
+  if (actionPerformerURDD != null)
+    body.actionPerformerURDD = actionPerformerURDD;
+  return tPost("/portal/permissions/set", body);
+}
+
+// Drop the manual override and fall back to the role default.
+export function resetUserPermission(
+  actor_email,
+  portal_user_id,
+  permission_name,
+  actionPerformerURDD,
+) {
+  const body = { actor_email, portal_user_id, permission_name };
+  if (actionPerformerURDD != null)
+    body.actionPerformerURDD = actionPerformerURDD;
+  return tPost("/portal/permissions/reset", body);
+}
+
+// ---- GitHub org connect (OAuth) ---------------------------------------------
+// Plain JSON, tokenless — same transport as the other portal/org calls. The
+// OAuth user token never reaches the browser; we only ever hold an opaque,
+// single-use, email-bound, TTL-bound (~10 min) connection_id. GET params ride
+// the query string. See docs on the github-org-integration backend branch.
+
+// Get the GitHub authorize URL (already carries state, scope, client_id). Open
+// it as a POPUP so the create-org wizard state survives the round trip.
+export function githubAuthorize(email) {
+  return tGet("/portal/github/authorize", { email });
+}
+
+// Exchange the OAuth { code, state } (read from the callback page's query) for a
+// connection_id. Called from the hosted callback page, not the wizard.
+export function githubCallback(code, state) {
+  return tPost("/portal/github/callback", { code, state });
+}
+
+// List the GitHub orgs the connected user can see: [{ login, avatar_url }].
+export function githubOrgs(connection_id, email) {
+  return tGet("/portal/github/orgs", { connection_id, email });
+}
+
+// List repos in a chosen org:
+// [{ full_name, name, private, default_branch, clone_url, archived, pushed_at }].
+export function githubRepos(connection_id, email, org) {
+  return tGet("/portal/github/repos", { connection_id, email, org });
+}
+
 // ---- Organization management ------------------------------------------------
 
-// Create a new organization. Each user may create at most one.
-export function createOrganization(email, organization_name, passcode) {
-  return tPost("/portal/org/create", { email, organization_name, passcode });
+// Create a new organization. Pass `opts` to also connect a GitHub org and import
+// repos in one step: { connection_id, github_org, selected }. `selected` is an
+// array of `full_name` strings (e.g. "acme/web") — never URLs; the backend
+// re-validates each against the live org list. Omit `opts` entirely to create a
+// plain org without connecting GitHub. A user may own multiple organizations.
+// Returns { ok, organization, urdd_id, imported, skipped, import_error? }.
+export function createOrganization(email, organization_name, passcode, opts) {
+  const body = { email, organization_name, passcode };
+  if (opts) {
+    const { connection_id, github_org, selected } = opts;
+    if (connection_id) body.connection_id = connection_id;
+    if (github_org) body.github_org = github_org;
+    if (Array.isArray(selected)) body.selected = selected;
+  }
+  return tPost("/portal/org/create", body);
 }
 
 // Join an existing organization by name + passcode.

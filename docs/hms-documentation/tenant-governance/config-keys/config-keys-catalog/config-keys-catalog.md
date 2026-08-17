@@ -8,6 +8,42 @@ This is the **data inventory**. For *how* keys are created, toggled, and given v
 
 ---
 
+## Current state (reconciled 2026-08-04)
+
+**193** system-tenant keys — **86 active, 107 inactive**.
+
+:::danger Many catalogued keys are retired
+This catalog was written when 167 keys were active. Successive retirement migrations
+(inventory, loyalty, operating hours, package composition, viewable-for-user, the
+standalone amenity keys, …) have cut that to **86**. Rows whose key is now
+`status='inactive'` are marked **⚠️** next to the key slug — **88 rows** in the tables
+below. An unmarked row is current; a ⚠️ row is historical and kept for reference.
+:::
+
+| `category_id` | Label | Active | Total |
+|---|---|---:|---:|
+| 1 | Basics | 12 | 13 |
+| 2 | Availability | 15 | 46 |
+| 3 | Audience | 10 | 29 |
+| 4 | Pricing Model | 13 | 22 |
+| 10 | Package Composition | **0** | 5 |
+| 11 | Viewable for User | **0** | 9 |
+| 12 | Guest Display | 25 | 27 |
+| 13 | User Form Values | 1 | 1 |
+| 14 | Service Details | 8 | 10 |
+| 15 | Amenities | 2 | 31 |
+| | **Total** | **86** | **193** |
+
+Two whole categories — **Package Composition (10)** and **Viewable for User (11)** — have
+no active key left. **Amenities (15)** collapsed from 31 keys to 2 (`amenities_tags`,
+`keyword_tags`) when the 29 per-amenity keys gave way to tag-driven amenities.
+
+Five keys post-date the original catalog and are listed in their category tables:
+`services_as_amenities` (122), `guardian_required` (6812), `min_guests_age` (6839),
+`max_guests_age` (6840), `unit_type` (7072).
+
+---
+
 ## How to read this catalog
 
 Each key in §Catalog is one row of `hms_config_keys`. To understand a key fully you usually look at it across the four tables. Worked example — key **67 `base_price`**:
@@ -84,6 +120,7 @@ Row fields (each `hms_config_keys` column, translated where applicable):
 | `hmsConfigKeys_appliesTo` | Comma-separated service slugs or `all`. |
 | `hmsConfigKeys_valueType` | Value/widget type (translated). |
 | `hmsConfigKeys_isRequired` / `hmsConfigKeys_isMultiValue` | `1`/`0` flags. |
+| `hmsConfigKeys_hasConstraint` | `1` = the applied value is bounded by an external constraint; call `GET /api/config/constraints?config_key_id=<id>` for the bound. `0` = free. Currently `1` only for `max_adults` / `max_children`. See [Config Constraints](../../config-constraints/config-constraints.md). |
 | `hmsConfigKeys_possibleValues` | JSON array of allowed values or example shapes (NULL if unconstrained). |
 | `hmsConfigKeys_enabledFor` | JSON map of category / `package` / `user` enablement flags. |
 | `hmsConfigKeys_groupOrder` | Display ordering hint. |
@@ -298,6 +335,7 @@ Almost all keys are scope `1` (service); package-anchored keys use `4`.
 | `possible_values` | JSON | Auto-synced pointer map (see above). |
 | `is_required` | 0/1 | Mandatory at write time. |
 | `is_multi_value` | 0/1 | `1` = stored as selectable options; `0` = single value / placeholder schema. |
+| `has_constraint` | 0/1 | Added `20260722_2` (after `is_multi_value`). `1` = the value is bounded by an external constraint — call `GET /api/config/constraints?config_key_id=<id>` for the bound. `0` = free. Currently `1` only for `max_adults` / `max_children`. See [Config Constraints](../../config-constraints/config-constraints.md). |
 | `description` | text | Freeform note or `{ "en": …, "ar": … }` localised label. |
 | `status` | enum | `active` / `inactive`. |
 | `source_hms_config_key_id` | int | NULL for originals; set on tenant clones. |
@@ -317,8 +355,8 @@ Two slugs deliberately exist twice — disambiguate by `id` / `category_id`:
 
 | slug | Admin row | Guest-form row |
 |---|---|---|
-| `service_type` | id 2 (Basics, all categories) | id 167 (Guest Display, Barber `[4]`) |
-| `pickup_datetime` | — (admin row deprecated) | id 178 (Guest Display, Transport `[7]`) |
+| `service_type` | id 2 (Basics, all categories) | id 171 (Guest Display, Barber `[4]`) |
+| `pickup_datetime` | id 46 (admin, deprecated) | id 182 (Guest Display, Transport `[7]`) |
 
 ---
 
@@ -339,7 +377,7 @@ Two slugs deliberately exist twice — disambiguate by `id` / `category_id`:
 | 7 | `media` | Media | svc,pkg | viewing | `*` | attachment | —/✓ | Ordered array of media assets (cover + gallery images/videos). |
 | 9 | `visibility` | Visibility | svc,pkg | viewing | `*` | dropdown | ✓/— | Record lifecycle / publication state. Options `draft` + `published` — `published` was added by `20260709_2` to every `visibility` key (SaaS-global `"all"` + all clones), which also backfilled a `visibility = published` config for every active hotel/branch service & package that had none (so an unset item reads as *published*, not *draft*). |
 | 93 | `consumption_type` | Consumption Type | svc,pkg | consumption | `[2,3,4,5,6,7,8,9,"package"]` | dropdown | —/— | How the service is consumed when bundled or used. |
-| 94 | `consumption_reset_cadence` | Consumption Reset Cadence | pkg | consumption | `["package"]` | dropdown | —/— | When included-capped counters reset within the package. |
+| 94 | ⚠️ `consumption_reset_cadence` | Consumption Reset Cadence | pkg | consumption | `["package"]` | dropdown | —/— | When included-capped counters reset within the package. |
 | 110 | `services_list` | Services List | svc_cat | viewing | `*` | dropdown | —/✓ | The list of service types. |
 | 114 | `is_featured` | Is Featured | svc,pkg | viewing | `*` | checkbox | —/— | Marks the record as featured for promoted placement. Default: false. |
 | 120 | `deliver_unit` | Delivery Unit | svc,pkg | booking | `*` | delivery-units_api_dropdown | —/— | Unit of measurement for delivery (km, kg, pieces, room…). Sourced from the external delivery-units API. |
@@ -351,73 +389,77 @@ Two slugs deliberately exist twice — disambiguate by `id` / `category_id`:
 | 13 | `advance_booking_min_days` | Advance Booking Minimum Days | svc,pkg | viewing | `*` | number | —/— | Minimum days ahead a booking can be made. 0 = same-day allowed. |
 | 14 | `advance_booking_max_days` | Advance Booking Maximum Days | svc,pkg | viewing | `*` | number | —/— | Maximum days ahead a booking can be made. |
 | 15 | `blackout_dates` | Blackout Dates | svc,pkg | viewing | `*` | cron_job_form | —/✓ | Revenue/marketing blackout windows. Array of `{name,blackout_type,start_date,end_date,frequency,cron_expression,active}`. |
-| 16 | `operating_hours` | Operating Hours | svc | viewing | `[2,3,4,5,6,7]` | text_area | —/— | Weekly operating schedule per meal period or shift. |
-| 17 | `slot_duration_minutes` | Slot Duration Minutes | svc | viewing | `[2,3,4,5,6]` | dropdown | —/✓ | Allowed slot durations in minutes. |
-| 18 | `buffer_between_slots_minutes` | Buffer Between Slots Minutes | svc | viewing | `[2,3,4,6]` | number | —/— | Buffer between consecutive slots for turnaround or cleaning. |
-| 19 | `lead_time_hours` | Lead Time Hours | svc | viewing | `[2,3,4]` | number | —/— | Minimum lead time in hours before a slot can be booked. |
-| 20 | `lead_time_minutes` | Lead Time Minutes | svc | viewing | `[4]` | number | —/— | Minimum lead time in minutes for barber slot bookings. |
-| 21 | `cutoff_time` | Cutoff Time | svc | viewing | `[2,3,4]` | text | —/— | Latest same-day booking cut-off (HH:MM or hours-before-slot). |
-| 22 | `return_request_lead_time_minutes` | Return Request Lead Time Minutes | svc | viewing | `[7]` | number | —/— | Minutes a guest must request their car before it arrives. Default: 10. |
-| 23 | `modification_cancellation_cutoff_hours` | Modification Cancellation Cutoff Hours | svc | viewing | `[7]` | number | —/— | Hours before pickup within which modifications/cancellations are refused. Default: 2. |
+| 16 | ⚠️ `operating_hours` | Operating Hours | svc | viewing | `[2,3,4,5,6,7]` | text_area | —/— | Weekly operating schedule per meal period or shift. |
+| 17 | ⚠️ `slot_duration_minutes` | Slot Duration Minutes | svc | viewing | `[2,3,4,5,6]` | dropdown | —/✓ | Allowed slot durations in minutes. |
+| 18 | ⚠️ `buffer_between_slots_minutes` | Buffer Between Slots Minutes | svc | viewing | `[2,3,4,6]` | number | —/— | Buffer between consecutive slots for turnaround or cleaning. |
+| 19 | ⚠️ `lead_time_hours` | Lead Time Hours | svc | viewing | `[2,3,4]` | number | —/— | Minimum lead time in hours before a slot can be booked. |
+| 20 | ⚠️ `lead_time_minutes` | Lead Time Minutes | svc | viewing | `[4]` | number | —/— | Minimum lead time in minutes for barber slot bookings. |
+| 21 | ⚠️ `cutoff_time` | Cutoff Time | svc | viewing | `[2,3,4]` | text | —/— | Latest same-day booking cut-off (HH:MM or hours-before-slot). |
+| 22 | ⚠️ `return_request_lead_time_minutes` | Return Request Lead Time Minutes | svc | viewing | `[7]` | number | —/— | Minutes a guest must request their car before it arrives. Default: 10. |
+| 23 | ⚠️ `modification_cancellation_cutoff_hours` | Modification Cancellation Cutoff Hours | svc | viewing | `[7]` | number | —/— | Hours before pickup within which modifications/cancellations are refused. Default: 2. |
 | 24 | `publish_start_datetime` | Publish Start Date Time | svc,pkg | viewing | `*` | datetime | —/— | Datetime from which the card is visible to guests. NULL = always on. |
 | 25 | `publish_end_datetime` | Publish End Date Time | svc,pkg | viewing | `*` | datetime | —/— | Datetime after which the service is auto-archived. NULL = always on. |
-| 26 | `inventory_treatment_rooms` | Inventory Treatment Rooms | svc | viewing | `[3]` | text_area | —/— | Treatment rooms per zone. JSON `{unisex,women_floor,men_floor,couples_suite}`. |
-| 28 | `inventory_capacity_per_age_group` | Inventory Capacity Per Age Group | svc | viewing | `[6]` | text_area | —/— | Max children per age bracket. JSON `{"2-4":N,"5-12":N}`. |
-| 29 | `staff_to_child_ratio` | Staff to Child Ratio | svc | viewing | `[6]` | text_area | —/— | Staff-to-child ratio per age bracket. Default 1:4 (2-4), 1:8 (5-12). |
-| 30 | `inventory_barber_chairs` | Inventory Barber Chairs | svc | viewing | `[4]` | number | —/— | Total number of barber chairs available. |
-| 31 | `inventory_floor_capacity` | Inventory Floor Capacity | svc | viewing | `[5]` | text_area | —/— | Concurrent floor capacity per zone. JSON `{cardio,weights,studio}`. |
-| 32 | `inventory_parking_slots` | Inventory Parking Slots | svc | viewing | `[7]` | number | —/— | Total assigned valet parking spots. |
+| 26 | ⚠️ `inventory_treatment_rooms` | Inventory Treatment Rooms | svc | viewing | `[3]` | text_area | —/— | Treatment rooms per zone. JSON `{unisex,women_floor,men_floor,couples_suite}`. |
+| 28 | ⚠️ `inventory_capacity_per_age_group` | Inventory Capacity Per Age Group | svc | viewing | `[6]` | text_area | —/— | Max children per age bracket. JSON `{"2-4":N,"5-12":N}`. |
+| 29 | ⚠️ `staff_to_child_ratio` | Staff to Child Ratio | svc | viewing | `[6]` | text_area | —/— | Staff-to-child ratio per age bracket. Default 1:4 (2-4), 1:8 (5-12). |
+| 30 | ⚠️ `inventory_barber_chairs` | Inventory Barber Chairs | svc | viewing | `[4]` | number | —/— | Total number of barber chairs available. |
+| 31 | ⚠️ `inventory_floor_capacity` | Inventory Floor Capacity | svc | viewing | `[5]` | text_area | —/— | Concurrent floor capacity per zone. JSON `{cardio,weights,studio}`. |
+| 32 | ⚠️ `inventory_parking_slots` | Inventory Parking Slots | svc | viewing | `[7]` | number | —/— | Total assigned valet parking spots. |
 | 33 | `queue_depth_max_orders` | Queue Depth Maximum Orders | svc | viewing | `[9]` | number | —/— | Max concurrently open orders before new requests are queued. |
 | 44 | `destination_location_type` | Destination Location Type | svc | booking | `[7]` | dropdown | —/— | Type of destination for a transport trip. Default: hotel. |
 | 45 | `schedule_identifier` | Schedule Identifier | svc | booking | `[7]` | text | —/— | External schedule reference (flight_no, train_no, ship_id, route_no). |
-| 47 | `passenger_luggage_vehicle_preference` | Passenger Luggage Vehicle Preference | svc | booking | `[7]` | text_area | —/— | Passenger count, luggage count, and vehicle class. JSON `{passengers,luggage,vehicle_class}`. |
-| 48 | `weekday_arrival_restriction` | Weekday Arrival Restriction | pkg | booking | `["package"]` | dropdown | —/✓ | Allowed arrival weekdays. NULL = unrestricted. |
-| 50 | `staff_routing` | Staff Routing | svc | booking | `[7,9]` | text_area | —/— | Department/pool routing rules. JSON map of category to department. |
+| 47 | ⚠️ `passenger_luggage_vehicle_preference` | Passenger Luggage Vehicle Preference | svc | booking | `[7]` | text_area | —/— | Passenger count, luggage count, and vehicle class. JSON `{passengers,luggage,vehicle_class}`. |
+| 48 | ⚠️ `weekday_arrival_restriction` | Weekday Arrival Restriction | pkg | booking | `["package"]` | dropdown | —/✓ | Allowed arrival weekdays. NULL = unrestricted. |
+| 50 | ⚠️ `staff_routing` | Staff Routing | svc | booking | `[7,9]` | text_area | —/— | Department/pool routing rules. JSON map of category to department. |
 | 51 | `acknowledge_sla_minutes` | Acknowledge SLA Minutes | svc | booking | `[9]` | number | —/— | Target minutes for staff to acknowledge a request. Default: 5. |
-| 52 | `fulfil_sla_per_category_minutes` | Fulfil SLA Per Category Minutes | svc | booking | `[9]` | text_area | —/— | Fulfilment SLA per category in minutes. JSON `{"fb":30,"linen":15,…}`. |
-| 53 | `vehicle_delivery_sla_minutes` | Vehicle Delivery SLA Minutes | svc | booking | `[7]` | number | —/— | Target minutes from return-request to car at forecourt. Default: 10. |
+| 52 | ⚠️ `fulfil_sla_per_category_minutes` | Fulfil SLA Per Category Minutes | svc | booking | `[9]` | text_area | —/— | Fulfilment SLA per category in minutes. JSON `{"fb":30,"linen":15,…}`. |
+| 53 | ⚠️ `vehicle_delivery_sla_minutes` | Vehicle Delivery SLA Minutes | svc | booking | `[7]` | number | —/— | Target minutes from return-request to car at forecourt. Default: 10. |
 | 54 | `allowed_regions` | Allowed Regions | svc,pkg | viewing | `*` | region | —/✓ | ISO-3166 country codes allowed to book. Empty = all regions. |
-| 55 | `adult_age_cutoff` | Adult Age Cutoff | svc | viewing | `*` | number | —/— | Minimum age to be classified as an adult. Default: 18 (spa/gym: 16). |
-| 56 | `child_age_brackets` | Child Age Brackets | svc,pkg | viewing | `[6]` | dropdown | —/✓ | Age bracket definitions for child pricing. JSON `{label,min,max,rate_type}`. |
-| 57 | `guardian_rule` | Guardian Rule | svc | booking | `[6]` | checkbox | —/— | Whether unaccompanied minors require a guardian. Default: true. |
-| 58 | `guardian_required_age_bracket` | Guardian Required Age Bracket | svc | booking | `[3]` | text_area | —/— | Age range requiring guardian consent at spa. Default 12-15. |
+| 55 | ⚠️ `adult_age_cutoff` | Adult Age Cutoff | svc | viewing | `*` | number | —/— | Minimum age to be classified as an adult. Default: 18 (spa/gym: 16). |
+| 56 | ⚠️ `child_age_brackets` | Child Age Brackets | svc,pkg | viewing | `[6]` | dropdown | —/✓ | Age bracket definitions for child pricing. JSON `{label,min,max,rate_type}`. |
+| 57 | ⚠️ `guardian_rule` | Guardian Rule | svc | booking | `[6]` | checkbox | —/— | Whether unaccompanied minors require a guardian. Default: true. |
+| 58 | ⚠️ `guardian_required_age_bracket` | Guardian Required Age Bracket | svc | booking | `[3]` | text_area | —/— | Age range requiring guardian consent at spa. Default 12-15. |
 | 59 | `guardian_required_age_cutoff` | Guardian Required Age Cutoff | svc | booking | `[4]` | number | —/— | Children under this age require a guardian present. Default: 8. |
-| 62 | `age_bracket_mandatory` | Age Bracket Mandatory | svc | viewing | `[6]` | text_area | ✓/— | Mandatory age eligibility bracket for Kids Center. Default `{min:2,max:12}`. |
-| 113 | `requires_approval` | Requires Approval | svc,pkg | booking | `*` | checkbox | —/— | Whether the booking requires manual approval. Default: false. |
-| 116 | `sort_order` | Display Order | svc,pkg | viewing | `*` | number | —/— | Display sort order on listings (lower = earlier). Default: 0. |
-| 117 | `validity_days` | Validity Days | svc,pkg | booking | `*` | number | —/— | Days the booking/voucher remains valid after issuance. |
+| 62 | ⚠️ `age_bracket_mandatory` | Age Bracket Mandatory | svc | viewing | `[6]` | text_area | ✓/— | Mandatory age eligibility bracket for Kids Center. Default `{min:2,max:12}`. |
+| 113 | ⚠️ `requires_approval` | Requires Approval | svc,pkg | booking | `*` | checkbox | —/— | Whether the booking requires manual approval. Default: false. |
+| 116 | ⚠️ `sort_order` | Display Order | svc,pkg | viewing | `*` | number | —/— | Display sort order on listings (lower = earlier). Default: 0. |
+| 117 | ⚠️ `validity_days` | Validity Days | svc,pkg | booking | `*` | number | —/— | Days the booking/voucher remains valid after issuance. |
+| 6812 | `guardian_required` | Guardian Required for Kids | svc | booking | `[6]` | checkbox | —/— | **Added 2026-07-29** (`20260729_6`). Whether a guardian is required for kids. Replaces the retired `guardian_rule` (57) and `guardian_required_age_bracket` (58). Scoped to the **Kids** category, resolved per clone by `category_code='KIDS'` rather than a fixed id. |
+| 6839 | `min_guests_age` | Min Guests Age | svc | viewing | `*` | number | —/— | **Added 2026-07-29** (`20260729_7`). Minimum guest age allowed. |
+| 6840 | `max_guests_age` | Max Guests Age | svc | viewing | `*` | number | —/— | **Added 2026-07-29** (`20260729_7`). Maximum guest age allowed. Together with `min_guests_age` this replaces the retired `age_bracket_mandatory` (62), `adult_age_cutoff` (55) and `child_age_brackets` (56). |
 
 ### Audience (category 3)
 
 | id | config_key | Display name | Target | Phase | applies_to | value_type | R/M | Description |
 |---|---|---|---|---|---|---|---|---|
-| 10 | `scheduling_mode` | Scheduling Mode | svc | viewing | `[7,9]` | dropdown | —/— | How service delivery events are scheduled. Applies to request-type services. |
-| 27 | `per_slot_capacity` | Guests served simultaneously per time slot | svc | viewing | `[2,3,4,5,6]` | number | —/— | Guests or vehicles served simultaneously per slot. Renamed from "Per Slot Capacity" and re-scoped from `[1,3,7]` to Dining/Spa/Barber/Gym/Kids (services-only, `package`=0) — `20260610_*`, originals only. |
-| 34 | `confirmation_mode` | Confirmation Mode | svc,pkg | booking | `*` | dropdown | ✓/— | **Deprecated** — no longer used for booking status determination. Use `requires_approval` (id 113) instead. Bookings now default to `confirmed`; only `requires_approval = true` produces `pending`. |
+| 10 | ⚠️ `scheduling_mode` | Scheduling Mode | svc | viewing | `[7,9]` | dropdown | —/— | How service delivery events are scheduled. Applies to request-type services. |
+| 27 | ⚠️ `per_slot_capacity` | Guests served simultaneously per time slot | svc | viewing | `[2,3,4,5,6]` | number | —/— | Guests or vehicles served simultaneously per slot. Renamed from "Per Slot Capacity" and re-scoped from `[1,3,7]` to Dining/Spa/Barber/Gym/Kids (services-only, `package`=0) — `20260610_*`, originals only. |
+| 34 | ⚠️ `confirmation_mode` | Confirmation Mode | svc,pkg | booking | `*` | dropdown | ✓/— | **RETIRED** — soft-deleted (`status='inactive'`, `20260720_2`); no longer in the active set. Was superseded by `requires_approval` (id 113): bookings default to `confirmed`, only `requires_approval = true` produces `pending`. |
 | 35 | `min_persons_per_booking` | Minimum allowed party size per booking | svc,pkg | booking | `[1,7,"package"]` | number | —/— | Minimum persons or children per booking. Renamed from "Minimum Persons Per Booking" and re-scoped from `[1,2,3,6,"package"]` to Stay/Transport + Package — `20260610_*`, originals only. |
 | 36 | `max_persons_per_booking` | Maximum allowed party size per booking | svc,pkg | booking | `[1,7,"package"]` | number | —/— | Maximum persons per booking. Renamed from "Maximum Persons Per Booking" and re-scoped from `[1,2,3,"package"]` to Stay/Transport + Package — `20260610_*`, originals only. |
-| 37 | `max_children_per_guardian` | Maximum Children Per Guardian | svc | booking | `[6]` | number | —/— | Max children per guardian in one Kids Center booking. Default: 4. |
-| — | `max_adults` | Maximum Adults | svc,pkg | viewing | `*` | number | —/— | Maximum number of adults allowed per booking for any service or package. |
-| — | `max_children` | Maximum Children | svc,pkg | viewing | `*` | number | —/— | Maximum number of children allowed per booking for any service or package. |
-| — | `max_quantity_per_booking` | Maximum Quantity Per Booking | svc | viewing | `*` | number | —/— | Maximum number of times this service can be booked in a single reservation. Default: 1. Controls `quantity` parameter in booking APIs. Exposed as `maxQuantityPerBooking` and `additional_attributes.maxQuantityPerBooking` in guest responses. |
+| 37 | ⚠️ `max_children_per_guardian` | Maximum Children Per Guardian | svc | booking | `[6]` | number | —/— | Max children per guardian in one Kids Center booking. Default: 4. |
+| 874 | `max_adults` | Maximum Adults | svc,pkg | viewing | `*` | number | —/— | Maximum adults per booking. **`has_constraint=1`** — value ≤ delivery unit capacity; fetch the bound from `GET /api/config/constraints?config_key_id=874`. |
+| 875 | `max_children` | Maximum Children | svc,pkg | viewing | `*` | number | —/— | Maximum children per booking. **`has_constraint=1`** — value ≤ delivery unit capacity (see `GET /api/config/constraints?config_key_id=875`). |
+| 2033 | `max_quantity_per_booking` | Maximum Quantity Per Booking | svc,pkg | viewing | `*` | number | —/— | Maximum times this service/package can be booked in one reservation. Default: 1. Controls `quantity` in booking APIs; exposed as `maxQuantityPerBooking` / `additional_attributes.maxQuantityPerBooking` in guest responses. |
+| 2332 | `is_consumable` | Is Consumable | svc | viewing | `*` | checkbox | —/— | Whether this service is consumable (drives consumption-tracking behaviour). |
 | 38 | `min_stay_nights` | Minimum Stay Nights | svc | booking | `[1]` | number | —/— | Minimum stay length in nights. Default: 1. |
 | 39 | `max_stay_nights` | Maximum Stay Nights | svc | booking | `[1]` | number | —/— | Maximum stay length in nights. Default: 30. |
-| 40 | `appointment_required` | Appointment Required | svc | booking | `[9]` | checkbox | —/— | Whether an appointment slot is required. |
-| 41 | `walk_in_accepted` | Walk-in Accepted | svc | booking | `[7]` | checkbox | —/— | Whether walk-in use is accepted without a booking. Default: true. |
-| 42 | `required_guest_inputs` | Required Guest Inputs | svc | booking | `[7]` | dropdown | —/✓ | Custom input fields required at drop (license_plate, car_type, …). |
-| 43 | `required_documents` | Required Documents | svc | booking | `[3,5,6,7]` | checkbox | —/✓ | Documents or consents required at booking. |
-| 49 | `stay_boundary_rule` | Stay Boundary Rule | pkg | booking | `["package"]` | dropdown | —/— | How the stay period relates to the package publish window. |
-| 60 | `guest_of_guest_allowed` | Guest of Guest Allowed | svc | booking | `[1]` | checkbox | —/— | Whether a guest may bring an external visitor. Default: false. |
+| 40 | ⚠️ `appointment_required` | Appointment Required | svc | booking | `[9]` | checkbox | —/— | Whether an appointment slot is required. |
+| 41 | ⚠️ `walk_in_accepted` | Walk-in Accepted | svc | booking | `[7]` | checkbox | —/— | Whether walk-in use is accepted without a booking. Default: true. |
+| 42 | ⚠️ `required_guest_inputs` | Required Guest Inputs | svc | booking | `[7]` | dropdown | —/✓ | Custom input fields required at drop (license_plate, car_type, …). |
+| 43 | ⚠️ `required_documents` | Required Documents | svc | booking | `[3,5,6,7]` | checkbox | —/✓ | Documents or consents required at booking. |
+| 49 | ⚠️ `stay_boundary_rule` | Stay Boundary Rule | pkg | booking | `["package"]` | dropdown | —/— | How the stay period relates to the package publish window. |
+| 60 | ⚠️ `guest_of_guest_allowed` | Guest of Guest Allowed | svc | booking | `[1]` | checkbox | —/— | Whether a guest may bring an external visitor. Default: false. |
 | 61 | `gender_restricted_windows` | Gender Restricted Windows | svc | viewing | `[3,4,5]` | gender_restricted_windows_form | —/— | Gender-restricted time windows. |
-| 63 | `access_scope` | Access Scope | svc | viewing | `*` | dropdown | ✓/— | Who can access and book this service. Options are ordered **public → mixed → guests-only → members-only** across every category and the package slot, so the first-option default is **public** — `20260611_1`, parent key only. |
-| 64 | `tier_extra_savings_badge` | Tier Extra Savings Badge | pkg | viewing | `["package"]` | tier_savings_badge_form | —/— | Optional per-tier extra-savings badge. |
-| 65 | `membership_gate` | Membership Gate | svc | booking | `[5]` | dropdown | —/✓ | Required membership SKUs to access the service. |
-| 74 | `savings_badge` | Savings Badge | pkg | booking | `["package"]` | savings_badge_form | —/— | Auto-computed savings badge ("Save X%") above a threshold. |
-| 83 | `partial_consumption_refund_rule` | Partial Consumption Refund Rule | pkg | booking | `["package"]` | dropdown | —/— | How consumed-but-cancelled package components are refunded. |
-| 96 | `loyalty_earn_rate` | Loyalty Earn Rate | pkg | booking | `["package"]` | decimal | —/— | Loyalty points earned per currency unit (pre-tax). |
-| 97 | `loyalty_redemption_enabled` | Loyalty Redemption Enabled | pkg | booking | `["package"]` | checkbox | —/— | Whether loyalty points can be redeemed against this service. |
-| 98 | `loyalty_redemption_cap_pct` | Loyalty Redemption Cap Percentage | pkg | booking | `["package"]` | decimal | —/— | Max percentage of the total covered by loyalty redemption. |
-| 99 | `member_extra_discount_per_tier` | Member Extra Discount Per Tier | pkg | booking | `["package"]` | tier_discount_form | —/— | Additional member discount per loyalty tier. |
+| 63 | ⚠️ `access_scope` | Access Scope | svc | viewing | `[1,2,3,4,5,6,7,8,9]` | dropdown | ✓/— | Who can access and book this service. Re-scoped from `*` to the explicit service-category list (no `package`; package `enabled_for`=0) — `20260716_4`. Options ordered **public → mixed → guests-only → members-only**, so the first-option default is **public** — `20260611_1`, parent key only. |
+| 64 | ⚠️ `tier_extra_savings_badge` | Tier Extra Savings Badge | pkg | viewing | `["package"]` | tier_savings_badge_form | —/— | Optional per-tier extra-savings badge. |
+| 65 | ⚠️ `membership_gate` | Membership Gate | svc | booking | `[5]` | dropdown | —/✓ | Required membership SKUs to access the service. |
+| 74 | ⚠️ `savings_badge` | Savings Badge | pkg | booking | `["package"]` | savings_badge_form | —/— | Auto-computed savings badge ("Save X%") above a threshold. |
+| 83 | ⚠️ `partial_consumption_refund_rule` | Partial Consumption Refund Rule | pkg | booking | `["package"]` | dropdown | —/— | How consumed-but-cancelled package components are refunded. |
+| 96 | ⚠️ `loyalty_earn_rate` | Loyalty Earn Rate | pkg | booking | `["package"]` | decimal | —/— | Loyalty points earned per currency unit (pre-tax). |
+| 97 | ⚠️ `loyalty_redemption_enabled` | Loyalty Redemption Enabled | pkg | booking | `["package"]` | checkbox | —/— | Whether loyalty points can be redeemed against this service. |
+| 98 | ⚠️ `loyalty_redemption_cap_pct` | Loyalty Redemption Cap Percentage | pkg | booking | `["package"]` | decimal | —/— | Max percentage of the total covered by loyalty redemption. |
+| 99 | ⚠️ `member_extra_discount_per_tier` | Member Extra Discount Per Tier | pkg | booking | `["package"]` | tier_discount_form | —/— | Additional member discount per loyalty tier. |
 | 115 | `requires_booking` | Requires Booking | svc,pkg | booking | `*` | checkbox | —/— | Whether a booking is required to consume this service. Default: true. |
 
 ### Pricing, Taxes, Payment, Cancellation (category 4)
@@ -425,68 +467,72 @@ Two slugs deliberately exist twice — disambiguate by `id` / `category_id`:
 | id | config_key | Display name | Target | Phase | applies_to | value_type | R/M | Description |
 |---|---|---|---|---|---|---|---|---|
 | 67 | `base_price` | Base Price | svc,pkg | booking | `*` | decimal | —/— | Base price in the configured currency. |
-| 72 | `package_bundle_mode` | Package Bundle Mode | pkg | booking | `["package"]` | dropdown | —/— | Fixed = all services included; flexible = guest picks N of M. Default: fixed. |
-| 76 | `primary_service_type_anchor` | Primary Service Type Anchor | pkg | booking | `["package"]` | dropdown | —/— | Dominant included service type that anchors the package. |
-| 77 | `tax_profile` | Tax Applied | svc,pkg | booking | `*` | tax_profile_api_form | —/— | Tax profile slug. Default: `vat_15_ksa` (ZATCA-compliant). |
-| 78 | `service_charge_pct` | Service Charge Percentage | svc,pkg | booking | `*` | decimal | —/— | Service charge percentage on top of base price. Default: 10%. |
-| 79 | `payment_timing` | Payment Timing | svc,pkg | booking | `*` | dropdown | —/✓ | When payment is collected (at booking, at service, partial deposit). |
-| 80 | `deposit_amount` | Deposit Amount | svc,pkg | booking | `[1,"package"]` | deposit_form | —/— | Deposit collected at booking. JSON `{type:"percent"\|"fixed",value}`. |
+| 72 | ⚠️ `package_bundle_mode` | Package Bundle Mode | pkg | booking | `["package"]` | dropdown | —/— | Fixed = all services included; flexible = guest picks N of M. Default: fixed. |
+| 76 | ⚠️ `primary_service_type_anchor` | Primary Service Type Anchor | pkg | booking | `["package"]` | dropdown | —/— | Dominant included service type that anchors the package. |
+| 77 | `tax_profile` | Tax Applied | **tenants** | booking | `*` | tax_profile_api_form | —/— | Repointed to `target_table='tenants'` (`20260720_2`) — the applied value now belongs to the hotel/tenant, read/written via [Tenant Configs](../../tenant-configs/tenant-configs.md). Tax profile schema; default `vat_15_ksa` (ZATCA-compliant). |
+| 78 | ⚠️ `service_charge_pct` | Service Charge Percentage | svc,pkg | booking | `*` | decimal | —/— | Service charge percentage on top of base price. Default: 10%. |
+| 79 | `payment_timing` | Payment Timing | **tenants** | booking | `*` | dropdown | —/✓ | Repointed to `tenants` (`20260720_2`); tenant-scoped (see [Tenant Configs](../../tenant-configs/tenant-configs.md)). When payment is collected (at booking, at service, partial deposit). |
+| 80 | `deposit_amount` | Deposit Amount | **tenants** | booking | `[1,"package"]` | deposit_form | —/— | Repointed to `tenants` (`20260720_2`); tenant-scoped. Deposit collected at booking. JSON `{type:"percent"\|"fixed",value}`. |
 | 81 | `accepted_payment_methods` | Accepted Payment Methods | svc,pkg | booking | `*` | multi_checkbox | —/✓ | Accepted payment methods (mada, apple_pay, visa, …). |
 | 82 | `cancellation_margin` | Cancellation Margin | svc,pkg | booking | `*` | cancellation_form | —/— | Cancellation policy template (`free >72h, 50% 24-72h, 100% <24h` by default). |
 | 84 | `extension_allowed` | Extension Allowed | svc,pkg | consumption | `[1,6,7,"package"]` | checkbox | —/— | Whether the stay or session can be extended. Default: true for Stay. |
 | 85 | `extension_unit` | Extension Unit | svc | consumption | `[1,"package"]` | max_extension_length_label | —/— | Unit for stay extension. Default: night. |
 | 86 | `max_extension_length` | Maximum Extension Length | svc | consumption | `[1,"package"]` | number | —/— | Max extension length in the configured unit. |
 | 87 | `extension_pricing_rule` | Extension Price Adjustment (%) | svc | consumption | `[1,"package"]` | number_spinner | —/— | Percentage adjustment to base price for extensions (+ increase, − discount). |
-| 89 | `extension_cutoff_time` | Extension Cutoff Time | svc | consumption | `[1,"package"]` | mm:dd:hh | —/— | Latest time on the final day to request an extension. Default: 10:00. |
-| 90 | `extension_requires_availability_recheck` | Extension Requires Availability Recheck | svc | consumption | `[1]` | checkbox | —/— | Whether extending requires a real-time availability re-check. Default: true. |
+| 89 | ⚠️ `extension_cutoff_time` | Extension Cutoff Time | svc | consumption | `[1,"package"]` | mm:dd:hh | —/— | Latest time on the final day to request an extension. Default: 10:00. |
+| 90 | ⚠️ `extension_requires_availability_recheck` | Extension Requires Availability Recheck | svc | consumption | `[1]` | checkbox | —/— | Whether extending requires a real-time availability re-check. Default: true. |
 | 91 | `extension_behaviour_auto` | Extension Behaviour Auto | svc | consumption | `[7]` | checkbox | —/— | Whether valet parking auto-extends with an active guest stay. Default: true. |
-| 92 | `honour_on_extension_per_service` | Honour on Extension Per Service | pkg | consumption | `["package"]` | dropdown | —/✓ | Per-included-service extension behaviour (scales / fixed / billed-separately). |
-| 95 | `overage_rate` | Overage Rate | pkg | consumption | `["package"]` | overage_rate_form | —/— | Overage charge when capped consumption is exceeded. |
-| 118 | `cancellation_exceptions` | Cancellation Exceptions | svc,pkg | booking | `*` | dropdown_multiselect | —/✓ | Cancellation reasons that qualify for exception handling (override standard policy). |
+| 92 | ⚠️ `honour_on_extension_per_service` | Honour on Extension Per Service | pkg | consumption | `["package"]` | dropdown | —/✓ | Per-included-service extension behaviour (scales / fixed / billed-separately). |
+| 95 | ⚠️ `overage_rate` | Overage Rate | pkg | consumption | `["package"]` | overage_rate_form | —/— | Overage charge when capped consumption is exceeded. |
+| 118 | ⚠️ `cancellation_exceptions` | Cancellation Exceptions | svc,pkg | booking | `*` | dropdown_multiselect | —/✓ | Cancellation reasons that qualify for exception handling (override standard policy). |
 | 119 | `base_currency` | Base Currency | svc,pkg | booking | `*` | currencies_api_dropdown | ✓/— | Base currency for pricing and transactions across the system. |
-| 181 | `pricing_rules` | Pricing Rules | svc,pkg | consumption | `*` | pricing_rules_api_form | —/— | Pricing rules applied to the service or package during consumption. |
-| 183 | `duration_unit` | Duration Unit | svc | booking | `[1,2,3,4,5,6,7,8,9]` | base_price_label | —/— | Duration unit for the service. |
+| 128 | `pricing_rules` | Pricing Rules | **tenants** | consumption | `*` | pricing_rules_api_form | —/— | Repointed to `tenants` (`20260720_2`); tenant-scoped (see [Tenant Configs](../../tenant-configs/tenant-configs.md)). Value is one or more `pricing_rules.pricing_rule_id` (NOT possible-value ids). |
+| 129 | `duration_unit` | Duration Unit | svc,pkg | booking | `[1,2,3,4,5,6,7,8,9,"package"]` | base_price_label | —/— | Duration unit for the service or package. |
 
 ### Package Composition (category 10)
 
 | id | config_key | Display name | Target | Phase | applies_to | value_type | R/M | Description |
 |---|---|---|---|---|---|---|---|---|
-| 102 | `pkg_quantity_override` | Package Quantity Override | pkg | booking | `["package"]` | text_area | —/— | Quantity/duration override per included service. JSON `{service_id,quantity,unit}`. |
-| 103 | `pkg_consumption_override` | Package Consumption Override | pkg | consumption | `["package"]` | dropdown | —/— | Overrides the default consumption model for a bundled service. |
-| 104 | `pkg_reset_cadence_override` | Package Reset Cadence Override | pkg | consumption | `["package"]` | dropdown | —/— | Overrides the reset cadence for capped consumption of a bundled service. |
+| 102 | ⚠️ `pkg_quantity_override` | Package Quantity Override | pkg | booking | `["package"]` | text_area | —/— | Quantity/duration override per included service. JSON `{service_id,quantity,unit}`. |
+| 103 | ⚠️ `pkg_consumption_override` | Package Consumption Override | pkg | consumption | `["package"]` | dropdown | —/— | Overrides the default consumption model for a bundled service. |
+| 104 | ⚠️ `pkg_reset_cadence_override` | Package Reset Cadence Override | pkg | consumption | `["package"]` | dropdown | —/— | Overrides the reset cadence for capped consumption of a bundled service. |
 
 ### Guest Display — booking-time guest form (category 12)
 
 These describe what the guest sees and fills in during booking.
 
+> **Card ids reconciled to the current dump.** These ids were previously off by a fixed offset
+> (numbered 155–179 against an older snapshot); the live `config_key_id`s are 159–184. `phone`,
+> `preferred_time` and `parent_phone` are **optional** in the current DB.
+
 | id | config_key | Display name | Target | applies_to | value_type | R/M | Group |
 |---|---|---|---|---|---|---|---|
-| 155 | `full_name` | Full Name | svc | `[1,2,3,4,5,7]` | text | ✓/— | Contact |
-| 156 | `email` | Email Address | svc | `[1,2,3,5]` | email | ✓/— | Contact |
-| 157 | `phone` | Phone Number | svc | `[1,2,3,4,5,7]` | tel | ✓/— | Contact |
-| 158 | `preferred_time` | Preferred Time | svc | `[3,4]` | datetime | ✓/— | Dates |
-| 159 | `check_in` | Check-in Date | svc | `[1]` | date | ✓/— | Dates |
-| 160 | `check_out` | Check-out Date | svc | `[1]` | date | ✓/— | Dates |
-| 161 | `adults` | Adults | svc | `[1]` | number | ✓/— | Party Size |
-| 162 | `children` | Children | svc | `[1]` | number | —/— | Party Size |
-| 163 | `reservation_date` | Reservation Date & Time | svc | `[2]` | datetime | ✓/— | Dates |
-| 164 | `party_size` | Number of Guests | svc | `[2]` | number | ✓/— | Party Size |
-| 190 | `meal_type` | Meal Type | svc | `[2]` | dropdown | ✓/✓ | Service Details |
-| 165 | `treatment_type` | Treatment Type | svc | `[3]` | dropdown | ✓/— | Service Details |
-| 166 | `duration` | Duration | svc | `[3]` | dropdown | ✓/— | Service Details |
-| 167 | `service_type` | Service Type | svc | `[4]` | dropdown | ✓/— | Service Details |
-| 168 | `pass_type` | Pass Type | svc | `[5]` | dropdown | ✓/— | Service Details |
-| 169 | `visit_date` | Visit Date | svc | `[5]` | date | ✓/— | Dates |
-| 170 | `parent_name` | Parent/Guardian Name | svc | `[6]` | text | ✓/— | Child |
-| 171 | `parent_phone` | Parent Phone Number | svc | `[6]` | tel | ✓/— | Child |
-| 172 | `child_name` | Child's Name | svc | `[6]` | text | ✓/— | Child |
-| 173 | `child_age` | Child's Age | svc | `[6]` | number | ✓/— | Child |
-| 174 | `booking_date` | Booking Date | svc | `[6]` | date | ✓/— | Dates |
-| 175 | `session_duration` | Session Duration | svc | `[6]` | dropdown | ✓/— | Service Details |
-| 176 | `pickup_location` | Pickup Location | svc | `[7]` | text | ✓/— | Transport |
-| 177 | `dropoff_location` | Dropoff Location | svc | `[7]` | text | ✓/— | Transport |
-| 178 | `pickup_datetime` | Pickup Date & Time | svc | `[7]` | datetime | ✓/— | Dates |
-| 179 | `passengers` | Number of Passengers | svc | `[7]` | number | ✓/— | Party Size |
+| 159 | `full_name` | Full Name | svc | `[1,2,3,4,5,7]` | text | ✓/— | Contact |
+| 160 | `email` | Email Address | svc | `[1,2,3,5]` | email | ✓/— | Contact |
+| 161 | `phone` | Phone Number | svc | `[1,2,3,4,5,7]` | tel | —/— | Contact |
+| 162 | `preferred_time` | Preferred Time | svc | `[3,4]` | datetime | —/— | Dates |
+| 163 | `check_in` | Check-in Date | svc | `[1]` | date | ✓/— | Dates |
+| 164 | `check_out` | Check-out Date | svc | `[1]` | date | ✓/— | Dates |
+| 165 | `adults` | Adults | svc | `[1]` | number | ✓/— | Party Size |
+| 166 | `children` | Children | svc | `[1]` | number | —/— | Party Size |
+| 167 | `reservation_date` | Reservation Date & Time | svc | `[2]` | datetime | ✓/— | Dates |
+| 168 | `party_size` | Number of Guests | svc | `[2]` | number | ✓/— | Party Size |
+| 184 | `meal_type` | Meal Type | svc | `[2]` | dropdown | ✓/✓ | Service Details |
+| 169 | `treatment_type` | Treatment Type | svc | `[3]` | dropdown | ✓/— | Service Details |
+| 170 | `duration` | Duration | svc | `[3]` | dropdown | ✓/— | Service Details |
+| 171 | `service_type` | Service Type | svc | `[4]` | dropdown | ✓/— | Service Details |
+| 172 | `pass_type` | Pass Type | svc | `[5]` | dropdown | ✓/— | Service Details |
+| 173 | `visit_date` | Visit Date | svc | `[5]` | date | ✓/— | Dates |
+| 174 | `parent_name` | Parent/Guardian Name | svc | `[6]` | text | ✓/— | Child |
+| 175 | `parent_phone` | Parent Phone Number | svc | `[6]` | tel | —/— | Child |
+| 176 | `child_name` | Child's Name | svc | `[6]` | text | ✓/— | Child |
+| 177 | `child_age` | Child's Age | svc | `[6]` | number | ✓/— | Child |
+| 178 | `booking_date` | Booking Date | svc | `[6]` | date | ✓/— | Dates |
+| 179 | ⚠️ `session_duration` | Session Duration | svc | `[6]` | dropdown | ✓/— | Service Details |
+| 180 | `pickup_location` | Pickup Location | svc | `[7]` | text | ✓/— | Transport |
+| 181 | `dropoff_location` | Dropoff Location | svc | `[7]` | text | ✓/— | Transport |
+| 182 | `pickup_datetime` | Pickup Date & Time | svc | `[7]` | datetime | ✓/— | Dates |
+| 183 | `passengers` | Number of Passengers | svc | `[7]` | number | ✓/— | Party Size |
 
 All Guest Display rows are phase `booking`.
 
@@ -502,11 +548,13 @@ All Guest Display rows are phase `booking`.
 |---|---|---|---|---|---|---|---|---|
 | 8 | `terms_and_conditions` | Terms and Conditions | svc,pkg | viewing | `*` | text_area | —/— | Localized rich-text terms & conditions. |
 | 75 | `non_transferable_flag` | Non-transferable Flag | pkg | booking | `["package"]` | checkbox | —/— | Packages are bound to the original guest/booking. Default: true. |
-| 100 | `linked_addons` | Linked Add-ons | svc,pkg | booking | `[5,6,7,"package"]` | dropdown | —/✓ | Linked add-on service or SKU IDs offered at checkout. |
+| 100 | ⚠️ `linked_addons` | Linked Add-ons | svc,pkg | booking | `[5,6,7,"package"]` | dropdown | —/✓ | Linked add-on service or SKU IDs offered at checkout. |
 | 123 | `is_amenity` | Is Amenity | svc | viewing | `*` | checkbox | —/— | Whether this service can be offered as an amenity for another service. |
 | 124 | `wifi_name` | WiFi Name | svc | viewing | `[8]` | text | —/— | WiFi network name (SSID) for the networking service. |
 | 125 | `wifi_password` | WiFi Password | svc | viewing | `[8]` | text | —/— | WiFi network password for the networking service. |
-| 180 | `physical_dimension` | Physical Dimension | svc | viewing | `[1,2,3,4,5,6]` | form | —/— | Physical dimensions (length, width, height) of the service or its delivered unit. |
+| 126 | `physical_dimension` | Physical Dimension | svc | viewing | `[1,2,3,4,5,6]` | form | —/— | Physical dimensions (length, width, height) of the service or its delivered unit. |
+| 122 | `services_as_amenities` | Services as Amenities | svc | viewing | `*` | services_api_dropdown | —/✓ | **Added 2026-07-28** (`20260728_2`). Renamed + retyped from the retired `amenities` key: an API-backed picker of the services offerable as an amenity on this service. Options come from the services API, so clones carry `possible_values = {}`. |
+| 7072 | `unit_type` | Unit Type | **delivery_units** | viewing | `[1,2,3,4,5,6,7,8]` | dropdown | ✓/— | The type of delivery unit available for this service category. The only active key targeting `delivery_units` — its value belongs to a unit, not a service or package. |
 
 ### Amenities (category 15)
 
@@ -514,41 +562,43 @@ Per-service-category amenity toggles. All target `services`, scope `service`, ph
 
 | id | config_key | Display name | applies_to | Group | Note |
 |---|---|---|---|---|---|
-| 126 | `meal_plan` | Meal Plan | `[1]` | Rooms | dropdown_multiselect |
-| 128 | `early_checkin` | Early Check-in | `[1]` | Rooms | |
-| 129 | `late_checkout` | Late Check-out | `[1]` | Rooms | |
-| 130 | `in_room_dining` | In-Room Dining Access | `[1]` | Rooms | |
-| 131 | `spa_voucher` | Spa Treatment Voucher | `[1]` | Rooms | |
-| 132 | `spa_access` | Spa / Sauna / Steam Access | `[1]` | Rooms | |
-| 133 | `gym_access` | Gym Access | `[1]` | Rooms | |
-| 134 | `kids_club_access` | Kids Club Access | `[1]` | Rooms | |
-| 135 | `laundry` | Laundry (X pieces included) | `[1]` | Rooms | number |
-| 136 | `valet_parking` | Valet Parking | `[1,2]` | Shared | |
-| 137 | `locker` | Locker | `[3,5]` | Shared | |
-| 138 | `private_room` | Private Room Available | `[2]` | Restaurants | |
-| 139 | `birthday_package` | Birthday/Anniversary Package | `[2]` | Restaurants | |
-| 140 | `herbal_tea` | Complimentary Herbal Tea | `[3]` | Spa | |
-| 141 | `towel_robe` | Towel & Robe | `[3]` | Spa | |
-| 142 | `sauna_steam_access` | Sauna & Steam Access | `[3]` | Spa | |
-| 143 | `hair_wash` | Hair Wash Included | `[4]` | Barber | |
-| 144 | `beard_oil` | Beard Oil Treatment | `[4]` | Barber | |
-| 145 | `coffee_tea` | Complimentary Coffee/Tea | `[4]` | Barber | |
-| 146 | `towel` | Towel Service | `[5]` | Gym | |
-| 147 | `water_bottle` | Complimentary Water Bottle | `[5]` | Gym | |
-| 148 | `personal_trainer` | Personal Trainer Session | `[5]` | Gym | |
-| 149 | `snacks` | Snacks Included | `[6]` | Kids | |
-| 150 | `art_supplies` | Art Supplies | `[6]` | Kids | |
-| 151 | `nanny_service` | Nanny Service | `[6]` | Kids | |
-| 152 | `water_bottles` | Complimentary Water Bottles | `[7]` | Transport | |
-| 153 | `wifi` | Onboard WiFi | `[7]` | Transport | |
-| 154 | `child_seat` | Child Seat Available | `[7]` | Transport | |
+| 130 | ⚠️ `meal_plan` | Meal Plan | `[1]` | Rooms | dropdown_multiselect |
+| 132 | ⚠️ `early_checkin` | Early Check-in | `[1]` | Rooms | |
+| 133 | ⚠️ `late_checkout` | Late Check-out | `[1]` | Rooms | |
+| 134 | ⚠️ `in_room_dining` | In-Room Dining Access | `[1]` | Rooms | |
+| 135 | ⚠️ `spa_voucher` | Spa Treatment Voucher | `[1]` | Rooms | |
+| 136 | ⚠️ `spa_access` | Spa / Sauna / Steam Access | `[1]` | Rooms | |
+| 137 | ⚠️ `gym_access` | Gym Access | `[1]` | Rooms | |
+| 138 | ⚠️ `kids_club_access` | Kids Club Access | `[1]` | Rooms | |
+| 139 | ⚠️ `laundry` | Laundry (X pieces included) | `[1]` | Rooms | number |
+| 140 | ⚠️ `valet_parking` | Valet Parking | `[1,2]` | Shared | |
+| 141 | ⚠️ `locker` | Locker | `[3,5]` | Shared | |
+| 142 | ⚠️ `private_room` | Private Room Available | `[2]` | Restaurants | |
+| 143 | ⚠️ `birthday_package` | Birthday/Anniversary Package | `[2]` | Restaurants | |
+| 144 | ⚠️ `herbal_tea` | Complimentary Herbal Tea | `[3]` | Spa | |
+| 145 | ⚠️ `towel_robe` | Towel & Robe | `[3]` | Spa | |
+| 146 | ⚠️ `sauna_steam_access` | Sauna & Steam Access | `[3]` | Spa | |
+| 147 | ⚠️ `hair_wash` | Hair Wash Included | `[4]` | Barber | |
+| 148 | ⚠️ `beard_oil` | Beard Oil Treatment | `[4]` | Barber | |
+| 149 | ⚠️ `coffee_tea` | Complimentary Coffee/Tea | `[4]` | Barber | |
+| 150 | ⚠️ `towel` | Towel Service | `[5]` | Gym | |
+| 151 | ⚠️ `water_bottle` | Complimentary Water Bottle | `[5]` | Gym | |
+| 152 | ⚠️ `personal_trainer` | Personal Trainer Session | `[5]` | Gym | |
+| 153 | ⚠️ `snacks` | Snacks Included | `[6]` | Kids | |
+| 154 | ⚠️ `art_supplies` | Art Supplies | `[6]` | Kids | |
+| 155 | ⚠️ `nanny_service` | Nanny Service | `[6]` | Kids | |
+| 156 | ⚠️ `water_bottles` | Complimentary Water Bottles | `[7]` | Transport | |
+| 157 | ⚠️ `wifi` | Onboard WiFi | `[7]` | Transport | |
+| 158 | ⚠️ `child_seat` | Child Seat Available | `[7]` | Transport | |
+
+(Ids reconciled to the current dump — this table was previously numbered 126–154, off by −4 from the live `config_key_id`s 130–158.)
 
 Two tag keys (value type `keyword_chips`, `applies_to = *`, enabled for all categories + package):
 
 | id | config_key | Display name | Description |
 |---|---|---|---|
-| 182 | `amenities_tags` | Amenities Tags | Amenity tags per service category, grouped for display (Beds, Bathroom, Comfort, …). Each value stores `{key, group:{en,ar,key}, label:{en,ar}, group_order, keyword_order}`. |
-| 191 | `keyword_tags` | Keyword Tags | Classification keyword tags per service category (room class, dining style, treatment type, vehicle class, …). A flat list of selectable chips. |
+| 127 | `amenities_tags` | Amenities Tags | Amenity tags per service category, grouped for display (Beds, Bathroom, Comfort, …). Each value stores `{key, group:{en,ar,key}, label:{en,ar}, group_order, keyword_order}`. |
+| 186 | `keyword_tags` | Keyword Tags | Classification keyword tags per service category (room class, dining style, treatment type, vehicle class, …). A flat list of selectable chips. |
 
 ---
 
@@ -560,11 +610,11 @@ Inactive (`status='inactive'`) keys and their active replacement. Their ids are 
 |---|---|---|
 | 11 | `checkin_anchor` | folded into stay/extension config |
 | 12 | `checkout_anchor` | folded into stay/extension config |
-| 46 | `pickup_datetime` (admin) | guest-side `pickup_datetime` (178) |
-| 66 | `pricing_model` | `base_currency` (119) + `pricing_rules` (181) |
+| 46 | `pickup_datetime` (admin) | guest-side `pickup_datetime` (182) |
+| 66 | `pricing_model` | `base_currency` (119) + `pricing_rules` (128) |
 | 68 | `currency` | `base_currency` (119) |
-| 69 | `peak_offpeak_multipliers` | `pricing_rules` (181) |
-| 70 | `express_multiplier` | `pricing_rules` (181) |
+| 69 | `peak_offpeak_multipliers` | `pricing_rules` (128) |
+| 70 | `express_multiplier` | `pricing_rules` (128) |
 | 71 | `sibling_discount` | `member_extra_discount_per_tier` (99) |
 | 73 | `package_price` | `base_price` (67) under packages |
 | 88 | `extension_discount_pct` | `extension_pricing_rule` (87) |
@@ -572,8 +622,35 @@ Inactive (`status='inactive'`) keys and their active replacement. Their ids are 
 | 105 | `pkg_overage_rate_override` | `overage_rate` (95) |
 | 111 | `form_inputs` | `form_values` (112) |
 | 121 | `delivery_unit_inventory` | `deliver_unit` (120) |
-| 122 | `amenities` | per-amenity rows 126–154 |
-| 127 | `airport_transfer` | rolled into room amenities |
+| 122 | `amenities` | per-amenity rows 130–158 |
+| 131 | `airport_transfer` | rolled into room amenities |
+| 34 | `confirmation_mode` | `requires_approval` (113); soft-deleted `20260720_2` |
+| 116 | `sort_order` | listing sort handled elsewhere |
+| 185 | `unit` | `duration_unit` (129) |
+
+:::warning `amenities` (122) is no longer deprecated
+`20260728_2` renamed id 122 from `amenities` to **`services_as_amenities`**, retyped it to
+`services_api_dropdown` and re-activated it. The row above is superseded — see the
+Service Details table.
+:::
+
+### Full inactive inventory (reconciled 2026-08-04)
+
+The table above records *why* the early keys were retired. The list below is the complete
+current inactive set — **107 keys** — grouped by `category_id`. Every one is also marked ⚠️
+in the catalog tables above if it has a row there.
+
+| cat | Label | Inactive keys |
+|---|---|---|
+| 1 | Basics (1) | `consumption_reset_cadence` (94) |
+| 2 | Availability (31) | `operating_hours` (16), `slot_duration_minutes` (17), `buffer_between_slots_minutes` (18), `lead_time_hours` (19), `lead_time_minutes` (20), `cutoff_time` (21), `return_request_lead_time_minutes` (22), `modification_cancellation_cutoff_hours` (23), `inventory_treatment_rooms` (26), `inventory_capacity_per_age_group` (28), `staff_to_child_ratio` (29), `inventory_barber_chairs` (30), `inventory_floor_capacity` (31), `inventory_parking_slots` (32), `pickup_datetime` (46), `passenger_luggage_vehicle_preference` (47), `weekday_arrival_restriction` (48), `staff_routing` (50), `fulfil_sla_per_category_minutes` (52), `vehicle_delivery_sla_minutes` (53), `adult_age_cutoff` (55), `child_age_brackets` (56), `guardian_rule` (57), `guardian_required_age_bracket` (58), `age_bracket_mandatory` (62), `requires_approval` (113), `sort_order` (116), `validity_days` (117), `inventory_floor_capacity_cardio` (6356), `inventory_floor_capacity_weights` (6357), `inventory_floor_capacity_studio` (6358) |
+| 3 | Audience (19) | `scheduling_mode` (10), `per_slot_capacity` (27), `confirmation_mode` (34), `max_children_per_guardian` (37), `appointment_required` (40), `walk_in_accepted` (41), `required_guest_inputs` (42), `required_documents` (43), `stay_boundary_rule` (49), `guest_of_guest_allowed` (60), `access_scope` (63), `tier_extra_savings_badge` (64), `membership_gate` (65), `savings_badge` (74), `partial_consumption_refund_rule` (83), `loyalty_earn_rate` (96), `loyalty_redemption_enabled` (97), `loyalty_redemption_cap_pct` (98), `member_extra_discount_per_tier` (99) |
+| 4 | Pricing Model (9) | `package_bundle_mode` (72), `primary_service_type_anchor` (76), `service_charge_pct` (78), `extension_discount_pct` (88), `extension_cutoff_time` (89), `extension_requires_availability_recheck` (90), `honour_on_extension_per_service` (92), `overage_rate` (95), `cancellation_exceptions` (118) |
+| 10 | Package Composition (5 — **all**) | `pkg_service_ref` (101), `pkg_quantity_override` (102), `pkg_consumption_override` (103), `pkg_reset_cadence_override` (104), `pkg_overage_rate_override` (105) |
+| 11 | Viewable for User (9 — **all**) | `checkin_anchor` (11), `checkout_anchor` (12), `pricing_model` (66), `currency` (68), `peak_offpeak_multipliers` (69), `express_multiplier` (70), `sibling_discount` (71), `package_price` (73), `unit` (185) |
+| 12 | Guest Display (2) | `form_inputs` (111), `session_duration` (179) |
+| 14 | Service Details (2) | `linked_addons` (100), `delivery_unit_inventory` (121) |
+| 15 | Amenities (29) | `meal_plan` (130), `airport_transfer` (131), `early_checkin` (132), `late_checkout` (133), `in_room_dining` (134), `spa_voucher` (135), `spa_access` (136), `gym_access` (137), `kids_club_access` (138), `laundry` (139), `valet_parking` (140), `locker` (141), `private_room` (142), `birthday_package` (143), `herbal_tea` (144), `towel_robe` (145), `sauna_steam_access` (146), `hair_wash` (147), `beard_oil` (148), `coffee_tea` (149), `towel` (150), `water_bottle` (151), `personal_trainer` (152), `snacks` (153), `art_supplies` (154), `nanny_service` (155), `water_bottles` (156), `wifi` (157), `child_seat` (158) |
 
 ---
 
@@ -582,6 +659,18 @@ Inactive (`status='inactive'`) keys and their active replacement. Their ids are 
 This catalog covers the **system tenant** only. Every other `hms_config_keys` row is a per-tenant **clone**: `source_hms_config_key_id` points back to a system-tenant original, `tenant_id` is `[<tenant_id>]`, and `created_by` is the onboarding tenant admin.
 
 A clone is the same key with a tenant-specific scope override (`applies_to` / `enabled_for`) — there is no other content drift. To read a clone, look up its `source_hms_config_key_id` in the catalog above, then inspect the clone's `applies_to` / `enabled_for`. Query a tenant's clones directly rather than enumerating them here. How clones are produced is covered in [per-tenant-cloning.md](../../per-tenant-cloning/per-tenant-cloning.md) and [resource-assignments.md](../../per-tenant-resource-assignment/resource-assignments.md).
+
+**Reconciled 2026-08-04:** **5,345 clone rows across 59 distinct `tenant_id` values — of which only 2,252 are `active`.** A fully-onboarded tenant carries ~170–175 clones.
+
+:::caution A clone count is not a count of usable keys
+Fewer than half the clone rows are active: the retirement migrations that cut the system
+tenant from 167 → 86 active keys propagated into the clones. Always filter on
+`status='active'` when asking what a tenant can actually see.
+
+Note also that 26 clone rows store `tenant_id` as a **bare scalar** rather than the usual
+`[<id>]` array, so they group on their own in any `GROUP BY tenant_id`. They are genuine
+clones, not duplicates.
+:::
 
 ---
 
@@ -604,6 +693,7 @@ See [config-keys.md](../config-keys.md) for the CRUD contract behind the first f
 
 | Date | Change |
 |---|---|
+| 2026-08-04 | **Reconciled against the live registry** (`dev-restructure_hms_1.8`): 193 keys, **86 active / 107 inactive** (was 167 active). Added the Current state summary; marked ⚠️ on the **88** catalog rows whose key is now inactive; added the full inactive inventory by category; added the five post-snapshot keys (`services_as_amenities` 122, `guardian_required` 6812, `min_guests_age` 6839, `max_guests_age` 6840, `unit_type` 7072); refreshed clone counts to 5,345 rows / 2,252 active across 59 tenant ids. Categories **10** and **11** now have no active key; Amenities dropped from 31 keys to 2. |
 | 2026-06-14 | Added `max_quantity_per_booking` config key (availability category, booking group, `applies_to = *`). Controls multi-quantity service bookings. Migration `20260614_1`. |
 | 2026-06-11 | Added `max_adults` and `max_children` config keys (Audience category, party group, `applies_to = *`). Migration `20260611_3`. |
 | 2026-06-11 | Synced keys `27`/`35`/`36` (rename + `applies_to` re-scope, `20260610_*`) and `63` `access_scope` (option order → default public, `20260611_1`) — originals only; tenant clones untouched (issue #229 B/D). |

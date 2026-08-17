@@ -6,11 +6,11 @@ Add one or more standalone services (addons) to an existing **upcoming or future
 
 ## Endpoints
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| **POST** | `/api/guest/bookings/{bookingId}/services` | Add service addons |
-| **DELETE** | `/api/guest/bookings/{bookingId}/services` | Remove a service addon |
-| **PUT** | `/api/guest/bookings/{bookingId}/services/{serviceId}` | Reschedule addon slots |
+| Method     | Path                                                   | Purpose                |
+| ---------- | ------------------------------------------------------ | ---------------------- |
+| **POST**   | `/api/guest/bookings/{bookingId}/services`             | Add service addons     |
+| **DELETE** | `/api/guest/bookings/{bookingId}/services`             | Remove a service addon |
+| **PUT**    | `/api/guest/bookings/{bookingId}/services/{serviceId}` | Reschedule addon slots |
 
 All endpoints use **AUTH_PLATFORM** (require a valid guest JWT).
 
@@ -26,15 +26,15 @@ Requires a valid guest JWT (`accessToken`). The guest's identity is resolved via
 
 ### Request Payload
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `booking_id` | `number` | Yes | The existing booking to add services to (path parameter, mapped to body). |
-| `addons` | `array` | Yes | Non-empty array of service addons to add. |
-| `addons[].serviceId` | `number` | Yes | The service to add. Must not be a stay-category service. |
-| `addons[].quantity` | `number` | No | Number of slots (default: 1). Capped by `max_quantity_per_booking` config. |
-| `addons[].sessions` | `array` | No | For session-based services. Each: `{ date, slot }`. |
-| `addons[].meals` | `array` | No | For dining/room-service. Each: `{ date, mealType }`. |
-| `addons[].transport` | `object` | No | For transport: `{ tripType, pickupDateTime, pickupLocation, dropoffLocation, passengers }`. |
+| Field                | Type     | Required | Description                                                                                                                               |
+| -------------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `booking_id`         | `number` | Yes      | The existing booking to add services to (path parameter, mapped to body).                                                                 |
+| `addons`             | `array`  | Yes      | Non-empty array of service addons to add.                                                                                                 |
+| `addons[].serviceId` | `number` | Yes      | The service to add. Must not be a stay-category service.                                                                                  |
+| `addons[].quantity`  | `number` | No       | Number of slots (default: 1). Capped by `max_quantity_per_booking` config.                                                                |
+| `addons[].sessions`  | `array`  | No       | For session-based services. Each: `{ date, slot }`.                                                                                       |
+| `addons[].meals`     | `array`  | No       | For dining/room-service. Each: `{ date, mealType, slot? }`. `slot` is `"HH:MM-HH:MM"` (e.g. `"10:30-12:00"`) for precise time scheduling. |
+| `addons[].transport` | `object` | No       | For transport: `{ tripType, pickupDateTime, pickupLocation, dropoffLocation, passengers }`.                                               |
 
 ### Example: Add a spa session to a room booking
 
@@ -45,9 +45,7 @@ Requires a valid guest JWT (`accessToken`). The guest's identity is resolved via
   "addons": [
     {
       "serviceId": 55,
-      "sessions": [
-        { "date": "2026-07-15", "slot": "15:00-16:00" }
-      ]
+      "sessions": [{ "date": "2026-07-15", "slot": "15:00-16:00" }]
     }
   ]
 }
@@ -63,7 +61,7 @@ Requires a valid guest JWT (`accessToken`). The guest's identity is resolved via
     {
       "serviceId": 76,
       "meals": [
-        { "date": "2026-07-15", "mealType": "dinner" }
+        { "date": "2026-07-15", "mealType": "dinner", "slot": "19:00-21:00" }
       ]
     },
     {
@@ -86,9 +84,7 @@ Requires a valid guest JWT (`accessToken`). The guest's identity is resolved via
 {
   "actionPerformerURDD": 16,
   "booking_id": 9060,
-  "addons": [
-    { "serviceId": 90 }
-  ]
+  "addons": [{ "serviceId": 90 }]
 }
 ```
 
@@ -109,6 +105,17 @@ Returns the full v2 booking bundle with the updated services list, plus a `downP
   "status": "confirmed",
   "amount": 375,
   "paidAmount": 60,
+  "slots": {
+    "type": "meals",
+    "items": [
+      {
+        "id": 501,
+        "date": "2026-07-15",
+        "mealType": "dinner",
+        "status": "scheduled"
+      }
+    ]
+  },
   "services": [
     {
       "serviceId": 55,
@@ -137,12 +144,12 @@ Returns the full v2 booking bundle with the updated services list, plus a `downP
 
 ### `downPayment` Object
 
-| Field | Type | Description |
-|---|---|---|
-| `required` | `boolean` | `true` if the guest must pay before services are activated. |
-| `amount` | `number` | 20% of the newly added services total. |
-| `addedServicesTotal` | `number` | Sum of the prices of the services just added. |
-| `currency` | `string` | Currency code (e.g. `"SAR"`). |
+| Field                | Type      | Description                                                 |
+| -------------------- | --------- | ----------------------------------------------------------- |
+| `required`           | `boolean` | `true` if the guest must pay before services are activated. |
+| `amount`             | `number`  | 20% of the newly added services total.                      |
+| `addedServicesTotal` | `number`  | Sum of the prices of the services just added.               |
+| `currency`           | `string`  | Currency code (e.g. `"SAR"`).                               |
 
 ---
 
@@ -227,26 +234,26 @@ If the guest has a saved card, pass `savedCardId` instead of rendering the Moyas
 
 The booking confirmation email is sent **after the first successful down payment**, not at booking creation time. This ensures the guest only receives a confirmation once payment is secured.
 
-| Event | Email Sent? |
-|---|---|
-| Booking created (no payment yet) | No |
-| First down payment succeeds (webhook or confirm) | Yes |
-| Subsequent payments on same booking | No |
+| Event                                            | Email Sent? |
+| ------------------------------------------------ | ----------- |
+| Booking created (no payment yet)                 | No          |
+| First down payment succeeds (webhook or confirm) | Yes         |
+| Subsequent payments on same booking              | No          |
 
 ---
 
 ## Validation Rules
 
-| Rule | Error |
-|---|---|
-| Booking must exist, be active, and belong to the guest | `404 Booking not found` |
-| Service must be active | `404 Service N not found` |
-| Service must belong to the same hotel as the booking | `422 Addon belongs to a different hotel` |
-| Stay-category services cannot be added as addons | `422 Stay services cannot be added as addons` |
-| Quantity must not exceed `max_quantity_per_booking` | `400 Maximum N booking(s) allowed for service "..."` |
-| `addons` must be a non-empty array | `400 addons must be a non-empty array` |
-| `booking_id` is required | `400 booking id is required (path param)` |
-| `tenant_id` is required | `400 tenant_id is required` |
+| Rule                                                   | Error                                                |
+| ------------------------------------------------------ | ---------------------------------------------------- |
+| Booking must exist, be active, and belong to the guest | `404 Booking not found`                              |
+| Service must be active                                 | `404 Service N not found`                            |
+| Service must belong to the same hotel as the booking   | `422 Addon belongs to a different hotel`             |
+| Stay-category services cannot be added as addons       | `422 Stay services cannot be added as addons`        |
+| Quantity must not exceed `max_quantity_per_booking`    | `400 Maximum N booking(s) allowed for service "..."` |
+| `addons` must be a non-empty array                     | `400 addons must be a non-empty array`               |
+| `booking_id` is required                               | `400 booking id is required (path param)`            |
+| `tenant_id` is required                                | `400 tenant_id is required`                          |
 
 ---
 
@@ -279,9 +286,7 @@ Reschedules the time slots of a previously added service.
   "actionPerformerURDD": 16,
   "booking_id": 9060,
   "booking_service_id": 145,
-  "sessions": [
-    { "date": "2026-07-16", "slot": "11:00-12:00" }
-  ]
+  "sessions": [{ "date": "2026-07-16", "slot": "11:00-12:00" }]
 }
 ```
 
@@ -290,6 +295,7 @@ Reschedules the time slots of a previously added service.
 ## Eligible Services
 
 Any active service belonging to the same hotel as the booking **except**:
+
 - **Stay** services (`category_slug = "stay"`) — these are the anchor service of a room booking.
 - **Amenity** services — not standalone bookable.
 
@@ -299,7 +305,9 @@ In practice, eligible categories include: spa, dining, room-service, barber, gym
 
 ## Change Log
 
-| Date | Change |
-|---|---|
-| 2026-07-13 | Added 20% down payment requirement for added services. Response now includes `downPayment` object. Booking confirmation email moved to after first successful payment. |
-| 2026-06-14 | Initial documentation for add/remove/reschedule service addons on existing bookings. |
+| Date       | Change                                                                                                                                                                                                       |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-08-13 | Dining/room-service `meals[]` now accepts optional `slot` field (`"HH:MM-HH:MM"`) for precise time scheduling in `booking_service_slots`.                                                                    |
+| 2026-07-20 | Added `slot_id` parameter to DELETE endpoint for targeted slot removal. A guest can now remove a specific scheduled session (e.g., the 10:00 barber slot) without affecting other slots of the same service. |
+| 2026-07-13 | Added 20% down payment requirement for added services. Response now includes `downPayment` object. Booking confirmation email moved to after first successful payment.                                       |
+| 2026-06-14 | Initial documentation for add/remove/reschedule service addons on existing bookings.                                                                                                                         |
