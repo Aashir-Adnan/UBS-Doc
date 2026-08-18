@@ -1,23 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import { listMembers, listTenants, assignTenant } from './tenantApi';
-import { useActingPermissions } from './useActingPermissions';
-import PermissionNotice from './PermissionNotice';
+import React, { useEffect, useState } from "react";
+import { listMembers, listTenants, assignTenant } from "./tenantApi";
+import { useActingPermissions } from "./useActingPermissions";
 
-// Admin → Assign tenant (§3.3). Pick a user (target_urdd_id) and a tenant, then
-// POST /projects/tenant/assign, which is gated on update_portal_users. The lists
-// stay readable without it; only the write path is closed off, so a caller who
-// would 403 never gets to submit.
-const EDIT_USERS_PERM = 'update_portal_users';
+const EDIT_USERS_PERM = "update_portal_users";
 
 export default function AssignTenant({ adminUrdd, defaultTenantId }) {
   const { has } = useActingPermissions();
   const canEdit = has(EDIT_USERS_PERM);
+
   const [members, setMembers] = useState([]);
   const [tenants, setTenants] = useState([]);
   const [loadError, setLoadError] = useState(null);
 
-  const [targetUrdd, setTargetUrdd] = useState('');
-  const [tenantId, setTenantId] = useState(defaultTenantId != null ? String(defaultTenantId) : '');
+  const [targetUrdd, setTargetUrdd] = useState("");
+  const [tenantId, setTenantId] = useState(
+    defaultTenantId != null ? String(defaultTenantId) : "",
+  );
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -31,8 +29,12 @@ export default function AssignTenant({ adminUrdd, defaultTenantId }) {
         setMembers(Array.isArray(m?.members) ? m.members : []);
         setTenants(Array.isArray(t?.tenants) ? t.tenants : []);
       })
-      .catch((e) => { if (!cancelled) setLoadError(e.message); });
-    return () => { cancelled = true; };
+      .catch((e) => {
+        if (!cancelled) setLoadError(e.message);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [adminUrdd]);
 
   // Follow the System-tab org picker: preselect the chosen tenant as the
@@ -45,16 +47,17 @@ export default function AssignTenant({ adminUrdd, defaultTenantId }) {
     e.preventDefault();
     setResult(null);
     setError(null);
-    // Belt and braces: a disabled submit button doesn't reliably stop implicit
-    // submission (Enter in a field) in every browser.
-    if (!canEdit) return;
     if (!targetUrdd || !tenantId) {
-      setError('Pick a user and a tenant.');
+      setError("Pick a user and a tenant.");
       return;
     }
     try {
       setSubmitting(true);
-      const res = await assignTenant(adminUrdd, Number(targetUrdd), Number(tenantId));
+      const res = await assignTenant(
+        adminUrdd,
+        Number(targetUrdd),
+        Number(tenantId),
+      );
       setResult(res);
     } catch (err) {
       setError(err.message);
@@ -74,30 +77,24 @@ export default function AssignTenant({ adminUrdd, defaultTenantId }) {
 
   return (
     <form className="tenant-form" onSubmit={handleSubmit}>
-      {!canEdit && (
-        <PermissionNotice
-          permission={EDIT_USERS_PERM}
-          action="assigning a user to a tenant"
-        />
+      {loadError && (
+        <p className="tenant-error">Failed to load lists: {loadError}</p>
       )}
-
-      {loadError && <p className="tenant-error">Failed to load lists: {loadError}</p>}
 
       <label className="tenant-field">
         <span>User</span>
         <select
           value={targetUrdd}
-          disabled={!canEdit}
           onChange={(e) => setTargetUrdd(e.target.value)}
         >
           <option value="">Select a user…</option>
           {members.map((m) => (
             <option key={m.urdd_id} value={m.urdd_id}>
-              {(m.first_name || m.last_name)
-                ? `${m.first_name || ''} ${m.last_name || ''}`.trim()
+              {m.first_name || m.last_name
+                ? `${m.first_name || ""} ${m.last_name || ""}`.trim()
                 : m.username || m.email}
               {` — URDD #${m.urdd_id}`}
-              {m.email ? ` (${m.email})` : ''}
+              {m.email ? ` (${m.email})` : ""}
             </option>
           ))}
         </select>
@@ -105,11 +102,7 @@ export default function AssignTenant({ adminUrdd, defaultTenantId }) {
 
       <label className="tenant-field">
         <span>Tenant</span>
-        <select
-          value={tenantId}
-          disabled={!canEdit}
-          onChange={(e) => setTenantId(e.target.value)}
-        >
+        <select value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
           <option value="">Select a tenant…</option>
           {tenants.map((t) => (
             <option key={t.tenant_id} value={t.tenant_id}>
@@ -120,8 +113,12 @@ export default function AssignTenant({ adminUrdd, defaultTenantId }) {
         </select>
       </label>
 
-      <button type="submit" className="tenant-submit" disabled={submitting || !canEdit}>
-        {submitting ? 'Assigning…' : 'Assign tenant'}
+      <button
+        type="submit"
+        className="tenant-submit"
+        disabled={submitting || !canEdit}
+      >
+        {submitting ? "Assigning…" : "Assign tenant"}
       </button>
 
       {error && <p className="tenant-error">{error}</p>}

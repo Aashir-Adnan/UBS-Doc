@@ -1,0 +1,193 @@
+.sidebar {
+  width: 280px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  border-right: 1px solid #e5e7eb;
+  overflow-y: auto;
+  border-radius: 18px;
+  padding: 32px;
+  border: 1px solid #e5e7eb;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.section {
+  margin-bottom: 18px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 8px 0;
+  color: #222;
+}
+
+.arrow {
+  width: 18px;
+  text-align: center;
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  margin-left: 26px;
+  margin-top: 8px;
+  gap: 8px;
+}
+
+.link {
+  text-decoration: none;
+  color: #555;
+  font-size: 15px;
+  transition: color 0.2s ease;
+}
+
+.link:hover {
+  color: #2563eb;
+}
+
+.active {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px 0;
+  font-weight: 600;
+  user-select: none;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: 100vh;
+}
+
+.pitchMain {
+  padding: 0 2rem 4rem;
+}
+
+.content {
+  padding: 0 2rem;
+}
+
+.sidebar {
+  width: 280px;
+  min-height: 100vh;
+  padding: 24px;
+  border-right: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+}
+
+.logo {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 30px;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.nav a {
+  text-decoration: none;
+  color: inherit;
+  font-weight: 500;
+}
+
+.nav a:hover {
+  color: #2563eb;
+}
+
+.bottom {
+  margin-top: 40px;
+}
+
+.title {
+  margin-top: 30px;
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* ── Dark theme refinements ──────────────────────────────────────────────
+   Everything above is untouched so light mode renders exactly as before.
+   These overrides layer a GitHub-Dark-style surface, softer borders,
+   readable secondary text, and a nicer scrollbar for the two .sidebar
+   variants (folder tree + pitch-page nav) defined in this file. */
+:global([data-theme="dark"]) .sidebar {
+  border-right-color: var(--app-border, #30363d);
+  background: #161b22;
+  border: 1px solid #30363d;
+}
+
+:global([data-theme="dark"]) .title {
+  color: var(--app-text, #e6edf3);
+}
+
+:global([data-theme="dark"]) .sectionHeader {
+  color: var(--app-text, #e6edf3);
+}
+
+:global([data-theme="dark"]) .link {
+  color: var(--app-text-secondary, #8b949e);
+}
+
+:global([data-theme="dark"]) .link:hover {
+  color: var(--app-accent, #58a6ff);
+}
+
+:global([data-theme="dark"]) .active {
+  color: var(--app-accent, #58a6ff);
+  font-weight: 700;
+}
+
+:global([data-theme="dark"]) .logo {
+  color: var(--app-accent, #58a6ff);
+}
+
+:global([data-theme="dark"]) .nav a:hover {
+  color: var(--app-accent, #58a6ff);
+}
+
+/* Thin, unobtrusive scrollbar for the folder tree in dark mode */
+:global([data-theme="dark"]) .sidebar::-webkit-scrollbar {
+  width: 10px;
+}
+
+:global([data-theme="dark"]) .sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:global([data-theme="dark"]) .sidebar::-webkit-scrollbar-thumb {
+  background-color: var(--app-scrollbar-thumb, #30363d);
+  border-radius: 999px;
+  border: 2px solid var(--app-surface, #0d1117);
+}
+
+:global([data-theme="dark"]) .sidebar {
+  scrollbar-color: var(--app-scrollbar-thumb, #30363d) transparent;
+  scrollbar-width: thin;
+}

@@ -1,21 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { listMembers, listAvailableRepos, getRepoGrants, grantRepos } from './tenantApi';
-import { useActingPermissions } from './useActingPermissions';
-import PermissionNotice from './PermissionNotice';
 
 // Admin → Grant repos. Mirrors GrantProjects but targets the repo endpoints.
 // Pick a target user, show the repos available in *their* tenant as a checkbox
 // list pre-checked from their current grants, and write a plain repo_ids array.
 // Turning the restriction off clears the allow-list (user then sees ALL repos in
-// their tenant).
-//
-// Writing is gated on update_portal_users (what /repos/tenant/grant checks).
-// Without it the boxes still show who has what — they just can't be changed.
-const EDIT_USERS_PERM = 'update_portal_users';
-
+// their tenant). Admin-only; enforced server-side (403 for non-admins).
 export default function GrantRepos({ adminUrdd }) {
-  const { has } = useActingPermissions();
-  const canEdit = has(EDIT_USERS_PERM);
   const [members, setMembers] = useState([]);
   const [loadError, setLoadError] = useState(null);
 
@@ -82,9 +73,6 @@ export default function GrantRepos({ adminUrdd }) {
     e.preventDefault();
     setError(null);
     setNotice(null);
-    // Belt and braces: a disabled submit button doesn't reliably stop implicit
-    // submission (Enter in a field) in every browser.
-    if (!canEdit) return;
     if (!selectedMember) {
       setError('Pick a user first.');
       return;
@@ -146,13 +134,6 @@ export default function GrantRepos({ adminUrdd }) {
 
   return (
     <form className="tenant-form" onSubmit={handleSubmit}>
-      {!canEdit && (
-        <PermissionNotice
-          permission={EDIT_USERS_PERM}
-          action="changing a user's repo grants"
-        />
-      )}
-
       {loadError && <p className="tenant-error">Failed to load members: {loadError}</p>}
 
       <label className="tenant-field">
@@ -176,7 +157,6 @@ export default function GrantRepos({ adminUrdd }) {
             <input
               type="checkbox"
               checked={restrict}
-              disabled={!canEdit}
               onChange={(e) => setRestrict(e.target.checked)}
             />
             <span>
@@ -199,7 +179,6 @@ export default function GrantRepos({ adminUrdd }) {
                     <input
                       type="checkbox"
                       checked={checked.has(Number(r.id))}
-                      disabled={!canEdit}
                       onChange={() => toggle(Number(r.id))}
                     />
                     <span>
@@ -218,11 +197,7 @@ export default function GrantRepos({ adminUrdd }) {
         </>
       )}
 
-      <button
-        type="submit"
-        className="tenant-submit"
-        disabled={submitting || !selectedMember || !canEdit}
-      >
+      <button type="submit" className="tenant-submit" disabled={submitting || !selectedMember}>
         {submitting ? 'Saving…' : 'Save grants'}
       </button>
 

@@ -1,27 +1,53 @@
-import React from 'react';
-import Layout from '@theme/Layout';
-import Link from '@docusaurus/Link';
-import { useAuth } from '@site/src/components/portal/authStore';
-import PortalSignIn from '@site/src/components/portal/PortalSignIn';
-import { projects } from '@site/src/data/projectsConfig';
-import { usePortalAccess } from '@site/src/components/portal/usePortalAccess';
-import AccessRestricted from '@site/src/components/portal/AccessRestricted';
+import React from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "../../../components/portal/authStore";
+import GoogleSignIn from "../../../components/portal/GoogleSignIn";
+import { projects } from "../../../data/projectsConfig";
+import { isGranjurEmail } from "../../../utils/isGranjurEmail";
 
 function ProjectsContent() {
   const { user, signOut, loading } = useAuth();
-  const { allowed: canAccessPortal, loading: accessLoading } = usePortalAccess();
+  const canAccessPortal = !!user && isGranjurEmail(user?.email);
 
-  if (loading || accessLoading) {
-    return <section className="portal-hero portal-hero-center"><p>Loading...</p></section>;
+  if (loading) {
+    return (
+      <section className="portal-hero portal-hero-center">
+        <p>Loading...</p>
+      </section>
+    );
   }
 
   if (!user) {
-    return <PortalSignIn />;
+    return (
+      <section className="portal-hero portal-hero-center">
+        <div className="portal-auth-card portal-auth-centered">
+          <h2 className="card-title">Sign in</h2>
+          <p className="card-subtitle">
+            Use your Google account to access Granjur Dev tools.
+          </p>
+          <GoogleSignIn />
+          <p className="card-helper">
+            Use your organization&apos;s @granjur.com account for full access.
+          </p>
+        </div>
+      </section>
+    );
   }
 
   if (!canAccessPortal) {
     return (
-      <AccessRestricted email={user.email} onSignOut={signOut} />
+      <section className="portal-hero portal-hero-center">
+        <div className="portal-auth-card portal-auth-centered">
+          <h2 className="card-title">Access restricted</h2>
+          <p className="card-subtitle">
+            This portal is limited to @granjur.com accounts.
+          </p>
+          <p className="card-helper">
+            You are currently signed in as <strong>{user.email}</strong>. Please
+            sign out and use your Granjur workspace account.
+          </p>
+        </div>
+      </section>
     );
   }
 
@@ -36,7 +62,7 @@ function ProjectsContent() {
           <h2>Projects</h2>
           <p>
             View documentation and custom dashboards for each project. Signed in
-            as <strong>{user.name || user.email}</strong>.{' '}
+            as <strong>{user.name || user.email}</strong>.{" "}
             <button
               type="button"
               className="portal-signout-link"
@@ -60,14 +86,16 @@ function ProjectsContent() {
               </div>
               <div className="project-card-hover-layer">
                 {project.description && (
-                  <p className="project-card-hover-desc">{project.description}</p>
+                  <p className="project-card-hover-desc">
+                    {project.description}
+                  </p>
                 )}
                 <div className="project-card-actions">
                   <Link
                     to={project.docPath}
                     className="button button--secondary button--sm"
                   >
-                    {project.docLabel || 'Documentation'}
+                    {project.docLabel || "Documentation"}
                   </Link>
                   {project.hasCustomView && (
                     <Link
@@ -89,13 +117,10 @@ function ProjectsContent() {
 
 export default function ProjectsPage() {
   return (
-    <Layout
-      title="Projects"
-      description="Project documentation and custom views"
-    >
+    <>
       <main className="portal-main-wrapper">
         <ProjectsContent />
       </main>
-    </Layout>
+    </>
   );
 }

@@ -1,12 +1,8 @@
-import React from 'react';
-import Layout from '@theme/Layout';
+import React from "react";
 
 export default function AboutPage() {
   return (
-    <Layout
-      title="About Dev"
-      description="About the developer and Granjur Dev"
-    >
+    <>
       <main className="portal-main-wrapper portal-main-wrapper--center">
         <section className="portal-section about-section">
           <div className="portal-section-header">
@@ -47,6 +43,6 @@ export default function AboutPage() {
           </div>
         </section>
       </main>
-    </Layout>
+    </>
   );
 }

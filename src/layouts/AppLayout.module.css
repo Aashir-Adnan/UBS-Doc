@@ -1,0 +1,60 @@
+/* ============================================================
+   App shell: App Sidebar | Main Content
+   The sidebar itself (width, sticky position, dark-mode colors)
+   is owned by its own component/module. This file only has to
+   guarantee the shell behaves: the sidebar slot never shrinks or
+   wraps, and the content column always fills the rest of the
+   width without ever causing horizontal overflow — regardless of
+   whether the page rendered inside .content is the home page, a
+   docs page (with its own doc-sidebar/TOC grid), or a tool page.
+   ============================================================ */
+.layout {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+/* The sidebar is always the first child of .layout. Targeting it
+   structurally (rather than by class) keeps this file decoupled
+   from whichever component renders it. */
+.layout > :first-child {
+  flex: 0 0 auto; /* fixed width, never grows or shrinks */
+  align-self: stretch;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  min-height: 100vh;
+
+  margin-left: 210px;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow-x: hidden;
+}
+
+/* ============================================================
+   Responsive behavior
+   Desktop stays a stable two-column row. Below the point where a
+   fixed-width sidebar would start crowding the content, let the
+   sidebar's own component collapse (e.g. into a drawer/hamburger);
+   this file just stops forcing a fixed-width row so that collapse
+   isn't fighting a flex constraint.
+   ============================================================ */
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+  }
+
+  .layout > :first-child {
+    flex: 0 0 auto;
+    width: 100%;
+    align-self: stretch;
+  }
+
+  .content {
+    min-height: auto;
+  }
+}

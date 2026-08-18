@@ -1,24 +1,47 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap");
+
+/* ============================================================
+   Page shell
+   The hero and story rail share this single gradient background,
+   so they already read as one continuous surface — the "isolated
+   hero" feeling mostly came from oversized spacing, not a lack of
+   visual connection. Padding below was reduced accordingly.
+   ============================================================ */
 .pitchMain {
   min-height: 100vh;
   background:
-    radial-gradient(950px 520px at 18% -8%, rgba(9, 60, 93, 0.18), transparent 62%),
-    radial-gradient(780px 460px at 90% 6%, rgba(111, 209, 215, 0.10), transparent 58%),
+    radial-gradient(
+      950px 520px at 18% -8%,
+      rgba(9, 60, 93, 0.18),
+      transparent 62%
+    ),
+    radial-gradient(
+      780px 460px at 90% 6%,
+      rgba(111, 209, 215, 0.1),
+      transparent 58%
+    ),
     var(--ifm-background-color);
   color: var(--ifm-font-color-base);
-  padding-bottom: 4rem;
+  font-family: "Inter", var(--ifm-font-family-base, sans-serif);
+  padding-bottom: 2.5rem;
 }
 
+/* ============================================================
+   Hero
+   ============================================================ */
 .hero {
   position: relative;
   max-width: 1160px;
   margin: 0 auto;
-  padding: 5.5rem 1rem 4rem;
+  /* Less bottom padding than before: the hero now hands off to the
+     story rail with a short, deliberate gap instead of a dead zone. */
+  padding: 4rem 1rem 2rem;
 }
 
 .heroGlow {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(9, 60, 93, 0.06), transparent 60%);
+  background: linear-gradient(180deg, rgba(9, 60, 93, 0.05), transparent 60%);
   pointer-events: none;
 }
 
@@ -28,10 +51,13 @@
   text-transform: uppercase;
   letter-spacing: 0.16em;
   font-size: 0.72rem;
+  font-weight: 600;
 }
 
 .heroTitle {
   margin: 0.6rem 0 0;
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-weight: 700;
   font-size: clamp(2.2rem, 5.5vw, 4.4rem);
   line-height: 1.05;
   letter-spacing: -0.02em;
@@ -39,40 +65,61 @@
 }
 
 .heroSubtitle {
-  margin: 1rem 0 0;
-  max-width: 740px;
+  margin: 1.1rem 0 0;
+  max-width: 620px;
   color: var(--ifm-color-emphasis-700);
-  font-size: clamp(1rem, 1.65vw, 1.25rem);
-  line-height: 1.7;
+  font-size: clamp(1rem, 1.5vw, 1.2rem);
+  line-height: 1.65;
 }
 
 .ctaRow {
-  margin-top: 1.6rem;
+  margin-top: 1.75rem;
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
 }
 
+/* ── Buttons ──────────────────────────────────────────────────────────
+   Slightly larger touch targets, a resting shadow on the primary
+   button so it feels tactile rather than flat, and a real focus
+   ring for keyboard users. */
 .ctaPrimary,
 .ctaGhost {
+  display: inline-flex;
+  align-items: center;
   border-radius: 999px;
-  padding: 0.7rem 1.25rem;
-  font-size: 0.88rem;
+  padding: 0.75rem 1.4rem;
+  font-size: 0.9rem;
   font-weight: 600;
   text-decoration: none;
-  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .ctaPrimary {
-  background: linear-gradient(120deg, var(--ifm-color-primary), var(--ifm-color-primary-dark));
+  background: linear-gradient(
+    120deg,
+    var(--ifm-color-primary),
+    var(--ifm-color-primary-dark)
+  );
   color: #ffffff;
   border: 1px solid var(--ifm-color-primary-light);
+  box-shadow: 0 6px 18px
+    color-mix(in srgb, var(--ifm-color-primary) 30%, transparent);
 }
 
 .ctaGhost {
   border: 1px solid var(--ifm-color-emphasis-400);
   color: var(--ifm-font-color-base);
-  background: color-mix(in srgb, var(--ifm-background-surface-color) 82%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--ifm-background-surface-color) 82%,
+    transparent
+  );
 }
 
 .ctaPrimary:hover,
@@ -80,88 +127,110 @@
   transform: translateY(-1px);
 }
 
+.ctaPrimary:hover {
+  box-shadow: 0 10px 24px
+    color-mix(in srgb, var(--ifm-color-primary) 38%, transparent);
+}
+
+.ctaPrimary:focus-visible,
+.ctaGhost:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   Story rail / pillar cards
+   Was `grid-template-columns: 280px 1fr` left over from a layout
+   that also had a sidebar in this row; with only .storyRail as a
+   child, that squeezed every card into a 280px column. It's a
+   simple centered container now, aligned to the same 1160px/1rem
+   rhythm as the hero so the two sections feel like one page
+   instead of two differently-sized blocks stitched together.
+   ============================================================ */
 .scrollShell {
   max-width: 1160px;
   margin: 0 auto;
   padding: 0 1rem;
-  display: grid;
-  grid-template-columns: 300px 1fr;
-  gap: 2rem;
 }
 
-.docsSidebar {
-  position: sticky;
-  top: 86px;
-  align-self: start;
-  background: color-mix(in srgb, var(--ifm-background-surface-color) 90%, transparent);
-  border: 1px solid var(--ifm-color-emphasis-300);
-  border-radius: 1rem;
-  padding: 1rem;
+.pillarsEyebrow {
+  margin: 0 0 1.1rem;
+  color: var(--ifm-color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+  font-weight: 600;
 }
 
-.docsSidebar h3 {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.docsSidebar p {
-  margin: 0.35rem 0 0.8rem;
-  color: var(--ifm-color-emphasis-700);
-  font-size: 0.82rem;
-}
-
-.docsSidebar nav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.docsSidebar nav a {
-  color: var(--ifm-font-color-base);
-  font-size: 0.85rem;
-  text-decoration: none;
-  border: 1px solid transparent;
-  border-radius: 0.5rem;
-  padding: 0.45rem 0.55rem;
-}
-
-.docsSidebar nav a:hover {
-  border-color: var(--ifm-color-primary);
-  background: var(--brand-primary-alpha-10);
-}
-
+/* A real 2-up card grid instead of stacked full-width paragraphs
+   separated by hairlines — that stacked-text-with-rules look is
+   what reads as a PDF/document rather than a web page. */
 .storyRail {
-  display: flex;
-  flex-direction: column;
-  gap: 3.4rem;
-  padding-top: 0.4rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.1rem;
 }
 
 .storyCard {
-  min-height: 46vh;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  gap: 0.6rem;
+  padding: 1.75rem;
+  border-radius: 1rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: color-mix(
+    in srgb,
+    var(--ifm-background-surface-color) 92%,
+    transparent
+  );
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
   opacity: 0.18;
   transform: translateY(16px);
-  transition: opacity 480ms ease, transform 480ms ease;
-  border-bottom: 1px solid color-mix(in srgb, var(--ifm-color-primary) 25%, transparent);
-  padding-bottom: 2.2rem;
+  transition:
+    opacity 480ms ease,
+    transform 480ms ease;
+}
+
+/* Hover lift only applies once a card has already revealed, so it
+   never fights the reveal-on-scroll transform. */
+.storyCard.isVisible:hover {
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 12px 28px rgba(9, 60, 93, 0.12);
+  transform: translateY(-3px);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.storyBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 0.6rem;
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--ifm-color-primary);
+  background: color-mix(in srgb, var(--ifm-color-primary) 12%, transparent);
 }
 
 .storyCard h2 {
   margin: 0;
-  font-size: clamp(1.6rem, 3vw, 2.6rem);
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-weight: 600;
+  font-size: clamp(1.15rem, 1.8vw, 1.4rem);
   letter-spacing: -0.01em;
   color: var(--ifm-font-color-base);
 }
 
 .storyCard p {
-  margin: 0.9rem 0 0;
-  max-width: 720px;
-  line-height: 1.8;
+  margin: 0;
+  line-height: 1.65;
   color: var(--ifm-color-emphasis-700);
-  font-size: clamp(0.98rem, 1.4vw, 1.1rem);
+  font-size: 0.92rem;
 }
 
 .isVisible {
@@ -169,17 +238,122 @@
   transform: translateY(0);
 }
 
-@media (max-width: 996px) {
-  .scrollShell {
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 768px) {
+  .storyRail {
     grid-template-columns: 1fr;
   }
+}
 
-  .docsSidebar {
-    position: relative;
-    top: 0;
+@media (max-width: 640px) {
+  .hero {
+    padding: 3rem 1rem 1.5rem;
+  }
+
+  .ctaRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ctaPrimary,
+  .ctaGhost {
+    justify-content: center;
   }
 
   .storyCard {
-    min-height: 34vh;
+    padding: 1.4rem;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .storyCard,
+  .ctaPrimary,
+  .ctaGhost {
+    transition: none !important;
+  }
+}
+
+/* ── Dark theme refinements ──────────────────────────────────────────────
+   The rules above already read most colors from Infima's --ifm-*
+   custom properties, so tuning the dark palette here goes a long way.
+   These overrides remove the last hardcoded light-mode assumptions
+   (a navy glow tuned for a light background, a light-only button
+   shadow) and give buttons a proper dark, GitHub/Linear-style
+   treatment. No new colors are introduced that only work in one
+   theme — every value below has a light-mode counterpart above. */
+
+:global([data-theme="dark"]) .heroGlow {
+  background: linear-gradient(180deg, rgba(88, 166, 255, 0.1), transparent 60%);
+}
+
+:global([data-theme="dark"]) .pitchMain {
+  --app-accent: #58a6ff;
+  --app-text-secondary: #8b949e;
+  --app-btn-primary-bg: linear-gradient(120deg, #58a6ff, #388bfd);
+  --app-btn-primary-text: #0d1117;
+  --app-btn-primary-border: #58a6ff;
+  --app-btn-ghost-border: #30363d;
+  --app-btn-ghost-bg: rgba(255, 255, 255, 0.03);
+
+  background:
+    radial-gradient(
+      950px 520px at 18% -8%,
+      rgba(88, 166, 255, 0.1),
+      transparent 62%
+    ),
+    radial-gradient(
+      780px 460px at 90% 6%,
+      rgba(88, 166, 255, 0.06),
+      transparent 58%
+    ),
+    var(--ifm-background-color);
+}
+
+:global([data-theme="dark"]) .ctaPrimary {
+  background: var(--app-btn-primary-bg);
+  color: var(--app-btn-primary-text);
+  border-color: var(--app-btn-primary-border);
+  box-shadow: 0 4px 14px rgba(56, 139, 253, 0.25);
+}
+
+:global([data-theme="dark"]) .ctaPrimary:hover {
+  box-shadow: 0 6px 18px rgba(56, 139, 253, 0.35);
+}
+
+:global([data-theme="dark"]) .ctaGhost {
+  border-color: var(--app-btn-ghost-border);
+  background: var(--app-btn-ghost-bg);
+  color: var(--ifm-font-color-base);
+}
+
+:global([data-theme="dark"]) .ctaGhost:hover {
+  border-color: var(--app-accent);
+}
+
+:global([data-theme="dark"]) .storyCard {
+  background: var(--app-surface, #161b22);
+  border-color: var(--app-border, #30363d);
+  box-shadow: 0 1px 2px rgba(2, 6, 23, 0.3);
+}
+
+:global([data-theme="dark"]) .storyCard.isVisible:hover {
+  border-color: var(--app-accent);
+  box-shadow: var(--app-shadow-lg, 0 12px 32px rgba(1, 4, 9, 0.55));
+}
+
+:global([data-theme="dark"]) .storyBadge {
+  color: var(--app-accent);
+  background: rgba(88, 166, 255, 0.15);
+}
+
+:global([data-theme="dark"]) .pillarsEyebrow {
+  color: var(--app-accent);
+}
+
+:global([data-theme="dark"]) .kicker,
+:global([data-theme="dark"]) .heroSubtitle,
+:global([data-theme="dark"]) .storyCard p {
+  color: var(--app-text-secondary);
 }

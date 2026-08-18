@@ -1,4 +1,4 @@
-import { decryptObject, encryptObject } from "@site/src/utils/platformCrypto";
+import { decryptObject, encryptObject } from "../utils/platformCrypto";
 
 const getEnvValue = (...keys) => {
   if (typeof window !== "undefined") {
@@ -6,8 +6,10 @@ const getEnvValue = (...keys) => {
       if (window[key]) return window[key];
     }
   }
+  const env = import.meta.env;
+
   for (const key of keys) {
-    if (process.env[key]) return process.env[key];
+    if (env[key]) return env[key];
   }
   return "";
 };
@@ -15,25 +17,32 @@ const getEnvValue = (...keys) => {
 const getRuntimeConfig = () => {
   const apiBaseUrl =
     (typeof window !== "undefined" && window.__API_BASE_URL__) ||
-    process.env.VITE_BASE_URL ||
-    process.env.API_BASE_URL ||
+    import.meta.env.VITE_API_BASE_URL ||
     "http://localhost:3000";
 
   return {
     apiBaseUrl: String(apiBaseUrl).replace(/\/$/, ""),
-    secretKey: getEnvValue("__VITE_SECRET_KEY__", "VITE_SECRET_KEY", "SECRET_KEY"),
-    platformKey: getEnvValue("__VITE_PLATFORM_KEY__", "VITE_PLATFORM_KEY", "PLATFORM_KEY"),
+    secretKey: getEnvValue(
+      "__VITE_SECRET_KEY__",
+      "VITE_SECRET_KEY",
+      "SECRET_KEY",
+    ),
+    platformKey: getEnvValue(
+      "__VITE_PLATFORM_KEY__",
+      "VITE_PLATFORM_KEY",
+      "PLATFORM_KEY",
+    ),
     platformName: getEnvValue(
       "__VITE_PLATFORM_NAME__",
       "VITE_PLATFORM_NAME",
       "PLATFORM_NAME",
-      "__PLATFORM_NAME__"
+      "__PLATFORM_NAME__",
     ),
     platformVersion: getEnvValue(
       "__VITE_PLATFORM_VERSION__",
       "VITE_PLATFORM_VERSION",
       "PLATFORM_VERSION",
-      "__PLATFORM_VERSION__"
+      "__PLATFORM_VERSION__",
     ),
   };
 };
@@ -54,7 +63,7 @@ export async function fetchRuntimeClientKeys() {
         PlatformVersion: platformVersion,
       },
     },
-    secretKey
+    secretKey,
   );
 
   const response = await fetch(`${apiBaseUrl}/api/runtimekeys?version=1`, {

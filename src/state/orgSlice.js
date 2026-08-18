@@ -1,16 +1,16 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { getUserUrdds } from '@site/src/components/portal/tenantProjects/tenantApi';
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { getUserUrdds } from "../components/portal/tenantProjects/tenantApi";
 
 // Fetch all URDDs for the signed-in user.
 export const fetchUserUrdds = createAsyncThunk(
-  'org/fetchUserUrdds',
+  "org/fetchUserUrdds",
   async (email) => {
     const res = await getUserUrdds(email);
     return res?.urdds ?? [];
   },
 );
 
-const STORAGE_KEY = 'ubs-active-urdd';
+const STORAGE_KEY = "ubs-active-urdd";
 
 function loadPersistedUrdd() {
   try {
@@ -22,11 +22,11 @@ function loadPersistedUrdd() {
 }
 
 const orgSlice = createSlice({
-  name: 'org',
+  name: "org",
   initialState: {
     urdds: [],
     activeUrdd: null,
-    status: 'idle', // idle | loading | ready | error
+    status: "idle", // idle | loading | ready | error
     error: null,
   },
   reducers: {
@@ -35,30 +35,35 @@ const orgSlice = createSlice({
       const found = state.urdds.find((u) => u.urdd_id === urddId);
       if (found) {
         state.activeUrdd = urddId;
-        try { localStorage.setItem(STORAGE_KEY, String(urddId)); } catch {}
+        try {
+          localStorage.setItem(STORAGE_KEY, String(urddId));
+        } catch {}
       }
     },
     clearOrg(state) {
       state.urdds = [];
       state.activeUrdd = null;
-      state.status = 'idle';
+      state.status = "idle";
       state.error = null;
-      try { localStorage.removeItem(STORAGE_KEY); } catch {}
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {}
     },
   },
   extraReducers: (builder) => {
     builder
       .addCase(fetchUserUrdds.pending, (state) => {
-        state.status = 'loading';
+        state.status = "loading";
         state.error = null;
       })
       .addCase(fetchUserUrdds.fulfilled, (state, action) => {
         state.urdds = action.payload;
-        state.status = 'ready';
+        state.status = "ready";
 
         // Restore persisted selection, or pick the default, or the first
         const persisted = loadPersistedUrdd();
-        const persistedValid = persisted && action.payload.some((u) => u.urdd_id === persisted);
+        const persistedValid =
+          persisted && action.payload.some((u) => u.urdd_id === persisted);
         if (persistedValid) {
           state.activeUrdd = persisted;
         } else {
@@ -66,12 +71,14 @@ const orgSlice = createSlice({
           state.activeUrdd = def?.urdd_id ?? action.payload[0]?.urdd_id ?? null;
         }
         if (state.activeUrdd) {
-          try { localStorage.setItem(STORAGE_KEY, String(state.activeUrdd)); } catch {}
+          try {
+            localStorage.setItem(STORAGE_KEY, String(state.activeUrdd));
+          } catch {}
         }
       })
       .addCase(fetchUserUrdds.rejected, (state, action) => {
-        state.status = 'error';
-        state.error = action.error?.message || 'Failed to load organizations';
+        state.status = "error";
+        state.error = action.error?.message || "Failed to load organizations";
       });
   },
 });

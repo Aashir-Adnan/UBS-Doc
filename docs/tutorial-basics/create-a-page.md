@@ -15,15 +15,14 @@ Add **Markdown or React** files to `src/pages` to create a **standalone page**:
 Create a file at `src/pages/my-react-page.js`:
 
 ```jsx title="src/pages/my-react-page.js"
-import React from 'react';
-import Layout from '@theme/Layout';
+import React from "react";
 
 export default function MyReactPage() {
   return (
-    <Layout>
+    <>
       <h1>My React page</h1>
       <p>This is a React page</p>
-    </Layout>
+    </>
   );
 }
 ```
