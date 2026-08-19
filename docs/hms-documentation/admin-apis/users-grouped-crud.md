@@ -69,10 +69,13 @@ Section `userRolesDesignationsDepartment`:
 | Field | Type | Notes |
 |---|---|---|
 | `userRolesDesignationsDepartment_userId` | int | The user to assign roles to. |
-| `userRolesDesignationsDepartment_roleDesignationDepartmentId` | select / **array** | The **set** of RDD ids (the value the RDD dropdown keys on). Tolerates scalar, array, or `[{value}]` option objects. **Empty array removes every role** the user holds in the actor's tenant. |
+| `userRolesDesignationsDepartment_roleDesignationDepartmentId` | select / **array** | The **set** of RDD ids (the value the RDD dropdown keys on). Tolerates a scalar, an array, `[{value}]` option objects, a **JSON-array string** (`"[12, 13]"`), and a **comma-separated string** (`"12,13"`). **Empty array removes every role** the user holds in the actor's tenant. |
 | `userRolesDesignationsDepartment_additionalAttributes` | string | Optional per-assignment attributes. |
 | `userRolesDesignationsDepartment_startDate` / `_endDate` | date | Optional. |
-| `actionPerformerURDD` | int | Actor. |
+| `persona_of_tenants` | bool | *(Tenant-Manager fan-out — see below.)* Opt in to provisioning the same role set into **many tenants**. Absent/false → nothing fan-out-related runs. |
+| `tenants` | tenant `id[]` | The hotels to provision into (same shapes as the RDD field: array / `"[6,7]"` / `"6,7"` / single). Authoritative — a tenant dropped from the list is revoked. |
+| `includes_global` | bool | Also give the user the general **"manager of all hotels"** leg (see below). |
+| `actionPerformerURDD` | int | Actor. Must be a **system-tenant** URDD for the fan-out. |
 
 ```json
 // POST ?step=2
@@ -135,6 +138,20 @@ Each step-2 helper wraps its work in a single `START TRANSACTION` / `COMMIT` (ro
 
 **List** returns the rows array, each augmented with `tenantUrddMap` (`{ "global": urddId, "<tenant_id>": urddId, … }` — the same structure returned after guest login); `table_count` per row is preserved so pagination is unaffected. **View** returns the raw user row including `userRolesDesignationsDepartment_roleDesignationDepartmentId` (a JSON array of the user's active RDD ids that drives the FE multi-select pre-selection).
 
+> **List/View no longer carry the persona-of-tenants read state.** `persona_of_tenants` / `tenants` / `includes_global` / `persona_of_tenants_detail` used to be attached to each read row; that moved to the **[Tenant Manager Candidates](./tenant-manager-candidates.md)** API (POST `entity_type: "users"`), which is the source of truth for a user's Tenant-Manager membership. This CRUD's List/View emit only the plain user/URDD data.
+
+### Step 2 — `persona_of_tenants`: manage a user as Tenant-Manager of many hotels
+
+The **inverse** of TenantsGroupedCrud's `tenant_personas` (there the admin fixes a *hotel* and picks users; here they fix a *user* and pick hotels). When `persona_of_tenants` is truthy — and the actor is a **system-tenant** URDD — step 2 additionally provisions the user as a **Tenant Manager** across the tenants in `tenants`, running the full per-tenant sequence (tenant-local RDD clone owned by that tenant's URDD-B', with URDP fan-out) for each. Handled by `syncPersonaTenantUrdds` alongside the in-tenant role sync.
+
+- **Source role.** The fan-out clones the submitted role set into each tenant. When `roleDesignationDepartmentId` is **empty/omitted** (the persona controls are decoupled from the actor's-own-tenant role picker), the source **defaults to the global `TENANT/Manager` RDD** — so an `includes_global` / `tenants` submit with no role still works.
+- **`includes_global: true`** mints the general **"manager of all hotels"** leg — a twin of the platform's own URDD-B': a URDD on the **system tenant** (not `tenant_id NULL`) on the global `TENANT/Manager` RDD, carrying the **`PG-TENANT-MGMT`** set. It is a staff persona and logs in via the staff path. `includes_global: false` (or omitted) **revokes** that leg and deletes its URDP.
+- **Authoritative / desired-state.** A tenant dropped from `tenants` has its per-tenant TM leg **revoked** (matched by role **signature**, since each tenant holds its own clone; never the actor's own tenant, never the `tenant_id NULL` guest leg). `persona_of_tenants: true` with `tenants: []` and `includes_global: false` clears the user's Tenant-Manager legs entirely.
+- **Session refresh.** Any change to a user's role set — in the actor's tenant **or** in any persona tenant — flags `needs_refresh = 1` on the user's active devices so cached permissions rebuild on the next authenticated request.
+- The response carries `persona_of_tenants_result` (the outcome: `created` / `kept` / `revoked` / `global_leg`), `null` when the flag wasn't sent.
+
+To **read** a user's current Tenant-Manager tenants / `includes_global`, call [Tenant Manager Candidates](./tenant-manager-candidates.md) (POST `entity_type: "users"`) — feeding those values straight back here is a no-op, never a silent revoke.
+
 > A failed role sync **throws** (step 2 rolls back), so the failure path never reaches the post-process. The step-2 helpers prefix the thrown error so the client gets a role-attributed message — `"Role assignment failed: <reason>"` (Add) / `"Role assignment update failed: <reason>"` (Update) — preserving the original `statusCode`.
 
 ---
@@ -161,5 +178,6 @@ Each step-2 helper wraps its work in a single `START TRANSACTION` / `COMMIT` (ro
 | `Src/HelperFunctions/PreProcessingFunctions/CustomUsersGroupedCrud/step2_add_urdd_and_urdp.js` | Step 2 Add — link RDD set + fan out URDPs. |
 | `Src/HelperFunctions/PreProcessingFunctions/CustomUsersGroupedCrud/step2_update_urdd_and_urdp.js` | Step 2 Update — re-sync RDD set + URDPs (replace-all). |
 | `Src/HelperFunctions/PreProcessingFunctions/CustomUsersGroupedCrud/syncUserRddSet.js` | Shared engine — diff current-vs-desired URDDs, insert/keep/soft-delete, re-fan URDPs. |
+| `Src/HelperFunctions/PreProcessingFunctions/CustomUsersGroupedCrud/syncPersonaTenantUrdds.js` | `persona_of_tenants` fan-out (user → many tenants) + `includes_global` general-manager leg; also the readers (`readPersonaOfTenantsBulk`, `readTenantPersonaUserIds`). |
 | `Src/HelperFunctions/PreProcessingFunctions/CustomUsersGroupedCrud/resolveGovernancePermissionGroup.js` | Governance-persona fallback — `(designation_code, role_name)` → `PG-*` group. |
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/buildGuestUrddList.js` | Builds each listed user's `tenantUrddMap` (guest filter opt-in via `?guests=1`). |
