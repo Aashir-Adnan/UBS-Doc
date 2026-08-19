@@ -98,7 +98,28 @@ This endpoint takes no request parameters. Send an empty encrypted body.
       { "en": "City View", "ar": "إطلالة على المدينة" }
     ],
     "room": "Room 301",
-    "rating": null,
+    "deliveryUnits": [
+      {
+        "name": "Room 301",
+        "timeSlot": null,
+        "location": {
+          "id": 1,
+          "name": "Hotel Main Building",
+          "type": "building",
+          "child": {
+            "id": 5,
+            "name": "Floor 3",
+            "type": "floor",
+            "child": {
+              "id": 12,
+              "name": "East Wing",
+              "type": "zone"
+            }
+          }
+        }
+      }
+    ],
+ "rating": null,
     "reviewCount": 0,
     "viewers": { "count": 0, "avatars": [] },
     "schedulingStatus": "complete",
@@ -118,6 +139,27 @@ This endpoint takes no request parameters. Send an empty encrypted body.
         "amenities": [],
         "tags": [],
         "isConsumable": false,
+        "deliveryUnits": [
+          {
+            "name": "Restaurant Hall A",
+            "timeSlot": null,
+            "location": {
+              "id": 1,
+              "name": "Hotel Main Building",
+              "type": "building",
+              "child": {
+                "id": 8,
+                "name": "Ground Floor",
+                "type": "floor",
+                "child": {
+                  "id": 15,
+                  "name": "Restaurant Area",
+                  "type": "zone"
+                }
+              }
+            }
+          }
+        ],
         "operatingHours": [],
         "status": "confirmed",
         "rating": null,
@@ -208,6 +250,7 @@ This endpoint takes no request parameters. Send an empty encrypted body.
 | `amenities` | `array` | Per-service amenities from `amenities_tags` config. Each: `{ key, icon, label: { en, ar }, group }`. |
 | `tags` | `array` | Per-service keyword tags from `keyword_tags` config. Each: `{ en, ar }`. |
 | `room` | `string\|null` | Assigned delivery unit label (e.g. `"Room 301"`). |
+| `deliveryUnits` | `array` | Delivery units assigned to this service. See **Delivery Units** section below. |
 | `rating` | `object\|null` | Rating breakdown (stub — `null` until `service_reviews` table exists). |
 | `reviewCount` | `number` | Number of reviews (stub — `0`). |
 | `viewers` | `object` | Stub — `{ count: 0, avatars: [] }` until presence service is built. |
@@ -229,12 +272,32 @@ This endpoint takes no request parameters. Send an empty encrypted body.
 | `services[].amenities` | `array` | Per-service amenities. Each: `{ key, icon, label: { en, ar }, group }`. |
 | `services[].tags` | `array` | Per-service keyword tags. Each: `{ en, ar }`. |
 | `services[].isConsumable` | `boolean` | Whether the service is consumable (from `is_consumable` config). |
+| `services[].deliveryUnits` | `array` | Delivery units assigned to this addon. See **Delivery Units** section below. |
 | `services[].operatingHours` | `array` | Operating hours for the service. |
 | `services[].status` | `string` | Addon status (e.g. `"confirmed"`, `"cancelled"`). |
 | `services[].meals` | `array` | Present when category is `dining` or `room-service`. |
 | `services[].sessions` | `array` | Present when category is not dining/transport. |
 | `services[].transport` | `object\|null` | Present when category is `transport`. |
 | `formValues` | `object\|null` | Booking-level form values from `hms_config`. |
+
+#### Delivery Units
+
+Each service (primary and addon) includes a `deliveryUnits` array describing the physical resources assigned to the booking. The array shape depends on whether the service is **consumable** or **non-consumable**:
+
+- **Non-consumable** (e.g., swimming pool access): exactly **1 entry** with `timeSlot: null`. All guests share the same physical resource regardless of quantity.
+- **Consumable** (e.g., room service, spa treatment): **one entry per slot/assignment**. Each quantity maps to a separate physical resource with its own time slot.
+
+| Field | Type | Description |
+|---|---|---|
+| `deliveryUnits[].name` | `string` | Display name of the delivery unit (e.g. `"Room 301"`, `"Pool Area"`). |
+| `deliveryUnits[].timeSlot` | `string\|null` | Time slot in `"HH:MM-HH:MM"` format for consumable services. `null` for non-consumable. |
+| `deliveryUnits[].location` | `object\|null` | Nested location hierarchy from root (building) to leaf (zone). `null` if no location assigned. |
+| `deliveryUnits[].location.id` | `number` | Location ID. |
+| `deliveryUnits[].location.name` | `string` | Location name (English). |
+| `deliveryUnits[].location.type` | `string` | Location type (e.g. `"building"`, `"floor"`, `"zone"`). |
+| `deliveryUnits[].location.child` | `object\|null` | Next level in the hierarchy. Same shape recursively. `null` at the leaf. |
+
+The location hierarchy is walked from the delivery unit's anchor in `service_locations` up through the `locations` table's `parent_id` chain. A cycle guard (max 10 levels + visited-set) prevents infinite loops from malformed data.
 
 #### Pricing Block
 
@@ -287,5 +350,6 @@ This endpoint takes no request parameters. Send an empty encrypted body.
 
 | Date | Change |
 |---|---|
+| 2026-08-19 | Added `deliveryUnits` array to primary and addon services. Each entry includes the unit name, time slot, and nested location hierarchy (building > floor > zone). Non-consumable services return 1 shared unit; consumable services return 1 unit per slot. Includes cycle detection for location hierarchy. |
 | 2026-06-09 | Fixed query so `checked_in` bookings always appear regardless of scheduled dates (previously required `CURDATE() BETWEEN check_in_date AND check_out_date` for all statuses, causing early check-ins to vanish). Fixes [#248](https://github.com/UBS-Dev-Org/hms/issues/248). |
 | 2026-06-09 | After checkout (`POST /guest/booking/checkout`), bookings with `booking_status = 'checked_out'` no longer appear here because the query requires `actual_check_out IS NULL` for checked-in bookings ([#253](https://github.com/UBS-Dev-Org/hms/issues/253)). |
