@@ -491,6 +491,7 @@ const sidebars = {
           items: [
             'hms-documentation/tenant-governance/README',
             'hms-documentation/tenant-governance/tenant-governance-model/governance-model',
+            'hms-documentation/tenant-governance/tenant-manager-management/tenant-manager-management',
             'hms-documentation/tenant-governance/per-tenant-cloning/per-tenant-cloning',
             'hms-documentation/tenant-governance/per-tenant-resource-assignment/resource-assignments',
             {
@@ -563,7 +564,7 @@ const sidebars = {
                 'hms-documentation/admin-apis/tenant-provisioning-grouped-crud',
                 'hms-documentation/admin-apis/tenant-assignments-grouped-crud',
                 'hms-documentation/admin-apis/service-manager-provisioning',
-                'hms-documentation/admin-apis/tenant-admin-candidates-dropdown',
+                'hms-documentation/admin-apis/tenant-manager-candidates',
                 'hms-documentation/admin-apis/dev-seed-tenant',
               ],
             },
