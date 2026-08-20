@@ -209,6 +209,13 @@ const sidebars = {
                 'hms-documentation/minor-implementations/requires-stay-service-flag/frontend-implementation',
               ],
             },
+            {
+              type: 'category',
+              label: 'QA Fixes 2026-08-19',
+              items: [
+                'hms-documentation/minor-implementations/qa-fixes-20260819/qa-fixes-20260819',
+              ],
+            },
           ],
         },
         {
