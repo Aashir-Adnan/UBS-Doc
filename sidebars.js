@@ -223,6 +223,13 @@ const sidebars = {
                 'hms-documentation/minor-implementations/auth-token-flow/auth-token-flow',
               ],
             },
+            {
+              type: 'category',
+              label: 'Apple Pay Integration',
+              items: [
+                'hms-documentation/minor-implementations/apple-pay-integration/apple-pay-integration',
+              ],
+            },
           ],
         },
         {
