@@ -216,6 +216,13 @@ const sidebars = {
                 'hms-documentation/minor-implementations/qa-fixes-20260819/qa-fixes-20260819',
               ],
             },
+            {
+              type: 'category',
+              label: 'Auth Token Flow',
+              items: [
+                'hms-documentation/minor-implementations/auth-token-flow/auth-token-flow',
+              ],
+            },
           ],
         },
         {
