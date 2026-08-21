@@ -141,20 +141,50 @@ POST /api/Login?step=2
 
 ## 2. Using the Access Token
 
-Send the access token in the `accesstoken` header on every authenticated API call:
+### Required headers
+
+Every authenticated API call must include the access token **and** device identification headers:
 
 ```
 GET /api/guest/bookings
 accesstoken: <jwt>
+x-client-platform: ios | android | web
+x-client-device-uuid: <unique device id>
+x-app-version: <app version string>
 ```
+
+| Header | Required | Description |
+|---|---|---|
+| `accesstoken` | Yes | The JWT access token from login |
+| `x-client-platform` | Yes | Platform type: `ios`, `android`, or `web` |
+| `x-client-device-uuid` | Yes | A stable unique identifier for the device (e.g. device UUID on mobile, fingerprint on web) |
+| `x-app-version` | Yes | App or client version string (e.g. `1.0.0`) |
+| `x-client-os` | No | OS name (e.g. `iOS`, `Android`, `Windows`) |
+| `x-client-os-version` | No | OS version (e.g. `17.4`, `14`) |
+| `x-client-device` | No | Device model name (e.g. `iPhone 15`, `Pixel 8`) |
+
+These headers are validated by the `deviceHeadersValidator` middleware. Requests missing `x-client-platform`, `x-client-device-uuid`, or `x-app-version` are rejected with **400**.
+
+### Token validation
 
 The server validates this token on every request by:
 
 1. Verifying the JWT signature and expiry
-2. Checking that the token matches the `device_token` stored in `user_devices` for that device
-3. Confirming the device is still active (`status = 'active'`)
+2. Confirming the user/device pair exists and is active (`status = 'active'`)
 
-If the token is expired, revoked (doesn't match the stored token), or the device is inactive, the server returns **401**.
+When **strict token validation** is enabled (`STRICT_TOKEN_VALIDATION=true` in env):
+
+3. Checking that the token matches the `device_token` stored in `user_devices` for that device — a revoked or replaced token is rejected
+4. Checking that the request's `x-client-platform` matches the `device_type` the token was originally issued to — prevents cross-device token theft (e.g. an iOS token used from a web browser)
+
+| Error message | Cause |
+|---|---|
+| `"Invalid Token"` | JWT signature invalid or token expired |
+| `"Device not found or inactive"` | No active device record for this user/device pair (strict mode) |
+| `"Token has been revoked"` | Token doesn't match the stored `device_token` — it was replaced by login, refresh, or auto-renewal (strict mode) |
+| `"Device mismatch"` | Request platform doesn't match the device type the token was issued to (strict mode) |
+
+Without strict mode (default), only checks 1 and 2 apply — the token just needs a valid signature and not be expired.
 
 ---
 
@@ -189,18 +219,18 @@ On EVERY API response:
   3. Use the new token for all subsequent requests
 ```
 
-**This is critical.** If you ignore the `x-new-accesstoken` header, your next request will use a token that the server has already replaced in the database, and the request will fail with 401.
+**This is critical when strict mode is enabled.** If you ignore the `x-new-accesstoken` header, your next request will use a token that the server has already replaced in the database, and the request will fail with 401 ("Token has been revoked"). Even without strict mode, always store the renewed token — the old one will expire shortly.
 
 ### Timeline example
 
 ```
 0:00  Login → receive access token (expires at 5:00)
 ...
-3:05  GET /api/guest/profile → token has 1:55 left (< 2 min threshold)
-      ← response includes x-new-accesstoken: <new_jwt> (expires at 8:05)
+4:05  GET /api/guest/profile → token has 0:55 left (< 60s threshold = 20% of 5 min)
+      ← response includes x-new-accesstoken: <new_jwt> (expires at 9:05)
       → client stores new token
 ...
-6:00  GET /api/guest/bookings → uses new token (2:05 remaining, no renewal)
+7:00  GET /api/guest/bookings → uses new token (2:05 remaining, no renewal)
       ← normal response
 ...
 ```
@@ -326,7 +356,38 @@ Both the auto-renewal threshold and refresh grace window are always 20% of the a
 
 ---
 
-## 7. Shape Validator Behaviour
+## 7. Strict Token Validation
+
+Controlled by the `STRICT_TOKEN_VALIDATION` env var.
+
+| `STRICT_TOKEN_VALIDATION` | Behaviour |
+|---|---|
+| Not set or `false` (default) | **Lenient** — JWT signature + expiry check only. Any valid, unexpired token passes. |
+| `true` | **Strict** — additionally checks that the token matches the stored `device_token` in the DB, and that the request platform matches the device type. |
+
+### What strict mode prevents
+
+| Attack | Without strict mode | With strict mode |
+|---|---|---|
+| Stolen token used from same platform | Passes until token expires | Passes until token is auto-renewed or refreshed, then immediately rejected ("Token has been revoked") |
+| Stolen token used from different platform (e.g. iOS token on web) | Passes until token expires | Immediately rejected ("Device mismatch") |
+| Token used after user logs in again | Passes until token expires | Immediately rejected ("Token has been revoked" — login overwrites `device_token`) |
+
+### Enabling strict mode
+
+Add to `.env`:
+
+```
+STRICT_TOKEN_VALIDATION=true
+```
+
+**Important:** When enabling strict mode, ensure all clients are:
+1. Sending the required device headers (`x-client-platform`, `x-client-device-uuid`, `x-app-version`) on every request
+2. Persisting the `x-new-accesstoken` header value on every response — ignoring it will cause the next request to fail
+
+---
+
+## 8. Shape Validator Behaviour
 
 The response shape validator does **not** interfere with any auth endpoint:
 
@@ -343,7 +404,7 @@ All token-related keys (`accesstoken`, `refreshToken`, `expiresIn`, `tenantUrddM
 
 ---
 
-## 8. Summary of Response Keys by Endpoint
+## 9. Summary of Response Keys by Endpoint
 
 | Endpoint | `accesstoken` | `access_token` | `refreshToken` | `expiresIn` | `tenantUrddMap` |
 |---|---|---|---|---|---|
