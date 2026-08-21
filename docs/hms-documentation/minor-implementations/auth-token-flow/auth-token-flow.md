@@ -148,7 +148,13 @@ GET /api/guest/bookings
 accesstoken: <jwt>
 ```
 
-The server validates this token on every request. If it is expired or invalid, the server returns **401**.
+The server validates this token on every request by:
+
+1. Verifying the JWT signature and expiry
+2. Checking that the token matches the `device_token` stored in `user_devices` for that device
+3. Confirming the device is still active (`status = 'active'`)
+
+If the token is expired, revoked (doesn't match the stored token), or the device is inactive, the server returns **401**.
 
 ---
 
@@ -161,8 +167,10 @@ The server automatically renews the access token when it is **close to expiry** 
 On every authenticated request, the middleware checks:
 
 ```
-time remaining on access token <= TOKEN_RENEWAL_THRESHOLD_SECONDS (default: 120s / 2 min)
+time remaining on access token <= 20% of ACCESS_TOKEN_SECONDS
 ```
+
+With the default 300s (5 min) lifetime, renewal triggers when 60s or less remain.
 
 If the token is within the renewal window:
 
@@ -206,7 +214,7 @@ When the access token **has expired** and is no longer being auto-renewed (the u
 ### When to use this
 
 - The access token has expired (API calls return 401)
-- The access token expired **less than 60 seconds ago** (grace window)
+- The access token expired within the **grace window** (20% of access token lifetime — 60s with the default 300s TTL)
 - You still have a valid refresh token stored
 
 ### Request
@@ -303,16 +311,18 @@ Making an API call:
 | Setting | Default | Env var to override |
 |---|---|---|
 | Access token lifetime | 300 seconds (5 min) | `ACCESS_TOKEN_SECONDS` |
-| Auto-renewal threshold | 120 seconds (2 min) | `TOKEN_RENEWAL_THRESHOLD_SECONDS` |
+| Auto-renewal threshold | 20% of access token lifetime (60s at default) | Derived — not independently configurable |
 | Refresh token lifetime | 86400 seconds (24 hr) | `GUEST_REFRESH_TOKEN_SECONDS` or `GUEST_REFRESH_TOKEN_DAYS` |
-| Refresh grace window | 60 seconds | Hardcoded in `refreshGuestTokens.js` |
+| Refresh grace window | 20% of access token lifetime (60s at default) | Derived — not independently configurable |
 
 ### What each value means
 
 - **Access token lifetime**: How long the JWT is valid. After this, API calls return 401.
-- **Auto-renewal threshold**: When remaining time on the access token drops below this value, the server auto-generates a new one on the next successful API hit.
+- **Auto-renewal threshold**: Fixed at 20% of the access token lifetime. When remaining time drops below this, the server auto-generates a new token on the next successful API hit.
 - **Refresh token lifetime**: How long the refresh token can be used. After 24 hours, the user must log in again.
-- **Refresh grace window**: After the access token expires, the client has this many seconds to call `/api/auth/refresh`. After the grace window, they must re-login.
+- **Refresh grace window**: Fixed at 20% of the access token lifetime. After the access token expires, the client has this window to call `/api/auth/refresh`. After the grace window, they must re-login.
+
+Both the auto-renewal threshold and refresh grace window are always 20% of the access token lifetime. Changing `ACCESS_TOKEN_SECONDS` automatically adjusts both.
 
 ---
 
