@@ -421,6 +421,7 @@ const sidebars = {
               label: 'Guest Pricing Rules',
               items: [
                 'hms-documentation/guest-apis/guest-pricing-rules/guest-pricing-rules',
+                'hms-documentation/guest-apis/guest-pricing-rules/checkin-date-pricing',
               ],
             },
             {
