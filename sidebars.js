@@ -197,7 +197,7 @@ const sidebars = {
             },
             {
               type: 'category',
-              label: 'Flexible Package Pricing & Booking',
+              label: 'Fetching Package Oriented Pricing',
               items: [
                 'hms-documentation/major-implementations/flexible-package-pricing/flexible-package-pricing',
               ],
