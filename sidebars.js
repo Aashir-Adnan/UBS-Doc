@@ -195,6 +195,13 @@ const sidebars = {
                 'hms-documentation/major-implementations/guest-booking-enhancements/frontend-implementation',
               ],
             },
+            {
+              type: 'category',
+              label: 'Flexible Package Pricing & Booking',
+              items: [
+                'hms-documentation/major-implementations/flexible-package-pricing/flexible-package-pricing',
+              ],
+            },
           ],
         },
         {
