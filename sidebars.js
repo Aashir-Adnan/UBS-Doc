@@ -230,6 +230,13 @@ const sidebars = {
                 'hms-documentation/minor-implementations/apple-pay-integration/apple-pay-integration',
               ],
             },
+            {
+              type: 'category',
+              label: 'File Upload Flow',
+              items: [
+                'hms-documentation/minor-implementations/file-upload-flow/file-upload-flow',
+              ],
+            },
           ],
         },
         {
