@@ -63,8 +63,9 @@ Both endpoints require no auth (no `accesstoken` header needed). Pass `fileType`
 
 ### Step 2 — Upload the File
 
-POST the raw file binary to `uploadUrl`. The request body must be the raw binary (not form data, not JSON).
+The HTTP method and destination depend on the storage backend:
 
+**Local storage — POST to the backend:**
 ```
 POST <uploadUrl>
 Content-Type: image/jpeg
@@ -73,13 +74,25 @@ x-filename: photo.jpg
 <raw binary body>
 ```
 
+The `uploadUrl` points to the backend's `/upload?token=...` endpoint. The request body must be the raw binary — not form data, not JSON.
+
 | Header | Required | Notes |
 |---|---|---|
 | `Content-Type` | Recommended | MIME type of the file (e.g. `image/jpeg`, `application/pdf`). Used to set the correct type in the DB. |
 | `x-filename` | Optional | Original filename including extension. If omitted, the server infers the extension from `Content-Type`. |
 | `Content-Disposition` | Optional | Alternative way to supply the filename: `attachment; filename="photo.jpg"`. |
 
-**Response:**
+**S3 storage — PUT directly to S3:**
+```
+PUT <uploadUrl>
+Content-Type: image/jpeg
+
+<raw binary body>
+```
+
+The `uploadUrl` is a pre-signed S3 `PutObject` URL. The PUT goes directly to S3 — it does not go through the backend. The backend has already created the `attachments` row and reserved the S3 key before returning the URL. `x-filename` and `Content-Disposition` headers are not needed for S3 uploads; the key was determined when the URL was generated.
+
+**Response (local only — S3 responds with an empty 200):**
 ```json
 {
   "success": true,
@@ -90,7 +103,7 @@ x-filename: photo.jpg
 }
 ```
 
-The upload endpoint is a one-time token. Attempting to upload again with the same `uploadToken` returns an error — request a new URL for each file.
+The upload token is single-use. Attempting to upload again with the same token returns an error — request a new URL for each file.
 
 **Error responses:**
 
@@ -132,16 +145,18 @@ Send the image as the `file` field in the form body.
 {
   "success": true,
   "data": {
-    "profile_image_url": "/uploads/guest_profile_images/5_1722000000000_avatar.jpg"
+    "profile_image_url": "/uploads/guest_profile_images/5_1722000000000_avatar.jpg",
+    "attachment_id": 42
   }
 }
 ```
 
 | Field | Description |
 |---|---|
-| `profile_image_url` | A relative server path to the uploaded image. Prepend the API base URL to display it. |
+| `attachment_id` | The attachment record ID. Use this with `GET /api/get/file?attachmentId=42` to retrieve a displayable URL. This is the canonical reference to store and pass around. |
+| `profile_image_url` | A raw server-relative path. Treat this as a fallback only — use `attachment_id` with the standard retrieval endpoint for consistency across local and S3 environments. |
 
-This endpoint also creates an `attachments` row and links it to the user record automatically — no additional step is needed.
+This endpoint creates an `attachments` row and links it to the user record automatically. When displaying the profile image, resolve it via `GET /api/get/file?attachmentId=<attachment_id>` — this ensures the correct URL is returned regardless of which storage backend is active.
 
 ---
 
@@ -203,11 +218,11 @@ The backend storage provider is configured server-side via the `FILE_STORAGE_PRO
 
 ### S3 Upload vs Local Upload
 
-For **local storage**, the `uploadUrl` points to the backend (`/upload?token=...`) and the client does a POST there.
+For **local storage**, the `uploadUrl` points to the backend (`/upload?token=...`) and the client POSTs the raw binary there.
 
-For **S3 storage**, the `uploadUrl` is a **pre-signed S3 PUT URL**. The client PUTs directly to S3 — the request does not go through the backend. The backend has already created the `attachments` row and stored the S3 key before returning the URL.
+For **S3 storage**, the `uploadUrl` is a **pre-signed S3 `PutObject` URL**. The client PUTs the raw binary directly to S3 — the request does not go through the backend. The backend has already created the `attachments` row and stored the S3 key before returning the URL.
 
-This means for S3 uploads, Step 2's request goes to `https://s3.amazonaws.com/...` (or your configured S3 endpoint), not to the API server. The Content-Type and file size limits are governed by S3, not the backend.
+This means for S3 uploads, Step 2's request goes to `https://s3.amazonaws.com/...` (or your configured S3 endpoint), not to the API server. The `Content-Type` and file size limits for that PUT are governed by S3, not the backend. S3 responds with an empty `200 OK` body on success.
 
 ---
 
