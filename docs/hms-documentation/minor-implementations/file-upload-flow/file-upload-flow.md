@@ -4,24 +4,11 @@ sidebar_position: 5
 
 # File Upload Flow — Frontend Integration Guide
 
-This document covers the complete file upload and retrieval flow for the HMS backend. It is written for frontend developers integrating file uploads (profile images, KYC documents, service images, or any attachment).
+This document covers the complete file upload and retrieval flow for the HMS backend. It is written for frontend developers integrating file uploads (profile images, KYC documents, service images, or any other attachment).
 
 ---
 
-## Overview
-
-There are two upload patterns in the system:
-
-| Pattern | Used for | Transport |
-|---|---|---|
-| **Token-based upload** | General-purpose attachments, KYC documents | Two-step: get URL → PUT binary |
-| **Multipart direct upload** | Guest profile image | Single POST with `multipart/form-data` |
-
-Both patterns write to the `attachments` table and return an `attachmentId`. Retrieval always goes through the backend via `attachmentId`.
-
----
-
-## Pattern 1 — Token-Based Upload (Two-Step)
+## Token-Based Upload (Two-Step)
 
 This is the primary framework-level upload pattern. The backend issues a short-lived upload URL and token. The client uploads the raw binary file to that URL. The backend then stores the file and marks the attachment as active.
 
@@ -125,38 +112,6 @@ After a successful upload, pass `attachmentId` to whatever API expects the file 
 ```
 
 The specific field name varies by endpoint — check the endpoint's parameter schema.
-
----
-
-## Pattern 2 — Multipart Direct Upload (Profile Image)
-
-The guest profile image endpoint accepts a standard `multipart/form-data` POST. No pre-upload URL step is required.
-
-```
-POST /api/guest/profile/image
-Content-Type: multipart/form-data
-accesstoken: <jwt>
-```
-
-Send the image as the `file` field in the form body.
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "profile_image_url": "/uploads/guest_profile_images/5_1722000000000_avatar.jpg",
-    "attachment_id": 42
-  }
-}
-```
-
-| Field | Description |
-|---|---|
-| `attachment_id` | The attachment record ID. Use this with `GET /api/get/file?attachmentId=42` to retrieve a displayable URL. This is the canonical reference to store and pass around. |
-| `profile_image_url` | A raw server-relative path. Treat this as a fallback only — use `attachment_id` with the standard retrieval endpoint for consistency across local and S3 environments. |
-
-This endpoint creates an `attachments` row and links it to the user record automatically. When displaying the profile image, resolve it via `GET /api/get/file?attachmentId=<attachment_id>` — this ensures the correct URL is returned regardless of which storage backend is active.
 
 ---
 
