@@ -202,6 +202,14 @@ const sidebars = {
                 'hms-documentation/major-implementations/flexible-package-pricing/flexible-package-pricing',
               ],
             },
+            {
+              type: 'category',
+              label: 'Additional Package Nights',
+              items: [
+                'hms-documentation/major-implementations/additional-package-nights/frontend-integration',
+                'hms-documentation/major-implementations/additional-package-nights/backend-implementation',
+              ],
+            },
           ],
         },
         {
