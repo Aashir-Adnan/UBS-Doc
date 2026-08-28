@@ -11,7 +11,7 @@
 A service can have a different price when booked as part of a specific package. For example:
 > "Spa session is normally 400 SAR. When booked as part of the Wellness Package it's 300 SAR."
 
-The backend resolves these discounts automatically when you pass a `packageId` query parameter. No new response fields are introduced — the existing `basePrice` / `currentPrice` fields carry the discounted values.
+The backend resolves these discounts automatically when you pass a `packageId` query parameter. When a `packageId` is provided, a new `packageSpecificPrice` field is returned alongside the standard pricing fields.
 
 ---
 
@@ -51,14 +51,34 @@ GET /api/guest/services?serviceId=101&packageId=42
 
 ## Response Shape
 
-The response shape is unchanged. `basePrice` and `currentPrice` reflect the package-scoped price when a matching discount has been configured by the admin; otherwise they fall back to the generic price.
+When a `packageId` is passed, three pricing fields are returned:
 
+| Field | Description |
+|-------|-------------|
+| `base_price` | Generic catalog price — no package context, no tenant rules |
+| `current_price` | Package-scoped catalog price **with** tenant pricing rules applied |
+| `packageSpecificPrice` | Package-scoped catalog price **without** tenant pricing rules. `null` when no `packageId` is provided or no package-specific price row exists. |
+
+**With `packageId`** (service is 400 SAR standalone, 300 SAR in this package, tenant rules apply a 5% discount):
 ```json
 {
   "id": 101,
   "name": "Spa Session",
-  "basePrice": 300,
-  "currentPrice": 285,
+  "base_price": 400,
+  "current_price": 285,
+  "packageSpecificPrice": 300,
+  "currency": "SAR"
+}
+```
+
+**Without `packageId`** (generic pricing only):
+```json
+{
+  "id": 101,
+  "name": "Spa Session",
+  "base_price": 400,
+  "current_price": 380,
+  "packageSpecificPrice": null,
   "currency": "SAR"
 }
 ```
@@ -74,7 +94,7 @@ The response shape is unchanged. `basePrice` and `currentPrice` reflect the pack
 | Add-on selector during package booking checkout | Yes |
 | Standalone service detail (not in a package context) | No |
 
-When `packageId` is absent the APIs behave exactly as before, returning generic prices.
+When `packageId` is absent the APIs behave exactly as before — `packageSpecificPrice` will be `null` and only generic prices are returned.
 
 ---
 
