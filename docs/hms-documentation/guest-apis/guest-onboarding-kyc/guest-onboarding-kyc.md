@@ -1,10 +1,24 @@
 # Guest Onboarding KYC
 
-**POST** `/api/guest/onboarding/kyc`
+`/api/guest/onboarding/kyc`
 
-Submits a guest's Know Your Customer (KYC) identity document for verification. Supports passport, national ID, and iqama (Saudi residence permit) documents.
+Submits, retrieves and amends a guest's Know Your Customer (KYC) identity documents. Supports passport, national ID, and iqama (Saudi residence permit) documents.
 
-Images are uploaded separately via the file upload endpoint. This endpoint accepts **attachment IDs** referencing the already-uploaded images.
+Images are uploaded separately via the attachment flow. Every operation here works in **attachment IDs**, never in file bytes.
+
+| Method | Operation | Purpose |
+|---|---|---|
+| `POST` | Add | submit a complete document |
+| `GET` | List / View | read the guest's own documents |
+| `PUT` | Update | replace individual sides of a document, or correct its details |
+
+The guest's identity comes from the access token on every operation, so none of them can be pointed at another guest's records.
+
+:::note Schema-level requirements are not enforced per field
+The parameter schema marks every field optional because the same field list is shared by all
+three operations — a `required` flag would demand a full submission payload on a plain `GET`.
+Requirements are enforced inside each operation instead, exactly as documented below.
+:::
 
 ---
 
@@ -14,9 +28,11 @@ Requires the **AUTH_PLATFORM** (guest JWT). The `userId` is resolved from the au
 
 ---
 
-## Request Payload
+## Submitting a document
 
-Sent as encrypted JSON (standard platform encryption).
+**POST** `/api/guest/onboarding/kyc`
+
+Sent as encrypted JSON (standard platform encryption). Submits a complete document — every side and every detail together.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
@@ -35,7 +51,7 @@ Sent as encrypted JSON (standard platform encryption).
 
 ---
 
-## Valid Document Types
+### Valid Document Types
 
 | Value | Description | `backImageId` Required? |
 |---|---|---|
@@ -47,9 +63,9 @@ The `documentType` field is **case-insensitive** — `"PASSPORT"`, `"Passport"`,
 
 ---
 
-## Examples
+### Examples
 
-### Passport submission
+#### Passport submission
 
 ```json
 {
@@ -65,7 +81,7 @@ The `documentType` field is **case-insensitive** — `"PASSPORT"`, `"Passport"`,
 }
 ```
 
-### National ID submission (with tags)
+#### National ID submission (with tags)
 
 ```json
 {
@@ -85,16 +101,16 @@ The `documentType` field is **case-insensitive** — `"PASSPORT"`, `"Passport"`,
 
 ---
 
-## Behavior
+### Behavior
 
 All attachment IDs are validated against the `attachments` table — they must exist and have `status = 'active'`.
 
-### For `passport`:
+#### For `passport`:
 
 1. Upserts a row in `guest_passport_documents` with passport details and the provided attachment IDs. Uses `user_id` as the idempotency key — resubmitting overwrites the previous passport data.
 2. Syncs `users.passport_number` and `users.date_of_birth`.
 
-### For `national_id` / `iqama`:
+#### For `national_id` / `iqama`:
 
 1. Updates `users` table: `cnic` (document number), `country` (issuing country), `date_of_birth`.
 2. Creates `dynamic_attachments` rows linking the attachment IDs with keys:
@@ -105,9 +121,9 @@ All attachment IDs are validated against the `attachments` table — they must e
 
 ---
 
-## Response
+### Response
 
-### Success (200)
+#### Success (200)
 
 ```json
 {
@@ -121,7 +137,7 @@ All attachment IDs are validated against the `attachments` table — they must e
 | `kyc_status` | `string` | Always `"pending"` on submission. |
 | `submitted_at` | `string` | ISO 8601 timestamp of submission. |
 
-### Error Responses
+#### Error Responses
 
 Error details are returned in `error.details` (not `meta.message`). The `meta.message` field contains a generic user-facing string.
 
@@ -160,7 +176,7 @@ Error details are returned in `error.details` (not `meta.message`). The `meta.me
 
 ---
 
-## Validation Order
+### Validation Order
 
 1. `documentType` must be one of the three allowed values
 2. `fullName`, `documentNumber`, `dateOfBirth`, `expiryDate` must all be non-empty
@@ -168,6 +184,132 @@ Error details are returned in `error.details` (not `meta.message`). The `meta.me
 4. `frontImageId` must be provided and reference an active attachment
 5. `backImageId` must be provided for `national_id` / `iqama` and reference an active attachment
 6. `selfieId` (if provided) must reference an active attachment
+
+---
+
+## Retrieving documents
+
+**GET** `/api/guest/onboarding/kyc`
+
+Returns every active KYC document belonging to the authenticated guest, grouped per document. No request payload is needed — the guest is identified from the token. `?id=` may be supplied and is ignored; it resolves to the same reader.
+
+```json
+{
+  "documents": [
+    {
+      "documentType": "national_id",
+      "verification_status": null,
+      "slots": {
+        "front": {
+          "dynamic_attachment_id": 293,
+          "attachment_id": 1216,
+          "attachment_name": "1216-1783589537280.png",
+          "attachment_type": "image/png",
+          "attachment_size": 20418,
+          "attachment_link": "/api/upload/serve?encryptedRequest=U2FsdGVkX1...",
+          "tags": [],
+          "uploaded_at": "2026-08-20T19:15:32.000Z",
+          "updated_at": "2026-08-20T19:15:32.000Z"
+        },
+        "back": { "...": "same shape" },
+        "selfie": { "...": "same shape" }
+      },
+      "meta": {
+        "full_name": "Ali Khan",
+        "document_number": "1234567890",
+        "issuing_country": "SA",
+        "date_of_birth": "1990-01-01",
+        "expiry_date": null,
+        "nationality": "SA"
+      }
+    }
+  ]
+}
+```
+
+| Field | Description |
+|---|---|
+| `documentType` | `national_id`, `iqama` or `passport`. |
+| `verification_status` | `pending` / `verified` / `rejected` for passports; `null` for national ID and iqama, which have no per-document status store. |
+| `slots` | Present sides only — a document with no selfie simply has no `selfie` key. |
+| `slots.*.attachment_link` | A ready-to-render URL for the image, signed for this guest. See the caveat below. |
+| `meta` | Document details. For national ID / iqama these are read from the `users` row, so `expiry_date` is always `null` — it is not persisted for those types. |
+
+:::caution `attachment_link` is a served URL, not a storage path
+The link points at `GET /api/upload/serve` with an encrypted payload baked into the query string,
+because a browser cannot attach a header to an `<img src>`. Use it verbatim; never build it
+client-side, and never append an attachment id to it. See
+[Attachment Upload & Serve](../../major-implementations/attachment-pipeline/attachment-pipeline.md).
+:::
+
+Only `status = 'active'` rows are returned, so a replaced image disappears from the response as soon as its replacement is stored.
+
+---
+
+## Updating a document
+
+**PUT** `/api/guest/onboarding/kyc`
+
+Replaces **individual sides** of a document, or corrects its details, leaving everything not sent exactly as it was. A guest whose back photo came out blurred can fix that one image without re-submitting the whole document.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `documentType` | `string` | Yes | Which document to amend: `national_id`, `iqama` or `passport`. |
+| `frontImageId` | `number` | No | New attachment ID for the front image. |
+| `backImageId` | `number` | No | New attachment ID for the back image. |
+| `selfieId` | `number` | No | New attachment ID for the selfie. |
+| `fullName` | `string` | No | Corrected name. |
+| `documentNumber` | `string` | No | Corrected document number. |
+| `issuingCountry` | `string` | No | Corrected 2-letter ISO country code. |
+| `dateOfBirth` | `string` | No | Corrected date of birth, `YYYY-MM-DD`. |
+| `expiryDate` | `string` | No | Corrected expiry date, `YYYY-MM-DD`. Passport only. |
+| `tags` | `string[]` | No | Tags applied to newly created attachment links. |
+
+**At least one** image id or detail field must be sent.
+
+```json
+{
+  "documentType": "national_id",
+  "backImageId": 1300
+}
+```
+
+```json
+{
+  "documentType": "national_id",
+  "updated_slots": ["back"],
+  "updated_fields": [],
+  "kyc_status": "pending",
+  "updated_at": "2026-08-28T09:12:44.180Z"
+}
+```
+
+### Behaviour
+
+**`national_id` / `iqama`** — for each slot sent, the current active `dynamic_attachments` row for that slot is set to `inactive` and a new active row is inserted. History is preserved, and slots that were not sent keep their existing rows untouched. Detail fields update the matching `users` columns only.
+
+**`passport`** — the single `guest_passport_documents` row is updated with only the columns actually supplied. Sending just `frontImageId` changes only that column; every other field keeps its value.
+
+:::warning Every update re-opens verification
+`verification_status` returns to `pending` on any change. An image or a document number that has
+just changed has not been checked by anyone.
+:::
+
+### Ownership
+
+Every attachment id sent must belong to the requesting guest — matched by **user**, so an image uploaded from any of their hotel sessions is accepted. Pointing at another user's attachment id is refused with `403`, which is what stops a guest attaching someone else's photo to their own record.
+
+### Error Responses
+
+| Status | `error.details` | Condition |
+|---|---|---|
+| 400 | `Invalid documentType` | Not `national_id`, `iqama` or `passport`. |
+| 400 | `Send at least one of frontImageId, backImageId, selfieId, or a metadata field to update` | Nothing to change. |
+| 400 | `<field> must be a valid attachment id` | A non-numeric or non-positive attachment id. |
+| 401 | `Guest identity could not be resolved` | No `userId` on the session. |
+| 403 | `<field>: this attachment does not belong to you` | The attachment belongs to another user. |
+| 404 | `<field>: attachment not found` | Unknown or inactive attachment. |
+| 404 | `No passport document to update — submit one first` | `PUT` with `documentType: "passport"` before any passport was submitted. |
 
 ---
 
@@ -205,29 +347,30 @@ Primary key: `guest_passport_document_id` (auto-increment). Upsert uses `idempot
 
 ---
 
-## Known Issue — Attachment Upload Status (Issue #236)
-
-:::caution Resolved
-The two-step attachment upload flow (`GET /api/get/file/url/local` → `POST /upload?token=…`) creates rows with `status = 'pending'` and the upload handler never transitions them to `'active'`. Because `validateAttachment` queries `WHERE status = 'active'`, freshly uploaded attachments are rejected with `"attachment not found"`.
-
-**Root cause:** `Src/Routes/upload.router.js` line 56 — the `UPDATE` sets `attachment_name`, `attachment_type`, `attachment_size`, and `attachment_link` but omits `status = 'active'`.
-
-**Fix:** Add `status = 'active'` to the upload router's UPDATE statement.
-:::
-
----
-
 ## Attachment Upload Flow (prerequisite)
 
-Before submitting KYC, the client must upload each image through the two-step attachment flow:
+Before submitting or updating KYC, each image must be uploaded through the two-step attachment flow. Both steps are platform-encrypted like every other endpoint.
 
 | Step | Call | Returns |
 |------|------|---------|
-| 1. Reserve | `GET /api/get/file/url/local` | `{ uploadUrl, attachmentId }` |
-| 2. Upload | `POST {uploadUrl}` — raw bytes with `Content-Type: image/…` | `{ success, data: { name, attachmentId } }` |
+| 1. Reserve | `GET /api/get/file/url/local?step=1` | `attachmentId` — an empty slot |
+| 2. Upload | `POST /api/upload/file` — the file in a multipart part named `file`, with `attachmentId` and `actionPerformerURDD` in the encrypted payload | `attachmentId`, `name`, `type`, `size` |
 
-The `attachmentId` returned in step 1 is the value passed to `frontImageId`, `backImageId`, or `selfieId` in the KYC payload.
+The `attachmentId` from step 1 is the value passed to `frontImageId`, `backImageId` or `selfieId` here.
 
-### Sim test
+:::caution An attachment slot can be filled only once
+Re-uploading to an id that already holds a file is refused with `409`. To replace an image,
+reserve a **new** id and send that to `PUT`. This is why the update endpoint takes attachment
+ids rather than files.
+:::
 
-The test script at `Services/SysScripts/TestScripts/sim/guestOnboardingKyc.js` exercises the full flow end-to-end: uploads three images via the real attachment API, verifies each DB row, then runs all KYC validation and submission tests. Run `guestOtpFlow.js` first to populate `credentials.json`.
+Full details — encryption, ownership rules, storage providers and error codes — are in
+[Attachment Upload & Serve](../../major-implementations/attachment-pipeline/attachment-pipeline.md).
+
+---
+
+## Tests
+
+`Services/SysScripts/TestScripts/sim/guestOnboardingKyc.js` exercises the submission flow end-to-end: uploads three images via the real attachment API, verifies each DB row, then runs all KYC validation and submission tests. Run `guestOtpFlow.js` first to populate `credentials.json`.
+
+`Services/SysScripts/TestScripts/fileFlowEdgeCases.test.js` covers the attachment endpoints these operations depend on, across every storage provider.

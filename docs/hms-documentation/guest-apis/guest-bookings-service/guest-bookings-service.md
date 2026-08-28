@@ -62,6 +62,11 @@ The `slot` field is optional. When provided, `scheduled_start` and `scheduled_en
 
 ### Example: Transport booking
 
+Pickup and drop-off are chosen from the dropdown options the service detail returns for
+`guest_pickup_location` / `guest_dropoff_location` (see
+[Transport Pickup / Drop-off](#transport-pickup--drop-off-locations) below). Send the option's
+`value`:
+
 ```json
 {
   "actionPerformerURDD": 16,
@@ -69,12 +74,37 @@ The `slot` field is optional. When provided, `scheduled_start` and `scheduled_en
   "transport": {
     "tripType": "airport_pickup",
     "pickupDateTime": "2026-07-02 14:00:00",
-    "pickupLocation": "King Abdulaziz International Airport",
-    "dropoffLocation": "Hotel Main Entrance",
     "passengers": 2
+  },
+  "formData": {
+    "guest_pickup_location": "59871",
+    "guest_dropoff_location": "59872"
   }
 }
 ```
+
+`"59871"` is the option's `value` — the `hms_config.id` of the row holding that stop, exactly as a
+normal dropdown submits an `hms_config_possible_values.id`. Treat it as opaque; take it from the
+service detail response.
+
+Sending the whole option (or its `form` object) instead of the scalar works identically:
+
+```json
+{
+  "formData": {
+    "guest_pickup_location": {
+      "hms_config_id": 59871,
+      "order": 1,
+      "location_name": { "en": "Leamridian Hotel", "ar": "" },
+      "location_latitude": "31.480369",
+      "location_longitude": "74.369286"
+    }
+  }
+}
+```
+
+The legacy shape — `transport.pickupLocation` / `transport.dropoffLocation` as free text — is
+still accepted and is back-filled into the two `formData` keys, so existing clients keep working.
 
 ### Example: Kids Center session
 
@@ -186,19 +216,23 @@ A common mistake is placing `sessions`, `meals`, or `transport` inside `formData
 7. Validates category-specific rules:
    - **Kids Center** (category_id=6): Guardian name/phone required if `guardian_rule` is set. Age bracket validation.
    - **Spa** (category_id=3): Guardian consent required for certain age brackets.
-8. Validates guest-supplied `formData` against category-12 required fields.
-9. Gets catalog price for the service. Multiplies by `quantity` for the initial total.
-10. Inserts `bookings` row with `booking_type='individual_service'`.
-11. Inserts `booking_services` row + `booking_service_slots` rows for the primary service:
+8. Resolves `formData.guest_pickup_location` / `guest_dropoff_location` against the service's
+   configured `pickup_locations` / `dropoff_locations`, expanding the submitted value into the
+   full location form entry. Back-fills them from `transport.pickupLocation` /
+   `transport.dropoffLocation` first when absent.
+9. Validates guest-supplied `formData` against category-12 required fields.
+10. Gets catalog price for the service. Multiplies by `quantity` for the initial total.
+11. Inserts `bookings` row with `booking_type='individual_service'`.
+12. Inserts `booking_services` row + `booking_service_slots` rows for the primary service:
     - **Dining/room-service**: One slot per meal with `meal_type` form value.
-    - **Transport**: Single slot with `trip_type`, `pickup_location`, `dropoff_location` form values.
+    - **Transport**: Single slot with `trip_type`, `pickup_location`, `dropoff_location`, `guest_pickup_location`, `guest_dropoff_location` form values.
     - **Other (spa, barber, gym, etc.)**: One slot per session entry.
     - **No scheduling provided**: Single unscheduled slot.
-12. If `addons` provided, inserts additional `booking_services` + slots for each addon.
-13. Recomputes `total_amount` from all `booking_services` rows.
-14. Stores guest form values in `hms_config`.
-15. Awards loyalty points based on tenant's `loyalty_earn_rate`.
-16. Returns the full v2 booking bundle (same shape as all other booking endpoints).
+13. If `addons` provided, inserts additional `booking_services` + slots for each addon.
+14. Recomputes `total_amount` from all `booking_services` rows.
+15. Stores guest form values in `hms_config`.
+16. Awards loyalty points based on tenant's `loyalty_earn_rate`.
+17. Returns the full v2 booking bundle (same shape as all other booking endpoints).
 
 ---
 
@@ -418,7 +452,7 @@ Only services where `standaloneBookable: true` in the service catalog (`GET /gue
 | Category | Scheduling Field | Slot Shape | Form Values Stored |
 |---|---|---|---|
 | Dining / Room Service | `meals[]` | `{ date, mealType, slot? }` → one slot per meal. `slot` (`"HH:MM-HH:MM"`) sets `scheduled_start`/`scheduled_end` as full datetimes. | `meal_type` |
-| Transport | `transport` | `{ pickupDateTime, tripType, ... }` → single slot | `trip_type`, `pickup_location`, `dropoff_location`, `passengers` |
+| Transport | `transport` | `{ pickupDateTime, tripType, ... }` → single slot | `trip_type`, `pickup_location`, `dropoff_location`, `guest_pickup_location`, `guest_dropoff_location`, `passengers` |
 | Spa / Barber / Gym / Other | `sessions[]` | `{ date, slot:"HH:MM-HH:MM" }` → one slot per session | None |
 | Any (no scheduling) | None | Single unscheduled slot | None |
 
@@ -535,10 +569,121 @@ node Services/SysScripts/TestScripts/sim/guestServiceBookingCheckInOut.js
 
 ---
 
+## Transport Pickup / Drop-off Locations
+
+:::info Added 2026-08-27
+Transport pickup and drop-off moved from free text to a per-service dropdown.
+:::
+
+### Where the options come from
+
+A hotel admin configures the stops on the **service** itself, via the `location_form` config keys
+`pickup_locations` and `dropoff_locations`. Each entry is
+`{ order, location_name, location_latitude, location_longitude }`.
+
+`GET /guest/services?serviceId=<id>` turns those entries into options on the two category-12
+dropdown keys, so the client never reads the raw config:
+
+| Guest form key | Options sourced from |
+|---|---|
+| `guest_pickup_location` | the service's `pickup_locations` |
+| `guest_dropoff_location` | the service's `dropoff_locations` |
+
+Both keys are `isRequired: true` and apply to the **transport** category only. Full option shape
+is documented in [Guest Services](../guest-services/guest-services.md#per-service-dropdown-options--transport-pickup--drop-off).
+
+### What to submit
+
+Put the value in `formData`. Four forms are accepted:
+
+| Submitted | Resolved to |
+|---|---|
+| The option's `value` — `"59871"` | that exact location's full form entry |
+| The whole option object | same — matched on its `value` |
+| The option's `form` object | same — matched on `hms_config_id` |
+| A bare location name — `"Leamridian Hotel"` | that location, **only if the name is unique** on the service (matched against the option's English label) |
+
+The option `value` is the `hms_config.id` of the row holding that location. A multi-value config is
+stored one row per entity, so that id addresses one stop the way an `hms_config_possible_values.id`
+addresses one option for every other dropdown. Prefer it: it is the only form that stays
+unambiguous when two stops share a name.
+
+The last row is the legacy path, kept so clients that still send free text keep working. It
+resolves only on an **unambiguous** match — if two stops share the name there is no way to tell
+which was meant, so the raw string is stored rather than silently attributed to the first one.
+
+A value matching no configured location is also stored as-is rather than rejected: a transport
+service whose admin has not yet filled in `pickup_locations` returns the field with **no
+options**, and the legacy free-text `transport.pickupLocation` accepted arbitrary names.
+Required-ness is still enforced — a missing value is a `400`.
+
+### What gets stored
+
+Two places, both under `hms_config` with `config_key='form_values'`:
+
+**Booking level** (`base_table='bookings'`, `record_id=<booking_id>`) — the resolved value is
+stored **as the form**, not flattened to its label:
+
+```json
+{
+  "guest_pickup_location": {
+    "hms_config_id": 59871,
+    "order": 1,
+    "location_name": { "en": "Leamridian Hotel", "ar": "" },
+    "location_latitude": "31.480369",
+    "location_longitude": "74.369286"
+  },
+  "guest_dropoff_location": {
+    "hms_config_id": 59872,
+    "order": 2,
+    "location_name": { "en": "Hotel", "ar": "" },
+    "location_latitude": "32.5204",
+    "location_longitude": "75.3587"
+  }
+}
+```
+
+`hms_config_id` is what makes the stored answer traceable: it names the `hms_config` row the guest
+actually chose — the same role a possible-value id plays for every other dropdown.
+
+`location_name` is stored **verbatim as the admin entered it**, so it is normally a bilingual
+`{en, ar}` object rather than a string. The scalar `pickup_location` / `dropoff_location` keys
+below carry the plain English name for readers that want a string. The rest of the object is
+a snapshot taken at booking time, so a later admin edit never rewrites history — the booking keeps
+the name and coordinates it was made with, and the provenance pair says where they came from.
+
+**Slot level** (`base_table='booking_service_slots'`, `record_id=<slot_id>`) — the same objects,
+alongside the pre-existing scalar keys, which stay populated with the location name:
+
+```json
+{
+  "trip_type": "airport_pickup",
+  "pickup_location": "Leamridian Hotel",
+  "dropoff_location": "Hotel",
+  "guest_pickup_location": { "hms_config_id": 59871, "order": 1, "location_name": { "en": "Leamridian Hotel", "ar": "" }, "location_latitude": "31.480369", "location_longitude": "74.369286" },
+  "guest_dropoff_location": { "hms_config_id": 59872, "order": 2, "location_name": { "en": "Hotel", "ar": "" }, "location_latitude": "32.5204", "location_longitude": "75.3587" },
+  "passengers": 2
+}
+```
+
+`pickup_location` / `dropoff_location` are kept so that booking bundles, the `slots.items`
+response block, and the admin screens keep reading the same scalar they always have. Anything
+needing coordinates should read the `guest_*_location` objects.
+
+### Applies to addons too
+
+The same resolution runs for services added through
+[`POST /guest/bookings/services`](./add-services-to-booking.md). An addon may carry the locations
+as `addon.transport.guest_pickup_location`, `addon.transport.pickupLocation`, or
+`addon.guestPickupLocation` — all three resolve identically.
+
+---
+
 ## Change Log
 
 | Date | Change |
 |---|---|
+| 2026-08-27 | Transport pickup/drop-off moved to the per-service dropdowns `guest_pickup_location` / `guest_dropoff_location` in `formData`. The option value is the `hms_config.id` of the row holding that location, addressing the source row the way a possible-value id does. Submitted values are resolved against the service's configured locations and stored as the full location form entry — stamped with `hms_config_id` — at both booking and slot level. The legacy `transport.pickupLocation` / `dropoffLocation` fields and the scalar `pickup_location` / `dropoff_location` slot form values are both retained; a bare location name resolves only when unambiguous. |
 | 2026-07-13 | Response now includes `downPayment` object (20% of total). Booking confirmation email moved to after first successful payment. See [Add Services to Booking](./add-services-to-booking.md) for full addon + payment flow. |
 | 2026-08-13 | Added top-level `slots` object to standalone service booking responses. Contains `type` (`"meals"`, `"sessions"`, or `"transport"`) and `items` (the scheduled slot entries). Previously, primary service slots were only stored in the DB but not returned in the response. Also: dining/room-service `meals[]` now accepts optional `slot` field (`"HH:MM-HH:MM"`) — when provided, `booking_service_slots.scheduled_start` and `scheduled_end` are stored as full datetimes. `children` field now accepted and stored. |
 | 2026-06-14 | Added `quantity` parameter for multi-quantity service bookings. Price = unit price × quantity. Controlled by `max_quantity_per_booking` hms_config key (default: 1). Quantity > provided scheduling entries creates remaining slots as unscheduled. |

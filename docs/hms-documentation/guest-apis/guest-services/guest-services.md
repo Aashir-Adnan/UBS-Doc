@@ -299,6 +299,116 @@ Possible value JSON supports three shapes:
 - `{"label": {"en": "Stay", "ar": "إقامة"}, "key": "stay"}` — value = `key` string
 - Plain string — value = the string itself
 
+#### Per-Service Dropdown Options — Transport Pickup / Drop-off
+
+Two dropdown fields are special: **`guest_pickup_location`** and **`guest_dropoff_location`**.
+
+Every other dropdown draws its options from `hms_config_possible_values`, which are shared by
+every service in a category. Pickup and drop-off stops are not shareable — they differ per
+service — so these two keys carry **no possible values at all**. Their options come from the
+service's own configuration instead:
+
+| Guest form key | Source config on the service |
+|---|---|
+| `guest_pickup_location` | `pickup_locations` |
+| `guest_dropoff_location` | `dropoff_locations` |
+
+`pickup_locations` / `dropoff_locations` are multi-value `location_form` config keys
+(`hms_config_keys` category `service_details`) that a hotel admin fills in per transport service.
+Each entry has `order`, `location_name`, `location_latitude`, `location_longitude`.
+
+A multi-value config is stored as **one `hms_config` row per entity**, each holding a bare JSON
+object, so a service with three pickup stops has three `pickup_locations` rows. The backend reads
+those rows, emits one option per row, and sorts by the admin's `order`.
+
+Both keys apply to the **transport** category only, so these fields appear only on transport
+services. They are `isRequired: true`.
+
+Option shape — the usual `{value, label}` plus a `form` object:
+
+```json
+{
+  "key": "guest_pickup_location",
+  "label": "Guest Pickup Location",
+  "type": "dropdown",
+  "isRequired": true,
+  "autoDerivable": false,
+  "options": [
+    {
+      "value": "59871",
+      "label": { "en": "Leamridian Hotel", "ar": "Leamridian Hotel" },
+      "form": {
+        "hms_config_id": 59871,
+        "order": 1,
+        "location_name": { "en": "Leamridian Hotel", "ar": "" },
+        "location_latitude": "31.480369",
+        "location_longitude": "74.369286"
+      }
+    },
+    {
+      "value": "59879",
+      "label": { "en": "Jeddah Airport T1", "ar": "Jeddah Airport T1" },
+      "form": {
+        "hms_config_id": 59879,
+        "order": 2,
+        "location_name": { "en": "Jeddah Airport T1", "ar": "" },
+        "location_latitude": "21.6796",
+        "location_longitude": "39.1565"
+      }
+    }
+  ]
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `value` | `string` | The `hms_config.id` of the row holding this location. See below. |
+| `label.en` / `label.ar` | `string` | **Always plain strings — render these.** Resolved from the configured `location_name`; `ar` falls back to `en` when no Arabic was entered. |
+| `form` | `object` | **These two keys only.** The location entry exactly as the admin stored it. |
+| `form.hms_config_id` | `number` | The `hms_config.id` of the row holding this location — the same id as `value`, as a number. |
+| `form.location_name` | `object\|string` | **Verbatim admin value, not a display string.** Usually a bilingual `{en, ar}` object (these keys are `is_input = 1`, so free text goes through the multilingual path); a bare string on legacy rows. Render `label` instead — stringifying this yields `"[object Object]"`. |
+| `form.order`, `form.location_latitude`, `form.location_longitude` | — | The rest of the `location_form` entry. |
+
+#### The `value` format
+
+Every other dropdown submits an `hms_config_possible_values.id`, so the stored answer always
+points back at the row it came from. These two keys have no possible values, but they keep that
+contract exactly: **`value` is the `hms_config.id` of the row holding that location.**
+
+That works because a multi-value config is stored one row per entity — the row id addresses a
+single stop the same way a possible-value id addresses a single option. `form.hms_config_id`
+repeats it as a number, so an option round-tripped through the client is still self-describing.
+
+The field is named `hms_config_id` for the table it comes from. Do not confuse it with `config_id`
+elsewhere in this schema: `hms_config_possible_values.config_id` is a config **key** id, and this
+is not that.
+
+Consequences worth knowing:
+
+- **Treat `value` as opaque.** Render `label`, submit `value`.
+- **Two stops may share a name** and both appear as distinct options, because their row ids
+  differ. Earlier drafts used the location name as the value and silently collapsed them.
+- **The value survives an admin rename** — and a reorder, and the deletion of a *different* stop.
+  It stops resolving only when that stop itself is deleted, which is correct. Bookings store the
+  resolved snapshot, so historical records keep the name and coordinates they were made with
+  regardless.
+- **Render `label`, never `form.location_name`.** The latter is the raw admin value and is
+  normally a `{en, ar}` object.
+
+**Client guidance**
+
+- Render these like any other dropdown — submit `value`, display `label`.
+- Submit the scalar `value`, the whole option, or its `form` object in `formData`. All three
+  resolve to the same stored result (see
+  [Guest Bookings Service](../guest-bookings-service/guest-bookings-service.md)).
+- Use `form.location_latitude` / `form.location_longitude` for maps — no extra request needed.
+- **`options` may be absent.** A transport service whose admin has not yet filled in
+  `pickup_locations` / `dropoff_locations` returns the field with no `options` array, even
+  though `isRequired` is `true`. Fall back to a free-text input in that case: the backend
+  accepts an arbitrary string and stores it as-is.
+- Options are **per service**. Do not cache them by category — two transport services in the
+  same category have different stops.
+
 **Auto-derivable fields** (`autoDerivable: true`) are fields the server can fill automatically from the guest's profile or the request context. The client should not require the guest to manually enter these. The auto-derivable keys are: `full_name`, `email`, `phone`, `party_size`, `reservation_date`, `meal_type`.
 
 ### Response Field Reference
@@ -347,6 +457,7 @@ Possible value JSON supports three shapes:
 | `formSchema[].isRequired` | `boolean` | Detail | Whether the field is required for booking. |
 | `formSchema[].autoDerivable` | `boolean` | Detail | Whether the server can auto-fill this field from the guest profile. |
 | `formSchema[].options` | `array\|undefined` | Detail | Dropdown options (only for `type: "dropdown"` fields with configured possible values). |
+| `formSchema[].options[].form` | `object\|undefined` | Detail | Only on `guest_pickup_location` / `guest_dropoff_location`. The location entry as stored (`hms_config_id`, `order`, `location_name`, `location_latitude`, `location_longitude`). `location_name` is the verbatim admin value — usually a bilingual `{en, ar}` object; render `label` for display. |
 
 ---
 
@@ -450,6 +561,7 @@ node Services/SysScripts/TestScripts/sim/guestDataAuditAndSeed.js
 
 | Date | Change |
 |---|---|
+| 2026-08-27 | Transport services now return per-service options on the `guest_pickup_location` / `guest_dropoff_location` dropdowns, sourced from that service's `pickup_locations` / `dropoff_locations` `location_form` config instead of from shared possible values. Option `value` is the `hms_config.id` of the row holding that location, addressing the source row the way a possible-value id does; `form` carries the location's coordinates and its `hms_config_id`; `label` is the plain-string display pair (the raw `form.location_name` is the admin's bilingual object). Options are absent when the admin has not configured any locations. |
 | 2026-06-11 | Added `maxAdults`, `maxChildren`, `minAdults`, `minNights`, `maxNights`, `sessionDurationMinutes` to the detail response field reference. `maxAdults` and `maxChildren` use the new dedicated config keys, falling back to `max_persons_per_booking` and `max_children_per_guardian` respectively. |
 | 2026-06-10 | `formSchema` is now always `[]` (never undefined) on detail objects when a category has no form fields. Previously only attached when non-empty. |
 | 2026-06-10 | `fetchFormSchema` dropdown resolution now falls back to `hms_config_possible_values.config_id` FK when `hms_config_keys.possible_values` column is NULL or has no entries for the requested category. Also handles bilingual label + key possible value shape. |
