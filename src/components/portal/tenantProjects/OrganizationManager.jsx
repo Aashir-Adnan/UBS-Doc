@@ -446,7 +446,7 @@ function CreateJoinPanel({ email, onDone }) {
   );
 }
 
-function SettingsPanel({ email, org, onDone }) {
+function SettingsPanel({ email, actionPerformerURDD, org, onDone }) {
   const [name, setName] = useState(org?.organization_name || '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -465,7 +465,7 @@ function SettingsPanel({ email, org, onDone }) {
     if (name.trim() === org.organization_name) { setError('Name is unchanged.'); return; }
     try {
       setSubmitting(true);
-      await updateOrganization(email, org.id, name.trim());
+      await updateOrganization(actionPerformerURDD, org.id, name.trim());
       setSuccess('Organization renamed successfully.');
       dispatch(fetchUserUrdds(email));
       if (onDone) onDone();
@@ -491,7 +491,7 @@ function SettingsPanel({ email, org, onDone }) {
   );
 }
 
-function MembersPanel({ email, org }) {
+function MembersPanel({ actionPerformerURDD, org }) {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [memberEmail, setMemberEmail] = useState('');
@@ -503,7 +503,7 @@ function MembersPanel({ email, org }) {
     if (!org) return;
     try {
       setLoading(true);
-      const res = await getOrgMembers(email, org.id);
+      const res = await getOrgMembers(actionPerformerURDD, org.id);
       setMembers(Array.isArray(res?.members) ? res.members : []);
     } catch {
       // Silently fail — user may not have permissions
@@ -521,7 +521,7 @@ function MembersPanel({ email, org }) {
     if (!memberEmail.trim()) { setError('Enter the member\'s email address.'); return; }
     try {
       setAdding(true);
-      const res = await addOrgMember(email, org.id, memberEmail.trim());
+      const res = await addOrgMember(actionPerformerURDD, org.id, memberEmail.trim());
       if (res.already_member) {
         setSuccess(`${memberEmail.trim()} is already a member of this organization.`);
       } else {
@@ -613,7 +613,7 @@ function PermissionsPanel() {
   );
 }
 
-function ReposPanel({ email, org }) {
+function ReposPanel({ actionPerformerURDD, org }) {
   const [repos, setRepos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(null);
@@ -624,7 +624,7 @@ function ReposPanel({ email, org }) {
     if (!org) return;
     try {
       setLoading(true);
-      const res = await getOrgRepos(email, org.id);
+      const res = await getOrgRepos(actionPerformerURDD, org.id);
       setRepos(Array.isArray(res?.all) ? res.all : []);
     } catch {
       setError('Could not load repositories.');
@@ -640,7 +640,7 @@ function ReposPanel({ email, org }) {
     setSuccess(null);
     try {
       setAdding(repoId);
-      const res = await addRepoToOrg(email, org.id, repoId);
+      const res = await addRepoToOrg(actionPerformerURDD, org.id, repoId);
       setSuccess(`"${res.repo_name}" added to organization.`);
       await loadRepos();
     } catch (err) {
@@ -731,6 +731,13 @@ export default function OrganizationManager({ email, onOrgChanged }) {
   const selectedOrg = ownedOrgs.find((o) => o.id === selectedOrgId) || ownedOrgs[0] || null;
   const ownerPanel = tab === 'settings' || tab === 'members' || tab === 'repos';
 
+  // The org-management endpoints authorize by the caller's URDD IN the org being
+  // managed. Resolve it from the switcher's URDD list (tenant_id === org id).
+  const urdds = useSelector((s) => s.org.urdds) || [];
+  const selectedActingUrdd = selectedOrg
+    ? (urdds.find((u) => Number(u.tenant_id) === Number(selectedOrg.id))?.urdd_id ?? null)
+    : null;
+
   if (loading) return <p className="tenant-muted">Loading organization info...</p>;
 
   return (
@@ -766,9 +773,9 @@ export default function OrganizationManager({ email, onOrgChanged }) {
 
       <div className="portal-card">
         {tab === 'org' && <CreateJoinPanel email={email} onDone={() => { loadOrg(); if (onOrgChanged) onOrgChanged(); }} />}
-        {tab === 'settings' && <SettingsPanel email={email} org={selectedOrg} onDone={loadOrg} />}
-        {tab === 'members' && <MembersPanel email={email} org={selectedOrg} />}
-        {tab === 'repos' && <ReposPanel email={email} org={selectedOrg} />}
+        {tab === 'settings' && <SettingsPanel email={email} actionPerformerURDD={selectedActingUrdd} org={selectedOrg} onDone={loadOrg} />}
+        {tab === 'members' && <MembersPanel actionPerformerURDD={selectedActingUrdd} org={selectedOrg} />}
+        {tab === 'repos' && <ReposPanel actionPerformerURDD={selectedActingUrdd} org={selectedOrg} />}
         {tab === 'permissions' && <PermissionsPanel />}
       </div>
     </div>
