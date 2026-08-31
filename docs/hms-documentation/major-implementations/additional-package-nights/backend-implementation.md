@@ -21,7 +21,7 @@ All 4 keys target `packages` in `hms_config_keys` and are scoped per package via
 | `additional_package_nights_price_discount_value` | text (number) | `"10"` | Discount amount applied to the per-night rate for extra nights. |
 | `additional_package_nights_price_discount_type` | text (enum) | `"percentage"` | Either `"percentage"` or `"flat"`. |
 
-**Migration:** `data/migrations/20260827_1_add_additional_package_nights_config_keys.sql` — 4 idempotent `INSERT ... WHERE NOT EXISTS` statements.
+**Migration:** `data/migrations_completed/20260827_1_add_additional_package_nights_config_keys.sql` — 4 idempotent `INSERT ... WHERE NOT EXISTS` statements.
 
 ---
 
@@ -241,7 +241,7 @@ The test inserts temporary `hms_config` rows for setup and cleans up all created
 
 | File | Change |
 |---|---|
-| `data/migrations/20260827_1_add_additional_package_nights_config_keys.sql` | 4 new config keys |
+| `data/migrations_completed/20260827_1_add_additional_package_nights_config_keys.sql` | 4 new config keys |
 | `Src/HelperFunctions/Guest/v2/catalogPricing.js` | `validateExtraNights` helper + `computeBookingPricing` extension |
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/createPackageBooking.js` | Import + validation gate (entries + non-entries) |
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/editBooking.js` | Import + relaxed divisibility check |

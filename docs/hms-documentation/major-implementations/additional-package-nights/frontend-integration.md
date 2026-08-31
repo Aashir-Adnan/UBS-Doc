@@ -22,7 +22,7 @@ The backend handles all validation and pricing. The frontend needs to:
 
 ## New Fields on the Package Detail Object
 
-When you call `GET /api/guest/packages/:id`, the response now includes these additional config fields that the frontend should read. These fields are **only present when the admin has configured additional nights for the package**.
+When you call `GET /api/guest/packages?packageId=N`, the response now includes these additional config fields that the frontend should read. These fields are **only present when the admin has configured additional nights for the package**.
 
 ### Where to source them
 

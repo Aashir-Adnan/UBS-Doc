@@ -140,6 +140,10 @@ Returns a single package object with all list fields plus:
   },
   "termsAndConditions": { "en": "Non-refundable after check-in.", "ar": "" },
   "maxQuantityPerBooking": 5,
+  "additionalNightsAllowed": true,
+  "maxAdditionalNights": 3,
+  "additionalNightsDiscountValue": 10,
+  "additionalNightsDiscountType": "percentage",
   "additional_attributes": {
     "tags": [{ "en": "Romantic", "ar": "رومانسي" }]
   },
@@ -235,6 +239,10 @@ Returns a single package object with all list fields plus:
 | `allowedCheckInDays` | `string[]\|null` | Detail | Weekdays guests may check in (e.g. `["fri","sat"]`). `null` = any day. |
 | `is_featured` | `boolean` | Both | Whether the package is featured. |
 | `maxQuantityPerBooking` | `number` | Detail | Maximum bookable quantity per reservation. |
+| `additionalNightsAllowed` | `boolean` | Detail | Whether guests may book extra nights beyond the package duration. |
+| `maxAdditionalNights` | `number\|null` | Detail | Maximum extra nights permitted when `additionalNightsAllowed` is `true`. `null` = no cap. |
+| `additionalNightsDiscountValue` | `number\|null` | Detail | Discount applied per extra night (value; see `additionalNightsDiscountType`). |
+| `additionalNightsDiscountType` | `string` | Detail | How the discount is applied: `"percentage"` (% off per-night rate) or `"flat"` (fixed amount off per night). |
 | `cancellation_info` | `object` | Both | Cancellation margin and exceptions (bilingual). |
 | `termsAndConditions` | `object` | Both | Terms and conditions (bilingual). |
 | `additional_attributes.tags` | `array` | Both | Keyword tags, each `{ en, ar }`. |
