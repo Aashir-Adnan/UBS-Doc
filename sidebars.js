@@ -665,6 +665,13 @@ const sidebars = {
                 'projects/badar-hms/v4/OPERA_PMS_Integration_Solutions_v4'              
               ]
             },
+            {
+              type: 'category',
+              label: 'Questionairre For Client',
+              items: [
+                'projects/badar-hms/questionnaire/questionnaire_for_client'              
+              ]
+            },
             'projects/badar-hms/Opera_Config',
           ]
         }
