@@ -63,6 +63,14 @@
 > `audit_logs`), while **`hms_tenants_config` is `tenant`** — the hotel-facing counterpart of the
 > framework-tier `hms_config` catalogue, so a Tenant Admin owns it. Who receives them is covered
 > in the Permission Groups → Permissions reference (2026-07-21 note).
+>
+> **Update 2026-08-18 (new special permission — `manage_tenants_manager`).** Migration
+> `20260818_1_add_manage_tenants_manager_perm` adds one **special (non-CRUD)** permission
+> `manage_tenants_manager` (a `manage_*` capability, tier **`tenant_mgmt`**), described as
+> *"Manage the Tenant-Manager assignments of tenants."* — a Tenant-Manager governance
+> capability. Its Arabic description is pre-seeded into `translated_entries` by the migration
+> itself, so the runtime translator (`translateAllOnStart`) skips it. Added to the §5 special
+> (non-CRUD) CASE block below.
 
 ---
 
@@ -442,6 +450,8 @@ UPDATE permissions SET permission_description = CASE permission_name
   WHEN 'manage_config_possible_values'      THEN 'Manage the list of allowed options for a configurable setting.'
   WHEN 'manage_config_key_category_flags'   THEN 'Choose which service categories a setting applies to.'
   WHEN 'manage_config_key_user_visibility'  THEN 'Control whether a setting is shown to guests.'
+  -- managing tenant-manager assignments
+  WHEN 'manage_tenants_manager'             THEN 'Manage the Tenant-Manager assignments of tenants.'
   -- giving a hotel access to shared items
   WHEN 'assign_hms_config_keys_to_tenant'     THEN 'Give a hotel access to specific configurable settings.'
   WHEN 'assign_location_type_to_tenant'       THEN 'Give a hotel access to a location type.'
@@ -458,6 +468,7 @@ WHERE permission_name IN (
   'account','dashboard','privacy_policy','profile','security',
   'saas_admin_dashboard','service_manager_dashboard','tenant_admin_dashboard','tenant_manager_dashboard',
   'manage_config_possible_values','manage_config_key_category_flags','manage_config_key_user_visibility',
+  'manage_tenants_manager',
   'assign_hms_config_keys_to_tenant','assign_location_type_to_tenant','assign_scenario_config_to_tenant','assign_service_categories_to_tenant',
   'revoke_hms_config_keys_from_tenant','revoke_location_type_from_tenant','revoke_scenario_config_from_tenant','revoke_service_categories_from_tenant'
 )

@@ -35,8 +35,10 @@ Requires a valid guest JWT (`accessToken`). The guest's identity is resolved via
 | `addons[].serviceId` | `number` | Yes | The service to add. Must not be a stay-category service. |
 | `addons[].quantity` | `number` | No | Number of slots (default: 1). Capped by `max_quantity_per_booking` config. |
 | `addons[].sessions` | `array` | No | For session-based services. Each: `{ date, slot }`. |
-| `addons[].meals` | `array` | No | For dining/room-service. Each: `{ date, mealType }`. |
-| `addons[].transport` | `object` | No | For transport: `{ tripType, pickupDateTime, pickupLocation, dropoffLocation, passengers }`. |
+| `addons[].meals` | `array` | No | For dining/room-service. Each: `{ date, mealType, slot? }`. `slot` is `"HH:MM-HH:MM"` (e.g. `"10:30-12:00"`) for precise time scheduling. |
+| `addons[].transport` | `object` | No | For transport: `{ tripType, pickupDateTime, guest_pickup_location, guest_dropoff_location, passengers }`. See [Transport pickup / drop-off](#transport-pickup--drop-off) below. |
+| `addons[].guestPickupLocation` | `string\|object` | No | Alternative placement for the pickup location, alongside `transport.guest_pickup_location`. |
+| `addons[].guestDropoffLocation` | `string\|object` | No | Alternative placement for the drop-off location. |
 
 ### Example: Add a spa session to a room booking
 
@@ -65,7 +67,7 @@ Requires a valid guest JWT (`accessToken`). The guest's identity is resolved via
     {
       "serviceId": 76,
       "meals": [
-        { "date": "2026-07-15", "mealType": "dinner" }
+        { "date": "2026-07-15", "mealType": "dinner", "slot": "19:00-21:00" }
       ]
     },
     {
@@ -73,8 +75,8 @@ Requires a valid guest JWT (`accessToken`). The guest's identity is resolved via
       "transport": {
         "tripType": "airport_pickup",
         "pickupDateTime": "2026-07-14 14:00:00",
-        "pickupLocation": "King Abdulaziz International Airport",
-        "dropoffLocation": "Hotel Main Entrance",
+        "guest_pickup_location": "59871",
+        "guest_dropoff_location": "59872",
         "passengers": 2
       }
     }
@@ -111,6 +113,12 @@ Returns the full v2 booking bundle with the updated services list, plus a `downP
   "status": "confirmed",
   "amount": 375,
   "paidAmount": 60,
+  "slots": {
+    "type": "meals",
+    "items": [
+      { "id": 501, "date": "2026-07-15", "mealType": "dinner", "status": "scheduled" }
+    ]
+  },
   "services": [
     {
       "serviceId": 55,
@@ -331,10 +339,70 @@ In practice, eligible categories include: spa, dining, room-service, barber, gym
 
 ---
 
+## Transport Pickup / Drop-off
+
+:::info Added 2026-08-27
+Transport pickup and drop-off are now chosen from a per-service dropdown rather than typed free-hand.
+:::
+
+Fetch the options from `GET /guest/services?serviceId=<id>` — the detail response returns them as
+`formSchema` fields `guest_pickup_location` / `guest_dropoff_location`, built from the stops the
+hotel configured on that service. See
+[Guest Services](../guest-services/guest-services.md#per-service-dropdown-options--transport-pickup--drop-off).
+
+The addon payload accepts the value in any of three places, resolved in this order:
+
+1. `addons[].guestPickupLocation` / `addons[].guestDropoffLocation`
+2. `addons[].transport.guest_pickup_location` / `guest_dropoff_location`
+3. `addons[].transport.pickupLocation` / `dropoffLocation` — the legacy free-text fields
+
+The value itself may be the option's scalar `value` — the `hms_config.id` of the row holding that
+stop — or the whole option object, or its `form` object.
+All resolve to the same stored result. A bare location name still resolves too, but only when it is
+unambiguous on that service. A value matching no configured location is stored as-is rather than
+rejected, so services with no locations configured yet keep working with free text.
+
+### What gets stored
+
+The slot's `form_values` row (`hms_config`, `base_table='booking_service_slots'`) carries both
+shapes — the full location form entry under the `guest_*` keys — stamped with `hms_config_id` so the
+choice stays traceable to the config row it came from — and the plain
+location name under the pre-existing scalar keys that the booking bundle and admin screens read:
+
+```json
+{
+  "trip_type": "airport_pickup",
+  "pickup_location": "Leamridian Hotel",
+  "dropoff_location": "Hotel",
+  "guest_pickup_location": {
+    "hms_config_id": 59871,
+    "order": 1,
+    "location_name": { "en": "Leamridian Hotel", "ar": "" },
+    "location_latitude": "31.480369",
+    "location_longitude": "74.369286"
+  },
+  "guest_dropoff_location": {
+    "hms_config_id": 59872,
+    "order": 2,
+    "location_name": { "en": "Hotel", "ar": "" },
+    "location_latitude": "32.5204",
+    "location_longitude": "75.3587"
+  },
+  "passengers": 2
+}
+```
+
+Full behaviour is documented in
+[Guest Bookings Service](./guest-bookings-service.md#transport-pickup--drop-off-locations).
+
+---
+
 ## Change Log
 
 | Date | Change |
 |---|---|
+| 2026-08-27 | Transport addons take pickup/drop-off from the per-service dropdowns `guest_pickup_location` / `guest_dropoff_location` instead of free text. The option value is the `hms_config.id` of the row holding that location, addressing the source row. The submitted value is resolved against the service's configured locations and stored as the full location form entry — with `hms_config_id` provenance — in the slot's `form_values`, alongside the retained scalar `pickup_location` / `dropoff_location` keys. Legacy `transport.pickupLocation` / `dropoffLocation` still accepted. |
+| 2026-08-13 | Dining/room-service `meals[]` now accepts optional `slot` field (`"HH:MM-HH:MM"`) for precise time scheduling in `booking_service_slots`. |
 | 2026-07-20 | Added `slot_id` parameter to DELETE endpoint for targeted slot removal. A guest can now remove a specific scheduled session (e.g., the 10:00 barber slot) without affecting other slots of the same service. |
 | 2026-07-13 | Added 20% down payment requirement for added services. Response now includes `downPayment` object. Booking confirmation email moved to after first successful payment. |
 | 2026-06-14 | Initial documentation for add/remove/reschedule service addons on existing bookings. |

@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { SIDEBAR, flattenSidebar, docLabel, categoryPathFor, type SidebarNode } from './sidebar'
 
 describe('sidebar', () => {
@@ -23,6 +25,15 @@ describe('sidebar', () => {
       'HMS Documentation',
       'Projects',
     ])
+  })
+
+  it('every doc id resolves to a file under docs/', () => {
+    // Guards the merge case: a sidebar entry ported without its .md file (or a
+    // renamed doc) would 404 in the app. Cheap to check, catches it at CI time.
+    const missing = flattenSidebar().filter(
+      id => !existsSync(resolve('docs', `${id}.md`)) && !existsSync(resolve('docs', `${id}.mdx`)),
+    )
+    expect(missing).toEqual([])
   })
 
   it('contains no duplicate doc ids', () => {

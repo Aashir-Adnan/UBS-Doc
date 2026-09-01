@@ -44,19 +44,26 @@ The chain walk cannot distinguish them — both are simply unreachable — so ea
 
 ## Rule 1 — who may I act on?
 
-An actor may act on **juniors, peers and guests**. Never on **itself**, never on a **senior**.
+An actor may act on **juniors, peers and guests**, plus a few provisioning cases. Never on **itself**, never on a **senior**.
 
-Evaluated in this order — the order matters, and self is deliberately first:
+Evaluated in this order — the order matters, and self is deliberately first. Every branch below the self check is **gated on the target not being a SaaS-Admin/SYSTEM** (only another SaaS-Admin may act on the platform owner):
 
 | # | Branch | Outcome |
 |---|---|---|
 | 1 | **Self** — the target is the acting user, incl. via another leg of the same user | ⛔ **403**, always |
-| 2 | **Guest target** — the target's roles are all guest roles | ✅ pass (same tenant, or no tenant yet) |
-| 3 | **Root actor** — acting role is non-guest with no `senior_rdd_id` | ✅ pass (same tenant, target on a chain) |
-| 4 | **Persona override** — SaaS-Admin anywhere; Tenant-Manager in its own tenant | ✅ pass |
-| 5 | **Chain walk** — walk UP from the target's **own** role; reached the acting role? | ✅ pass / ⛔ **403** |
+| 2 | **No-owner target** — `users.created_by IS NULL` (a seed / imported / self-registered account nobody owns) | ✅ pass |
+| 3 | **Guest-only target** — the target's roles are all guest roles | ✅ pass — **any tenant** (a guest carries no authority) |
+| 4 | **Root actor** — acting role is non-guest with no `senior_rdd_id` | ✅ pass (same tenant, target on a chain) |
+| 5 | **Persona override** — SaaS-Admin anywhere; Tenant-Manager in its own tenant | ✅ pass |
+| 6 | **Provisioning** — the target holds **no active leg in the actor's tenant**, and the actor is a Tenant-Manager or SaaS-Admin | ✅ pass |
+| 7 | **Chain walk** — walk UP from the target's **own** role; reached the acting role? | ✅ pass / ⛔ **403** |
 
 **Self is checked before everything else** so that neither the persona overrides nor the peer rule can re-open self-service. A SaaS-Admin cannot edit its own account either.
+
+:::info Branches 2, 3 and 6 (2026-08 additions)
+- **No-owner** and **guest-only** targets are admitted **directly** — a guest holds no authority, and an un-owned account has no owning creator/tenant to isolate it behind. Guest-only is admitted **regardless of tenant** (the earlier same-tenant restriction was dropped, which had made ~45 guest-only users unmanageable).
+- **Provisioning** fills the onboarding gap: a Tenant-Manager (root of its tenant) may assign a role to a user who currently holds roles only in **other** tenants (or none) — there is no role in this tenant to outrank the actor. This is what lets the system-tenant Tenant-Manager (URDD-B′) manage a Tenant-Admin who has no system-tenant leg. Escalation is still blocked by Rule 2.
+:::
 
 ### Worked examples
 
@@ -69,8 +76,9 @@ Using the tree above:
 | `276` STAY/Manager | `276` STAY/Manager *(different user)* | ✅ allowed | **peer** — the walk seeds at the target's own role, so it matches at depth 0 |
 | `276` STAY/Manager | *itself* | ⛔ 403 | branch 1 — self, regardless of the peer rule |
 | `276` STAY/Manager | `277` DINE/Manager *(and no other staff role)* | ⛔ 403 | **siblings are not peers** — walk from 277 → \{277, 275\}; 276 is not there |
-| any staff | `274` STANDARD/Guest | ✅ allowed | branch 2 — guests are junior to every non-guest role |
-| `276` STAY/Manager | a brand-new user | ✅ allowed | branch 2 — a new user holds only the global guest leg |
+| any staff | `274` STANDARD/Guest | ✅ allowed | branch 3 — guests are junior to every non-guest role (any tenant) |
+| `276` STAY/Manager | a brand-new user | ✅ allowed | branch 3 — a new user holds only the global guest leg |
+| Tenant-Manager (system tenant) | a Tenant-Admin with no system-tenant leg | ✅ allowed | branch 6 — provisioning: nothing in the actor's tenant outranks it |
 
 :::info Peer ≠ sibling
 A **peer** is someone on the **same RDD**. Two *different* roles at the same depth (`STAY/Manager` and `DINE/Manager`) are **siblings**, and neither may act on the other — a spa manager has no business editing the restaurant manager.
@@ -162,7 +170,7 @@ The long-term fix is a seniority backfill so every tenant role chains up to its 
 
 Normally the chain provides it for free: a tenant's roles report up to *that* tenant's root, so another tenant's role can never appear in the walk.
 
-The two branches that **skip** the walk — guest target and root actor — assert tenant equality **explicitly** instead, since nothing else would.
+The **root-actor** branch skips the walk, so it asserts tenant equality **explicitly** instead. The **guest-only** and **no-owner** branches deliberately do **not** restrict by tenant — those targets carry no authority, so they stay broadly editable (a guest of another tenant, or an un-owned seed account, may be managed). The **provisioning** branch is inherently the *no-leg-in-this-tenant* case, and confines its effect to the actor's tenant via the tenant-scoped role sync.
 
 ---
 

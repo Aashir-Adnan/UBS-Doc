@@ -156,6 +156,19 @@ export const SIDEBAR: SidebarNode[] = [
               'hms-documentation/major-implementations/guest-booking-enhancements/frontend-implementation',
             ],
           },
+          {
+            label: 'Fetching Package Oriented Pricing',
+            items: [
+              'hms-documentation/major-implementations/flexible-package-pricing/flexible-package-pricing',
+            ],
+          },
+          {
+            label: 'Additional Package Nights',
+            items: [
+              'hms-documentation/major-implementations/additional-package-nights/frontend-integration',
+              'hms-documentation/major-implementations/additional-package-nights/backend-implementation',
+            ],
+          },
         ],
       },
       {
@@ -166,6 +179,30 @@ export const SIDEBAR: SidebarNode[] = [
             items: [
               'hms-documentation/minor-implementations/requires-stay-service-flag/backend-implementation',
               'hms-documentation/minor-implementations/requires-stay-service-flag/frontend-implementation',
+            ],
+          },
+          {
+            label: 'QA Fixes 2026-08-19',
+            items: [
+              'hms-documentation/minor-implementations/qa-fixes-20260819/qa-fixes-20260819',
+            ],
+          },
+          {
+            label: 'Auth Token Flow',
+            items: [
+              'hms-documentation/minor-implementations/auth-token-flow/auth-token-flow',
+            ],
+          },
+          {
+            label: 'Apple Pay Integration',
+            items: [
+              'hms-documentation/minor-implementations/apple-pay-integration/apple-pay-integration',
+            ],
+          },
+          {
+            label: 'File Upload Flow',
+            items: [
+              'hms-documentation/minor-implementations/file-upload-flow/file-upload-flow',
             ],
           },
         ],
@@ -235,6 +272,7 @@ export const SIDEBAR: SidebarNode[] = [
             items: [
               'hms-documentation/guest-apis/guest-bookings-service/guest-bookings-service',
               'hms-documentation/guest-apis/guest-bookings-service/add-services-to-booking',
+              'hms-documentation/guest-apis/guest-bookings-service/slot-scheduling',
             ],
           },
           {
@@ -331,6 +369,7 @@ export const SIDEBAR: SidebarNode[] = [
             label: 'Guest Pricing Rules',
             items: [
               'hms-documentation/guest-apis/guest-pricing-rules/guest-pricing-rules',
+              'hms-documentation/guest-apis/guest-pricing-rules/checkin-date-pricing',
             ],
           },
           {
@@ -404,6 +443,7 @@ export const SIDEBAR: SidebarNode[] = [
         items: [
           'hms-documentation/tenant-governance/README',
           'hms-documentation/tenant-governance/tenant-governance-model/governance-model',
+          'hms-documentation/tenant-governance/tenant-manager-management/tenant-manager-management',
           'hms-documentation/tenant-governance/per-tenant-cloning/per-tenant-cloning',
           'hms-documentation/tenant-governance/per-tenant-resource-assignment/resource-assignments',
           {
@@ -420,6 +460,7 @@ export const SIDEBAR: SidebarNode[] = [
           'hms-documentation/tenant-governance/permission-descriptions/permission-descriptions',
           'hms-documentation/tenant-governance/original-to-clone-propagation/original-to-clone-propagation',
           'hms-documentation/tenant-governance/deferred-delete-probation/deferred-delete-probation',
+          'hms-documentation/tenant-governance/cascade-restore/cascade-restore',
           'hms-documentation/tenant-governance/tenant-lifecycle-cron/tenant-lifecycle-cron',
         ],
       },
@@ -469,7 +510,7 @@ export const SIDEBAR: SidebarNode[] = [
               'hms-documentation/admin-apis/tenant-provisioning-grouped-crud',
               'hms-documentation/admin-apis/tenant-assignments-grouped-crud',
               'hms-documentation/admin-apis/service-manager-provisioning',
-              'hms-documentation/admin-apis/tenant-admin-candidates-dropdown',
+              'hms-documentation/admin-apis/tenant-manager-candidates',
               'hms-documentation/admin-apis/dev-seed-tenant',
             ],
           },
@@ -523,6 +564,12 @@ export const SIDEBAR: SidebarNode[] = [
             label: 'V4',
             items: [
               'projects/badar-hms/v4/OPERA_PMS_Integration_Solutions_v4',
+            ],
+          },
+          {
+            label: 'Questionairre For Client',
+            items: [
+              'projects/badar-hms/questionnaire/questionnaire_for_client',
             ],
           },
           'projects/badar-hms/Opera_Config',

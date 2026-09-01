@@ -21,16 +21,23 @@ to `target_table='tenants'` (migration `20260720_2`), meaning their applied valu
 | Config key | `value_type` | Stored as | Multiple values? |
 |---|---|---|---|
 | `payment_timing` | `dropdown` (`is_multi_value=1`) | `is_input=0` **reference** — one row per option id | **Yes**, as rows |
-| `tax_profile` | `tax_profile_api_form` | `is_input=1` **authored form**, kept whole | **Yes**, inside the value |
-| `pricing_rules` | `pricing_rules_api_form` | `is_input=1` **`pricing_rule_id`(s)**, kept whole | **Yes**, inside the value |
-| `deposit_amount` | `deposit_form` | `is_input=1` **authored form**, kept whole | No |
+| `tax_profile` | `tax_profile_api_form` | `is_input=1` **authored form** — one row per profile | **Yes**, as rows |
+| `pricing_rules` | `pricing_rules_api_form` | `is_input=1` **`pricing_rule_id`(s)** — one row per id | **Yes**, as rows |
+| `deposit_amount` | `deposit_form` | `is_input=1` **authored form** — one row | No |
 
-Only `payment_timing` is a possible-value reference set. The `*_api_form` keys carry their
-multiplicity **inside** the stored value (an id collection, a `profiles` collection) in a **single**
-row — they are not exploded.
+Only `payment_timing` is a possible-value reference set — but **every** key stores **one value per
+row**, whatever its `is_input` (see §3). A multi-value `is_input=1` value explodes to one row per
+element; a scalar, a single object or a single-element array stays one row.
 
 The applied values live in `hms_config` with `base_table='tenants'` and
 `record_id = <tenant_id>` (see §3).
+
+:::note `pricing_rules` availability
+`pricing_rules` was soft-deleted by `20260728_2` and restored — across the SaaS-global original and
+every tenant clone, together with its possible-value rows — by
+`20260804_2_activate_pricing_rules_tenant_config_key`. Until that migration runs the key simply does
+not appear in the List for any tenant.
+:::
 
 :::caution `value_type` is not uniform across clones
 `deposit_amount` is `deposit_form` on most tenant clones but `text_area` on a couple. Always render
@@ -115,7 +122,7 @@ tenant id. A save is rejected if the key is not tenant-scoped or belongs to a di
 }
 ```
 
-Two guarantees:
+Three guarantees:
 
 1. **`tenantConfig_applied` is always present.** For a key the tenant has never configured, the block
    is empty **but `hmsConfig_isInput` is still filled in** (derived from `value_type`), so a first
@@ -124,6 +131,19 @@ Two guarantees:
    The stored rows *are* those ids, so consumers should never reverse-match display labels back to
    options — label matching is fuzzy (duplicate, renamed or re-localized labels) and, combined with
    replace-style saves, a missed match would silently drop the selection.
+3. **`hmsConfig_configValue` is always an array** — one entry per stored row, in id order — for
+   `is_input=0` and `is_input=1` alike. Iterate it; never read only the first entry.
+
+:::caution Changed 2026-08-04
+`hmsConfig_configValue` previously returned only the **first** row for `is_input=1`, so a
+multi-value entered config (several pricing rule ids, several tax profiles, several blackout rows)
+was silently truncated to its first element on read. It now returns every row. Consumers that read
+`hmsConfig_configValue[0]` and parsed a nested array out of it must map over **all** entries
+instead.
+:::
+
+Note that `hmsConfigPossibleValues_configPossibleValue` on the **options** above is *not* an array —
+it stays a single payload per option. Only the **applied** value is an array.
 
 Possible-value payloads are **polymorphic** — a bilingual object, a flat `value`/`key` option, a rich
 object, or an inline `fields` form schema. Render by the value's shape, not by `value_type` alone:
@@ -153,11 +173,26 @@ The value's shape is driven by **`is_input`**, which the read hands you:
 | `is_input` | Keys | Send |
 |---|---|---|
 | **0** — selected | `payment_timing` | the possible-value ids — `[11547, 11548]`, or `11547` for one |
-| **1** — entered | `tax_profile`, `pricing_rules`, `deposit_amount` | the value itself, wrapped once: `[{ "en": "<stringified value>", "ar": "" }]` |
+| **1** — entered | `tax_profile`, `pricing_rules`, `deposit_amount` | an **array of values** — `[190, 191]`, `[{…profile…}, {…profile…}]`, or the single-value form `[{ "en": "<stringified value>", "ar": "" }]` |
 
 For `is_input = 1` the backend does **not** interpret the value, so its internal shape is entirely
-the caller's: `{"profiles":[…]}` for several tax profiles, an id collection for several pricing
-rules. Whatever you send is what you read back.
+the caller's. Whatever you send is what you read back.
+
+:::caution Send a real array, not a stringified one
+Each element of the array you send becomes **its own row**. Sending several values as one
+JSON-stringified blob inside a single bilingual bag —
+`[{ "en": "[{…},{…}]", "ar": "" }]` — stores them in **one** row and defeats the per-row model. Send
+`[{…}, {…}]` instead. A single value (a scalar, one object, or a one-element array) still collapses
+to exactly one row, so single-valued keys are unaffected.
+:::
+
+:::danger `pricing_rules` and `tax_profile` are `is_input = 1`
+Both carry **`pricing_rules.pricing_rule_id`s**, which are *not* possible-value ids. Saving them
+with `is_input = 0` appears to succeed — the rows are written — but the read resolves every
+`is_input=0` row against `hms_config_possible_values` and **drops whatever does not match**, so the
+value comes back as an empty `hmsConfig_configValue` and an empty `hmsConfigPossibleValues_ids`.
+Always send `is_input = 1` for these keys.
+:::
 
 :::tip Clearing is uniform
 To clear a setting, send **any** empty value — `[]`, `null`, an empty string, an empty object, or a
@@ -184,13 +219,29 @@ So editing an existing setting edits its row rather than leaving an inactive tom
 creating a new id. Shrinking a selection retires only the surplus. If an updated value no longer
 carries Arabic text, the stale translation is retired with it.
 
-### How values are stored
+### How values are stored — one value per row
+
+The value is **always** an array on the wire and **always one value per row** in storage. The reader
+re-aggregates a key's rows back into the array that was sent, so the round-trip is stable.
+
+| Element sent | `hms_config.config_value` | `translated_entries` |
+|---|---|---|
+| `is_input=0` — an option id | the **bare id** (`11547`) | — |
+| `is_input=1` — **non-structured** (a `{en,ar}` bag or a scalar) | the **bare English** (`"250"`) | the Arabic (`"٢٥٠"`) |
+| `is_input=1` — **structured** (an object or array) | the **whole object**, bare | the **same whole object**, as-is |
 
 - A **single value is stored bare** — never wrapped in an array. Selecting one option persists `39`,
   not `[39]`.
 - **No `NULL` and no empty-array placeholder row is ever written.**
 - **Clearing retires the rows** rather than parking an empty one, so an unset setting simply has no
   active row. Reads then return an empty applied value and an empty list of selected ids.
+
+:::note Legacy rows
+Values saved before 2026-08-04 kept a multi-element `is_input=1` value in a single array-wrapped
+cell. Migration `20260804_1_explode_wrapped_is_input1_tenant_config_rows` splits each of those into
+one row per element (and mirrors each structured element's Arabic entry), matching what the writer
+now produces. Readers tolerate both shapes.
+:::
 
 ### Emptying vs removing
 
@@ -207,8 +258,9 @@ Both end with no active row for that key; they differ only in how you express it
 Everything above follows the shared model in
 [config-storage-model.md](../config-keys/config-storage-model/config-storage-model.md):
 
-- **One value per row.** A reference set (`is_input=0`) explodes to one row per selected id; an
-  entered value (`is_input=1`) stays a **single** row with the value kept whole. An empty selection
-  writes **no** row at all — the existing rows are retired.
+- **One value per row — in both `is_input` modes.** A reference set (`is_input=0`) explodes to one
+  row per selected id, and an entered value (`is_input=1`) explodes to one row per element too; a
+  scalar, a single object or a single-element array is one row. An empty selection writes **no** row
+  at all — the existing rows are retired.
 - **Translations externalised.** A simple bilingual value stores the bare English on the row and
   mirrors the Arabic into `translated_entries`; structured values are stored whole.

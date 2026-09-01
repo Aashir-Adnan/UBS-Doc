@@ -57,7 +57,7 @@ tenant id. Only the tenant's own, non-inactive, constraint-bearing keys are retu
 
   "configConstraint_constraints": {
     "constraint_operator": "<=",
-    "constraint_reference": "basics.service_locations.delivery_unit.capacity"
+    "constraint_reference": "service.basics.service_location.delivery_unit.capacity"
   }
 }
 ```
