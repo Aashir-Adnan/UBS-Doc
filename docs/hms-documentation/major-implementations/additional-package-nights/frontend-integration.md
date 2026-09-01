@@ -76,6 +76,25 @@ Booking 3 nights (2-night block + 1 extra):
   subtotal          = 700 SAR
 ```
 
+### Example: 2-night package, price 500 SAR — 4-night stay with 50 SAR flat discount
+
+With `max_additional_package_nights = 2` and a 50 SAR flat discount:
+
+```
+basePerNight       = 500 / 2 = 250 SAR
+discountedPerNight = 250 - 50 = 200 SAR
+
+Booking 4 nights (fill-extra-first: 1 full period + 2 extra nights):
+  packageBlockTotal = 500 SAR
+  extraNightsTotal  = 200 × 2 = 400 SAR
+  subtotal          = 900 SAR
+
+Contrast with the old behaviour (2 full periods, no discount applied):
+  subtotal (old)    = 500 × 2 = 1,000 SAR
+```
+
+The fill-extra-first rule saves the guest 100 SAR on a 4-night stay.
+
 ---
 
 ## Displaying Extra-Night Availability
@@ -99,17 +118,45 @@ When the user is selecting check-in and check-out dates:
 
 1. **Read `nights` (package duration)** from the package object.
 2. **Read `max_additional_package_nights`** from the config.
-3. Allow the user to pick checkout dates that produce `nights` to `nights + max_additional_package_nights` total nights for a single-period stay, or any multiple-period stay with up to `max_additional_package_nights` extra nights on the last period.
+3. Allow the user to pick checkout dates according to the **fill-extra-first** rule: a minimum of one full period is required; remaining nights above that minimum fill the extra-nights budget before another full period is added.
 
-**Valid stay lengths for a 3-night package with max 2 extra:**
-- 3, 4, 5 nights (1 period + 0/1/2 extra)
-- 6, 7, 8 nights (2 periods + 0/1/2 extra)
-- 9, 10, 11 nights (3 periods + 0/1/2 extra)
-- ... and so on, subject to `maxQuantityPerBooking`
+**Rule for valid stay lengths:**
 
-**Invalid:**
-- 2 nights (less than 1 period)
-- 12 nights with `maxQuantityPerBooking = 3` and extra=0 → 4 periods > 3 max
+```
+minPeriods  = max(1, ceil((N - max_additional) / duration))
+extraNights = N - minPeriods × duration
+Valid if: 0 ≤ extraNights ≤ max_additional
+```
+
+**Example: 3-night package with max 2 extra (`max_additional_package_nights = 2`)**
+
+| Total nights | Full periods | Extra nights | Valid? |
+|---|---|---|---|
+| 2 | — | — | No (less than 1 period) |
+| 3 | 1 | 0 | Yes |
+| 4 | 1 | 1 | Yes |
+| 5 | 1 | 2 | Yes |
+| 6 | 2 | 0 | Yes |
+| 7 | 2 | 1 | Yes |
+| 8 | 2 | 2 | Yes |
+| 9 | 3 | 0 | Yes |
+
+**Example: 2-night package with max 2 extra (`max_additional_package_nights = 2`)**
+
+| Total nights | Full periods | Extra nights | Valid? | Notes |
+|---|---|---|---|---|
+| 1 | — | — | No | Less than 1 period |
+| 2 | 1 | 0 | Yes | |
+| 3 | 1 | 1 | Yes | |
+| 4 | 1 | 2 | Yes | Extra nights fill up; guest pays discounted rate for nights 3–4 |
+| 5 | 2 | 1 | Yes | Extra budget exhausted at 4 nights — new period starts |
+| 6 | 2 | 2 | Yes | |
+| 7 | 3 | 1 | Yes | |
+| 8 | 3 | 2 | Yes | |
+
+> **Important:** a 4-night stay on a 2-night package is priced as **1 full period + 2 extra nights at the discounted rate**, not as 2 full periods. Stays that are clean multiples of the duration are cheaper when `max_additional >= duration`, because the trailing nights use the extra-night discount instead of another full-price period.
+
+The booking server enforces these rules. The frontend does not need to validate them — just present date options and handle the `400` response if the server rejects a selection.
 
 ### Price Breakdown
 

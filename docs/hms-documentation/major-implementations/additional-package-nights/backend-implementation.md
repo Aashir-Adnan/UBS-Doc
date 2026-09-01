@@ -37,27 +37,100 @@ function validateExtraNights(nights, duration, allowed, maxAllowed, maxQuantity)
 
 ### Logic
 
+#### When additional nights is OFF (`allowed` is falsy)
+
+Use the standard floor decomposition — the stay must be an exact multiple of `duration`:
+
 ```
 fullPeriods = floor(nights / duration)
-extraNights = nights - (fullPeriods * duration)
+extraNights = nights - fullPeriods × duration
+valid = (extraNights === 0)
 ```
 
-**When additional nights is OFF** (`allowed` is falsy):
-- Pure divisibility only: valid if and only if `extraNights === 0`.
-- `maxQuantity` is NOT checked (the caller handles it separately or not at all).
+`maxQuantity` is not checked here (handled by the caller or not at all).
 
-**When additional nights is ON** (`allowed` is truthy):
-- Both constraints are checked simultaneously:
-  1. `extraNights <= maxAllowed` (or `maxAllowed` is null/unset = unlimited)
-  2. `fullPeriods <= maxQuantity` (or `maxQuantity` is null/unset = unlimited)
-- The floor approach means extra days are consumed before adding another quantity. A 5-night stay on a 3-night package is 1 period + 2 extra, not 2 periods short 1 night.
+#### When additional nights is ON (`allowed` is truthy) and `maxAllowed` is defined
+
+Use the **fill-extra-first** decomposition: find the *minimum* number of full periods such that the remaining nights fit within `maxAllowed`. This ensures that any stay which can be represented as fewer full periods plus discounted extra nights will be priced that way, giving guests the benefit of the extra-night rate rather than charging them for another full period.
+
+```
+proposed      = max(1, ceil((nights - maxAllowed) / duration))
+proposedExtra = nights - proposed × duration
+
+if proposedExtra >= 0 AND proposedExtra <= maxAllowed:
+    fullPeriods = proposed          ← fill-extra-first applies
+    extraNights = proposedExtra
+else:
+    // Cannot form a valid fill-first decomposition.
+    // Fall back to floor for meaningful error-message data.
+    fullPeriods = floor(nights / duration)
+    extraNights = nights - fullPeriods × duration
+```
+
+After computing `fullPeriods` and `extraNights`, both limits are validated:
+
+1. `extraNights <= maxAllowed` (or `maxAllowed` is null — unlimited)
+2. `fullPeriods <= maxQuantity` (or `maxQuantity` is null — unlimited)
+
+If either fails, `{ valid: false, ... }` is returned.
+
+#### When additional nights is ON and `maxAllowed` is null (unlimited)
+
+Fall back to the standard floor decomposition. Any `extraNights` value is accepted; only the `maxQuantity` limit is applied.
+
+### Worked Examples
+
+**2-night package, `additional_package_nights_allowed = true`, `max_additional_package_nights = 2`:**
+
+| Stay nights | `fullPeriods` | `extraNights` | Valid? | Notes |
+|---|---|---|---|---|
+| 2 | 1 | 0 | ✓ | Exact 1 period |
+| 3 | 1 | 1 | ✓ | 1 extra night |
+| 4 | 1 | 2 | ✓ | Fill-extra-first — was 2 periods under old formula |
+| 5 | 2 | 1 | ✓ | Extra budget exhausted at 4 nights; new period starts |
+| 6 | 2 | 2 | ✓ | Fill-extra-first — was 3 periods under old formula |
+| 7 | 3 | 1 | ✓ | |
+| 8 | 3 | 2 | ✓ | |
+
+**3-night package, `max_additional_package_nights = 2`:**
+
+| Stay nights | `fullPeriods` | `extraNights` | Valid? |
+|---|---|---|---|
+| 3 | 1 | 0 | ✓ |
+| 4 | 1 | 1 | ✓ |
+| 5 | 1 | 2 | ✓ |
+| 6 | 2 | 0 | ✓ |
+| 7 | 2 | 1 | ✓ |
+| 8 | 2 | 2 | ✓ |
+| 9 | 3 | 0 | ✓ |
+
+> **Note:** for the 3-night package with max=2, fill-extra-first produces the same result as the old floor formula because `max_additional (2) < duration (3)`. The observable difference only occurs when `max_additional >= duration`.
+
+### Key Property
+
+For any valid stay, the number of full periods is the **minimum** required so that extra nights fit within `maxAllowed`. A stay that is a clean multiple of `duration` will be priced with extra nights rather than an additional full period, provided the extra nights do not exceed `maxAllowed`.
 
 ### Unit Tests
 
-**File:** `Services/SysScripts/TestScripts/validateExtraNights.test.js` — 20 inline assertions.
+**File:** `Services/SysScripts/TestScripts/validateExtraNights.test.js`
 
 ```bash
 node Services/SysScripts/TestScripts/validateExtraNights.test.js
+```
+
+Key assertions added with this change (beyond the original 20):
+
+```js
+// fill-extra-first: clean 2-period stay now 1 period + 2 extra
+assert.deepStrictEqual(validateExtraNights(4, 2, true, 2), { valid: true, fullPeriods: 1, extraNights: 2 });
+// fill-extra-first: clean 3-period stay now 2 periods + 2 extra
+assert.deepStrictEqual(validateExtraNights(6, 2, true, 2), { valid: true, fullPeriods: 2, extraNights: 2 });
+// max=1 too small to absorb: stays at 2 full periods (no change)
+assert.deepStrictEqual(validateExtraNights(4, 2, true, 1), { valid: true, fullPeriods: 2, extraNights: 0 });
+// additional OFF: floor behaviour, no change
+assert.deepStrictEqual(validateExtraNights(4, 2, false, 2), { valid: true, fullPeriods: 2, extraNights: 0 });
+// maxAllowed null: floor behaviour, no change
+assert.deepStrictEqual(validateExtraNights(4, 2, true, null), { valid: true, fullPeriods: 2, extraNights: 0 });
 ```
 
 ---
@@ -220,13 +293,14 @@ All validation paths produce consistent, descriptive error messages:
 
 **File:** `Services/SysScripts/TestScripts/sim/guestAdditionalPackageNights.js`
 
-5 scenarios against a live server (package 365, tenant 86, duration 2):
+6 scenarios against a live server (package 365, tenant 86, duration 2):
 
 1. **Control** — 2-night booking (clean multiple) succeeds.
 2. **Rejection** — 3-night booking without additional-nights config returns 400.
 3. **Acceptance** — 3-night booking with config (`allowed=true`, `max=1`) succeeds.
 4. **Edit** — edit an existing 2-night booking to 3 nights succeeds.
 5. **Clean multiple** — 4-night booking (2 periods, no extra) still succeeds with additional ON.
+6. **Fill-extra-first pricing** — 4-night booking (clean multiple of 2) with `max_additional=2` and 10% discount: verifies the booking is accepted and the total reflects 1 full period + 2 discounted extra nights, not 2 full periods.
 
 ```bash
 npm start  # server must be running
@@ -242,11 +316,11 @@ The test inserts temporary `hms_config` rows for setup and cleans up all created
 | File | Change |
 |---|---|
 | `data/migrations_completed/20260827_1_add_additional_package_nights_config_keys.sql` | 4 new config keys |
-| `Src/HelperFunctions/Guest/v2/catalogPricing.js` | `validateExtraNights` helper + `computeBookingPricing` extension |
-| `Src/HelperFunctions/PreProcessingFunctions/Guest/createPackageBooking.js` | Import + validation gate (entries + non-entries) |
-| `Src/HelperFunctions/PreProcessingFunctions/Guest/editBooking.js` | Import + relaxed divisibility check |
-| `Src/HelperFunctions/PreProcessingFunctions/Guest/stageBookingChanges.js` | Import + relaxed divisibility check |
+| `Src/HelperFunctions/Guest/v2/catalogPricing.js` | `validateExtraNights` (fill-extra-first formula) + `derivePackageQuantity` (delegates to validateExtraNights) + `computeBookingPricing` extension |
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/createPackageBooking.js` | Pass additional-nights config to `derivePackageQuantity` (non-entries path) |
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/editBooking.js` | Fetch additional-nights config keys; pass to `derivePackageQuantity` |
+| `Src/HelperFunctions/PreProcessingFunctions/Guest/stageBookingChanges.js` | Pass additional-nights config to `derivePackageQuantity` (current + proposed quantity) |
 | `Src/HelperFunctions/PreProcessingFunctions/Guest/probeGuestAvailability.js` | Import + relaxed probe validation |
 | `Src/HelperFunctions/Guest/v2/searchQueries.js` | Import + relaxed package filter |
-| `Services/SysScripts/TestScripts/validateExtraNights.test.js` | Unit tests (20 assertions) |
-| `Services/SysScripts/TestScripts/sim/guestAdditionalPackageNights.js` | Integration sim test (5 scenarios) |
+| `Services/SysScripts/TestScripts/validateExtraNights.test.js` | Unit tests (27 assertions — 7 new fill-extra-first cases added) |
+| `Services/SysScripts/TestScripts/sim/guestAdditionalPackageNights.js` | Integration sim test (6 scenarios) |
