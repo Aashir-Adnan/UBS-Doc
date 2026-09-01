@@ -114,49 +114,47 @@ When a package allows extra nights, show a badge or banner:
 
 ### Date Picker / Night Selector
 
-When the user is selecting check-in and check-out dates:
+When selecting check-in and check-out dates:
 
 1. **Read `nights` (package duration)** from the package object.
 2. **Read `max_additional_package_nights`** from the config.
-3. Allow the user to pick checkout dates according to the **fill-extra-first** rule: a minimum of one full period is required; remaining nights above that minimum fill the extra-nights budget before another full period is added.
+3. The extra-nights budget applies **once per booking** — it does not multiply with the number of full periods. The system maximizes extra nights subject to divisibility.
 
-**Rule for valid stay lengths:**
+**Valid stay rule:**
 
-```
-minPeriods  = max(1, ceil((N - max_additional) / duration))
-extraNights = N - minPeriods × duration
-Valid if: 0 ≤ extraNights ≤ max_additional
-```
+A stay of N nights is valid when:
+- `(N − extra) % duration === 0` (extra nights leave whole periods)
+- `0 ≤ extra ≤ max_additional_package_nights`
+- `(N − extra) / duration ≥ 1` (at least one full period)
 
-**Example: 3-night package with max 2 extra (`max_additional_package_nights = 2`)**
+Extra nights are maximized within those constraints. The achievable maximum may be less than `max_additional_package_nights` when the divisibility constraint prevents reaching it.
 
-| Total nights | Full periods | Extra nights | Valid? |
-|---|---|---|---|
-| 2 | — | — | No (less than 1 period) |
-| 3 | 1 | 0 | Yes |
-| 4 | 1 | 1 | Yes |
-| 5 | 1 | 2 | Yes |
-| 6 | 2 | 0 | Yes |
-| 7 | 2 | 1 | Yes |
-| 8 | 2 | 2 | Yes |
-| 9 | 3 | 0 | Yes |
+**Example: 2-night package, max 5 additional nights**
 
-**Example: 2-night package with max 2 extra (`max_additional_package_nights = 2`)**
+| Total nights | Full periods | Extra nights |
+|---|---|---|
+| 2 | 1 | 0 |
+| 3 | 1 | 1 |
+| 5 | 1 | 3 |
+| 21 | 8 | 5 |
+| 22 | 9 | 4 |
+| 23 | 9 | 5 |
 
-| Total nights | Full periods | Extra nights | Valid? | Notes |
-|---|---|---|---|---|
-| 1 | — | — | No | Less than 1 period |
-| 2 | 1 | 0 | Yes | |
-| 3 | 1 | 1 | Yes | |
-| 4 | 1 | 2 | Yes | Extra nights fill up; guest pays discounted rate for nights 3–4 |
-| 5 | 2 | 1 | Yes | Extra budget exhausted at 4 nights — new period starts |
-| 6 | 2 | 2 | Yes | |
-| 7 | 3 | 1 | Yes | |
-| 8 | 3 | 2 | Yes | |
+> 22 nights yields 4 extra (not 5) because `22 − 5 = 17` is not divisible by 2. The maximum achievable extra is 4.
 
-> **Important:** a 4-night stay on a 2-night package is priced as **1 full period + 2 extra nights at the discounted rate**, not as 2 full periods. Stays that are clean multiples of the duration are cheaper when `max_additional >= duration`, because the trailing nights use the extra-night discount instead of another full-price period.
+**Example: 3-night package, max 2 additional nights**
 
-The booking server enforces these rules. The frontend does not need to validate them — just present date options and handle the `400` response if the server rejects a selection.
+| Total nights | Full periods | Extra nights |
+|---|---|---|
+| 3 | 1 | 0 |
+| 4 | 1 | 1 |
+| 5 | 1 | 2 |
+| 6 | 2 | 0 |
+| 7 | 2 | 1 |
+| 8 | 2 | 2 |
+| 9 | 3 | 0 |
+
+The booking server enforces all rules. The frontend just presents date options and handles `400` responses.
 
 ### Price Breakdown
 

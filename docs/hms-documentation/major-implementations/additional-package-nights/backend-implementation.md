@@ -39,76 +39,52 @@ function validateExtraNights(nights, duration, allowed, maxAllowed, maxQuantity)
 
 #### When additional nights is OFF (`allowed` is falsy)
 
-Use the standard floor decomposition — the stay must be an exact multiple of `duration`:
+Pure divisibility — valid only if `extraNights === 0`:
 
 ```
 fullPeriods = floor(nights / duration)
 extraNights = nights - fullPeriods × duration
-valid = (extraNights === 0)
 ```
 
-`maxQuantity` is not checked here (handled by the caller or not at all).
+#### When additional nights is ON and `maxAllowed` is defined
 
-#### When additional nights is ON (`allowed` is truthy) and `maxAllowed` is defined
-
-Use the **fill-extra-first** decomposition: find the *minimum* number of full periods such that the remaining nights fit within `maxAllowed`. This ensures that any stay which can be represented as fewer full periods plus discounted extra nights will be priced that way, giving guests the benefit of the extra-night rate rather than charging them for another full period.
+The system **maximizes extra nights** (subject to divisibility) up to `maxAllowed`. Extra nights apply **once per booking** — the budget does not multiply with the number of full periods.
 
 ```
+// Extra nights must satisfy: (nights - extraNights) % duration === 0
+// Find the maximum valid extraNights ≤ min(maxAllowed, nights - duration):
 proposed      = max(1, ceil((nights - maxAllowed) / duration))
 proposedExtra = nights - proposed × duration
 
-if proposedExtra >= 0 AND proposedExtra <= maxAllowed:
-    fullPeriods = proposed          ← fill-extra-first applies
+if proposedExtra ≥ 0 AND proposedExtra ≤ maxAllowed:
+    fullPeriods = proposed
     extraNights = proposedExtra
 else:
-    // Cannot form a valid fill-first decomposition.
-    // Fall back to floor for meaningful error-message data.
+    // No valid decomposition — fall back to floor for error messages
     fullPeriods = floor(nights / duration)
     extraNights = nights - fullPeriods × duration
 ```
 
-After computing `fullPeriods` and `extraNights`, both limits are validated:
+Then validate:
+1. `extraNights ≤ maxAllowed`
+2. `fullPeriods ≤ maxQuantity` (if set)
 
-1. `extraNights <= maxAllowed` (or `maxAllowed` is null — unlimited)
-2. `fullPeriods <= maxQuantity` (or `maxQuantity` is null — unlimited)
+**Divisibility note:** extra nights must make the remaining stay divisible by `duration`. The maximized extra may be less than `maxAllowed` when the remainder constraint prevents reaching it. For example, with `duration=2` and `maxAllowed=5`, a 22-night stay yields **4** extra nights (not 5) because `22 − 5 = 17` is not divisible by 2 — the largest valid extra is 4 (`22 − 4 = 18 = 2 × 9`).
 
-If either fails, `{ valid: false, ... }` is returned.
+#### Worked example: 2-night package, max 5 additional nights
+
+| Total nights | Full periods | Extra nights | Notes |
+|---|---|---|---|
+| 2 | 1 | 0 | No room for extra |
+| 3 | 1 | 1 | |
+| 5 | 1 | 3 | (5 would need 0 remainder nights which isn't possible) |
+| 21 | 8 | 5 | Max extra reached |
+| 22 | 9 | 4 | 5 not reachable (22−5=17, odd) |
+| 23 | 9 | 5 | Max extra reached |
 
 #### When additional nights is ON and `maxAllowed` is null (unlimited)
 
-Fall back to the standard floor decomposition. Any `extraNights` value is accepted; only the `maxQuantity` limit is applied.
-
-### Worked Examples
-
-**2-night package, `additional_package_nights_allowed = true`, `max_additional_package_nights = 2`:**
-
-| Stay nights | `fullPeriods` | `extraNights` | Valid? | Notes |
-|---|---|---|---|---|
-| 2 | 1 | 0 | ✓ | Exact 1 period |
-| 3 | 1 | 1 | ✓ | 1 extra night |
-| 4 | 1 | 2 | ✓ | Fill-extra-first — was 2 periods under old formula |
-| 5 | 2 | 1 | ✓ | Extra budget exhausted at 4 nights; new period starts |
-| 6 | 2 | 2 | ✓ | Fill-extra-first — was 3 periods under old formula |
-| 7 | 3 | 1 | ✓ | |
-| 8 | 3 | 2 | ✓ | |
-
-**3-night package, `max_additional_package_nights = 2`:**
-
-| Stay nights | `fullPeriods` | `extraNights` | Valid? |
-|---|---|---|---|
-| 3 | 1 | 0 | ✓ |
-| 4 | 1 | 1 | ✓ |
-| 5 | 1 | 2 | ✓ |
-| 6 | 2 | 0 | ✓ |
-| 7 | 2 | 1 | ✓ |
-| 8 | 2 | 2 | ✓ |
-| 9 | 3 | 0 | ✓ |
-
-> **Note:** for the 3-night package with max=2, fill-extra-first produces the same result as the old floor formula because `max_additional (2) < duration (3)`. The observable difference only occurs when `max_additional >= duration`.
-
-### Key Property
-
-For any valid stay, the number of full periods is the **minimum** required so that extra nights fit within `maxAllowed`. A stay that is a clean multiple of `duration` will be priced with extra nights rather than an additional full period, provided the extra nights do not exceed `maxAllowed`.
+Falls back to floor decomposition. Any `extraNights` value is accepted; only `maxQuantity` is checked.
 
 ### Unit Tests
 
@@ -118,20 +94,7 @@ For any valid stay, the number of full periods is the **minimum** required so th
 node Services/SysScripts/TestScripts/validateExtraNights.test.js
 ```
 
-Key assertions added with this change (beyond the original 20):
-
-```js
-// fill-extra-first: clean 2-period stay now 1 period + 2 extra
-assert.deepStrictEqual(validateExtraNights(4, 2, true, 2), { valid: true, fullPeriods: 1, extraNights: 2 });
-// fill-extra-first: clean 3-period stay now 2 periods + 2 extra
-assert.deepStrictEqual(validateExtraNights(6, 2, true, 2), { valid: true, fullPeriods: 2, extraNights: 2 });
-// max=1 too small to absorb: stays at 2 full periods (no change)
-assert.deepStrictEqual(validateExtraNights(4, 2, true, 1), { valid: true, fullPeriods: 2, extraNights: 0 });
-// additional OFF: floor behaviour, no change
-assert.deepStrictEqual(validateExtraNights(4, 2, false, 2), { valid: true, fullPeriods: 2, extraNights: 0 });
-// maxAllowed null: floor behaviour, no change
-assert.deepStrictEqual(validateExtraNights(4, 2, true, null), { valid: true, fullPeriods: 2, extraNights: 0 });
-```
+33 inline assertions — all passing.
 
 ---
 
