@@ -3,6 +3,10 @@
 // `{ label, items }`; doc-id strings stay strings. Order is load-bearing —
 // it drives both the tree and the prev/next footer, so keep it in sync with
 // sidebars.js if that file is ever the source of truth again.
+//
+// The root sidebars.js is present but DEAD: it is kept byte-identical to main
+// purely so the branch has no modify/delete conflict, and is deleted once PR #12
+// merges. This file is what the app actually reads — edit here, never there.
 
 export type SidebarNode = string | { label: string; items: SidebarNode[] }
 

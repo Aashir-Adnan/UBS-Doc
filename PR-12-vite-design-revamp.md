@@ -18,7 +18,7 @@ Before this, the product was two stacked layers: a Docusaurus docs site, plus cu
 No feature was dropped and no backend contract changed — apart from the `actionPerformerURDD` port described below, which is a deliberate port of an already-reviewed PR.
 
 - **44 commits, 152 files, +18,323 / −24,473** against `origin/main`
-- **Docusaurus gone:** `docusaurus.config.js`, `sidebars.js`, `src/theme/Root.js`, and all 18 files under `src/pages/`
+- **Docusaurus gone:** `docusaurus.config.js`, `src/theme/Root.js`, and all 18 files under `src/pages/` (`sidebars.js` is dead but deliberately retained — see *Merging this branch* below)
 - **Deps removed:** `@docusaurus/core`, `@docusaurus/preset-classic`, `@docusaurus/module-type-aliases`, `@docusaurus/types`, `dotenv`
 - **Deps added:** `vite`, `@vitejs/plugin-react`, `react-router-dom`, `typescript`, `vitest`, `tailwindcss`, the MDX + remark/rehype pipeline, `lucide-react`, `marked`
 - **69 tests across 11 files** — main has no test runner at all
@@ -117,5 +117,27 @@ ce9b2af  fix: opaque dropdown surfaces; add text-animate and number-ticker
 4ee6df1  feat(portal): authorize org/permission admin endpoints by actionPerfo…
 03b7f37  chore: drop the Figma design reference folder
 ```
+
+## Merging this branch
+
+**`sidebars.js` is intentionally still here, and must be deleted after the merge.**
+
+The Vite docs engine replaced it with `src/docs/sidebar.ts`, and this branch originally deleted it. That created the only merge conflict against `main`: a modify/delete conflict, because we deleted the file while `main` kept adding entries to it. Git cannot auto-resolve that.
+
+Restoring the file byte-identical to `main`'s copy removes the conflict entirely and lets any further `main` edits auto-merge, so the branch stays conflict-free while it waits to be merged.
+
+It is genuinely inert in the meantime:
+
+- not imported by anything (`src/docs/sidebar.ts` is the only source of truth the app reads)
+- not in Vite's module graph, so it is never bundled and never reaches `dist/`
+- not covered by `tsconfig.json` (`include` is `["src", "docs"]`), so its `// @ts-check` header never runs
+
+**After merging, delete it:**
+
+```bash
+git rm sidebars.js && git commit -m "chore: drop the dead Docusaurus sidebars.js"
+```
+
+`src/docs/sidebar.ts` has been verified to carry `main`'s sidebar in full — both flatten to the same 242 interleaved category/doc nodes in the same order, and `src/docs/sidebar.test.ts` asserts every id in it resolves to a real file. Nothing is lost by removing it.
 
 > Regenerate authoritative list: `gh pr view 12 -R Aashir-Adnan/UBS-Doc --json commits --jq '.commits[] | "\(.oid[0:7])  \(.messageHeadline)"'`
