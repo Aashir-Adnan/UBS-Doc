@@ -86,6 +86,40 @@ Then validate:
 
 Falls back to floor decomposition. Any `extraNights` value is accepted; only `maxQuantity` is checked.
 
+### Package Groups (Parallel Capacity)
+
+When a package defines a per-group capacity via the `max_adults` and
+`max_children` config keys, and the booking party size exceeds that capacity,
+the booking is split into multiple **groups**. Each group receives the same
+night decomposition independently.
+
+```
+packageCapacity = max_adults + max_children   (0 if neither key is configured)
+groups          = packageCapacity > 0
+                    ? max(1, ceil(partySize / packageCapacity))
+                    : number of room units assigned
+
+totalQuantity   = groups × fullPeriods
+extraNightsCost = groups × extraNights × discountedPricePerNight
+```
+
+**Example — package capacity 4, 5-night booking with duration 2, max 3 extra nights:**
+
+| Party | Groups | Full periods | Extra nights | Total pkg instances |
+|---|---|---|---|---|
+| 3 | 1 | 1 | 3 | 1 |
+| 4 | 1 | 1 | 3 | 1 |
+| 5 | 2 | 1 | 3 | 2 |
+| 8 | 2 | 1 | 3 | 2 |
+| 9 | 3 | 1 | 3 | 3 |
+
+Extra nights cost is also multiplied by `groups`. If one group's extra-nights
+subtotal is 150, a booking of 2 groups costs 300 in extra-nights charges.
+
+**When `max_adults` and `max_children` are both unset (capacity = 0):**
+The system falls back to the number of room units assigned to the booking
+(legacy behaviour — one group per room).
+
 ### Unit Tests
 
 **File:** `Services/SysScripts/TestScripts/validateExtraNights.test.js`

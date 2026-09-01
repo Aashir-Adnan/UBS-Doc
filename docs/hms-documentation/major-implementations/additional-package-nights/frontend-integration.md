@@ -156,6 +156,29 @@ Extra nights are maximized within those constraints. The achievable maximum may 
 
 The booking server enforces all rules. The frontend just presents date options and handles `400` responses.
 
+### Party Size and Package Groups
+
+If the package has `max_adults` and/or `max_children` configured, the
+frontend should communicate how many groups are being booked.
+
+```
+groups = ceil((adults + children) / (max_adults + max_children))
+```
+
+Display this to the user before checkout: "Your party of N will be split
+into X groups of this package."
+
+Each group is priced identically:
+- Full-period charge = `catalogPrice × fullPeriods` per group
+- Extra-nights charge = `discountedNightRate × extraNights` per group
+
+The total is then multiplied by `groups`.
+
+**The server enforces group splitting automatically** based on the party
+size sent in the booking request — the frontend does not need to send a
+`groups` field. Just send the correct `adults` and `children` counts and
+the server computes the rest.
+
 ### Price Breakdown
 
 Show the breakdown before the user confirms:
