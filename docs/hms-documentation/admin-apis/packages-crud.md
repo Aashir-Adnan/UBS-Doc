@@ -44,7 +44,7 @@ Multilingual fields arrive as `{ "en": "...", "ar": "..." }`; `en` is stored on 
 | `packageDescription` | `object` | No | Description `{ en, ar }`. |
 | `packageImageUrl` | `string` | No | JSON-string of attachment IDs (auto-filled from `packageAttachmentIds`). |
 | `packageAttachmentIds` | `number[]` | No | Attachment IDs to link (image gallery). |
-| `packagePricing` | `object[]` | No | `catalog_pricing` rows (price, currencyId, delta, value, type, validFrom, validTo, minQuantity, maxQuantity, customerSegment, region, dayOfWeek, conditions). On Update, `pricingId` id-targets a row. |
+| `packagePricing` | `object[]` | No | `catalog_pricing` rows (price, currencyId, delta, value, type, validFrom, validTo, minQuantity, maxQuantity, customerSegment, region, dayOfWeek, conditions). `price` is stored **post-computed** — see [Pricing](#pricing-price-is-stored-post-computed). On Update, `pricingId` id-targets a row. |
 | `packageServices` | `object[]` | No | `[{ serviceId, quantity, isConsumable, consumptionLimit, isMandatory, priceOverride, displayOrder }]`. |
 | `configs` | `array`/`object` | No | Dynamic config entries. On **Add** a flat array; on **Update** a `{ added, updated, deleted }` diff object. |
 | `packageStatus` | `string` | No | `active`/`inactive`; on Update applied via `COALESCE` so omitting it preserves the current status. |
@@ -118,6 +118,74 @@ Multilingual fields arrive as `{ "en": "...", "ar": "..." }`; `en` is stored on 
 ```
 
 ---
+
+## Pricing: `price` is stored post-computed
+
+A pricing row carries a base amount **and** an adjustment: `price` is what you send, and
+`delta` / `value` / `type` describe a discount or surcharge on it. The server applies the
+adjustment **once, at write time**, and stores the result in `catalog_pricing.price`. Readers never
+re-apply it; `delta`/`value`/`type` remain as the record of how the number was reached.
+
+| Submitted | Stored `price` |
+|---|---|
+| `price: "120", delta: "+", value: null, type: "flat"` | `120.0000` — no usable adjustment |
+| `price: "120", delta: "-", value: "40", type: "flat"` | `80.0000` |
+| `price: "120", delta: "-", value: 20, type: "percentage"` | `96.0000` |
+| `price: "120", delta: "+", value: 10, type: "percentage"` | `132.0000` |
+
+The price is stored **unchanged** when the row has no usable adjustment — `value` null, empty,
+zero or non-numeric; `delta` anything but `+`/`-`; or `type` anything but `flat`/`percentage`.
+That is the ordinary list-price case, which sends `delta: "+"` with `value: null`. A discount
+larger than the price floors at `0` rather than going negative, and results are rounded to
+`DECIMAL(19,4)`.
+
+:::caution Do not echo a stored price back with the same adjustment
+Because `price` is stored post-computed, sending `120 / - / 40 / flat` stores `80`. If a client
+reads that row back and re-submits it **unchanged**, it sends `price: 80` with the same
+`- / 40 / flat` and the row becomes `40` — the adjustment applies a second time.
+
+An edit form must resubmit the **original base** price, not the value it read back. When only the
+stored row is available, the base is recoverable: `flat` → `price + value` (or `price - value` when
+`delta` is `+`); `percentage` → `price / (1 - value/100)` (or `/ (1 + value/100)`).
+:::
+
+## `add_ons` config → package-scoped service prices
+
+The `add_ons` config records which add-on **services** a guest may attach at booking time — after
+the package is already booked — and at what discount. Each entry is one bare row:
+
+```json
+{"add_on_service": 378, "discount_pct": 20}
+```
+
+On Add and Update, every entry is projected into a **package-scoped `catalog_pricing` row for the
+service**, so pricing readers need no new join:
+
+| Column | Value |
+|---|---|
+| `base_table` | `services` |
+| `record_id` | the entry's `add_on_service` |
+| `package_id` | this package |
+| `price` | the service's standalone price with `discount_pct` applied (post-computed) |
+| `currency_id` | the package's currency |
+| `delta` / `value` / `type` | `'-'` / `discount_pct` / `'percentage'` |
+| `customer_segment` / `recurrence` | `regular` / `once` |
+| everything else | `NULL` |
+
+So `{"add_on_service": 378, "discount_pct": 20}` on a package priced in currency `4`, where service
+378 lists at `35.0000`, writes `price = 28.0000, delta = '-', value = 20.00, type = 'percentage'`.
+
+Reconcile rules:
+
+- The discount comes off the service's **standalone** price (its `catalog_pricing` row with no
+  `package_id`). A service with no standalone price is **skipped**, not written at `0`.
+- One row per (package, service). Re-sending a service updates it in place; listing the same
+  service twice keeps the last entry.
+- Removing an add-on **retires** its row (`status = 'inactive'`), never deletes it.
+- `discount_pct` is clamped to `0..100`; missing or non-numeric is treated as `0`.
+- **A payload that does not mention `add_ons` leaves existing rows untouched** — distinct from
+  sending an empty list, which clears them. An update that only renames the package must not wipe
+  its add-on pricing.
 
 ## Behavior
 

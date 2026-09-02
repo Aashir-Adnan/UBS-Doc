@@ -8,35 +8,40 @@ This is the **data inventory**. For *how* keys are created, toggled, and given v
 
 ---
 
-## Current state (reconciled 2026-08-04)
+## Current state (refreshed 2026-09-02 against `dev-restructure_hms_1.9`)
 
-**193** system-tenant keys — **86 active, 107 inactive**.
+**211** system-tenant (original) keys — **80 active, 131 inactive**.
 
 :::danger Many catalogued keys are retired
 This catalog was written when 167 keys were active. Successive retirement migrations
 (inventory, loyalty, operating hours, package composition, viewable-for-user, the
-standalone amenity keys, …) have cut that to **86**. Rows whose key is now
-`status='inactive'` are marked **⚠️** next to the key slug — **88 rows** in the tables
-below. An unmarked row is current; a ⚠️ row is historical and kept for reference.
+standalone amenity keys, …) have cut that to **80**, while later additions grew the total
+original set to **211**. Rows whose key is now `status='inactive'` are marked **⚠️** next
+to the key slug in the inventory tables below. **Caveat:** those per-key ⚠️ marks were set
+against the 2026-08-04 `dev-restructure_hms_1.8` snapshot (88 marked); the headline counts
+here are the current `_1.9` read and **supersede** them — a per-key ⚠️ re-mark is pending,
+so treat an individual row's mark as indicative, the totals as authoritative.
 :::
 
 | `category_id` | Label | Active | Total |
 |---|---|---:|---:|
 | 1 | Basics | 12 | 13 |
 | 2 | Availability | 15 | 46 |
-| 3 | Audience | 10 | 29 |
-| 4 | Pricing Model | 13 | 22 |
+| 3 | Audience | 14 | 33 |
+| 4 | Pricing Model | 13 | 25 |
 | 10 | Package Composition | **0** | 5 |
-| 11 | Viewable for User | **0** | 9 |
-| 12 | Guest Display | 25 | 27 |
+| 11 | Viewable for User | 2 | 9 |
+| 12 | Guest Display | 11 | 35 |
 | 13 | User Form Values | 1 | 1 |
-| 14 | Service Details | 8 | 10 |
+| 14 | Service Details | 9 | 12 |
 | 15 | Amenities | 2 | 31 |
-| | **Total** | **86** | **193** |
+| — | (uncategorized) | 1 | 1 |
+| | **Total** | **80** | **211** |
 
-Two whole categories — **Package Composition (10)** and **Viewable for User (11)** — have
-no active key left. **Amenities (15)** collapsed from 31 keys to 2 (`amenities_tags`,
-`keyword_tags`) when the 29 per-amenity keys gave way to tag-driven amenities.
+One whole category — **Package Composition (10)** — has no active key left (**Viewable for
+User (11)** now carries 2 again). **Amenities (15)** remains collapsed to 2
+(`amenities_tags`, `keyword_tags`) after the 29 per-amenity keys gave way to tag-driven
+amenities. Guest Display (12) has shed most of its keys (11 active of 35).
 
 Five keys post-date the original catalog and are listed in their category tables:
 `services_as_amenities` (122), `guardian_required` (6812), `min_guests_age` (6839),
@@ -661,7 +666,7 @@ This catalog covers the **system tenant** only. Every other `hms_config_keys` ro
 
 A clone is the same key with a tenant-specific scope override (`applies_to` / `enabled_for`) — there is no other content drift. To read a clone, look up its `source_hms_config_key_id` in the catalog above, then inspect the clone's `applies_to` / `enabled_for`. Query a tenant's clones directly rather than enumerating them here. How clones are produced is covered in [per-tenant-cloning.md](../../per-tenant-cloning/per-tenant-cloning.md) and [resource-assignments.md](../../per-tenant-resource-assignment/resource-assignments.md).
 
-**Reconciled 2026-08-04:** **5,345 clone rows across 59 distinct `tenant_id` values — of which only 2,252 are `active`.** A fully-onboarded tenant carries ~170–175 clones.
+**Refreshed 2026-09-02 (`dev-restructure_hms_1.9`):** **6,102 clone rows across 40 distinct `tenant_id` values — of which 2,320 are `active`.** *(Was 5,345 rows / 59 tenants / 2,252 active on the 2026-08-04 `_1.8` snapshot.)*
 
 :::caution A clone count is not a count of usable keys
 Fewer than half the clone rows are active: the retirement migrations that cut the system
@@ -694,6 +699,7 @@ See [config-keys.md](../config-keys.md) for the CRUD contract behind the first f
 
 | Date | Change |
 |---|---|
+| 2026-09-02 | **Headline figures refreshed against `dev-restructure_hms_1.9`** (the currently connected DB): **211** original keys — **80 active / 131 inactive**; per-category table rebuilt; clone counts now **6,102 rows / 2,320 active across 40 tenant ids**; **6** constrained key names (`max_adults`, `max_children`, `checkin_anchor`, `checkout_anchor`, `min_guests_age`, `max_guests_age`). Category **11** (Viewable for User) has active keys again (2); Guest Display (12) down to 11 active. Per-key ⚠️ marks still reflect the 2026-08-04 `_1.8` snapshot (full re-mark pending). |
 | 2026-08-04 | **Reconciled against the live registry** (`dev-restructure_hms_1.8`): 193 keys, **86 active / 107 inactive** (was 167 active). Added the Current state summary; marked ⚠️ on the **88** catalog rows whose key is now inactive; added the full inactive inventory by category; added the five post-snapshot keys (`services_as_amenities` 122, `guardian_required` 6812, `min_guests_age` 6839, `max_guests_age` 6840, `unit_type` 7072); refreshed clone counts to 5,345 rows / 2,252 active across 59 tenant ids. Categories **10** and **11** now have no active key; Amenities dropped from 31 keys to 2. |
 | 2026-06-14 | Added `max_quantity_per_booking` config key (availability category, booking group, `applies_to = *`). Controls multi-quantity service bookings. Migration `20260614_1`. |
 | 2026-06-11 | Added `max_adults` and `max_children` config keys (Audience category, party group, `applies_to = *`). Migration `20260611_3`. |

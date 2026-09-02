@@ -107,7 +107,12 @@ small set of special (non-CRUD) permissions. The 9 standard leading verbs are:
 `list`, `add`, `update`, `delete`, `view`, `export`, `filter`, `sort`, `search`
 (each appears 79 times).
 
-### 1.1 Live catalog (regenerated 2026-06-30 from `hms_db_10.0`)
+### 1.1 Live catalog (regenerated 2026-09-02 from `dev-restructure_hms_1.9`)
+
+> **Retarget note.** Figures below are a straight read of the currently connected
+> **`dev-restructure_hms_1.9`** database on **2026-09-02**; they supersede the earlier
+> `hms_db_10.0` snapshot (a separate, leaner lineage). The migration *logic* in §§2–7 is
+> unchanged — only the catalog counts moved.
 
 The catalog has grown since the backfill (new resources, the Booking-Manager / dashboard
 perms, the `*_admin_code` family, and the **`import_*`** family — see the verb note below).
@@ -116,22 +121,28 @@ remain to describe.
 
 | Metric | Value |
 |---|---:|
-| Total permission rows | **838** |
-| Active | **827** |
-| Rows with a non-empty `permission_description` | **837** |
+| Total permission rows | **840** |
+| Active | **840** (no inactive rows in this DB) |
+| Rows with a non-empty `permission_description` | **839** |
 | Rows with `NULL`/empty description | **1** |
 
-Category breakdown (active, refreshed 2026-07-02 after `20260702_1`): `tenant` 434 ·
-`framework` 207 · `service` 142 · `tenant_mgmt` 39 · `common` 5 — **no uncategorized rows**
-(that migration categorized `booking_manager_dashboard`). The four persona signature dashboards
-left `common` for their tier; the generic `dashboard` remains `common`. *(Prior to `20260702_1`:
-`tenant` 433 · `framework` 206 · `service` 140 · `tenant_mgmt` 38 · `common` 9 + 1 uncategorized.)*
+Category breakdown (active): `tenant` 440 · `framework` 212 · `service` 142 ·
+`tenant_mgmt` 41 · `common` 5 — **no uncategorized rows**. The four persona signature
+dashboards sit under their tier (`saas_admin_dashboard`→`framework`,
+`tenant_manager_dashboard`→`tenant_mgmt`, `tenant_admin_dashboard`→`tenant`,
+`service_manager_dashboard`/`booking_manager_dashboard`→`service`); the generic `dashboard`
+remains `common`.
 
-**Verbs (active).** The 9 original verbs now sit at **81** each (resource set grew), and a
-**10th** standard verb — **`import`** (81) — was added 2026-06-29 (gated on `add_`/create;
-descriptions read "Upload (import) …"). `export`/`filter`/`sort`/`search` are at 80 (no
-`export_frontpage_data`). New `import_*` descriptions are produced by the import migration,
-not by §4/§5 below.
+**Verbs (active).** The 10 standard verbs: `view` **84**, `list`/`delete` **83**,
+`add` **82**, `export`/`import`/`search`/`update` **81**, `filter`/`sort` **80**. `import`
+(gated on `add_`/create; descriptions read "Upload (import) …") is produced by the import
+migration, not by §4/§5 below.
+
+> **One remaining gap.** Exactly **one** active permission still has a `NULL` description in
+> this DB: **`booking_manager_dashboard`** (`permission_id` 779, `service` tier) — the
+> Booking-Manager signature dashboard. It is not yet in the §5 special-permission CASE block
+> (added below for completeness); until that migration runs here, the §6 verification query
+> will list this one row.
 
 > **Duplicates note.** Several `tenant`/`tenant_mgmt` special permissions exist as **two
 > rows** (one `active`, one `inactive`) sharing the same `permission_name` (e.g.
@@ -444,6 +455,7 @@ UPDATE permissions SET permission_description = CASE permission_name
   WHEN 'security'                   THEN 'Open the security settings area.'
   WHEN 'saas_admin_dashboard'       THEN 'Open the SaaS Admin dashboard.'
   WHEN 'service_manager_dashboard'  THEN 'Open the Service Manager dashboard.'
+  WHEN 'booking_manager_dashboard'  THEN 'Open the Booking Manager dashboard.'
   WHEN 'tenant_admin_dashboard'     THEN 'Open the Tenant Admin dashboard.'
   WHEN 'tenant_manager_dashboard'   THEN 'Open the Tenant Manager dashboard.'
   -- managing configurable settings
@@ -466,7 +478,7 @@ UPDATE permissions SET permission_description = CASE permission_name
 END
 WHERE permission_name IN (
   'account','dashboard','privacy_policy','profile','security',
-  'saas_admin_dashboard','service_manager_dashboard','tenant_admin_dashboard','tenant_manager_dashboard',
+  'saas_admin_dashboard','service_manager_dashboard','booking_manager_dashboard','tenant_admin_dashboard','tenant_manager_dashboard',
   'manage_config_possible_values','manage_config_key_category_flags','manage_config_key_user_visibility',
   'manage_tenants_manager',
   'assign_hms_config_keys_to_tenant','assign_location_type_to_tenant','assign_scenario_config_to_tenant','assign_service_categories_to_tenant',

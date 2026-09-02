@@ -37,10 +37,10 @@ No RBAC permission is enforced — `requestMetaData.permission` is `null` and `p
 | `tenant_id` | number | No | Tenant scope (present in the schema; not written by the current SQL). |
 | `catalogPricing_baseTable` | string | No | Name of the source table this price applies to (e.g. `services`, `packages`). |
 | `catalogPricing_recordId` | number | No | Primary key of the row in `base_table`. |
-| `catalogPricing_price` | decimal | No | Base price (DECIMAL 19,4). |
+| `catalogPricing_price` | decimal | No | The **effective** price, DECIMAL(19,4). When a row is written through the services or packages CRUD the adjustment (`delta`/`value`/`type`) is already applied to it; this endpoint stores what it is given verbatim. |
 | `catalogPricing_currencyId` | number | No | Currency reference. |
 | `catalogPricing_delta` | string | No | `'+'` to add or `'-'` to subtract the adjustment `value`. |
-| `catalogPricing_value` | decimal | No | Adjustment amount (DECIMAL 10,2). |
+| `catalogPricing_value` | decimal | No | Adjustment amount (DECIMAL 10,2). Records how `price` was reached; it is **not** re-applied on read. |
 | `catalogPricing_type` | string | No | `'flat'` or `'percentage'`. |
 | `catalogPricing_validFrom` | datetime | No | Start of this pricing rule's validity window. |
 | `catalogPricing_validTo` | datetime | No | End of this pricing rule's validity window. |

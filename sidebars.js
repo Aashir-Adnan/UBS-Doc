@@ -175,6 +175,25 @@ const sidebars = {
             },
             {
               type: 'category',
+              label: 'Attachment Upload & Serve',
+              items: [
+                'hms-documentation/major-implementations/attachment-pipeline/attachment-pipeline',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Tenant Creation Flow',
+              items: [
+                'hms-documentation/tenant-creation-flow/tenant-creation-flow',
+                'hms-documentation/tenant-creation-flow/tenants-grouped-crud',
+                'hms-documentation/tenant-creation-flow/service-location-facets',
+                'hms-documentation/tenant-creation-flow/delivery-units',
+                'hms-documentation/tenant-creation-flow/services',
+                'hms-documentation/tenant-creation-flow/packages',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Permission Manager',
               items: [
                 'hms-documentation/major-implementations/permission-manager/permission-manager',

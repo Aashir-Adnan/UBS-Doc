@@ -48,7 +48,7 @@ Multilingual fields arrive as `{ "en": "...", "ar": "..." }` objects; the `en` v
 | `serviceCommonAttributes` | `object`/`array` | No | Shared attributes `{ en, ar }` (serialized to JSON on write). |
 | `serviceAttachmentIds` | `number[]` | No | Attachment IDs to link (image gallery). |
 | `serviceLocations` | `object[]` | No | `[{ location_id }]` — leaf-zone locations the service is offered in. |
-| `servicePricing` | `object[]` | No | `catalog_pricing` rows (price, currencyId, delta, value, type, validFrom, validTo, minQuantity, maxQuantity, customerSegment, region, dayOfWeek, conditions). On Update, `pricingId` id-targets a row. |
+| `servicePricing` | `object[]` | No | `catalog_pricing` rows (price, currencyId, delta, value, type, validFrom, validTo, minQuantity, maxQuantity, customerSegment, region, dayOfWeek, conditions). `price` is stored **post-computed** — see [Pricing](#pricing-price-is-stored-post-computed). On Update, `pricingId` id-targets a row. |
 | `configs` | `array`/`object` | No | Dynamic config entries. On **Add** a flat array; on **Update** a `{ added, updated, deleted }` diff object. |
 | `serviceStatus` | `string` | No | `active`/`inactive`; on Update applied via `COALESCE` so omitting it preserves the current status. |
 
@@ -130,6 +130,55 @@ Multilingual fields arrive as `{ "en": "...", "ar": "..." }` objects; the `en` v
 `hms_config_keys_catalog` (View only) is an `{ en, ar }` split of the config-key catalog with each key's selected values hydrated.
 
 ---
+
+## Pricing: `price` is stored post-computed
+
+A pricing row carries a base amount **and** an adjustment: `price` is what you send, and
+`delta` / `value` / `type` describe a discount or surcharge on it. The server applies the
+adjustment **once, at write time**, and stores the result in `catalog_pricing.price`. Readers never
+re-apply it; `delta`/`value`/`type` remain as the record of how the number was reached.
+
+| Submitted | Stored `price` |
+|---|---|
+| `price: "120", delta: "+", value: null, type: "flat"` | `120.0000` — no usable adjustment |
+| `price: "120", delta: "-", value: "40", type: "flat"` | `80.0000` |
+| `price: "120", delta: "-", value: 20, type: "percentage"` | `96.0000` |
+| `price: "120", delta: "+", value: 10, type: "percentage"` | `132.0000` |
+
+The price is stored **unchanged** when the row has no usable adjustment — `value` null, empty,
+zero or non-numeric; `delta` anything but `+`/`-`; or `type` anything but `flat`/`percentage`.
+That is the ordinary list-price case, which sends `delta: "+"` with `value: null`. A discount
+larger than the price floors at `0` rather than going negative, and results are rounded to
+`DECIMAL(19,4)`.
+
+:::caution Do not echo a stored price back with the same adjustment
+Because `price` is stored post-computed, sending `120 / - / 40 / flat` stores `80`. If a client
+reads that row back and re-submits it **unchanged**, it sends `price: 80` with the same
+`- / 40 / flat` and the row becomes `40` — the adjustment applies a second time.
+
+An edit form must resubmit the **original base** price, not the value it read back. When only the
+stored row is available, the base is recoverable: `flat` → `price + value` (or `price - value` when
+`delta` is `+`); `percentage` → `price / (1 - value/100)` (or `/ (1 + value/100)`).
+:::
+
+## `servicePricing` covers only the service's own prices
+
+Every `catalog_pricing` query in this endpoint is scoped to `package_id IS NULL`.
+
+A `catalog_pricing` row for a service that carries a **non-null `package_id`** is a package-scoped
+**add-on price** — what that service costs inside one specific package. It is owned by the
+[Packages CRUD](./packages-crud.md), written from the package's `add_ons` config. This endpoint
+neither returns nor modifies it:
+
+- **Reads** omit it, so it never appears in `servicePricing[]` and `servicePrice` is never derived
+  from a discounted in-package price.
+- **The Update diff** ignores it. This matters: the diff soft-deletes rows that are in the database
+  but absent from the payload, and add-on prices are never in a service payload — without the
+  scope, every service update would retire them.
+- **Targeted writes** refuse it, so sending a package-scoped `pricingId` cannot mutate or retire a
+  row this endpoint does not own.
+
+To change an add-on price, edit the package's `add_ons` config, not the service.
 
 ## Behavior
 

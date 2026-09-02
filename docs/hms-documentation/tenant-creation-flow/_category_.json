@@ -1,0 +1,9 @@
+{
+  "label": "Tenant Creation Flow",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "title": "Tenant Creation Flow",
+    "description": "The five endpoints that take a hotel from nothing to bookable — tenant, locations, delivery units, services, packages."
+  }
+}
