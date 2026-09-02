@@ -310,64 +310,16 @@ service's own configuration instead:
 
 | Guest form key | Source config on the service |
 |---|---|
-| `guest_pickup_location` | `pickup_dropoff_locations` |
-| `guest_dropoff_location` | `pickup_dropoff_locations` |
+| `guest_pickup_location` | `pickup_locations` |
+| `guest_dropoff_location` | `dropoff_locations` |
 
-**Both dropdowns draw from the same list.** A stop serves both directions — any location can be a
-pickup point or a drop-off point — so the hotel maintains one list rather than two. The two form
-fields stay separate (the guest picks a pickup *and* a drop-off); only the options are shared.
-
-`pickup_dropoff_locations` is a multi-value `location_form` config key (`hms_config_keys` category
-`service_details`) that a hotel admin fills in per transport service. Each entry has `order`,
-`location_name`, `location_latitude`, `location_longitude`.
+`pickup_locations` / `dropoff_locations` are multi-value `location_form` config keys
+(`hms_config_keys` category `service_details`) that a hotel admin fills in per transport service.
+Each entry has `order`, `location_name`, `location_latitude`, `location_longitude`.
 
 A multi-value config is stored as **one `hms_config` row per entity**, each holding a bare JSON
-object, so a service with three stops has three `pickup_dropoff_locations` rows. The backend reads
+object, so a service with three pickup stops has three `pickup_locations` rows. The backend reads
 those rows, emits one option per row, and sorts by the admin's `order`.
-
-#### The hotel's own location
-
-One option is **not** admin-entered: the hotel's own address is added automatically by the services
-CRUD and returned to the guest flagged `is_default: 1`. It is usually the most common stop, so it
-is offered like any other option — and because it carries no `order`, it sorts **last**.
-
-A client may use the flag to badge it ("Hotel"), preselect it, or group it apart. Ignoring the flag
-is also fine: it behaves as an ordinary option in every other respect, and is submitted the same
-way. It is also the option the direction rule below auto-fills, so **find it by
-`option.is_default === 1`** — never by matching the hotel's name.
-
-#### `destination_type` — the direction rule
-
-A third transport field, **`destination_type`**, is a dropdown with two options: **`pickup`** and
-**`dropoff`**. It exists because a hotel transport service always runs **to or from the hotel** —
-never between two arbitrary points. So one leg of the trip is always the hotel itself, and the
-guest only ever chooses the other one.
-
-That makes one of the two location fields redundant, and the client should fill it in rather than
-ask for it:
-
-| `destination_type` | Trip runs | `guest_pickup_location` | `guest_dropoff_location` |
-|---|---|---|---|
-| `dropoff` | hotel → chosen stop | **auto-fill with the `is_default` option** | guest picks |
-| `pickup` | chosen stop → hotel | guest picks | **auto-fill with the `is_default` option** |
-
-So when the guest selects **`dropoff`**, set `guest_pickup_location` to the option whose
-`is_default` is `1` and hide (or disable, or show read-only) that field — the guest is being
-collected at the hotel. `pickup` is the mirror image.
-
-**All three fields are `isRequired: true`** — `destination_type`, `guest_pickup_location` and
-`guest_dropoff_location` alike. The auto-filled location is still submitted like any other value:
-send the `is_default` option's `value`. The server does not infer it — it stores exactly what it is
-sent, and a booking missing any of the three is rejected with a `400`.
-
-Notes:
-
-- **Ask for `destination_type` first.** It is required and it decides which location field to
-  auto-fill, so collect it before rendering the two location dropdowns.
-- **Do not confuse it with `destination_location_type`** — an unrelated, retired key whose options
-  were place *kinds* (hotel, airport, city center). `destination_type` is the direction.
-- The rule is **client-side orchestration over an unchanged request shape**. Nothing about the
-  stored result differs from a booking where the guest picked both locations by hand.
 
 Both keys apply to the **transport** category only, so these fields appear only on transport
 services. They are `isRequired: true`.
@@ -385,10 +337,8 @@ Option shape — the usual `{value, label}` plus a `form` object:
     {
       "value": "59871",
       "label": { "en": "Leamridian Hotel", "ar": "Leamridian Hotel" },
-      "is_default": 0,
       "form": {
         "hms_config_id": 59871,
-        "is_default": 0,
         "order": 1,
         "location_name": { "en": "Leamridian Hotel", "ar": "" },
         "location_latitude": "31.480369",
@@ -398,27 +348,12 @@ Option shape — the usual `{value, label}` plus a `form` object:
     {
       "value": "59879",
       "label": { "en": "Jeddah Airport T1", "ar": "Jeddah Airport T1" },
-      "is_default": 0,
       "form": {
         "hms_config_id": 59879,
-        "is_default": 0,
         "order": 2,
         "location_name": { "en": "Jeddah Airport T1", "ar": "" },
         "location_latitude": "21.6796",
         "location_longitude": "39.1565"
-      }
-    },
-    {
-      "value": "59927",
-      "label": { "en": "Le Meridien Makkah", "ar": "فندق مريديان مكة" },
-      "is_default": 1,
-      "form": {
-        "hms_config_id": 59927,
-        "is_default": 1,
-        "order": null,
-        "location_name": { "en": "Le Meridien Makkah", "ar": "فندق مريديان مكة" },
-        "location_latitude": "21.42025",
-        "location_longitude": "39.82918"
       }
     }
   ]
@@ -429,7 +364,6 @@ Option shape — the usual `{value, label}` plus a `form` object:
 |---|---|---|
 | `value` | `string` | The `hms_config.id` of the row holding this location. See below. |
 | `label.en` / `label.ar` | `string` | **Always plain strings — render these.** Resolved from the configured `location_name`; `ar` falls back to `en` when no Arabic was entered. |
-| `is_default` | `0` \| `1` | `1` on the hotel's own location, which the server adds automatically. `0` on every admin-entered stop. Mirrored inside `form`. |
 | `form` | `object` | **These two keys only.** The location entry exactly as the admin stored it. |
 | `form.hms_config_id` | `number` | The `hms_config.id` of the row holding this location — the same id as `value`, as a number. |
 | `form.location_name` | `object\|string` | **Verbatim admin value, not a display string.** Usually a bilingual `{en, ar}` object (these keys are `is_input = 1`, so free text goes through the multilingual path); a bare string on legacy rows. Render `label` instead — stringifying this yields `"[object Object]"`. |
@@ -454,10 +388,6 @@ Consequences worth knowing:
 - **Treat `value` as opaque.** Render `label`, submit `value`.
 - **Two stops may share a name** and both appear as distinct options, because their row ids
   differ. Earlier drafts used the location name as the value and silently collapsed them.
-- **The same option list is returned for both fields**, as two independent arrays. Mutating one
-  does not affect the other.
-- **The `is_default` option is always last** — it has no `order`, and unordered stops sort to the
-  bottom.
 - **The value survives an admin rename** — and a reorder, and the deletion of a *different* stop.
   It stops resolving only when that stop itself is deleted, which is correct. Bookings store the
   resolved snapshot, so historical records keep the name and coordinates they were made with
@@ -472,10 +402,10 @@ Consequences worth knowing:
   resolve to the same stored result (see
   [Guest Bookings Service](../guest-bookings-service/guest-bookings-service.md)).
 - Use `form.location_latitude` / `form.location_longitude` for maps — no extra request needed.
-- **`options` may still be absent.** A service whose `pickup_dropoff_locations` config has never
-  been saved (so not even the hotel's own default row exists) returns the field with no `options`
-  array, even though `isRequired` is `true`. Fall back to a free-text input in that case: the
-  backend accepts an arbitrary string and stores it as-is.
+- **`options` may be absent.** A transport service whose admin has not yet filled in
+  `pickup_locations` / `dropoff_locations` returns the field with no `options` array, even
+  though `isRequired` is `true`. Fall back to a free-text input in that case: the backend
+  accepts an arbitrary string and stores it as-is.
 - Options are **per service**. Do not cache them by category — two transport services in the
   same category have different stops.
 
@@ -527,8 +457,7 @@ Consequences worth knowing:
 | `formSchema[].isRequired` | `boolean` | Detail | Whether the field is required for booking. |
 | `formSchema[].autoDerivable` | `boolean` | Detail | Whether the server can auto-fill this field from the guest profile. |
 | `formSchema[].options` | `array\|undefined` | Detail | Dropdown options (only for `type: "dropdown"` fields with configured possible values). |
-| `formSchema[].options[].is_default` | `0\|1` | Detail | `1` on the hotel's own auto-added location; `0` otherwise. |
-| `formSchema[].options[].form` | `object\|undefined` | Detail | Only on `guest_pickup_location` / `guest_dropoff_location`. The location entry as stored (`hms_config_id`, `is_default`, `order`, `location_name`, `location_latitude`, `location_longitude`). `location_name` is the verbatim admin value — usually a bilingual `{en, ar}` object; render `label` for display. |
+| `formSchema[].options[].form` | `object\|undefined` | Detail | Only on `guest_pickup_location` / `guest_dropoff_location`. The location entry as stored (`hms_config_id`, `order`, `location_name`, `location_latitude`, `location_longitude`). `location_name` is the verbatim admin value — usually a bilingual `{en, ar}` object; render `label` for display. |
 
 ---
 
@@ -632,7 +561,6 @@ node Services/SysScripts/TestScripts/sim/guestDataAuditAndSeed.js
 
 | Date | Change |
 |---|---|
-| 2026-08-28 | `guest_pickup_location` and `guest_dropoff_location` now draw options from a single merged service config, `pickup_dropoff_locations` (the old `pickup_locations` / `dropoff_locations` pair was merged; `dropoff_locations` is retired). Both fields remain separate and receive the same option list. The hotel's own address is added automatically as an option flagged `is_default: 1`; it carries no `order` and therefore sorts last. Submission is unchanged. |
 | 2026-08-27 | Transport services now return per-service options on the `guest_pickup_location` / `guest_dropoff_location` dropdowns, sourced from that service's `pickup_locations` / `dropoff_locations` `location_form` config instead of from shared possible values. Option `value` is the `hms_config.id` of the row holding that location, addressing the source row the way a possible-value id does; `form` carries the location's coordinates and its `hms_config_id`; `label` is the plain-string display pair (the raw `form.location_name` is the admin's bilingual object). Options are absent when the admin has not configured any locations. |
 | 2026-06-11 | Added `maxAdults`, `maxChildren`, `minAdults`, `minNights`, `maxNights`, `sessionDurationMinutes` to the detail response field reference. `maxAdults` and `maxChildren` use the new dedicated config keys, falling back to `max_persons_per_booking` and `max_children_per_guardian` respectively. |
 | 2026-06-10 | `formSchema` is now always `[]` (never undefined) on detail objects when a category has no form fields. Previously only attached when non-empty. |

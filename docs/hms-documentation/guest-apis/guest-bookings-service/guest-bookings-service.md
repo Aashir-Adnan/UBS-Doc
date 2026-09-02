@@ -77,18 +77,13 @@ Pickup and drop-off are chosen from the dropdown options the service detail retu
     "passengers": 2
   },
   "formData": {
-    "destination_type": "dropoff",
-    "guest_pickup_location": "59927",
-    "guest_dropoff_location": "59871"
+    "guest_pickup_location": "59871",
+    "guest_dropoff_location": "59872"
   }
 }
 ```
 
-Here `destination_type` is `dropoff`, so the trip runs hotel → chosen stop: the client auto-filled
-`guest_pickup_location` with the `is_default` option (`59927`, the hotel) and the guest chose the
-drop-off. Both are still sent.
-
-`"59871"` is an option's `value` — the `hms_config.id` of the row holding that stop, exactly as a
+`"59871"` is the option's `value` — the `hms_config.id` of the row holding that stop, exactly as a
 normal dropdown submits an `hms_config_possible_values.id`. Treat it as opaque; take it from the
 service detail response.
 
@@ -222,7 +217,7 @@ A common mistake is placing `sessions`, `meals`, or `transport` inside `formData
    - **Kids Center** (category_id=6): Guardian name/phone required if `guardian_rule` is set. Age bracket validation.
    - **Spa** (category_id=3): Guardian consent required for certain age brackets.
 8. Resolves `formData.guest_pickup_location` / `guest_dropoff_location` against the service's
-   configured `pickup_dropoff_locations`, expanding the submitted value into the
+   configured `pickup_locations` / `dropoff_locations`, expanding the submitted value into the
    full location form entry. Back-fills them from `transport.pickupLocation` /
    `transport.dropoffLocation` first when absent.
 9. Validates guest-supplied `formData` against category-12 required fields.
@@ -582,65 +577,20 @@ Transport pickup and drop-off moved from free text to a per-service dropdown.
 
 ### Where the options come from
 
-A hotel admin configures the stops on the **service** itself, via the multi-value `location_form`
-config key `pickup_dropoff_locations`. Each entry is
-`{ order, location_name, location_latitude, location_longitude }`. The server adds the hotel's own
-address to that list automatically, flagged `is_default: 1` and carrying no `order`, so it sorts
-last.
+A hotel admin configures the stops on the **service** itself, via the `location_form` config keys
+`pickup_locations` and `dropoff_locations`. Each entry is
+`{ order, location_name, location_latitude, location_longitude }`.
 
 `GET /guest/services?serviceId=<id>` turns those entries into options on the two category-12
 dropdown keys, so the client never reads the raw config:
 
 | Guest form key | Options sourced from |
 |---|---|
-| `guest_pickup_location` | the service's `pickup_dropoff_locations` |
-| `guest_dropoff_location` | the service's `pickup_dropoff_locations` |
-
-**Both fields draw from one list.** A stop serves both directions, so the hotel maintains a single
-list rather than two. The fields stay separate — the guest picks a pickup *and* a drop-off — only
-the options are shared. One of those options is the **hotel's own address**, added automatically by
-the server and flagged `is_default: 1`; it is selected and submitted exactly like any other.
+| `guest_pickup_location` | the service's `pickup_locations` |
+| `guest_dropoff_location` | the service's `dropoff_locations` |
 
 Both keys are `isRequired: true` and apply to the **transport** category only. Full option shape
 is documented in [Guest Services](../guest-services/guest-services.md#per-service-dropdown-options--transport-pickup--drop-off).
-
-### `destination_type` — the direction rule
-
-A hotel transport service always runs **to or from the hotel**, never between two arbitrary points.
-A third transport form field, **`destination_type`** (dropdown: `pickup` | `dropoff`), says which
-way, and that determines which of the two location fields the guest actually chooses — the other
-one is always the hotel:
-
-| `destination_type` | Trip runs | `guest_pickup_location` | `guest_dropoff_location` |
-|---|---|---|---|
-| `dropoff` | hotel → chosen stop | **auto-filled with the `is_default` option** | guest picks |
-| `pickup` | chosen stop → hotel | guest picks | **auto-filled with the `is_default` option** |
-
-The client fills the redundant field rather than asking for it: on `dropoff`, set
-`guest_pickup_location` to the option whose `is_default` is `1` and hide or disable that field.
-Find that option by **`is_default === 1`**, never by matching the hotel's name.
-
-This is client-side orchestration over an **unchanged request shape**:
-
-- **All three keys are `isRequired: true`** — `destination_type`, `guest_pickup_location` and
-  `guest_dropoff_location`. The auto-filled location is **still submitted**: send the `is_default`
-  option's `value` in `formData` like any other. The server does not infer it; it stores exactly
-  what it is sent.
-- `destination_type` rides in `formData` as its own key. Submit the option's `value` — the literal
-  string `"pickup"` or `"dropoff"`.
-- **Ask for `destination_type` first**, since it decides which location field to auto-fill.
-- The stored booking is byte-identical to one where the guest picked both locations by hand.
-
-:::warning Three keys required, not two
-`validateBookingFormData` checks every required category-12 key for the service's category, so a
-transport booking must now carry `destination_type` as well as both locations. A client that sends
-only the two locations gets `400 Missing required booking fields: destination_type`.
-:::
-
-:::note Not `destination_location_type`
-An unrelated, retired key `destination_location_type` once held place *kinds* (hotel, airport,
-city center). `destination_type` is the direction, and is a different field.
-:::
 
 ### What to submit
 
@@ -662,10 +612,10 @@ The last row is the legacy path, kept so clients that still send free text keep 
 resolves only on an **unambiguous** match — if two stops share the name there is no way to tell
 which was meant, so the raw string is stored rather than silently attributed to the first one.
 
-A value matching no configured location is also stored as-is rather than rejected: a service whose
-`pickup_dropoff_locations` config has never been saved returns the field with **no options**, and
-the legacy free-text `transport.pickupLocation` accepted arbitrary names. Required-ness is still
-enforced — a missing value is a `400`.
+A value matching no configured location is also stored as-is rather than rejected: a transport
+service whose admin has not yet filled in `pickup_locations` returns the field with **no
+options**, and the legacy free-text `transport.pickupLocation` accepted arbitrary names.
+Required-ness is still enforced — a missing value is a `400`.
 
 ### What gets stored
 
@@ -677,26 +627,21 @@ stored **as the form**, not flattened to its label:
 ```json
 {
   "guest_pickup_location": {
-    "hms_config_id": 59927,
-    "is_default": 1,
-    "order": null,
-    "location_name": { "en": "Le Meridien Makkah", "ar": "فندق مريديان مكة" },
-    "location_latitude": "21.42025",
-    "location_longitude": "39.82918"
-  },
-  "guest_dropoff_location": {
     "hms_config_id": 59871,
-    "is_default": 0,
     "order": 1,
     "location_name": { "en": "Leamridian Hotel", "ar": "" },
     "location_latitude": "31.480369",
     "location_longitude": "74.369286"
+  },
+  "guest_dropoff_location": {
+    "hms_config_id": 59872,
+    "order": 2,
+    "location_name": { "en": "Hotel", "ar": "" },
+    "location_latitude": "32.5204",
+    "location_longitude": "75.3587"
   }
 }
 ```
-
-The hotel's own location is stored just like any other stop — `is_default: 1` records that the
-guest chose it, and `hms_config_id` still points at the row it came from.
 
 `hms_config_id` is what makes the stored answer traceable: it names the `hms_config` row the guest
 actually chose — the same role a possible-value id plays for every other dropdown.
@@ -713,10 +658,10 @@ alongside the pre-existing scalar keys, which stay populated with the location n
 ```json
 {
   "trip_type": "airport_pickup",
-  "pickup_location": "Le Meridien Makkah",
-  "dropoff_location": "Leamridian Hotel",
-  "guest_pickup_location": { "hms_config_id": 59927, "is_default": 1, "order": null, "location_name": { "en": "Le Meridien Makkah", "ar": "فندق مريديان مكة" }, "location_latitude": "21.42025", "location_longitude": "39.82918" },
-  "guest_dropoff_location": { "hms_config_id": 59871, "is_default": 0, "order": 1, "location_name": { "en": "Leamridian Hotel", "ar": "" }, "location_latitude": "31.480369", "location_longitude": "74.369286" },
+  "pickup_location": "Leamridian Hotel",
+  "dropoff_location": "Hotel",
+  "guest_pickup_location": { "hms_config_id": 59871, "order": 1, "location_name": { "en": "Leamridian Hotel", "ar": "" }, "location_latitude": "31.480369", "location_longitude": "74.369286" },
+  "guest_dropoff_location": { "hms_config_id": 59872, "order": 2, "location_name": { "en": "Hotel", "ar": "" }, "location_latitude": "32.5204", "location_longitude": "75.3587" },
   "passengers": 2
 }
 ```
@@ -738,7 +683,6 @@ as `addon.transport.guest_pickup_location`, `addon.transport.pickupLocation`, or
 
 | Date | Change |
 |---|---|
-| 2026-08-28 | Added `destination_type` (dropdown `pickup` \| `dropoff`), the direction of a transport trip. Because a transport service always runs to or from the hotel, the client auto-fills the opposite location field with the `is_default` (hotel) option — see the direction rule. `destination_type` is **required**, as are both location fields — all three must be submitted, the auto-filled one included. Pickup and drop-off options now come from one merged service config, `pickup_dropoff_locations` (`dropoff_locations` is retired and its values were merged in). Both form fields remain separate and receive the same option list, which now also includes the hotel's own address flagged `is_default: 1`. **Submission is unchanged** — send the option's `value` in `formData` exactly as before. |
 | 2026-08-27 | Transport pickup/drop-off moved to the per-service dropdowns `guest_pickup_location` / `guest_dropoff_location` in `formData`. The option value is the `hms_config.id` of the row holding that location, addressing the source row the way a possible-value id does. Submitted values are resolved against the service's configured locations and stored as the full location form entry — stamped with `hms_config_id` — at both booking and slot level. The legacy `transport.pickupLocation` / `dropoffLocation` fields and the scalar `pickup_location` / `dropoff_location` slot form values are both retained; a bare location name resolves only when unambiguous. |
 | 2026-07-13 | Response now includes `downPayment` object (20% of total). Booking confirmation email moved to after first successful payment. See [Add Services to Booking](./add-services-to-booking.md) for full addon + payment flow. |
 | 2026-08-13 | Added top-level `slots` object to standalone service booking responses. Contains `type` (`"meals"`, `"sessions"`, or `"transport"`) and `items` (the scheduled slot entries). Previously, primary service slots were only stored in the DB but not returned in the response. Also: dining/room-service `meals[]` now accepts optional `slot` field (`"HH:MM-HH:MM"`) — when provided, `booking_service_slots.scheduled_start` and `scheduled_end` are stored as full datetimes. `children` field now accepted and stored. |

@@ -69,19 +69,10 @@ tenant id. Only the tenant's own, non-inactive, constraint-bearing keys are retu
   "configConstraint_configName": "Maximum Adults",
   "configConstraint_hasConstraint": 1,
 
-  // SINGLE constraint → an object; MULTIPLE → an array of these objects.
-  "configConstraint_constraints": [
-    { "scope": "service", "constraint_operator": "<=",
-      "constraint_reference": "service.basics.service_location.delivery_unit.capacity" },
-    { "scope": "service", "constraint_operator": ">=",
-      "constraint_reference": { "key": "service.basics.service_location.delivery_unit.capacity",
-                                "op": "-", "ref": "service.availability.max_children" } },
-    { "scope": "package", "constraint_operator": "<=",
-      "constraint_reference": { "aggregate": "sum",
-        "over": "package.composition.package_composition[service.category=stay]",
-        "value": { "key": "service.availability.max_adults", "op": "*",
-                   "ref": "package.composition.package_composition.quantity" } } }
-  ]
+  "configConstraint_constraints": {
+    "constraint_operator": "<=",
+    "constraint_reference": "service.basics.service_location.delivery_unit.capacity"
+  }
 }
 ```
 

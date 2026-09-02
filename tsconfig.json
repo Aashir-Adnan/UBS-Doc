@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "paths": {
+      "@site/*": ["./*"],
+      "@/*": ["./src/*"],
+      "@theme/Layout": ["./src/compat/Layout.tsx"],
+      "@docusaurus/Link": ["./src/compat/Link.tsx"]
+    }
+  },
+  "include": ["src", "docs"]
+}

@@ -75,9 +75,8 @@ Requires a valid guest JWT (`accessToken`). The guest's identity is resolved via
       "transport": {
         "tripType": "airport_pickup",
         "pickupDateTime": "2026-07-14 14:00:00",
-        "destination_type": "dropoff",
-        "guest_pickup_location": "59927",
-        "guest_dropoff_location": "59871",
+        "guest_pickup_location": "59871",
+        "guest_dropoff_location": "59872",
         "passengers": 2
       }
     }
@@ -347,22 +346,9 @@ Transport pickup and drop-off are now chosen from a per-service dropdown rather 
 :::
 
 Fetch the options from `GET /guest/services?serviceId=<id>` — the detail response returns them as
-`formSchema` fields `guest_pickup_location` / `guest_dropoff_location`. Both are built from the same
-list, the service's `pickup_dropoff_locations` config, since a stop serves both directions. That
-list also includes the hotel's own address, added by the server and flagged `is_default: 1`. See
+`formSchema` fields `guest_pickup_location` / `guest_dropoff_location`, built from the stops the
+hotel configured on that service. See
 [Guest Services](../guest-services/guest-services.md#per-service-dropdown-options--transport-pickup--drop-off).
-
-A hotel transport service always runs **to or from the hotel**, so a third field
-**`destination_type`** (dropdown: `pickup` | `dropoff`) says which way, and the client auto-fills
-the opposite location with the hotel option (`is_default === 1`):
-
-| `destination_type` | Trip runs | `guest_pickup_location` | `guest_dropoff_location` |
-|---|---|---|---|
-| `dropoff` | hotel → chosen stop | **auto-filled with the `is_default` option** | guest picks |
-| `pickup` | chosen stop → hotel | guest picks | **auto-filled with the `is_default` option** |
-
-All three fields are required and all three are submitted, the auto-filled one included. Full rule in
-[Guest Bookings Service](./guest-bookings-service.md#destination_type--the-direction-rule).
 
 The addon payload accepts the value in any of three places, resolved in this order:
 
@@ -386,23 +372,21 @@ location name under the pre-existing scalar keys that the booking bundle and adm
 ```json
 {
   "trip_type": "airport_pickup",
-  "pickup_location": "Le Meridien Makkah",
-  "dropoff_location": "Leamridian Hotel",
+  "pickup_location": "Leamridian Hotel",
+  "dropoff_location": "Hotel",
   "guest_pickup_location": {
-    "hms_config_id": 59927,
-    "is_default": 1,
-    "order": null,
-    "location_name": { "en": "Le Meridien Makkah", "ar": "فندق مريديان مكة" },
-    "location_latitude": "21.42025",
-    "location_longitude": "39.82918"
-  },
-  "guest_dropoff_location": {
     "hms_config_id": 59871,
-    "is_default": 0,
     "order": 1,
     "location_name": { "en": "Leamridian Hotel", "ar": "" },
     "location_latitude": "31.480369",
     "location_longitude": "74.369286"
+  },
+  "guest_dropoff_location": {
+    "hms_config_id": 59872,
+    "order": 2,
+    "location_name": { "en": "Hotel", "ar": "" },
+    "location_latitude": "32.5204",
+    "location_longitude": "75.3587"
   },
   "passengers": 2
 }
@@ -417,7 +401,6 @@ Full behaviour is documented in
 
 | Date | Change |
 |---|---|
-| 2026-08-28 | Added `destination_type` (`pickup` \| `dropoff`) — the direction of the trip, **required**; the client auto-fills the opposite location field with the hotel's `is_default` option and still submits all three. Addon pickup/drop-off options now come from one merged service config, `pickup_dropoff_locations`, shared by both form fields, and include the hotel's own address flagged `is_default: 1`. **Submission is unchanged.** |
 | 2026-08-27 | Transport addons take pickup/drop-off from the per-service dropdowns `guest_pickup_location` / `guest_dropoff_location` instead of free text. The option value is the `hms_config.id` of the row holding that location, addressing the source row. The submitted value is resolved against the service's configured locations and stored as the full location form entry — with `hms_config_id` provenance — in the slot's `form_values`, alongside the retained scalar `pickup_location` / `dropoff_location` keys. Legacy `transport.pickupLocation` / `dropoffLocation` still accepted. |
 | 2026-08-13 | Dining/room-service `meals[]` now accepts optional `slot` field (`"HH:MM-HH:MM"`) for precise time scheduling in `booking_service_slots`. |
 | 2026-07-20 | Added `slot_id` parameter to DELETE endpoint for targeted slot removal. A guest can now remove a specific scheduled session (e.g., the 10:00 barber slot) without affecting other slots of the same service. |
