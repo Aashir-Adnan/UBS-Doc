@@ -5,7 +5,8 @@ sidebar_position: 0
 
 # Tenant Creation Flow — API Reference
 
-How a brand-new hotel goes from nothing to bookable, and the five endpoints that get it there.
+How a brand-new hotel goes from nothing to bookable — the five endpoints that get it there by hand,
+and one that does all five from a workbook.
 
 | # | Endpoint | Creates |
 |---|---|---|
@@ -14,6 +15,8 @@ How a brand-new hotel goes from nothing to bookable, and the five endpoints that
 | [3](./03-delivery-units.md) | `/api/custom/delivery/units` | the bookable instances — rooms, tables, chairs, vehicles |
 | [4](./04-services.md) | `/api/custom/services` | what a guest books, with pricing, config and unit assignment |
 | [5](./05-packages.md) | `/api/custom/packages` | bundles of services sold as one |
+| [6](./06-bulk-import.md) | `/api/custom/tenant/import` | all of the above, in one call, from the ops team's `.xlsx` workbook |
+| [7](./07-bulk-import-frontend.md) | — | frontend integration guide for endpoint 6 |
 
 The order matters: a service can only be assigned delivery units that exist, and a delivery unit
 can only sit at a location that exists. Step 1 already clones the global service categories,
