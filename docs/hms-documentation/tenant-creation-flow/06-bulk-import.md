@@ -70,6 +70,18 @@ All three of these throw `403` with `scc: E31`:
 | `actionPerformerURDD` | yes | A system-tenant URDD. A `NULL`-tenant URDD is rejected. |
 | `workbookBase64` | yes | Base64 of the `.xlsx` workbook bytes. |
 | `dryRun` | no (default `false`) | Validate + default + return the report; write nothing. |
+| `targetTenantId` | no | Add the workbook's data **into this existing tenant**. No tenant is provisioned, the tenant's own columns (name, timezone, address, currency, logo) are **not** touched, and the `Hotel Info` sheet is used only for defaults context. Without it, the endpoint matches an existing tenant by the code derived from `hotel_name`, or provisions a brand-new tenant if none matches. |
+
+### Two modes
+
+| | `targetTenantId` omitted | `targetTenantId` given |
+|---|---|---|
+| Tenant | matched by `hotel_name` → `tenant_code`, else **created** (row, URDD-B′, Tenant Admin, resource clone, welcome email) | the given tenant, **never created** — `404 / E50` if it is not an active tenant |
+| Tenant columns | written from `Hotel Info` | untouched |
+| Data added | locations, delivery units, services, packages, translations | same |
+| `report.mode` | `"created"` or `"reused"` | `"targeted"` |
+
+Both modes are idempotent: a record that already exists (tenant by code, service/package/location by name, unit by identifier) is reported `action: "exists"` and not re-created.
 
 ---
 
@@ -237,7 +249,8 @@ The response body's `data` is the report object.
 |---|---|
 | `dryRun` | echoes the request flag |
 | `committed` | `true` only after the commit phase ran to completion |
-| `tenant` | `{ id, code, urddBPrime }` once provisioned, otherwise `null` |
+| `tenant` | `{ id, code, urddBPrime }` on commit, otherwise `null` |
+| `mode` | `"created"` | `"reused"` | `"targeted"` |
 | `counts` | rows created per entity (`media` is always `0` in v1) |
 | `parsed` | row counts read from the workbook (committed responses only) |
 | `problems` | `{ severity, sheet, row, column, code, message, hint? }` — `severity` is `"blocking"` or `"warning"` |
