@@ -470,6 +470,19 @@ export const SIDEBAR: SidebarNode[] = [
       },
       'hms-documentation/tenant-seed-data-requirements',
       {
+        label: 'Tenant Creation Flow',
+        items: [
+          'hms-documentation/tenant-creation-flow/tenant-creation-flow',
+          'hms-documentation/tenant-creation-flow/01-tenants-grouped-crud',
+          'hms-documentation/tenant-creation-flow/02-service-location-facets',
+          'hms-documentation/tenant-creation-flow/03-delivery-units',
+          'hms-documentation/tenant-creation-flow/04-services',
+          'hms-documentation/tenant-creation-flow/05-packages',
+          'hms-documentation/tenant-creation-flow/06-bulk-import',
+          'hms-documentation/tenant-creation-flow/07-bulk-import-frontend',
+        ],
+      },
+      {
         label: 'Admin APIs',
         items: [
           'api/admin-code',
@@ -591,9 +604,11 @@ export function flattenSidebar(nodes: SidebarNode[] = SIDEBAR): string[] {
 // frontmatter for a label. Eagerly importing 144 files just to title the tree
 // would defeat the lazy loading, so the last path segment is prettified
 // instead: 'admin-apis/validation-duplicate' → 'validation duplicate'.
+// A leading order prefix ('06-bulk-import') is dropped — array order in
+// SIDEBAR already fixes the position.
 export function docLabel(id: string): string {
   const last = id.split('/').pop() || id
-  return last.replace(/[-_]+/g, ' ')
+  return last.replace(/^\d+[-_]/, '').replace(/[-_]+/g, ' ')
 }
 
 // Index-path keys ('5.2.4') of every category on the way to `id`. Category
