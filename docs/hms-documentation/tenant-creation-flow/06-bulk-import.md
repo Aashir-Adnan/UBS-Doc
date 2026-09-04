@@ -20,29 +20,54 @@ This is the canonical tenant-seeding path. It replaces `POST /api/dev/seed/tenan
 | | |
 |---|---|
 | **Path** | `POST /api/custom/tenant/import` (no IDs in the path) |
-| **Transport** | `PUBLIC_PLATFORM` — plain JSON. **No wire encryption, no access-token layer** in v1. |
-| **Authorization** | the `requireSystemTenantImportActor` guard (see below). |
+| **Transport** | `AUTH_PLATFORM` — two-layer AES: platform key **and** access token. Encrypted request + encrypted response. |
+| **Authorization** | valid access token, permission `add_tenants`, and the `requireSystemTenantImportActor` guard (see below). |
 | **API object** | `global.CustomTenantImport_object` (aliased `global.TenantImport_object`). |
+
+### Transport
+
+The request is the standard two-layer envelope:
+
+```
+inner  reqData          = AES(payload, accessToken + platformEncryptionKey)
+outer  encryptedRequest = AES({ reqData, encryptionDetails }, SECRET_KEY)
+```
+
+Send the outer envelope in the `encryptedrequest` header **or**, because a
+base64 workbook does not fit in an HTTP header, as an `encryptedRequest` field
+in the JSON body. The server accepts either. `express.json` is configured with
+a `25mb` limit; a decoded workbook larger than 15 MB is rejected with a
+blocking `WORKBOOK_TOO_LARGE` problem.
+
+The response `data` is AES-encrypted with the same inner key.
+
+### Authorization
+
+Three independent gates, in pipeline order:
+
+1. **Access token** — missing or invalid → `401`.
+2. **Permission** — the object declares `add_tenants`, the same permission
+   `TenantProvisioningGroupedCrud` requires. Without it → `403` / `scc: E41`.
+3. **System-tenant guard** — see below.
 
 ### System-tenant guard
 
 `requireSystemTenantImportActor` runs as the first `Add` preProcess. It reads
-`actionPerformerURDD` from the body, looks up its `tenant_id` in
+`actionPerformerURDD` from the payload, looks up its `tenant_id` in
 `user_roles_designations_department` (scoped to `status = 'active'`), and compares
 against `getSystemTenantId()`.
 
-- A URDD whose `tenant_id` is set and is **not** the system tenant, or a missing
-  URDD, throws `403` with `scc: E31`.
-- A URDD with a `NULL` `tenant_id` (the global URDD) is allowed.
+All three of these throw `403` with `scc: E31`:
 
-The `PUBLIC_PLATFORM` transport means the guard is the only authorization layer.
-Upgrading to a platform+token config is a tracked follow-up.
+- a URDD that does not exist or is not active,
+- a URDD whose `tenant_id` is `NULL`,
+- a URDD whose `tenant_id` is not the system tenant.
 
 ### Request body
 
 | Field | Required | Meaning |
 |---|---|---|
-| `actionPerformerURDD` | yes | System-tenant URDD (or the global `NULL`-tenant URDD). |
+| `actionPerformerURDD` | yes | A system-tenant URDD. A `NULL`-tenant URDD is rejected. |
 | `workbookBase64` | yes | Base64 of the `.xlsx` workbook bytes. |
 | `dryRun` | no (default `false`) | Validate + default + return the report; write nothing. |
 
@@ -177,6 +202,8 @@ The response body's `data` is the report object.
 {
   "dryRun": false,
   "committed": true,
+  "partial": true,
+  "blockingAfterCommit": 2,
   "tenant": { "id": 94, "code": "LE_MERIDIEN_TOWERS", "urddBPrime": 611 },
   "counts": {
     "locations": 3, "deliveryUnits": 5, "services": 3,
@@ -234,6 +261,7 @@ and appends one summary line: `… and N more rows with "CODE"`. A raw workbook 
 |---|---|
 | `NO_WORKBOOK` | `workbookBase64` missing or not valid base64. |
 | `PARSE_FAILED` | `xlsx` could not read the buffer. |
+| `WORKBOOK_TOO_LARGE` | the decoded workbook exceeds 15 MB. |
 | `MISSING_SHEET` | a required sheet (`Hotel Info` / `Locations` / `Services`) is absent. |
 | `NO_HOTEL_ROW` | the `Hotel Info` sheet has a header but no data row. |
 | `BAD_ENUM` | `hotel_type` not in `hotel`/`branch`, or `unit_type` not in `room`/`suite`/`station`/`vehicle`. |
@@ -267,6 +295,8 @@ and appends one summary line: `… and N more rows with "CODE"`. A raw workbook 
 | `TAG_UNMATCHED` | a `keyword_tags` / `amenities_tags` chip had no matching option for the tenant. |
 | `DURATION_NOT_IN_OPTIONS` | the service `duration` is not among the tenant's cloned `duration` possible-values; the service may need its duration re-picked in the admin editor. Currently fires for every service on a fresh-clone tenant. |
 | `CUTOFF_TIME_SKIPPED` | `config_cutoff_time` was present but its wire shape is unverified; not imported. |
+| `BLACKOUT_DATES_SKIPPED` | `config_blackout_dates` was present but its wire shape is unverified; not imported. |
+| `GENDER_WINDOWS_SKIPPED` | `config_gender_restricted_windows` was present but its wire shape is unverified; not imported. |
 | `PACKAGE_NO_STAY` | the package composes no Stay-category service; it will block its own next edit in the admin panel. |
 
 ### Commit phase (warning unless noted)
