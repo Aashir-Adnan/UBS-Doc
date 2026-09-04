@@ -43,6 +43,8 @@ POST /api/custom/tenants/grouped/crud?step=1
   "tenants_contactPhone": "+966500000000",
   "tenants_address": "123 Ibrahim Al Khalil Road",
   "tenants_city": "Makkah",
+  "tenants_latitude":21.4202500,
+  "tenants_longitude":39.8291800,
   "tenants_country": "Saudi Arabia",
   "tenants_postalCode": "24231",
   "tenants_tenantTimezone": "Asia/Riyadh",
@@ -181,6 +183,12 @@ designations, the persona permission groups (`PG-TENANT-ADMIN`, `PG-SERVICE-MGR`
 `PG-STANDARD-GUEST`, `PG-BOOKING-MGR`) and the tenant-scope functional `PG-FN-*` bundles, all owned
 by URDD-B′, then fans the permissions out onto the new admin's URDD. Platform-level groups
 (`PG-FRAMEWORK`, `PG-TENANT-MGMT`) are deliberately **not** cloned.
+
+:::note `PG-FN-FRONTPAGE` is not cloned either
+The front page is **platform** content owned by the system tenant, so a hotel has nothing to
+manage there. The group sits with the framework-scope bundles rather than the tenant-scope
+ones, and a new tenant gets no copy of it.
+:::
 
 ### Errors
 

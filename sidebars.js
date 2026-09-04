@@ -354,6 +354,13 @@ const sidebars = {
             },
             {
               type: 'category',
+              label: 'Guest Profile',
+              items: [
+                'hms-documentation/guest-apis/guest-profile/guest-profile',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Guest Favorites',
               items: [
                 'hms-documentation/guest-apis/guest-favorites/guest-favorites',
@@ -632,6 +639,9 @@ const sidebars = {
                 'hms-documentation/admin-apis/permission-groups-grouped-crud',
                 'hms-documentation/admin-apis/permission-manager',
                 'hms-documentation/admin-apis/permissions-dropdown',
+                'hms-documentation/admin-apis/rdd-dimension-dropdowns',
+                'hms-documentation/admin-apis/is-default-flag',
+                'hms-documentation/admin-apis/rdd-title',
                 'hms-documentation/admin-apis/user-role-permission-array',
                 'hms-documentation/admin-apis/urdd-dropdown',
               ],
