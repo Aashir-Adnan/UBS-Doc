@@ -268,7 +268,8 @@ All endpoints return standard HMS error format on failure:
 
 ## Related Endpoints
 
-- [Guest Filter Options (unified)](/hms-documentation/guest-apis/guest-search-filter/guest-search-filter) — `GET /api/guest/filterOptions` returns all filter options in a single call.
+- [Guest Filter Options (unified)](/hms-documentation/guest-apis/guest-search-filter/guest-search-filter) — `GET /api/guest/filter/options` returns all filter options in a single call.
+- [Dynamic Filter Options](/hms-documentation/minor-implementations/dynamic-filter-options/dynamic-filter-options) — `GET /api/guest/filters/dynamic?include=...` returns a chosen subset of sections in one call, so the client no longer needs to hit each split endpoint individually.
 - [Guest Search & Filter](/hms-documentation/guest-apis/guest-search-filter/guest-search-filter) — `GET /api/guest/search/filter` uses the `param` values from these responses as query parameters.
 
 ---
@@ -295,3 +296,4 @@ All endpoints return standard HMS error format on failure:
 | Date | Change |
 |---|---|
 | 2026-07-02 | Initial creation — split filter options into individual endpoints |
+| 2026-09-08 | Added `GET /api/guest/filters/dynamic` (see [Dynamic Filter Options](/hms-documentation/minor-implementations/dynamic-filter-options/dynamic-filter-options)) — one call for any subset of sections. |

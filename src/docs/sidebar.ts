@@ -209,6 +209,12 @@ export const SIDEBAR: SidebarNode[] = [
               'hms-documentation/minor-implementations/file-upload-flow/file-upload-flow',
             ],
           },
+          {
+            label: 'Dynamic Filter Options',
+            items: [
+              'hms-documentation/minor-implementations/dynamic-filter-options/dynamic-filter-options',
+            ],
+          },
         ],
       },
       {
