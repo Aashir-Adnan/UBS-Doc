@@ -525,6 +525,7 @@ export const SIDEBAR: SidebarNode[] = [
               'hms-documentation/admin-apis/config-possible-values',
               'hms-documentation/admin-apis/config-possible-values-crud',
               'hms-documentation/admin-apis/frontpage-data',
+              'hms-documentation/admin-apis/client-runtime-config',
             ],
           },
           {
@@ -543,6 +544,7 @@ export const SIDEBAR: SidebarNode[] = [
               'hms-documentation/admin-apis/users-grouped-crud',
               'hms-documentation/admin-apis/permission-groups-grouped-crud',
               'hms-documentation/admin-apis/permission-manager',
+              'hms-documentation/admin-apis/rdd-grouped-crud-step3',
               'hms-documentation/admin-apis/permissions-dropdown',
               'hms-documentation/admin-apis/user-role-permission-array',
               'hms-documentation/admin-apis/urdd-dropdown',

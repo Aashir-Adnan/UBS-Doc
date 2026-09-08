@@ -158,12 +158,17 @@ The two paths are chosen by the server's `FILE_STORAGE_PROVIDER`, not by the cli
 Step 1 endpoint matches your environment, then the upload method that goes with it.
 :::
 
-:::note The S3 row stays `pending`
-Since the bytes bypass the backend entirely, nothing reports back that the upload happened — the
-row keeps `status = 'pending'` and never gets `attachment_name`, `attachment_type` or
-`attachment_size`. Only `attachment_link` is populated. This is by design today and retrieval works
-regardless (the serve path does not filter on `attachments.status`), but do not rely on
-`status = 'active'` to mean "a file exists" on an S3 environment.
+:::note The S3 row is marked `active` at mint time, not on arrival
+The row is stamped `status = 'active'` in the same statement that reserves `attachment_link` —
+**when the pre-signed URL is issued, before any bytes exist**. Since the upload bypasses the
+backend entirely, nothing reports back that it happened, so this is a reservation, not a
+confirmation: the row also never gets `attachment_name`, `attachment_type` or `attachment_size`.
+
+On an S3 environment, `status = 'active'` therefore means *"an id was minted for S3"*, not
+*"a file exists"*. A slot whose `PUT` never ran, expired, or failed still reads `active` with a
+link pointing at an object that is not there — retrieval fails at fetch time, not at the status
+check. Nothing gates on the column either way (the serve path does not filter on
+`attachments.status`), so treat a successful fetch, not the status, as proof the file is there.
 :::
 
 ---
@@ -284,8 +289,9 @@ on exactly that capital `U`.
 `POST /api/upload/file`, and the backend fills in the link, name, type, size and
 `status = 'active'` — with the ownership and one-time checks applied.
 
-**S3 / GCS:** the backend mints an id, reserves and stores the object key up front, and hands you
-a pre-signed URL; you `PUT` straight to S3 and the backend is never involved again. Faster and it
+**S3 / GCS:** the backend mints an id, reserves and stores the object key up front, marks the row
+`status = 'active'` at that same moment, and hands you a pre-signed URL; you `PUT` straight to S3
+and the backend is never involved again. Faster and it
 keeps large bodies off the API server, but it also means the one-time and ownership guarantees of
 `/api/upload/file` do not exist on this path — the pre-signed URL is the only credential, and it
 is replayable for its full hour.
@@ -311,7 +317,8 @@ during verification.
 - Render from `attachment_link` as returned. Never construct a serve URL client-side.
 - Treat serve URLs as bearer capabilities — they carry the viewer's identity.
 - S3 environments: `PUT` to the pre-signed URL (1-hour expiry), never to `/api/upload/file` — an
-  S3-minted id already has its link set and would 409.
+  S3-minted id already has its link set and is already `active`, and would 409.
+- On S3, do not read `status = 'active'` as "the bytes arrived" — it is stamped at mint time.
 - Re-fetch S3 pre-signed **GetObject** URLs on demand; they expire after 7 days.
 - Never store `uploadToken` as the session access token.
 - Do not build against `/upload?token=` or `/upload/serve?attachmentId=` — both are deprecated and

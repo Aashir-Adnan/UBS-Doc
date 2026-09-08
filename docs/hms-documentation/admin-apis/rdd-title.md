@@ -61,18 +61,23 @@ Step 3 is one request in a multi-step wizard, and the frontend re-drives it on e
 you want to keep the existing title, **omit the field** — do not send `""`, which clears it.
 :::
 
-The step response echoes what was written:
+The step response reports the title as it now stands:
 
 ```json
 {
   "success": true,
   "role_designation_department_id": 54,
   "departments_departmentId": 7,
+  "departments_departmentCode": "HK-01",
+  "rolesDesignationsDepartment_seniorRddId": 11,
   "rolesDesignationsDepartment_rddTitle": "Front Desk Supervisor"
 }
 ```
 
-The key is present only when a title was actually part of the request.
+The key carries what this call wrote, or the stored title when the call did not send one — so
+an omitted title comes back unchanged rather than as `null`. The same step also carries the
+department code and the senior RDD id; see
+[RDD Wizard — Step 3](./rdd-grouped-crud-step3).
 
 ---
 
