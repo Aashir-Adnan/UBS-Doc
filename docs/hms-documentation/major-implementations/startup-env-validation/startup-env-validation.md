@@ -39,6 +39,101 @@ The order matters. Several modules read `process.env` when they are first loaded
 
 ---
 
+## Required variables
+
+### Always required (every environment)
+
+These **20 variables** must be present in every `backend/.env`. If any is missing, the server does not start.
+
+| # | Variable | Group | Rule | Example |
+|---|---|---|---|---|
+| 1 | `SECRET_KEY` | Core runtime | non-blank | a random string |
+| 2 | `NODE_ENV` | Core runtime | non-blank | `production` / `staging` / `development` |
+| 3 | `SERVER_PORT` | Core runtime | positive integer | `3000` |
+| 4 | `TENANCY_CHECK` | Core runtime | non-blank | `1` |
+| 5 | `FILE_STORAGE_PROVIDER` | Core runtime | `local`, `s3` or `gcs` | `local` |
+| 6 | `DB_TYPE` | Main database | non-blank | `mysql` |
+| 7 | `DB_HOST` | Main database | non-blank | `127.0.0.1` |
+| 8 | `DB_USER` | Main database | non-blank | `root` |
+| 9 | `DB_PW` | Main database | **must be declared, may be empty** | `root` |
+| 10 | `DB_DATABASE` | Main database | non-blank | `hms_db_10_0` |
+| 11 | `DB_PORT` | Main database | positive integer | `3306` |
+| 12 | `SECURITY_DB_HOST` | Security database | non-blank | `127.0.0.1` |
+| 13 | `SECURITY_DB_USER` | Security database | non-blank | `root` |
+| 14 | `SECURITY_DB_PW` | Security database | **must be declared, may be empty** | *(empty)* |
+| 15 | `SECURITY_DB_DATABASE` | Security database | non-blank | `securitydb` |
+| 16 | `SECURITY_DB_PORT` | Security database | positive integer | `3306` |
+| 17 | `ACCESS_TOKEN_SECONDS` | Token lifetimes | positive integer | `3600` |
+| 18 | `GUEST_REFRESH_TOKEN_SECONDS` | Token lifetimes | positive integer; **may be replaced by** `GUEST_REFRESH_TOKEN_DAYS` | `86400` |
+| 19 | `EMAIL_USER` | Outbound email | non-blank | `no-reply@example.com` |
+| 20 | `EMAIL_PASS` | Outbound email | non-blank | a Google app password |
+
+### Minimum `.env`
+
+Copy this and fill in the values. It is the smallest file that passes validation:
+
+```bash
+# Core runtime
+SECRET_KEY=
+NODE_ENV=development
+SERVER_PORT=3000
+TENANCY_CHECK=1
+FILE_STORAGE_PROVIDER=local
+
+# Main database
+DB_TYPE=mysql
+DB_HOST=127.0.0.1
+DB_USER=root
+DB_PW=
+DB_DATABASE=
+DB_PORT=3306
+
+# Security database
+SECURITY_DB_HOST=127.0.0.1
+SECURITY_DB_USER=root
+SECURITY_DB_PW=
+SECURITY_DB_DATABASE=securitydb
+SECURITY_DB_PORT=3306
+
+# Token lifetimes
+ACCESS_TOKEN_SECONDS=3600
+GUEST_REFRESH_TOKEN_SECONDS=86400
+
+# Outbound email
+EMAIL_USER=
+EMAIL_PASS=
+
+# Optional, but recommended (see the OTP fallback warning below)
+OTP_TTL_SECONDS=300
+OTP_MAX_ATTEMPTS=5
+```
+
+`SECRET_KEY`, `DB_DATABASE`, `EMAIL_USER` and `EMAIL_PASS` are blank in the template and **must** be filled in. `DB_PW` and `SECURITY_DB_PW` may stay blank.
+
+### Required only when an integration is used
+
+When any variable of an integration is set, all of that integration's **required** variables below must also be set. If none are set, the integration is skipped.
+
+| Integration | Required | Required unless an alternative is set | Optional |
+|---|---|---|---|
+| Firebase / FCM push | — | `FCM_SERVICE_ACCOUNT_JSON` **or** `FCM_SERVICE_ACCOUNT_PATH` (or a `FIREBASE_SERVICE_ACCOUNT_*` equivalent) | — |
+| S3 storage | `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_ACCESS_KEY` | — | — |
+| Google Cloud Storage | `GCS_BUCKET`, `GCS_PROJECT_ID` | `GCS_CREDENTIALS_JSON` (unless `GCS_KEY_FILE` is set) | — |
+| Stripe | `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` | — | — |
+| Moyasar | `MOYASAR_SECRET_KEY`, `MOYASAR_PUBLISHABLE_KEY` | — | — |
+| Authorize.net | `AUTHORIZE_NET_LOGIN_ID`, `AUTHORIZE_NET_TRANSACTION_KEY`, `AUTHORIZE_NET_BASE_URL` | — | — |
+| Kuickpay | `KUICKPAY_INSTITUTION_ID`, `KUICKPAY_SECURED_KEY`, `KUICKPAY_BASE_URL` | — | — |
+| Azure translator | `AZURE_TRANSLATOR_KEY` | — | `AZURE_TRANSLATOR_REGION`, `AZURE_TRANSLATOR_ENDPOINT` |
+| Deployment / crash alerts | `OPS_ALERT_EMAILS` | — | `OPS_ALERT_ENABLED`, `OPS_ALERT_THROTTLE_SECONDS`, `OPS_ALERT_SEND_TIMEOUT_MS`, `APP_INSTANCE_NAME`, `DEPLOYMENT_STATE_PATH` |
+
+Setting `FILE_STORAGE_PROVIDER=s3` or `FILE_STORAGE_PROVIDER=gcs` also turns on the matching storage row. `OPS_ALERT_ENABLED=false` skips the alerts row entirely.
+
+### Optional everywhere
+
+`GUEST_REFRESH_TOKEN_DAYS`, `OTP_TTL_SECONDS` and `OTP_MAX_ATTEMPTS` are never required. If set, each must be a positive integer.
+
+---
+
 ## How variables are categorised
 
 The contract works on two levels:
@@ -178,7 +273,7 @@ ACCESS_TOKEN_SECONDS=3600
 GUEST_REFRESH_TOKEN_SECONDS=86400
 ```
 
-It also needs every other variable in the *always-checked* table, plus the full set for each integration it uses. Recommended: `OTP_TTL_SECONDS=300`, because of the fallback mismatch above.
+It also needs every variable in [Required variables](#required-variables), plus the full set for each integration it uses. Recommended: `OTP_TTL_SECONDS=300`, because of the fallback mismatch above.
 
 To check an environment without starting the server, run this from `backend/`:
 
