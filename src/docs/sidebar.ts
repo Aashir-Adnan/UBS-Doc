@@ -173,6 +173,12 @@ export const SIDEBAR: SidebarNode[] = [
               'hms-documentation/major-implementations/additional-package-nights/backend-implementation',
             ],
           },
+          {
+            label: 'Startup Environment Validation',
+            items: [
+              'hms-documentation/major-implementations/startup-env-validation/startup-env-validation',
+            ],
+          },
         ],
       },
       {
