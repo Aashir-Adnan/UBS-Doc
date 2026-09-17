@@ -61,7 +61,7 @@ function ProjectsGrid({ theme }: { theme: 'light' | 'dark' }) {
                     Open <ExternalLink size={11} />
                   </Link>
                 )}
-                <Link to={`/tools/tasks?project=${encodeURIComponent(p.slug)}`}
+                <Link to={`/tools/team/tasks?project=${encodeURIComponent(p.slug)}`}
                   className={c('flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border tr no-underline',
                     d ? 'border-white/8 text-white/45 hover:text-white hover:border-white/18' : 'border-slate-200 text-slate-500 hover:text-slate-700')}>
                   Tasks

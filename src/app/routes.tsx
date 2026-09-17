@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import AppLayout from './AppLayout'
 import SiteGate from '../components/guards/SiteGate'
 import ToolGuard from '../components/guards/ToolGuard'
@@ -16,7 +16,12 @@ import Repositories from '../screens/Repositories'
 import GitHub from '../screens/GitHub'
 import GithubSandbox from '../screens/GithubSandbox'
 import Meetings from '../screens/Meetings'
-import Tasks from '../screens/Tasks'
+import TeamLayout from '../screens/team/TeamLayout'
+import TasksList from '../screens/team/TasksList'
+import People from '../screens/team/People'
+import TaskDetail from '../screens/team/TaskDetail'
+import Board from '../screens/team/Board'
+import { legacyTasksRedirect } from '../screens/team/redirect'
 import MeetingCreate from '../screens/MeetingCreate'
 import MeetingDetail from '../screens/MeetingDetail'
 import TenantAdmin from '../screens/TenantAdmin'
@@ -31,6 +36,13 @@ const T = (el: ReactNode) => <ToolGuard>{el}</ToolGuard>
 
 // Bare /docs has no page of its own — send it to the first doc in the tree.
 const DOCS_HOME = flattenSidebar()[0]
+
+// /tools/tasks became /tools/team/tasks. Old links (and the bookmarked
+// ?project= deep links Projects.tsx used to emit) keep working through this.
+function LegacyTasksRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={legacyTasksRedirect(search)} replace />
+}
 
 export default function AppRoutes() {
   return (
@@ -60,7 +72,17 @@ export default function AppRoutes() {
         <Route path="/tools/meetingWorkflow/:meetingId" element={T(<MeetingDetail />)} />
         <Route path="/tools/projects" element={T(<Projects view="grid" />)} />
         <Route path="/tools/projects/view" element={T(<Projects view="detail" />)} />
-        <Route path="/tools/tasks" element={T(<Tasks />)} />
+        {/* Team (Task 7): one guarded layout owns the fetch, the tabs and the
+            filter bar; every tab is a child route rendering into its Outlet,
+            so switching tabs never refetches. The guard wraps the parent, which
+            covers the whole subtree. */}
+        <Route path="/tools/team" element={T(<TeamLayout />)}>
+          <Route index element={<People />} />
+          <Route path="tasks" element={<TasksList />} />
+          <Route path="tasks/:taskId" element={<TaskDetail />} />
+          <Route path="board" element={<Board />} />
+        </Route>
+        <Route path="/tools/tasks" element={<LegacyTasksRedirect />} />
         <Route path="/tools/myProjects" element={T(<MyProjects view="grid" />)} />
         <Route path="/tools/myProjects/view" element={T(<MyProjects view="detail" />)} />
         <Route path="/tools/repos" element={T(<Repositories />)} />
