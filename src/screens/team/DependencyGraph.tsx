@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { c, muted } from '../../lib'
 import type { Theme } from '../../types'
@@ -26,6 +26,11 @@ export default function DependencyGraph({ tasks, theme }: { tasks: TaskRow[]; th
   const { search } = useLocation()
   const g = useMemo(() => layoutGraph(tasks), [tasks])
   const palette = PALETTE[theme]
+  // Two open graphs on one page would otherwise both emit id="dep-arrow" —
+  // invalid duplicate-id markup that also lets one graph's marker steal the
+  // other's. useId() gives each instance its own; the colons it produces
+  // aren't valid inside a url(#...) fragment, so they're stripped.
+  const markerId = `dep-arrow-${useId().replace(/:/g, '')}`
 
   if (g.nodes.length === 0) {
     return <p className={c('text-xs font-medium m-0', muted(theme))}>No dependencies yet.</p>
@@ -37,7 +42,7 @@ export default function DependencyGraph({ tasks, theme }: { tasks: TaskRow[]; th
     <div className="overflow-x-auto mb-4">
       <svg width={g.width} height={g.height} role="img" aria-label="Task dependency graph">
         <defs>
-          <marker id="dep-arrow" markerWidth={8} markerHeight={8} viewBox="0 0 8 8" refX={8} refY={4} orient="auto">
+          <marker id={markerId} markerWidth={8} markerHeight={8} viewBox="0 0 8 8" refX={8} refY={4} orient="auto">
             <path d="M0,0 L8,4 L0,8 Z" fill={palette.edge} />
           </marker>
         </defs>
@@ -54,7 +59,7 @@ export default function DependencyGraph({ tasks, theme }: { tasks: TaskRow[]; th
               y2={to.y + DEFAULT_NODE_H / 2}
               stroke={palette.edge}
               strokeWidth={1.5}
-              markerEnd="url(#dep-arrow)"
+              markerEnd={`url(#${markerId})`}
             />
           )
         })}
@@ -65,6 +70,7 @@ export default function DependencyGraph({ tasks, theme }: { tasks: TaskRow[]; th
               key={n.id}
               role="link"
               tabIndex={0}
+              aria-label={n.title}
               onClick={() => open(n.id)}
               onKeyDown={(e) => { if (e.key === 'Enter') open(n.id) }}
               style={{ cursor: 'pointer' }}
