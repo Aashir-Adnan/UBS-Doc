@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type DragEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Ban } from 'lucide-react'
 import { c, card, txt, muted, chipGray, chipRed } from '../../lib'
@@ -7,7 +7,10 @@ import type { Theme } from '../../types'
 import { allTasks, applyFilters, statusTone, STATUS_LABEL, type TaskRow } from '../tasksLogic'
 import { useActingPermissions } from '../../components/portal/tenantProjects/useActingPermissions'
 import { setTaskStatus } from '../../components/discordTasks/api'
-import { COLUMNS, groupByColumn, dropOutcome, classifyDropError, type BoardColumn } from './boardLogic'
+import {
+  COLUMNS, groupByColumn, dropOutcome, classifyDropError, releaseOverride, retireOverrides,
+  type BoardColumn,
+} from './boardLogic'
 import { toneChip } from './chips'
 import Toast, { type ToastTone } from './Toast'
 import { useTeam } from './TeamLayout'
@@ -27,7 +30,9 @@ import { useTeam } from './TeamLayout'
 // else on the page (or out of the window) from pasting an opaque id.
 const DRAG_TYPE = 'text/task-id'
 
-interface ToastState { message: string; tone: ToastTone }
+// `seq` only exists to key the <Toast>: two identical consecutive messages
+// would otherwise reuse the same element and keep the first one's dying timer.
+interface ToastState { message: string; tone: ToastTone; seq: number }
 
 export default function Board() {
   const { theme } = useTheme()
@@ -37,6 +42,10 @@ export default function Board() {
   const canMove = has('update_discord_tasks')
 
   const [overrides, setOverrides] = useState<Record<string, string>>({})
+  // The newest status requested per card, readable synchronously. A setState
+  // updater only runs at the next render, so it cannot tell a finishing
+  // request whether it is still the current one for that card — this can.
+  const latest = useRef<Record<string, string>>({})
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [toast, setToast] = useState<ToastState | null>(null)
 
@@ -55,36 +64,43 @@ export default function Board() {
   )
   const groups = useMemo(() => groupByColumn(shown), [shown])
 
+  // An override retires only when the payload is seen to carry that status.
+  // Nothing else drops one: if a refetch fails and leaves the payload stale,
+  // the card stays where the visitor put it rather than snapping back to a
+  // column the server no longer agrees with.
+  useEffect(() => {
+    setOverrides((prev) => retireOverrides(prev, tasks))
+  }, [tasks])
+
   // Stable identity: Toast re-arms its dismiss timer whenever onClose changes,
   // and refresh() re-renders this component mid-toast.
   const closeToast = useCallback(() => setToast(null), [])
-
-  const clearOverride = useCallback((id: string) => {
-    setOverrides((prev) => {
-      if (!(id in prev)) return prev
-      const next = { ...prev }
-      delete next[id]
-      return next
-    })
+  const showToast = useCallback((message: string, tone: ToastTone) => {
+    setToast((prev) => ({ message, tone, seq: (prev?.seq ?? 0) + 1 }))
   }, [])
 
   const move = useCallback(async (task: TaskRow, status: string) => {
+    latest.current[task.id] = status
     setOverrides((prev) => ({ ...prev, [task.id]: status }))
     try {
       const result = await setTaskStatus(task.id, status)
       // The bot warns (never refuses) about moves it considers questionable —
       // starting a blocked task, closing one with open blockers.
-      if (result?.warning) setToast({ message: result.warning, tone: 'info' })
+      if (result?.warning) showToast(result.warning, 'info')
       // Counts and blocked state are derived server-side, so the authoritative
-      // board comes from a refetch; the override holds the card in place until
-      // that lands, and is dropped once it has.
+      // board comes from a refetch. Nothing is cleared here: the effect above
+      // retires the override once the payload carries the new status, and if
+      // this refetch failed it simply stays until the next one succeeds.
       await refresh()
-      clearOverride(task.id)
     } catch (err) {
-      clearOverride(task.id)
-      setToast({ message: classifyDropError(err as { status?: number; message?: string }).text, tone: 'error' })
+      // Ownership-checked twice over: releaseOverride leaves the map alone
+      // unless this request's status is still the one on the card, and the
+      // toast is suppressed for a request a newer drop has already replaced.
+      const superseded = latest.current[task.id] !== status
+      setOverrides((prev) => releaseOverride(prev, task.id, status))
+      if (!superseded) showToast(classifyDropError(err as { status?: number; message?: string }).text, 'error')
     }
-  }, [refresh, clearOverride])
+  }, [refresh, showToast])
 
   const onDrop = useCallback((e: DragEvent, col: BoardColumn) => {
     e.preventDefault()
@@ -143,14 +159,20 @@ export default function Board() {
                 e.dataTransfer.dropEffect = 'move'
                 if (dragOver !== col.key) setDragOver(col.key)
               }}
-              onDragLeave={() => setDragOver((k) => (k === col.key ? null : k))}
+              onDragLeave={(e) => {
+                // Crossing from the column onto one of its own cards fires a
+                // leave on the column; ignoring those stops the highlight
+                // flickering as the pointer moves down a stack of cards.
+                if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+                setDragOver((k) => (k === col.key ? null : k))
+              }}
               onDrop={(e) => onDrop(e, col)}
             />
           ))}
         </div>
       )}
 
-      {toast && <Toast message={toast.message} tone={toast.tone} onClose={closeToast} />}
+      {toast && <Toast key={toast.seq} message={toast.message} tone={toast.tone} onClose={closeToast} />}
     </>
   )
 }
@@ -163,7 +185,7 @@ function Column({ col, tasks, theme, search, canMove, over, onDragOver, onDragLe
   canMove: boolean
   over: boolean
   onDragOver: (e: DragEvent) => void
-  onDragLeave: () => void
+  onDragLeave: (e: DragEvent) => void
   onDrop: (e: DragEvent) => void
 }) {
   const d = theme === 'dark'

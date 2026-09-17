@@ -65,6 +65,44 @@ export function classifyDropError(err: { status?: number; message?: string }): D
   if (status === 403) return forbidden
   if (status === 502 || status === 503) return offline
   if (/permission/i.test(message)) return forbidden
-  if (/not reachable|offline|not configured/i.test(message)) return offline
+  if (/not reachable|offline|not configured|failed to fetch|networkerror|load failed/i.test(message)) return offline
   return { kind: 'other', text: message || 'Could not move the card.' }
+}
+
+// --- Optimistic override bookkeeping ------------------------------------
+//
+// The Board holds a card where the visitor dropped it, keyed by task id, until
+// the payload catches up. Both of these are about *ownership*: a slow request
+// must never undo a newer move, and an override must only be dropped once
+// something has actually confirmed it.
+
+// Remove `id` only if it still carries the status the finishing request set.
+// If a second drop on the same card overwrote it, the newer move owns the
+// entry and the older request leaves it alone.
+export function releaseOverride(
+  overrides: Record<string, string>,
+  id: string,
+  status: string,
+): Record<string, string> {
+  if (overrides[id] !== status) return overrides
+  const next = { ...overrides }
+  delete next[id]
+  return next
+}
+
+// Drop every override the server now agrees with. This is the only thing that
+// retires a successful move: if the refetch failed and left the payload stale,
+// no task matches, nothing retires, and the card stays where it was put.
+// Returns the same object when nothing changes so the effect cannot loop.
+export function retireOverrides(
+  overrides: Record<string, string>,
+  tasks: Pick<TaskRow, 'id' | 'status'>[],
+): Record<string, string> {
+  const ids = Object.keys(overrides)
+  if (ids.length === 0) return overrides
+  const settled = tasks.filter((t) => overrides[t.id] === t.status)
+  if (settled.length === 0) return overrides
+  const next = { ...overrides }
+  for (const t of settled) delete next[t.id]
+  return next
 }

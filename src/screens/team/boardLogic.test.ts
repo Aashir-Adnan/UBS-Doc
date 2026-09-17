@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { COLUMNS, columnOf, statusForColumn, groupByColumn, dropOutcome, classifyDropError } from './boardLogic'
+import {
+  COLUMNS, columnOf, statusForColumn, groupByColumn, dropOutcome, classifyDropError,
+  releaseOverride, retireOverrides,
+} from './boardLogic'
 import type { TaskRow } from '../tasksLogic'
 
 const t = (id: string, status: string): TaskRow => ({
@@ -88,6 +91,13 @@ describe('classifyDropError', () => {
     expect(classifyDropError({ message: 'The bot is OFFLINE right now' }).kind).toBe('offline')
     expect(classifyDropError({ message: 'Discord bot is not configured' }).kind).toBe('offline')
   })
+  it('classifies a browser network failure as offline', () => {
+    // A fetch that never reached CSAAS throws a TypeError with no status, and
+    // the wording differs per browser.
+    expect(classifyDropError({ message: 'Failed to fetch' }).kind).toBe('offline')
+    expect(classifyDropError({ message: 'NetworkError when attempting to fetch resource.' }).kind).toBe('offline')
+    expect(classifyDropError({ message: 'Load failed' }).kind).toBe('offline')
+  })
   it('passes anything else through as "other" with its own message', () => {
     expect(classifyDropError({ status: 404, message: 'Task not found' }))
       .toEqual({ kind: 'other', text: 'Task not found' })
@@ -98,5 +108,51 @@ describe('classifyDropError', () => {
   })
   it('lets the status win over the text: a 403 whose message mentions offline is still forbidden', () => {
     expect(classifyDropError({ status: 403, message: 'bot is offline' }).kind).toBe('forbidden')
+  })
+})
+
+describe('releaseOverride', () => {
+  it('removes the entry when it still holds the status that request set', () => {
+    expect(releaseOverride({ A: 'done', B: 'open' }, 'A', 'done')).toEqual({ B: 'open' })
+  })
+  it('keeps the entry when a newer move already replaced it', () => {
+    // Drop 1 (-> done) resolves after drop 2 (-> open) overwrote the override:
+    // drop 1 must not pull the card back out from under the newer move.
+    expect(releaseOverride({ A: 'open' }, 'A', 'done')).toEqual({ A: 'open' })
+  })
+  it('is a no-op for an id that is not overridden', () => {
+    const before = { B: 'open' }
+    expect(releaseOverride(before, 'A', 'done')).toBe(before)
+  })
+  it('does not mutate the map it is given', () => {
+    const before = { A: 'done' }
+    releaseOverride(before, 'A', 'done')
+    expect(before).toEqual({ A: 'done' })
+  })
+})
+
+describe('retireOverrides', () => {
+  it('drops overrides the payload now agrees with', () => {
+    expect(retireOverrides({ A: 'done', B: 'open' }, [t('A', 'done'), t('B', 'pending')]))
+      .toEqual({ B: 'open' })
+  })
+  it('keeps an override the payload has not caught up with yet', () => {
+    expect(retireOverrides({ A: 'done' }, [t('A', 'open')])).toEqual({ A: 'done' })
+  })
+  it('keeps an override whose task is not in the list at all', () => {
+    // Filtered out of view, or a refetch that failed and left the payload
+    // stale: either way the server has not been seen to agree.
+    expect(retireOverrides({ A: 'done' }, [])).toEqual({ A: 'done' })
+  })
+  it('returns the same map when nothing retires, so the effect cannot loop', () => {
+    const before = { A: 'done' }
+    expect(retireOverrides(before, [t('A', 'open')])).toBe(before)
+    expect(retireOverrides({}, [t('A', 'open')])).toEqual({})
+  })
+  it('retires several at once and does not mutate the map it is given', () => {
+    const before = { A: 'done', B: 'open', C: 'pending' }
+    expect(retireOverrides(before, [t('A', 'done'), t('B', 'open'), t('C', 'in_progress')]))
+      .toEqual({ C: 'pending' })
+    expect(before).toEqual({ A: 'done', B: 'open', C: 'pending' })
   })
 })
