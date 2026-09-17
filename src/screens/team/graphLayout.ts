@@ -19,13 +19,21 @@ export interface GraphLayoutOptions { nodeW?: number; nodeH?: number; gapX?: num
 
 export interface GraphLayout { nodes: GraphNode[]; edges: GraphEdge[]; width: number; height: number }
 
+// Default node/gap sizing, exported so DependencyGraph.tsx can position its
+// SVG edges against the same numbers layoutGraph used rather than duplicating
+// them.
+export const DEFAULT_NODE_W = 180
+export const DEFAULT_NODE_H = 44
+export const DEFAULT_GAP_X = 60
+export const DEFAULT_GAP_Y = 16
+
 // The bot refuses cycles at write time, but a malformed/imported graph could
 // still contain one; longest-path relaxation on a cycle grows forever, so cap
 // the number of passes rather than looping until stable.
 const MAX_RELAXATIONS = 1000
 
 export function layoutGraph(tasks: TaskRow[], options: GraphLayoutOptions = {}): GraphLayout {
-  const { nodeW = 180, nodeH = 44, gapX = 60, gapY = 16 } = options
+  const { nodeW = DEFAULT_NODE_W, nodeH = DEFAULT_NODE_H, gapX = DEFAULT_GAP_X, gapY = DEFAULT_GAP_Y } = options
   const ids = new Set(tasks.map((t) => t.id))
 
   // De-duplicate edges: a blocking relationship is often declared from both
@@ -96,4 +104,12 @@ export function layoutGraph(tasks: TaskRow[], options: GraphLayoutOptions = {}):
   const height = nodes.length ? Math.max(...nodes.map((n) => n.y)) + nodeH : 0
 
   return { nodes, edges, width, height }
+}
+
+// Node titles run long; the graph's boxes are fixed-width, so a title beyond
+// `max` characters (ellipsis included) is clipped. The full title still
+// reaches the reader via the SVG <title> tooltip DependencyGraph renders.
+export function clipTitle(title: string, max = 28): string {
+  if (title.length <= max) return title
+  return `${title.slice(0, max - 1)}…`
 }

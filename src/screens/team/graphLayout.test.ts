@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { layoutGraph } from './graphLayout'
+import { layoutGraph, clipTitle } from './graphLayout'
 import type { TaskRow } from '../tasksLogic'
 
 const t = (id: string, status: string, blockedBy: string[] = [], blocks: string[] = [], isBlocked = false): TaskRow => ({
@@ -61,5 +61,19 @@ describe('layoutGraph', () => {
     expect(b.terminal).toBe(true)
     expect(width).toBe(b.x + 100)
     expect(height).toBeGreaterThanOrEqual(b.y + 40)
+  })
+})
+
+describe('clipTitle', () => {
+  it('leaves a short title unchanged', () => {
+    expect(clipTitle('Fix the login bug')).toBe('Fix the login bug')
+  })
+
+  it('clips a long title to 28 total characters ending with an ellipsis', () => {
+    const title = 'Add pagination to the admin dashboard task list'
+    const clipped = clipTitle(title)
+    expect(clipped).toHaveLength(28)
+    expect(clipped.endsWith('…')).toBe(true)
+    expect(clipped).toBe('Add pagination to the admin…')
   })
 })

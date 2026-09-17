@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ExternalLink, Ban } from 'lucide-react'
 import { c, card, txt, muted, chipRed, chipGray, chipIndigo } from '../../lib'
@@ -9,6 +9,7 @@ import {
   type ProjectGroup, type TaskRow,
 } from '../tasksLogic'
 import { toneChip } from './chips'
+import DependencyGraph from './DependencyGraph'
 import { useTeam } from './TeamLayout'
 
 // The Tasks tab of the Team section: project cards with their task rows, all
@@ -51,14 +52,29 @@ export default function TasksList() {
 
 function ProjectCard({ p, theme, search }: { p: ProjectGroup; theme: Theme; search: string }) {
   const d = theme === 'dark'
+  const [showGraph, setShowGraph] = useState(false)
+  const hasEdges = p.tasks.some((t) => t.blockedBy.length > 0 || t.blocks.length > 0)
   return (
     <section className={c(card(theme), 'rounded-2xl p-5 sm:p-6')}>
       <div className="flex flex-wrap items-baseline justify-between gap-3 mb-3">
         <h2 className={c('font-extrabold text-lg', txt(theme))}>{p.name}</h2>
-        <p className={c('text-xs font-semibold', muted(theme))}>
-          {p.counts.open} open · {p.counts.in_progress} in progress · {p.counts.done} done{p.counts.blocked ? ` · ${p.counts.blocked} blocked` : ''}
-        </p>
+        <div className="flex items-center gap-3">
+          <p className={c('text-xs font-semibold', muted(theme))}>
+            {p.counts.open} open · {p.counts.in_progress} in progress · {p.counts.done} done{p.counts.blocked ? ` · ${p.counts.blocked} blocked` : ''}
+          </p>
+          {hasEdges && (
+            <button
+              type="button"
+              onClick={() => setShowGraph((v) => !v)}
+              className={c('text-[11px] font-bold px-2.5 py-1 rounded-full tr shrink-0',
+                d ? 'bg-white/6 text-white/70 hover:bg-white/10' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}
+            >
+              {showGraph ? 'Hide graph' : 'Graph'}
+            </button>
+          )}
+        </div>
       </div>
+      {showGraph && <DependencyGraph tasks={p.tasks} theme={theme} />}
       {p.members.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-4">
           {p.members.map((m) => (
