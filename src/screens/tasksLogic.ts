@@ -38,6 +38,15 @@ export function applyFilters(projects: ProjectGroup[], f: Filters): ProjectGroup
     .filter((p) => p.tasks.length > 0)
 }
 
+// Returns the requested project slug when it is non-empty and no project in
+// `projects` carries that `docsSlug` — the signal Tasks.tsx uses to tell "no
+// tasks for this real project" apart from "this project slug doesn't exist
+// here at all" (e.g. a registry slug with no matching bot docsSlug).
+export function unknownProjectSlug(projects: ProjectGroup[], projectSlug: string | null): string | null {
+  if (!projectSlug) return null
+  return projects.some((p) => p.docsSlug === projectSlug) ? null : projectSlug
+}
+
 export function assigneeOptions(projects: ProjectGroup[]): { id: string; name: string }[] {
   const seen = new Map<string, string>()
   for (const p of projects) for (const t of p.tasks) for (const a of t.assignees) if (!seen.has(a.discordId)) seen.set(a.discordId, a.name)

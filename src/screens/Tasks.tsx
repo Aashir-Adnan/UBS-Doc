@@ -8,7 +8,7 @@ import { useTheme } from '../app/ThemeContext'
 import type { Theme } from '../types'
 import { fetchDiscordTasks } from '../components/discordTasks/api'
 import {
-  applyFilters, assigneeOptions, statusTone, DEFAULT_FILTERS, STATUS_LABEL,
+  applyFilters, assigneeOptions, statusTone, unknownProjectSlug, DEFAULT_FILTERS, STATUS_LABEL,
   type Filters, type ProjectGroup, type TaskRow, type Tone,
 } from './tasksLogic'
 
@@ -50,6 +50,7 @@ export default function Tasks() {
 
   const visible = useMemo(() => applyFilters(projects, filters), [projects, filters])
   const people = useMemo(() => assigneeOptions(projects), [projects])
+  const unknownSlug = useMemo(() => unknownProjectSlug(projects, filters.projectSlug), [projects, filters.projectSlug])
   const total = visible.reduce((n, p) => n + p.tasks.length, 0)
   const blocked = visible.reduce((n, p) => n + p.tasks.filter((t) => t.isBlocked).length, 0)
   const sel = inputCls(theme, 'text-xs py-2 px-3 rounded-xl')
@@ -73,14 +74,14 @@ export default function Tasks() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 mb-6">
-          <select className={sel} value={filters.status} onChange={(e) => set({ status: e.target.value as Filters['status'] })}>
+          <select aria-label="Status" className={sel} value={filters.status} onChange={(e) => set({ status: e.target.value as Filters['status'] })}>
             <option value="all">All statuses</option><option value="active">Active</option><option value="done">Done</option>
           </select>
-          <select className={sel} value={filters.projectSlug ?? ''} onChange={(e) => set({ projectSlug: e.target.value || null })}>
+          <select aria-label="Project" className={sel} value={filters.projectSlug ?? ''} onChange={(e) => set({ projectSlug: e.target.value || null })}>
             <option value="">All projects</option>
             {projects.filter((p) => p.docsSlug).map((p) => <option key={p.docsSlug!} value={p.docsSlug!}>{p.name}</option>)}
           </select>
-          <select className={sel} value={filters.assigneeId ?? ''} onChange={(e) => set({ assigneeId: e.target.value || null })}>
+          <select aria-label="Assignee" className={sel} value={filters.assigneeId ?? ''} onChange={(e) => set({ assigneeId: e.target.value || null })}>
             <option value="">Anyone</option>
             {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
@@ -94,7 +95,17 @@ export default function Tasks() {
             Could not load tasks: {error}
           </div>
         )}
-        {!loading && !error && visible.length === 0 && (
+        {!loading && !error && unknownSlug && (
+          <div className={c(card(theme), 'rounded-2xl px-8 py-14 text-center')}>
+            <p className={c('text-sm font-medium mb-4', muted(theme))}>
+              No project called &ldquo;{unknownSlug}&rdquo; has tasks in Discord yet.
+            </p>
+            <button type="button" onClick={() => set({ projectSlug: null })} className="btn-primary px-5 py-2.5 text-sm">
+              Show all projects
+            </button>
+          </div>
+        )}
+        {!loading && !error && !unknownSlug && visible.length === 0 && (
           <div className={c(card(theme), 'rounded-2xl px-8 py-14 text-center')}>
             <p className={c('text-sm font-medium', muted(theme))}>{projects.length ? 'No tasks match these filters.' : 'No tasks yet.'}</p>
           </div>
@@ -153,11 +164,14 @@ function TaskLine({ t, theme }: { t: TaskRow; theme: Theme }) {
           {t.assignees.length ? t.assignees.map((a) => a.name).join(', ') : 'Unassigned'}
           {t.type === 'bug' ? ' · bug' : ''}
         </p>
-        {t.isBlocked && (
-          <p className={c('text-xs font-semibold mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md', chipRed(theme))}>
-            <Ban size={11} /> Blocked by: {t.blockedBy.filter((b) => !['closed', 'done', 'resolved'].includes(b.status ?? '')).map((b) => b.title).join(', ')}
-          </p>
-        )}
+        {t.isBlocked && (() => {
+          const openBlockers = t.blockedBy.filter((b) => !['closed', 'done', 'resolved'].includes(b.status ?? ''))
+          return (
+            <p className={c('text-xs font-semibold mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md', chipRed(theme))}>
+              <Ban size={11} /> {openBlockers.length ? `Blocked by: ${openBlockers.map((b) => b.title).join(', ')}` : 'Blocked'}
+            </p>
+          )
+        })()}
       </div>
     </li>
   )

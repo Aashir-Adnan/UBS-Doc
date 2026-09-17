@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyFilters, assigneeOptions, statusTone, DEFAULT_FILTERS, type ProjectGroup } from './tasksLogic'
+import { applyFilters, assigneeOptions, statusTone, unknownProjectSlug, DEFAULT_FILTERS, type ProjectGroup } from './tasksLogic'
 
 const t = (id: string, status: string, assignees: string[], isBlocked = false, title = id) => ({
   id, title, type: 'feature', status, implementationStatus: null,
@@ -33,6 +33,21 @@ describe('applyFilters', () => {
 describe('assigneeOptions', () => {
   it('lists each person once, sorted by name', () => {
     expect(assigneeOptions(projects)).toEqual([{ id: 'u1', name: 'Name u1' }, { id: 'u2', name: 'Name u2' }])
+  })
+})
+
+describe('unknownProjectSlug', () => {
+  it('returns null for a null slug', () => {
+    expect(unknownProjectSlug(projects, null)).toBeNull()
+  })
+  it('returns null for a slug that exists', () => {
+    expect(unknownProjectSlug(projects, 'framework')).toBeNull()
+  })
+  it('returns the slug when it does not exist', () => {
+    expect(unknownProjectSlug(projects, 'nope')).toBe('nope')
+  })
+  it('returns the slug when projects is empty', () => {
+    expect(unknownProjectSlug([], 'framework')).toBe('framework')
   })
 })
 
