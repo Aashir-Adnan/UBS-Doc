@@ -28,6 +28,14 @@ describe('applyFilters', () => {
     expect(applyFilters(projects, { ...DEFAULT_FILTERS, query: 'git' })[0].tasks.map((x) => x.id)).toEqual(['A'])
     expect(applyFilters(projects, { ...DEFAULT_FILTERS, query: 'zzz' })).toEqual([])
   })
+  it('a null task title does not throw under a non-empty query, and is filtered out by it', () => {
+    const nullTitled: ProjectGroup[] = [
+      { id: 'p2', name: 'Nullable', docsSlug: 'nullable', members: [], counts: { open: 1, in_progress: 0, pending: 0, done: 0, blocked: 0 },
+        tasks: [{ ...t('Z', 'open', []), title: null as unknown as string }] },
+    ]
+    expect(() => applyFilters(nullTitled, { ...DEFAULT_FILTERS, query: 'git' })).not.toThrow()
+    expect(applyFilters(nullTitled, { ...DEFAULT_FILTERS, query: 'git' })).toEqual([])
+  })
 })
 
 describe('assigneeOptions', () => {

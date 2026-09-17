@@ -31,7 +31,7 @@ export function applyFilters(projects: ProjectGroup[], f: Filters): ProjectGroup
         if (f.status === 'done' && !isTerminal(t.status)) return false
         if (f.assigneeId && !t.assignees.some((a) => a.discordId === f.assigneeId)) return false
         if (f.blockedOnly && !t.isBlocked) return false
-        if (needle && !t.title.toLowerCase().includes(needle)) return false
+        if (needle && !(t.title ?? '').toLowerCase().includes(needle)) return false
         return true
       }),
     }))
