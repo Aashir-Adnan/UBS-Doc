@@ -99,6 +99,13 @@ export default function Board() {
       const superseded = latest.current[task.id] !== status
       setOverrides((prev) => releaseOverride(prev, task.id, status))
       if (!superseded) showToast(classifyDropError(err as { status?: number; message?: string }).text, 'error')
+      // A rejection does not prove nothing was written: a request that timed
+      // out (or whose reply was unreadable) may have reached the bot and
+      // changed the task. Having just dropped the override, refetch so the
+      // board shows what the server actually holds rather than the pre-drop
+      // column. Fire-and-forget — a failed refresh leaves the stale payload,
+      // which is where the board already was.
+      void refresh()
     }
   }, [refresh, showToast])
 

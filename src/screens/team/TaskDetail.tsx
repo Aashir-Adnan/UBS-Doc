@@ -118,13 +118,13 @@ export default function TaskDetail() {
 
         {task.blockedBy.length > 0 && (
           <Field label="Blocked by" theme={theme}>
-            <RefList refs={task.blockedBy} theme={theme} />
+            <RefList refs={task.blockedBy} theme={theme} search={search} />
           </Field>
         )}
 
         {task.blocks.length > 0 && (
           <Field label="Blocks" theme={theme}>
-            <RefList refs={task.blocks} theme={theme} />
+            <RefList refs={task.blocks} theme={theme} search={search} />
           </Field>
         )}
 
@@ -164,8 +164,11 @@ function Stat({ label, value, theme }: { label: string; value: string; theme: Th
 }
 
 // Dependency entries carry an id, a title and (optionally) a status — enough
-// for a chip and a link to that task's own detail page.
-function RefList({ refs, theme }: { refs: TaskRef[]; theme: Theme }) {
+// for a chip and a link to that task's own detail page. The link carries the
+// current `search` like every other in-section link, so stepping through a
+// dependency chain keeps the filters the visitor arrived with (and Back still
+// returns to the same filtered list).
+function RefList({ refs, theme, search }: { refs: TaskRef[]; theme: Theme; search: string }) {
   return (
     <ul className="list-none p-0 m-0 flex flex-col gap-1.5">
       {refs.map((r) => (
@@ -173,7 +176,7 @@ function RefList({ refs, theme }: { refs: TaskRef[]; theme: Theme }) {
           <span className={c('text-[11px] font-bold px-2 py-0.5 rounded-md shrink-0', toneChip[refTone(r.status)](theme))}>
             {refLabel(r.status)}
           </span>
-          <Link to={`/tools/team/tasks/${r.id}`} className={c('text-sm font-semibold no-underline hover:underline', txt(theme))}>{r.title}</Link>
+          <Link to={`/tools/team/tasks/${r.id}${search}`} className={c('text-sm font-semibold no-underline hover:underline', txt(theme))}>{r.title}</Link>
         </li>
       ))}
     </ul>

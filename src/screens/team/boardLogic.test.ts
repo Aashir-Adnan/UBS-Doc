@@ -89,7 +89,29 @@ describe('classifyDropError', () => {
   it('classifies the offline wordings by message when the status says nothing', () => {
     expect(classifyDropError({ message: 'Discord bot is not reachable' }).kind).toBe('offline')
     expect(classifyDropError({ message: 'The bot is OFFLINE right now' }).kind).toBe('offline')
-    expect(classifyDropError({ message: 'Discord bot is not configured' }).kind).toBe('offline')
+  })
+  // A deployment fault is not an outage: retrying never fixes it, so these
+  // three must not get the "try again" sentence even though CSAAS sends them
+  // under the same 502/503 as a genuinely unreachable bot.
+  it('classifies a missing bot link as misconfigured, not offline', () => {
+    expect(classifyDropError({ status: 503, message: 'Discord bot link is not configured' }))
+      .toEqual({ kind: 'other', text: 'Discord bot link is misconfigured. Tell an admin.' })
+  })
+  it('classifies a bot that refused the call as misconfigured', () => {
+    expect(classifyDropError({ status: 502, message: 'Discord bot rejected the request (configuration)' }))
+      .toEqual({ kind: 'other', text: 'Discord bot link is misconfigured. Tell an admin.' })
+  })
+  it('classifies an unparseable bot reply as misconfigured', () => {
+    expect(classifyDropError({ status: 502, message: 'Discord bot returned an unreadable reply' }))
+      .toEqual({ kind: 'other', text: 'Discord bot link is misconfigured. Tell an admin.' })
+  })
+  it('recognises the misconfiguration wordings without a status too', () => {
+    expect(classifyDropError({ message: 'Discord bot link is not configured' }).kind).toBe('other')
+    expect(classifyDropError({ message: 'discord bot REJECTED THE REQUEST (configuration)' }).text)
+      .toBe('Discord bot link is misconfigured. Tell an admin.')
+  })
+  it('still calls a plain unreachable 502 offline', () => {
+    expect(classifyDropError({ status: 502, message: 'Discord bot is not reachable' }).kind).toBe('offline')
   })
   it('classifies a browser network failure as offline', () => {
     // A fetch that never reached CSAAS throws a TypeError with no status, and

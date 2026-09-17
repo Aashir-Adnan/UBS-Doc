@@ -62,10 +62,17 @@ export function classifyDropError(err: { status?: number; message?: string }): D
   const message = (err?.message ?? '').trim()
   const forbidden: DropError = { kind: 'forbidden', text: "You can't move tasks. Ask an admin for the update_discord_tasks permission." }
   const offline: DropError = { kind: 'offline', text: 'Discord bot is offline, try again.' }
+  const misconfigured: DropError = { kind: 'other', text: 'Discord bot link is misconfigured. Tell an admin.' }
   if (status === 403) return forbidden
+  // A missing DISCORD_BOT_SECRET, a bot that answered 401/503, and a reply
+  // CSAAS could not parse all arrive under the same 502/503 as "unreachable",
+  // so the sentence has to be read before the status is trusted. None of them
+  // is fixed by trying again, so they must not say "try again" — the three
+  // phrases below are the ones discordTasksStatus.js sends.
+  if (/not configured|rejected the request|unreadable reply/i.test(message)) return misconfigured
   if (status === 502 || status === 503) return offline
   if (/permission/i.test(message)) return forbidden
-  if (/not reachable|offline|not configured|failed to fetch|networkerror|load failed/i.test(message)) return offline
+  if (/not reachable|offline|failed to fetch|networkerror|load failed/i.test(message)) return offline
   return { kind: 'other', text: message || 'Could not move the card.' }
 }
 

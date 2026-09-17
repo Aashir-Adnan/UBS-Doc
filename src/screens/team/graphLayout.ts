@@ -27,10 +27,6 @@ export const DEFAULT_NODE_H = 44
 export const DEFAULT_GAP_X = 60
 export const DEFAULT_GAP_Y = 16
 
-// The bot refuses cycles at write time, but a malformed/imported graph could
-// still contain one; longest-path relaxation on a cycle grows forever, so cap
-// the number of passes rather than looping until stable.
-const MAX_RELAXATIONS = 1000
 
 export function layoutGraph(tasks: TaskRow[], options: GraphLayoutOptions = {}): GraphLayout {
   const { nodeW = DEFAULT_NODE_W, nodeH = DEFAULT_NODE_H, gapX = DEFAULT_GAP_X, gapY = DEFAULT_GAP_Y } = options
@@ -58,14 +54,26 @@ export function layoutGraph(tasks: TaskRow[], options: GraphLayoutOptions = {}):
   }
 
   // depth = longest path from a node with no in-set blocker, found by
-  // relaxing every edge repeatedly (Bellman-Ford style), capped so a cycle
-  // terminates instead of growing depth forever.
+  // relaxing every edge repeatedly (Bellman-Ford style). The bot refuses
+  // cycles at write time, but a malformed/imported graph could still contain
+  // one, and relaxation around a cycle grows depth forever — so the passes
+  // are capped. A DAG's longest path spans at most n-1 edges, so n passes
+  // always reach the stable answer with one to spare; a cycle is simply cut
+  // off there. The cap is the node count rather than a flat 1000 so a cycle
+  // can never produce a depth (and therefore an SVG width) out of proportion
+  // to the graph being drawn.
+  const maxPasses = includedIds.size
   const depth = new Map<string, number>()
   for (const id of includedIds) depth.set(id, 0)
-  for (let pass = 0; pass < MAX_RELAXATIONS; pass++) {
+  for (let pass = 0; pass < maxPasses; pass++) {
+    // Each pass relaxes against the previous pass's depths, not the ones it
+    // is writing, so a single pass can raise any depth by at most 1. That is
+    // what makes the pass cap a depth cap too: after n passes nothing can
+    // exceed n, however the edges happen to be ordered.
+    const prev = new Map(depth)
     let changed = false
     for (const edge of edges) {
-      const candidate = (depth.get(edge.from) ?? 0) + 1
+      const candidate = (prev.get(edge.from) ?? 0) + 1
       if (candidate > (depth.get(edge.to) ?? 0)) {
         depth.set(edge.to, candidate)
         changed = true

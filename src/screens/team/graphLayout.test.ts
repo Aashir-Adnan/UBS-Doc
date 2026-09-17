@@ -54,6 +54,19 @@ describe('layoutGraph', () => {
     expect(nodes.map((n) => n.id).sort()).toEqual(['A', 'B'])
   })
 
+  // Relaxation is capped at the number of included nodes, so a cycle cannot
+  // push a depth past that count and blow the SVG's width out to thousands of
+  // columns; a two-node cycle stays inside two columns.
+  it('keeps the depths of a 2-cycle no larger than the node count', () => {
+    const tasks = [t('A', 'open', ['B'], ['B']), t('B', 'open', ['A'], ['A'])]
+    const { nodes } = layoutGraph(tasks)
+    expect(nodes).toHaveLength(2)
+    for (const n of nodes) {
+      expect(n.depth).toBeGreaterThanOrEqual(0)
+      expect(n.depth).toBeLessThanOrEqual(nodes.length)
+    }
+  })
+
   it('marks terminal tasks and lays out width/height covering the last node', () => {
     const tasks = [t('A', 'open', [], ['B']), t('B', 'done', ['A'])]
     const { nodes, width, height } = layoutGraph(tasks, { nodeW: 100, nodeH: 40, gapX: 10, gapY: 5 })
