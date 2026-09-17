@@ -4,6 +4,10 @@ export interface TaskRow {
   id: string; title: string; type: string; status: string; implementationStatus: string | null
   assignees: TaskPerson[]; blockedBy: TaskRef[]; blocks: TaskRef[]; isBlocked: boolean
   channelUrl: string | null; createdAt: string; updatedAt: string
+  description: string | null; scope: string | null; modules: string[]
+  createdBy: TaskPerson | null
+  passedApiTests: number | null; passedQaTests: number | null; passedAcceptanceCriteria: number | null
+  projectId: string | null; projectName: string | null
 }
 export interface ProjectMember { discordId: string; name: string; username: string | null; role: string | null; source: 'explicit' | 'inferred' }
 export interface ProjectGroup {
@@ -11,7 +15,30 @@ export interface ProjectGroup {
   counts: { open: number; in_progress: number; pending: number; done: number; blocked: number }
   tasks: TaskRow[]
 }
-export interface TasksPayload { generatedAt: string; projects: ProjectGroup[] }
+export interface TeamProjectRef { id: string; name: string; docsSlug: string | null; role: string }
+export interface TeamMember {
+  discordId: string; name: string; username: string | null; roleNames: string[]
+  status: string; verified: boolean; projects: TeamProjectRef[]
+}
+export interface TasksPayload { generatedAt: string; projects: ProjectGroup[]; members: TeamMember[] }
+
+// Flattens every task across every project group into one list, in group then
+// in-group order — the shape graph/board/team logic operate on when they need
+// "all tasks" rather than the per-project grouping.
+export function allTasks(projects: ProjectGroup[]): TaskRow[] {
+  return projects.flatMap((p) => p.tasks)
+}
+
+// Finds a single task by id anywhere in the payload, along with the project
+// group it belongs to (TaskDetail needs both: the task's own fields, and the
+// project name/slug for breadcrumbs and the "back to project" link).
+export function findTask(payload: TasksPayload, id: string): { task: TaskRow; project: ProjectGroup } | null {
+  for (const project of payload.projects) {
+    const task = project.tasks.find((t) => t.id === id)
+    if (task) return { task, project }
+  }
+  return null
+}
 
 export type StatusFilter = 'all' | 'active' | 'done'
 export interface Filters { status: StatusFilter; projectSlug: string | null; assigneeId: string | null; blockedOnly: boolean; query: string }

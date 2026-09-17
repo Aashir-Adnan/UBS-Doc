@@ -1,16 +1,25 @@
 import { describe, it, expect } from 'vitest'
-import { applyFilters, assigneeOptions, statusTone, unknownProjectSlug, roleLabel, DEFAULT_FILTERS, type ProjectGroup } from './tasksLogic'
+import {
+  applyFilters, assigneeOptions, statusTone, unknownProjectSlug, roleLabel, DEFAULT_FILTERS,
+  findTask, allTasks, type ProjectGroup, type TeamMember,
+} from './tasksLogic'
 
 const t = (id: string, status: string, assignees: string[], isBlocked = false, title = id) => ({
   id, title, type: 'feature', status, implementationStatus: null,
   assignees: assignees.map((a) => ({ discordId: a, name: `Name ${a}` })),
   blockedBy: [], blocks: [], isBlocked, channelUrl: null, createdAt: '', updatedAt: '',
+  description: null, scope: null, modules: [], createdBy: null,
+  passedApiTests: null, passedQaTests: null, passedAcceptanceCriteria: null,
+  projectId: null, projectName: null,
 })
 const projects: ProjectGroup[] = [
   { id: 'p1', name: 'Framework', docsSlug: 'framework', members: [], counts: { open: 2, in_progress: 0, pending: 0, done: 1, blocked: 1 },
     tasks: [t('A', 'open', ['u1'], true, 'Git Sync'), t('B', 'open', ['u2']), t('C', 'done', ['u1'])] },
   { id: null, name: 'No project', docsSlug: null, members: [], counts: { open: 1, in_progress: 0, pending: 0, done: 0, blocked: 0 },
     tasks: [t('N', 'open', [])] },
+]
+const members: TeamMember[] = [
+  { discordId: 'u1', name: 'Ada', username: 'ada', roleNames: ['Developer'], status: 'active', verified: true, projects: [] },
 ]
 
 describe('applyFilters', () => {
@@ -65,6 +74,30 @@ describe('statusTone', () => {
     expect(statusTone(t('x', 'closed', []))).toBe('done')
     expect(statusTone(t('x', 'in_progress', []))).toBe('active')
     expect(statusTone(t('x', 'pending', []))).toBe('idle')
+  })
+})
+
+describe('allTasks', () => {
+  it('flattens every project\'s tasks into one list, in order', () => {
+    expect(allTasks(projects).map((x) => x.id)).toEqual(['A', 'B', 'C', 'N'])
+  })
+  it('returns an empty list for no projects', () => {
+    expect(allTasks([])).toEqual([])
+  })
+})
+
+describe('findTask', () => {
+  it('finds a task and returns it with its owning project', () => {
+    const found = findTask({ generatedAt: '', projects, members }, 'B')
+    expect(found?.task.id).toBe('B')
+    expect(found?.project.id).toBe('p1')
+  })
+  it('finds a task that belongs to the "no project" group', () => {
+    const found = findTask({ generatedAt: '', projects, members }, 'N')
+    expect(found?.project.id).toBeNull()
+  })
+  it('returns null when no task matches', () => {
+    expect(findTask({ generatedAt: '', projects, members }, 'zzz')).toBeNull()
   })
 })
 
