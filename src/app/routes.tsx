@@ -16,6 +16,7 @@ import Repositories from '../screens/Repositories'
 import GitHub from '../screens/GitHub'
 import GithubSandbox from '../screens/GithubSandbox'
 import Meetings from '../screens/Meetings'
+import Tasks from '../screens/Tasks'
 import MeetingCreate from '../screens/MeetingCreate'
 import MeetingDetail from '../screens/MeetingDetail'
 import TenantAdmin from '../screens/TenantAdmin'
@@ -59,6 +60,7 @@ export default function AppRoutes() {
         <Route path="/tools/meetingWorkflow/:meetingId" element={T(<MeetingDetail />)} />
         <Route path="/tools/projects" element={T(<Projects view="grid" />)} />
         <Route path="/tools/projects/view" element={T(<Projects view="detail" />)} />
+        <Route path="/tools/tasks" element={T(<Tasks />)} />
         <Route path="/tools/myProjects" element={T(<MyProjects view="grid" />)} />
         <Route path="/tools/myProjects/view" element={T(<MyProjects view="detail" />)} />
         <Route path="/tools/repos" element={T(<Repositories />)} />
