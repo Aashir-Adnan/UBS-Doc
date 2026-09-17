@@ -1,17 +1,16 @@
 import type { ReactNode } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { ExternalLink } from 'lucide-react'
-import { c, card, txt, muted, chipGray, chipIndigo, chipMint, chipAmber, chipRed } from '../../lib'
+import { c, card, txt, muted, chipGray, chipIndigo } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
-import { findTask, statusTone, STATUS_LABEL, type TaskRef, type Tone } from '../tasksLogic'
+import { findTask, statusTone, STATUS_LABEL, type TaskRef } from '../tasksLogic'
 import { fmtDate, refLabel, refTone, testCount } from './detailLogic'
+import { toneChip } from './chips'
 import { useTeam } from './TeamLayout'
 
 // One task, in full. The payload is the section's — this screen never fetches,
 // so a deep link into it renders once TeamLayout's single request lands.
-
-const toneChip: Record<Tone, (t: Theme) => string> = { done: chipMint, active: chipIndigo, idle: chipAmber, bad: chipRed }
 
 export default function TaskDetail() {
   const { theme } = useTheme()

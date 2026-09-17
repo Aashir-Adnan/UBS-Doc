@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { COLUMNS, columnOf, statusForColumn, groupByColumn, dropOutcome } from './boardLogic'
+import { COLUMNS, columnOf, statusForColumn, groupByColumn, dropOutcome, classifyDropError } from './boardLogic'
 import type { TaskRow } from '../tasksLogic'
 
 const t = (id: string, status: string): TaskRow => ({
@@ -67,5 +67,36 @@ describe('dropOutcome', () => {
   })
   it('moving a terminal task to Done again is a no-op regardless of its exact terminal status', () => {
     expect(dropOutcome(t('A', 'closed'), 'done')).toEqual({ change: false })
+  })
+})
+
+describe('classifyDropError', () => {
+  it('classifies a 403 as forbidden with the permission sentence', () => {
+    expect(classifyDropError({ status: 403, message: "Permission 'update_discord_tasks' is required for this action" }))
+      .toEqual({ kind: 'forbidden', text: "You can't move tasks. Ask an admin for the update_discord_tasks permission." })
+  })
+  it('classifies a message mentioning Permission as forbidden even without a status', () => {
+    expect(classifyDropError({ message: "Permission 'update_discord_tasks' is required for this action" }).kind).toBe('forbidden')
+  })
+  it('classifies 502 and 503 as offline', () => {
+    expect(classifyDropError({ status: 502, message: 'Discord bot is not reachable' }))
+      .toEqual({ kind: 'offline', text: 'Discord bot is offline, try again.' })
+    expect(classifyDropError({ status: 503, message: '' }).kind).toBe('offline')
+  })
+  it('classifies the offline wordings by message when the status says nothing', () => {
+    expect(classifyDropError({ message: 'Discord bot is not reachable' }).kind).toBe('offline')
+    expect(classifyDropError({ message: 'The bot is OFFLINE right now' }).kind).toBe('offline')
+    expect(classifyDropError({ message: 'Discord bot is not configured' }).kind).toBe('offline')
+  })
+  it('passes anything else through as "other" with its own message', () => {
+    expect(classifyDropError({ status: 404, message: 'Task not found' }))
+      .toEqual({ kind: 'other', text: 'Task not found' })
+  })
+  it('falls back to a generic sentence when there is no message at all', () => {
+    expect(classifyDropError({})).toEqual({ kind: 'other', text: 'Could not move the card.' })
+    expect(classifyDropError({ status: 500, message: '' }).text).toBe('Could not move the card.')
+  })
+  it('lets the status win over the text: a 403 whose message mentions offline is still forbidden', () => {
+    expect(classifyDropError({ status: 403, message: 'bot is offline' }).kind).toBe('forbidden')
   })
 })

@@ -1,20 +1,19 @@
 import { useMemo } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ExternalLink, Ban } from 'lucide-react'
-import { c, card, txt, muted, chipRed, chipGray, chipIndigo, chipMint, chipAmber } from '../../lib'
+import { c, card, txt, muted, chipRed, chipGray, chipIndigo } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
 import {
   applyFilters, statusTone, roleLabel, unknownProjectSlug, STATUS_LABEL,
-  type ProjectGroup, type TaskRow, type Tone,
+  type ProjectGroup, type TaskRow,
 } from '../tasksLogic'
+import { toneChip } from './chips'
 import { useTeam } from './TeamLayout'
 
 // The Tasks tab of the Team section: project cards with their task rows, all
 // from the payload the layout fetched. Filtering is client-side — the corpus is
 // a few dozen rows and the endpoint returns every status.
-
-const toneChip: Record<Tone, (t: Theme) => string> = { done: chipMint, active: chipIndigo, idle: chipAmber, bad: chipRed }
 
 export default function TasksList() {
   const { theme } = useTheme()

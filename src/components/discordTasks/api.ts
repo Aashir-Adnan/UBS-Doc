@@ -40,7 +40,13 @@ export async function setTaskStatus(taskId: string, status: string): Promise<Set
     try { data = JSON.parse(text) } catch { data = {} }
   }
   if (!res.ok) {
-    const message = (data.message as string) || (data.error as string) || res.statusText
+    // CSAAS error bodies are { status, message, payload, source, scc }: `message`
+    // is generic catalogue text ("You do not have permission…") while `payload`
+    // carries the sentence that names the actual problem ("Permission
+    // 'update_discord_tasks' is required for this action"). Prefer the specific
+    // one; on success `payload` is an object, so the string check is the tell.
+    const specific = typeof data.payload === 'string' && data.payload ? data.payload : ''
+    const message = specific || (data.message as string) || (data.error as string) || res.statusText
     throw new ApiError(message, res.status)
   }
   const payload = data.payload as { return?: unknown } | undefined

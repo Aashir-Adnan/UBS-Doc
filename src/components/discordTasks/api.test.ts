@@ -41,11 +41,35 @@ describe('setTaskStatus', () => {
     expect(result).toEqual({ task: { id: 'T1' }, warning: 'blocked upstream', unchanged: false })
   })
 
-  it('throws an ApiError with the CSAAS "message" field, not raw JSON, on failure', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ message: 'You need the update_discord_tasks permission.' }, 403))
-    await expect(setTaskStatus('T1', 'done')).rejects.toMatchObject({
-      message: 'You need the update_discord_tasks permission.',
+  // CSAAS error bodies are { status, message, payload, source, scc } for every
+  // error status: `message` is generic catalogue text and `payload` carries the
+  // specific sentence. The specific one is what the board should show.
+  it('prefers the string "payload" over the generic catalogue "message" on failure', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({
       status: 403,
+      message: 'You do not have permission to perform this action.',
+      payload: "Permission 'update_discord_tasks' is required for this action",
+      source: 'DiscordTasksStatus',
+      scc: 'E41',
+    }, 403))
+    await expect(setTaskStatus('T1', 'done')).rejects.toMatchObject({
+      message: "Permission 'update_discord_tasks' is required for this action",
+      status: 403,
+    })
+  })
+
+  it('falls back to "message" when the body carries no string payload', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ message: 'Please check your input and try again.' }, 400))
+    await expect(setTaskStatus('T1', 'nope')).rejects.toMatchObject({
+      message: 'Please check your input and try again.',
+      status: 400,
+    })
+
+    // A non-string payload (or an empty one) must not shadow the message.
+    fetchMock.mockResolvedValue(jsonResponse({ message: 'An unexpected error occurred.', payload: {} }, 500))
+    await expect(setTaskStatus('T1', 'done')).rejects.toMatchObject({
+      message: 'An unexpected error occurred.',
+      status: 500,
     })
   })
 
