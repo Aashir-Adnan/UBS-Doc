@@ -64,3 +64,10 @@ export function statusTone(t: TaskRow): Tone {
 export const STATUS_LABEL: Record<string, string> = {
   open: 'Open', pending: 'Pending', in_progress: 'In progress', resolved: 'Resolved', closed: 'Closed', done: 'Done',
 }
+
+// Stored role keys come from the bot's PROJECT_MEMBER_ROLES; the site only labels them.
+export const ROLE_LABEL: Record<string, string> = {
+  lead: 'Lead', developer: 'Developer', backend_developer: 'Backend Developer',
+  frontend_developer: 'Frontend Developer', qa: 'QA', design: 'Design',
+}
+export const roleLabel = (role: string) => ROLE_LABEL[role] ?? role

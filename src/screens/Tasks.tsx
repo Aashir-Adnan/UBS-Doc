@@ -8,7 +8,7 @@ import { useTheme } from '../app/ThemeContext'
 import type { Theme } from '../types'
 import { fetchDiscordTasks } from '../components/discordTasks/api'
 import {
-  applyFilters, assigneeOptions, statusTone, unknownProjectSlug, DEFAULT_FILTERS, STATUS_LABEL,
+  applyFilters, assigneeOptions, statusTone, roleLabel, unknownProjectSlug, DEFAULT_FILTERS, STATUS_LABEL,
   type Filters, type ProjectGroup, type TaskRow, type Tone,
 } from './tasksLogic'
 
@@ -132,9 +132,9 @@ function ProjectCard({ p, theme }: { p: ProjectGroup; theme: Theme }) {
       {p.members.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-4">
           {p.members.map((m) => (
-            <span key={m.discordId} title={m.source === 'inferred' ? 'Assigned to tasks here' : (m.role ?? undefined)}
+            <span key={m.discordId} title={m.source === 'inferred' ? 'Assigned to tasks here' : (m.role ? roleLabel(m.role) : undefined)}
               className={c('text-[11px] font-semibold px-2.5 py-1 rounded-full', m.source === 'explicit' ? chipIndigo(theme) : chipGray(theme))}>
-              {m.name}{m.role ? ` · ${m.role}` : ''}
+              {m.name}{m.role ? ` · ${roleLabel(m.role)}` : ''}
             </span>
           ))}
         </div>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyFilters, assigneeOptions, statusTone, unknownProjectSlug, DEFAULT_FILTERS, type ProjectGroup } from './tasksLogic'
+import { applyFilters, assigneeOptions, statusTone, unknownProjectSlug, roleLabel, DEFAULT_FILTERS, type ProjectGroup } from './tasksLogic'
 
 const t = (id: string, status: string, assignees: string[], isBlocked = false, title = id) => ({
   id, title, type: 'feature', status, implementationStatus: null,
@@ -65,5 +65,15 @@ describe('statusTone', () => {
     expect(statusTone(t('x', 'closed', []))).toBe('done')
     expect(statusTone(t('x', 'in_progress', []))).toBe('active')
     expect(statusTone(t('x', 'pending', []))).toBe('idle')
+  })
+})
+
+describe('roleLabel', () => {
+  it('turns stored role keys into readable labels and leaves unknown keys alone', () => {
+    expect(roleLabel('backend_developer')).toBe('Backend Developer')
+    expect(roleLabel('frontend_developer')).toBe('Frontend Developer')
+    expect(roleLabel('qa')).toBe('QA')
+    expect(roleLabel('lead')).toBe('Lead')
+    expect(roleLabel('something_new')).toBe('something_new')
   })
 })
