@@ -1,7 +1,7 @@
 // Pure board logic: the four fixed columns, the status<->column mapping, and
 // the drop-outcome decision the Board screen uses to decide whether to call
 // setTaskStatus at all. No React, no DOM — see Board.tsx for the drag/drop UI.
-import { isTerminal, type TaskRow } from '../tasksLogic'
+import { isTerminal, type TaskRef, type TaskRow } from '../tasksLogic'
 
 export interface BoardColumn { key: string; label: string; status: string }
 
@@ -112,4 +112,13 @@ export function retireOverrides(
   const next = { ...overrides }
   for (const t of settled) delete next[t.id]
   return next
+}
+
+// What the board's "Blocked" chip says: name what's actually still open, not
+// a blocker that's already done — the List view already does this (its own
+// inline computation, not shared here), and a bare "Blocked" tag forces a
+// click into the card just to find out by what.
+export function blockedLabel(blockedBy: TaskRef[]): string {
+  const openBlockers = blockedBy.filter((b) => !isTerminal(b.status ?? ''))
+  return openBlockers.length ? `Blocked by: ${openBlockers.map((b) => b.title).join(', ')}` : 'Blocked'
 }

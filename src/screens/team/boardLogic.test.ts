@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
   COLUMNS, columnOf, statusForColumn, groupByColumn, dropOutcome, classifyDropError,
-  releaseOverride, retireOverrides,
+  releaseOverride, retireOverrides, blockedLabel,
 } from './boardLogic'
-import type { TaskRow } from '../tasksLogic'
+import type { TaskRow, TaskRef } from '../tasksLogic'
 
 const t = (id: string, status: string): TaskRow => ({
   id, title: id, type: 'feature', status, implementationStatus: null,
@@ -176,5 +176,29 @@ describe('retireOverrides', () => {
     expect(retireOverrides(before, [t('A', 'done'), t('B', 'open'), t('C', 'in_progress')]))
       .toEqual({ C: 'pending' })
     expect(before).toEqual({ A: 'done', B: 'open', C: 'pending' })
+  })
+})
+
+describe('blockedLabel', () => {
+  const ref = (id: string, title: string, status?: string): TaskRef => ({ id, title, status })
+
+  it('names every open blocker', () => {
+    expect(blockedLabel([ref('b1', 'Fix the API'), ref('b2', 'Ship the schema')]))
+      .toBe('Blocked by: Fix the API, Ship the schema')
+  })
+
+  it('leaves out a blocker that is already closed, done or resolved', () => {
+    expect(blockedLabel([ref('b1', 'Already done', 'done'), ref('b2', 'Still open', 'open')]))
+      .toBe('Blocked by: Still open')
+  })
+
+  it('falls back to a bare "Blocked" when every blocker has finished, or none is named', () => {
+    expect(blockedLabel([ref('b1', 'Closed one', 'closed'), ref('b2', 'Resolved one', 'resolved')]))
+      .toBe('Blocked')
+    expect(blockedLabel([])).toBe('Blocked')
+  })
+
+  it('treats a missing status as still open', () => {
+    expect(blockedLabel([ref('b1', 'No status set')])).toBe('Blocked by: No status set')
   })
 })
