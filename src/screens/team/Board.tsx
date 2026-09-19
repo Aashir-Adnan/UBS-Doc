@@ -8,7 +8,7 @@ import { allTasks, applyFilters, statusTone, STATUS_LABEL, type TaskRow } from '
 import { useActingPermissions } from '../../components/portal/tenantProjects/useActingPermissions'
 import { setTaskStatus } from '../../components/discordTasks/api'
 import {
-  COLUMNS, groupByColumn, dropOutcome, classifyDropError, releaseOverride, retireOverrides,
+  COLUMNS, groupByColumn, dropOutcome, classifyDropError, releaseOverride, retireOverrides, blockedLabel,
   type BoardColumn,
 } from './boardLogic'
 import { toneChip } from './chips'
@@ -254,11 +254,17 @@ function Card({ t, col, theme, search, canMove }: { t: TaskRow; col: BoardColumn
               {STATUS_LABEL[t.status] ?? t.status}
             </span>
           )}
-          {t.isBlocked && (
-            <span className={c('text-[10px] font-bold px-1.5 py-0.5 rounded-md inline-flex items-center gap-1', chipRed(theme))}>
-              <Ban size={10} /> Blocked
-            </span>
-          )}
+          {t.isBlocked && (() => {
+            const label = blockedLabel(t.blockedBy)
+            return (
+              <span
+                title={label}
+                className={c('text-[10px] font-bold px-1.5 py-0.5 rounded-md inline-flex items-center gap-1 max-w-full', chipRed(theme))}
+              >
+                <Ban size={10} className="shrink-0" /> <span className="truncate">{label}</span>
+              </span>
+            )
+          })()}
         </div>
       )}
     </article>
