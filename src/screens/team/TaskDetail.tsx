@@ -10,6 +10,9 @@ import { toneChip } from './chips'
 import { useTeam } from './TeamLayout'
 import Avatar from './Avatar'
 import ScopeBadge from './ScopeBadge'
+import UserCard from './UserCard'
+import TaskHistory from './TaskHistory'
+import { relativeTime } from './activityLogic'
 
 // One task, in full. The payload is the section's — this screen never fetches,
 // so a deep link into it renders once TeamLayout's single request lands.
@@ -133,10 +136,20 @@ export default function TaskDetail() {
           </Field>
         )}
 
-        <p className={c('text-xs font-medium mt-6 mb-0', muted(theme))}>
-          {task.createdBy ? `Created by ${task.createdBy.name}` : 'Created'}{created ? ` on ${created}` : ''}
-          {updated ? ` · Updated ${updated}` : ''}
-        </p>
+        <div className="mt-6 mb-5 grid gap-4 sm:grid-cols-2">
+          <Field label="Created by" theme={theme}>
+            <UserCard actor={task.createdBy} caption={created} theme={theme} />
+          </Field>
+          <Field label="Last updated by" theme={theme}>
+            {task.updatedBy
+              ? <UserCard actor={task.updatedBy} caption={[relativeTime(task.updatedBy.at) ?? updated, task.updatedBy.viaSite ? 'via the site' : null].filter(Boolean).join(' · ') || null} theme={theme} />
+              : <p className={c('text-sm m-0', muted(theme))}>{updated ? `No edits recorded yet · last change ${updated}` : 'No edits recorded yet'}</p>}
+          </Field>
+        </div>
+
+        <Field label="History" theme={theme}>
+          <TaskHistory task={task} theme={theme} />
+        </Field>
 
         {task.channelUrl && (
           <a href={task.channelUrl} target="_blank" rel="noreferrer"

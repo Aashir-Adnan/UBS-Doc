@@ -1,11 +1,26 @@
 export interface TaskPerson { discordId: string; name: string; avatarUrl?: string }
+// Someone who did something to a task, drawn as a card. `unknown` = a Discord id
+// with no member row (left the server / never synced). A site edit by someone
+// not matched to a member has a name only, no discordId.
+export interface TaskActor { discordId?: string; name: string; username?: string; avatarUrl?: string; unknown?: boolean }
+export type ActivityChange =
+  | { field: 'status' | 'scope' | 'implementationStatus' | 'passedApiTests' | 'passedQaTests' | 'passedAcceptanceCriteria'; from: string | number | null; to: string | number | null }
+  | { field: 'title' | 'description' }
+  | { field: 'assignees'; added: TaskActor[]; removed: TaskActor[] }
+  | { field: 'project'; from: string | null; to: string | null }
+  | { field: 'blocked_by'; action: 'added' | 'removed'; title: string }
+export interface TaskActivityEntry { at: string | null; actor: TaskActor | null; viaSite: boolean; changes: ActivityChange[] }
 export interface TaskRef { id: string; title: string; status?: string }
 export interface TaskRow {
   id: string; title: string; type: string; status: string; implementationStatus: string | null
   assignees: TaskPerson[]; blockedBy: TaskRef[]; blocks: TaskRef[]; isBlocked: boolean
   channelUrl: string | null; createdAt: string; updatedAt: string
   description: string | null; scope: string | null; modules: string[]
-  createdBy: TaskPerson | null
+  createdBy: TaskActor | null
+  // Optional: an older backend does not send them, and a task nobody has edited
+  // since activity logging began has none.
+  updatedBy?: (TaskActor & { at: string | null; viaSite: boolean }) | null
+  activity?: TaskActivityEntry[]
   passedApiTests: number | null; passedQaTests: number | null; passedAcceptanceCriteria: number | null
   projectId: string | null; projectName: string | null
 }

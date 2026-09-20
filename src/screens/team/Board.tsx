@@ -16,6 +16,7 @@ import Toast, { type ToastTone } from './Toast'
 import { useTeam } from './TeamLayout'
 import { AvatarStack } from './Avatar'
 import ScopeBadge from './ScopeBadge'
+import { whoLine } from './activityLogic'
 import TaskPreview from './TaskPreview'
 
 // The Board tab: the same filtered corpus as the Tasks tab, laid out in the
@@ -293,6 +294,7 @@ function Card({ t, col, theme, search, canMove }: { t: TaskRow; col: BoardColumn
           {t.assignees.length ? t.assignees.map((a) => a.name).join(', ') : 'Unassigned'}
         </p>
       </div>
+      {whoLine(t) && <p className={c('text-[11px] m-0 mt-2 truncate', muted(theme))} title={whoLine(t) ?? undefined}>{whoLine(t)}</p>}
     </article>
   )
 }
