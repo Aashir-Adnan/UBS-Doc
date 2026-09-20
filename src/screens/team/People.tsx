@@ -5,6 +5,7 @@ import type { Theme } from '../../types'
 import { allTasks, applyFilters, roleLabel, type TaskRow, type TeamMember } from '../tasksLogic'
 import { filterMembers, memberWorkload, sortMembers } from './teamLogic'
 import { useTeam } from './TeamLayout'
+import Avatar from './Avatar'
 
 // The People tab: the guild directory as cards, busiest first. Everything
 // comes from the payload TeamLayout fetched — this screen never calls the API.
@@ -85,9 +86,12 @@ function MemberCard({ m, tasks, theme }: { m: TeamMember; tasks: TaskRow[]; them
   return (
     <section className={c(card(theme), 'rounded-2xl p-5 flex flex-col gap-3')}>
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className={c('font-extrabold text-base m-0 truncate', txt(theme))}>{m.name}</h2>
-          {m.username && <p className={c('text-xs m-0 truncate', muted(theme))}>@{m.username}</p>}
+        <div className="min-w-0 flex items-center gap-3">
+          <Avatar person={m} size={40} theme={theme} />
+          <div className="min-w-0">
+            <h2 className={c('font-extrabold text-base m-0 truncate', txt(theme))}>{m.name}</h2>
+            {m.username && <p className={c('text-xs m-0 truncate', muted(theme))}>@{m.username}</p>}
+          </div>
         </div>
         <span className={c('text-[11px] font-bold px-2 py-0.5 rounded-md shrink-0', m.verified ? chipMint(theme) : chipAmber(theme))}>
           {m.verified ? 'Verified' : 'Pending'}

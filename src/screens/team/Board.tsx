@@ -14,6 +14,9 @@ import {
 import { toneChip } from './chips'
 import Toast, { type ToastTone } from './Toast'
 import { useTeam } from './TeamLayout'
+import { AvatarStack } from './Avatar'
+import ScopeBadge from './ScopeBadge'
+import TaskPreview from './TaskPreview'
 
 // The Board tab: the same filtered corpus as the Tasks tab, laid out in the
 // four fixed columns, with native HTML drag and drop writing a status change
@@ -202,20 +205,20 @@ function Column({ col, tasks, theme, search, canMove, over, onDragOver, onDragLe
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       className={c(
-        'flex-1 min-w-[250px] rounded-2xl p-3 border tr',
+        'flex-1 min-w-[375px] rounded-2xl p-4 border tr',
         over
           ? d ? 'border-indigo-400/60 bg-indigo-500/10' : 'border-indigo-300 bg-indigo-50/70'
           : d ? 'border-white/8 bg-white/3' : 'border-slate-200 bg-slate-50/60',
       )}
     >
-      <div className="flex items-baseline justify-between gap-2 px-1 mb-2.5">
-        <h2 className={c('font-extrabold text-sm m-0', txt(theme))}>{col.label}</h2>
-        <span className={c('text-[11px] font-bold px-2 py-0.5 rounded-full', chipGray(theme))}>{tasks.length}</span>
+      <div className="flex items-baseline justify-between gap-2 px-1 mb-3.5">
+        <h2 className={c('font-extrabold text-base m-0', txt(theme))}>{col.label}</h2>
+        <span className={c('text-xs font-bold px-2.5 py-0.5 rounded-full', chipGray(theme))}>{tasks.length}</span>
       </div>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         {tasks.map((t) => <Card key={t.id} t={t} col={col} theme={theme} search={search} canMove={canMove} />)}
         {tasks.length === 0 && (
-          <p className={c('text-xs font-medium text-center py-6 m-0', muted(theme))}>Nothing here</p>
+          <p className={c('text-sm font-medium text-center py-8 m-0', muted(theme))}>Nothing here</p>
         )}
       </div>
     </section>
@@ -232,41 +235,53 @@ function Card({ t, col, theme, search, canMove }: { t: TaskRow; col: BoardColumn
         e.dataTransfer.effectAllowed = 'move'
       }}
       className={c(
-        'rounded-xl border p-3 tr',
+        'rounded-2xl border p-4 tr',
         canMove ? 'cursor-grab active:cursor-grabbing' : '',
         d ? 'border-white/8 bg-white/6 hover:border-white/16' : 'border-slate-200 bg-white hover:border-slate-300',
       )}
     >
-      <p className={c('text-sm font-semibold m-0 mb-1 leading-snug', txt(theme))}>
-        <Link to={`/tools/team/tasks/${t.id}${search}`} className={c('no-underline hover:underline', txt(theme))}>{t.title}</Link>
-      </p>
-      <p className={c('text-[11px] font-medium m-0', muted(theme))}>
-        {t.projectName || 'No project'}
-        {' · '}
-        {t.assignees.length ? t.assignees.map((a) => a.name).join(', ') : 'Unassigned'}
-      </p>
-      {(col.key === 'done' || t.isBlocked) && (
-        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-          {/* Done holds three different statuses (done/closed/resolved), so only
-              there does the card spell out which one it actually is. */}
-          {col.key === 'done' && (
-            <span className={c('text-[10px] font-bold px-1.5 py-0.5 rounded-md', toneChip[statusTone(t)](theme))}>
-              {STATUS_LABEL[t.status] ?? t.status}
+      <div className="flex items-start gap-2 mb-2">
+        <p className={c('text-base font-semibold m-0 leading-snug flex-1 min-w-0', txt(theme))}>
+          <Link to={`/tools/team/tasks/${t.id}${search}`} className={c('no-underline hover:underline', txt(theme))}>{t.title}</Link>
+        </p>
+        <TaskPreview t={t} theme={theme} search={search} />
+      </div>
+
+      {/* Scope on every card (a muted "No scope" when unset) so the row of
+          badges reads the same down the whole column. */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-3">
+        <ScopeBadge scope={t.scope} theme={theme} showEmpty />
+        {t.type === 'bug' && (
+          <span className={c('text-[11px] font-bold px-2 py-0.5 rounded-md', chipRed(theme))}>Bug</span>
+        )}
+        {/* Done holds three different statuses (done/closed/resolved), so only
+            there does the card spell out which one it actually is. */}
+        {col.key === 'done' && (
+          <span className={c('text-[11px] font-bold px-2 py-0.5 rounded-md', toneChip[statusTone(t)](theme))}>
+            {STATUS_LABEL[t.status] ?? t.status}
+          </span>
+        )}
+        {t.isBlocked && (() => {
+          const label = blockedLabel(t.blockedBy)
+          return (
+            <span
+              title={label}
+              className={c('text-[11px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1 max-w-full', chipRed(theme))}
+            >
+              <Ban size={11} className="shrink-0" /> <span className="truncate">{label}</span>
             </span>
-          )}
-          {t.isBlocked && (() => {
-            const label = blockedLabel(t.blockedBy)
-            return (
-              <span
-                title={label}
-                className={c('text-[10px] font-bold px-1.5 py-0.5 rounded-md inline-flex items-center gap-1 max-w-full', chipRed(theme))}
-              >
-                <Ban size={10} className="shrink-0" /> <span className="truncate">{label}</span>
-              </span>
-            )
-          })()}
-        </div>
-      )}
+          )
+        })()}
+      </div>
+
+      <div className="flex items-center gap-2.5">
+        <AvatarStack people={t.assignees} size={26} theme={theme} />
+        <p className={c('text-xs font-medium m-0 min-w-0 truncate', muted(theme))}>
+          {t.projectName || 'No project'}
+          {' · '}
+          {t.assignees.length ? t.assignees.map((a) => a.name).join(', ') : 'Unassigned'}
+        </p>
+      </div>
     </article>
   )
 }

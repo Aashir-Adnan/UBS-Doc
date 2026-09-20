@@ -11,6 +11,8 @@ import {
 import { toneChip } from './chips'
 import DependencyGraph from './DependencyGraph'
 import { useTeam } from './TeamLayout'
+import Avatar, { AvatarStack } from './Avatar'
+import ScopeBadge from './ScopeBadge'
 
 // The Tasks tab of the Team section: project cards with their task rows, all
 // from the payload the layout fetched. Filtering is client-side — the corpus is
@@ -80,6 +82,7 @@ function ProjectCard({ p, theme, search }: { p: ProjectGroup; theme: Theme; sear
           {p.members.map((m) => (
             <span key={m.discordId} title={m.source === 'inferred' ? 'Assigned to tasks here' : (m.role ? roleLabel(m.role) : undefined)}
               className={c('text-[11px] font-semibold px-2.5 py-1 rounded-full', m.source === 'explicit' ? chipIndigo(theme) : chipGray(theme))}>
+              <Avatar person={m} size={16} theme={theme} />
               {m.name}{m.role ? ` · ${roleLabel(m.role)}` : ''}
             </span>
           ))}
@@ -109,10 +112,14 @@ function TaskLine({ t, theme, search }: { t: TaskRow; theme: Theme; search: stri
             </a>
           )}
         </p>
-        <p className={c('text-xs', muted(theme))}>
-          {t.assignees.length ? t.assignees.map((a) => a.name).join(', ') : 'Unassigned'}
-          {t.type === 'bug' ? ' · bug' : ''}
-        </p>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <AvatarStack people={t.assignees} size={22} theme={theme} />
+          <p className={c('text-xs m-0', muted(theme))}>
+            {t.assignees.length ? t.assignees.map((a) => a.name).join(', ') : 'Unassigned'}
+            {t.type === 'bug' ? ' · bug' : ''}
+          </p>
+          <ScopeBadge scope={t.scope} theme={theme} />
+        </div>
         {t.isBlocked && (() => {
           const openBlockers = t.blockedBy.filter((b) => !['closed', 'done', 'resolved'].includes(b.status ?? ''))
           return (
