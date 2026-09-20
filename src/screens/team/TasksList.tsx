@@ -13,6 +13,7 @@ import DependencyGraph from './DependencyGraph'
 import { useTeam } from './TeamLayout'
 import Avatar, { AvatarStack } from './Avatar'
 import ScopeBadge from './ScopeBadge'
+import { whoLine } from './activityLogic'
 
 // The Tasks tab of the Team section: project cards with their task rows, all
 // from the payload the layout fetched. Filtering is client-side — the corpus is
@@ -120,6 +121,7 @@ function TaskLine({ t, theme, search }: { t: TaskRow; theme: Theme; search: stri
           </p>
           <ScopeBadge scope={t.scope} theme={theme} />
         </div>
+        {whoLine(t) && <p className={c('text-[11px] m-0 mt-0.5', muted(theme))}>{whoLine(t)}</p>}
         {t.isBlocked && (() => {
           const openBlockers = t.blockedBy.filter((b) => !['closed', 'done', 'resolved'].includes(b.status ?? ''))
           return (

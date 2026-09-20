@@ -10,6 +10,7 @@ import { popoverPosition } from './previewLogic'
 import { toneChip } from './chips'
 import Avatar from './Avatar'
 import ScopeBadge from './ScopeBadge'
+import { whoLine } from './activityLogic'
 
 // The ⓘ button on a board card and the popover it opens: a read-only summary of
 // the task (description, scope, project, people, blockers) without leaving the
@@ -109,7 +110,9 @@ export default function TaskPreview({ t, theme, search }: { t: TaskRow; theme: T
           </div>
 
           <p className={c('text-sm font-bold m-0 mb-1 leading-snug', txt(theme))}>{t.title}</p>
-          <p className={c('text-xs m-0 mb-3', muted(theme))}>{t.projectName || 'No project'}</p>
+          <p className={c('text-xs m-0 mb-1', muted(theme))}>{t.projectName || 'No project'}</p>
+          {whoLine(t) && <p className={c('text-xs m-0 mb-3', muted(theme))}>{whoLine(t)}</p>}
+          {!whoLine(t) && <div className="mb-2" />}
 
           {t.description
             ? <p className={c('text-xs whitespace-pre-wrap m-0 mb-3 line-clamp-6', d ? 'text-white/70' : 'text-slate-600')}>{t.description}</p>
