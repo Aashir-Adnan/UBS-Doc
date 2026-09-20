@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   COLUMNS, columnOf, statusForColumn, groupByColumn, dropOutcome, classifyDropError,
-  releaseOverride, retireOverrides, blockedLabel,
+  releaseOverride, retireOverrides, blockedLabel, edgeScrollDelta,
 } from './boardLogic'
 import type { TaskRow, TaskRef } from '../tasksLogic'
 
@@ -200,5 +200,23 @@ describe('blockedLabel', () => {
 
   it('treats a missing status as still open', () => {
     expect(blockedLabel([ref('b1', 'No status set')])).toBe('Blocked by: No status set')
+  })
+})
+
+describe('edgeScrollDelta', () => {
+  const box = { left: 100, right: 1100 }
+  it('does not scroll away from the edges', () => {
+    expect(edgeScrollDelta(600, box)).toBe(0)
+    expect(edgeScrollDelta(190, box)).toBe(0)
+    expect(edgeScrollDelta(1010, box)).toBe(0)
+  })
+  it('scrolls left near the left edge and right near the right edge', () => {
+    expect(edgeScrollDelta(150, box)).toBeLessThan(0)
+    expect(edgeScrollDelta(1050, box)).toBeGreaterThan(0)
+  })
+  it('scrolls faster the closer to the edge, up to the top speed', () => {
+    expect(Math.abs(edgeScrollDelta(110, box))).toBeGreaterThan(Math.abs(edgeScrollDelta(180, box)))
+    expect(edgeScrollDelta(1500, box)).toBe(28)
+    expect(edgeScrollDelta(0, box)).toBe(-28)
   })
 })

@@ -8,7 +8,7 @@ import { allTasks, applyFilters, statusTone, STATUS_LABEL, type TaskRow } from '
 import { useActingPermissions } from '../../components/portal/tenantProjects/useActingPermissions'
 import { setTaskStatus } from '../../components/discordTasks/api'
 import {
-  COLUMNS, groupByColumn, dropOutcome, classifyDropError, releaseOverride, retireOverrides, blockedLabel,
+  COLUMNS, groupByColumn, dropOutcome, classifyDropError, releaseOverride, retireOverrides, blockedLabel, edgeScrollDelta,
   type BoardColumn,
 } from './boardLogic'
 import { toneChip } from './chips'
@@ -49,6 +49,7 @@ export default function Board() {
   // updater only runs at the next render, so it cannot tell a finishing
   // request whether it is still the current one for that card — this can.
   const latest = useRef<Record<string, string>>({})
+  const scroller = useRef<HTMLDivElement>(null)
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [toast, setToast] = useState<ToastState | null>(null)
 
@@ -153,7 +154,17 @@ export default function Board() {
       )}
 
       {tasks.length > 0 && (
-        <div className="flex gap-4 overflow-x-auto pb-2 items-start">
+        <div
+          ref={scroller}
+          className="flex gap-4 overflow-x-auto pb-2 items-start"
+          // Bubbles up from a column's own onDragOver, which still runs first.
+          onDragOver={(e) => {
+            const el = scroller.current
+            if (!canMove || !el) return
+            const dx = edgeScrollDelta(e.clientX, el.getBoundingClientRect())
+            if (dx) el.scrollLeft += dx
+          }}
+        >
           {COLUMNS.map((col) => (
             <Column
               key={col.key}
@@ -205,7 +216,7 @@ function Column({ col, tasks, theme, search, canMove, over, onDragOver, onDragLe
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       className={c(
-        'flex-1 min-w-[375px] rounded-2xl p-4 border tr',
+        'flex-1 basis-0 min-w-[300px] rounded-2xl p-4 border tr',
         over
           ? d ? 'border-indigo-400/60 bg-indigo-500/10' : 'border-indigo-300 bg-indigo-50/70'
           : d ? 'border-white/8 bg-white/3' : 'border-slate-200 bg-slate-50/60',
