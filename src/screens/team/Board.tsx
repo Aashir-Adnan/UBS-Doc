@@ -157,7 +157,9 @@ export default function Board() {
       {tasks.length > 0 && (
         <div
           ref={scroller}
-          className="flex gap-4 overflow-x-auto pb-2 items-start"
+          // items-stretch: every column is as tall as the tallest, so a long Done
+          // column never leaves the others ending mid-page with nowhere to drop.
+          className="flex gap-4 overflow-x-auto pb-2 items-stretch"
           // Bubbles up from a column's own onDragOver, which still runs first.
           onDragOver={(e) => {
             const el = scroller.current
@@ -217,7 +219,9 @@ function Column({ col, tasks, theme, search, canMove, over, onDragOver, onDragLe
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       className={c(
-        'flex-1 basis-0 min-w-[300px] rounded-2xl p-4 border tr',
+        // The whole column, including the empty space below its cards, is the drop
+        // target; min-h keeps a short board from being a thin strip to aim at.
+        'flex flex-col flex-1 basis-0 min-w-[300px] min-h-[24rem] rounded-2xl p-4 border tr',
         over
           ? d ? 'border-indigo-400/60 bg-indigo-500/10' : 'border-indigo-300 bg-indigo-50/70'
           : d ? 'border-white/8 bg-white/3' : 'border-slate-200 bg-slate-50/60',
