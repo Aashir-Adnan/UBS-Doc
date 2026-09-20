@@ -79,7 +79,9 @@ export default function TeamLayout() {
 
   return (
     <div className={c('min-h-full', d ? 'aurora-dark' : 'aurora-light')}>
-      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-12">
+      {/* The board needs the room: four columns of larger cards do not fit the
+          1240px the other tabs read comfortably in. */}
+      <div className={c('mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-12', tab === 'board' ? 'max-w-[1800px]' : 'max-w-[1240px]')}>
         <Breadcrumb items={['UBS', 'Dev Tools', 'Team']} theme={theme} />
         <div className="flex items-end justify-between gap-4 mb-6 flex-wrap">
           <div>

@@ -122,3 +122,13 @@ export function blockedLabel(blockedBy: TaskRef[]): string {
   const openBlockers = blockedBy.filter((b) => !isTerminal(b.status ?? ''))
   return openBlockers.length ? `Blocked by: ${openBlockers.map((b) => b.title).join(', ')}` : 'Blocked'
 }
+
+// While a card is being dragged, how far to scroll the board sideways: negative
+// near the left edge, positive near the right, zero elsewhere. The browser does
+// not scroll a container for you during an HTML5 drag, so on a screen too narrow
+// to show all four columns the Done column would be out of reach.
+export function edgeScrollDelta(clientX: number, box: { left: number; right: number }, zone = 90, speed = 28): number {
+  if (clientX < box.left + zone) return -Math.round(speed * Math.min(1, (box.left + zone - clientX) / zone))
+  if (clientX > box.right - zone) return Math.round(speed * Math.min(1, (clientX - (box.right - zone)) / zone))
+  return 0
+}
