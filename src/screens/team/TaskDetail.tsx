@@ -8,6 +8,8 @@ import { findTask, statusTone, STATUS_LABEL, type TaskRef } from '../tasksLogic'
 import { fmtDate, refLabel, refTone, testCount } from './detailLogic'
 import { toneChip } from './chips'
 import { useTeam } from './TeamLayout'
+import Avatar from './Avatar'
+import ScopeBadge from './ScopeBadge'
 
 // One task, in full. The payload is the section's — this screen never fetches,
 // so a deep link into it renders once TeamLayout's single request lands.
@@ -84,7 +86,7 @@ export default function TaskDetail() {
 
         {task.scope && (
           <Field label="Scope" theme={theme}>
-            <p className={c('text-sm whitespace-pre-wrap m-0', txt(theme))}>{task.scope}</p>
+            <ScopeBadge scope={task.scope} theme={theme} />
           </Field>
         )}
 
@@ -110,7 +112,10 @@ export default function TaskDetail() {
           {task.assignees.length ? (
             <div className="flex flex-wrap gap-1.5">
               {task.assignees.map((a) => (
-                <span key={a.discordId} className={c('text-[11px] font-semibold px-2.5 py-1 rounded-full', chipIndigo(theme))}>{a.name}</span>
+                <span key={a.discordId} className={c('text-[11px] font-semibold px-2.5 py-1 rounded-full', chipIndigo(theme))}>
+                  <Avatar person={a} size={18} theme={theme} />
+                  {a.name}
+                </span>
               ))}
             </div>
           ) : <p className={c('text-sm m-0', muted(theme))}>Unassigned</p>}

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   applyFilters, assigneeOptions, statusTone, unknownProjectSlug, roleLabel, DEFAULT_FILTERS,
-  findTask, allTasks, type ProjectGroup, type TeamMember,
+  findTask, allTasks, scopeLabel, scopeTone, type ProjectGroup, type TeamMember,
 } from './tasksLogic'
 
 const t = (id: string, status: string, assignees: string[], isBlocked = false, title = id) => ({
@@ -108,5 +108,28 @@ describe('roleLabel', () => {
     expect(roleLabel('qa')).toBe('QA')
     expect(roleLabel('lead')).toBe('Lead')
     expect(roleLabel('something_new')).toBe('something_new')
+  })
+})
+
+describe('scopeLabel / scopeTone', () => {
+  it('labels the four fixed scopes', () => {
+    expect(scopeLabel('backend')).toBe('Backend')
+    expect(scopeLabel('frontend')).toBe('Frontend')
+    expect(scopeLabel('qa')).toBe('QA')
+    expect(scopeLabel('design')).toBe('Design')
+  })
+  it('shows an older free-text scope as it was written, and nothing for none', () => {
+    expect(scopeLabel('GitSync')).toBe('GitSync')
+    expect(scopeLabel(null)).toBeNull()
+    expect(scopeLabel('  ')).toBeNull()
+  })
+  it('gives each fixed scope its own tone and everything else "other"', () => {
+    expect(scopeTone('qa')).toBe('qa')
+    expect(scopeTone('GitSync')).toBe('other')
+    expect(scopeTone(null)).toBe('other')
+  })
+  it('does not read an inherited object key as a scope', () => {
+    expect(scopeTone('constructor')).toBe('other')
+    expect(scopeLabel('constructor')).toBe('constructor')
   })
 })

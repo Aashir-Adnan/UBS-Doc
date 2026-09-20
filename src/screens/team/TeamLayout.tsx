@@ -3,7 +3,8 @@ import { Link, Outlet, useLocation, useOutletContext, useSearchParams } from 're
 import { RefreshCw } from 'lucide-react'
 import AuroraText from '../../components/ui/aurora-text'
 import SearchInput from '../../components/ui/search-input'
-import { c, muted, Breadcrumb, inputCls } from '../../lib'
+import { c, muted, Breadcrumb } from '../../lib'
+import FilterSelect from './FilterSelect'
 import { useTheme } from '../../app/ThemeContext'
 import { fetchDiscordTasks } from '../../components/discordTasks/api'
 import { applyFilters, assigneeOptions, DEFAULT_FILTERS, type Filters, type TasksPayload } from '../tasksLogic'
@@ -74,7 +75,6 @@ export default function TeamLayout() {
   const blocked = visible.reduce((n, p) => n + p.tasks.filter((t) => t.isBlocked).length, 0)
 
   const tab = activeTab(pathname)
-  const sel = inputCls(theme, 'text-xs py-2 px-3 rounded-xl')
   const context: TeamContext = { payload, loading, error, refresh, filters, setFilter, people }
 
   return (
@@ -91,7 +91,7 @@ export default function TeamLayout() {
           <div className="flex items-center gap-3">
             <SearchInput value={filters.query} onChange={(v) => setFilter({ query: v })} placeholder="Search tasks…" width={240} theme={theme} />
             <button type="button" onClick={() => void refresh()} disabled={loading} title="Refresh"
-              className={c('p-2.5 rounded-xl tr', d ? 'text-white/50 hover:bg-white/6' : 'text-slate-400 hover:bg-slate-100', loading ? 'opacity-50' : '')}>
+              className={c('h-11 w-11 inline-flex items-center justify-center rounded-xl tr', d ? 'text-white/50 hover:bg-white/6' : 'text-slate-400 hover:bg-slate-100', loading ? 'opacity-50' : '')}>
               <RefreshCw size={16} className={loading ? 'spin' : ''} />
             </button>
           </div>
@@ -112,22 +112,22 @@ export default function TeamLayout() {
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 mb-6">
+        <div className="flex flex-wrap items-center gap-3 mb-6">
           {/* Status is a tasks-list concept: the board has its own columns and
               People counts open work, so it only shows on the Tasks tab. */}
           {tab === 'tasks' && (
-            <select aria-label="Status" className={sel} value={filters.status} onChange={(e) => setFilter({ status: e.target.value as Filters['status'] })}>
+            <FilterSelect label="Status" theme={theme} value={filters.status} onChange={(v) => setFilter({ status: v as Filters['status'] })}>
               <option value="all">All statuses</option><option value="active">Active</option><option value="done">Done</option>
-            </select>
+            </FilterSelect>
           )}
-          <select aria-label="Project" className={sel} value={filters.projectSlug ?? ''} onChange={(e) => setFilter({ projectSlug: e.target.value || null })}>
+          <FilterSelect label="Project" theme={theme} value={filters.projectSlug ?? ''} onChange={(v) => setFilter({ projectSlug: v || null })}>
             <option value="">All projects</option>
             {projects.filter((p) => p.docsSlug).map((p) => <option key={p.docsSlug!} value={p.docsSlug!}>{p.name}</option>)}
-          </select>
-          <select aria-label="Assignee" className={sel} value={filters.assigneeId ?? ''} onChange={(e) => setFilter({ assigneeId: e.target.value || null })}>
+          </FilterSelect>
+          <FilterSelect label="Assignee" theme={theme} value={filters.assigneeId ?? ''} onChange={(v) => setFilter({ assigneeId: v || null })}>
             <option value="">Anyone</option>
             {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          </FilterSelect>
           <label className={c('flex items-center gap-2 text-xs font-semibold cursor-pointer', muted(theme))}>
             <input type="checkbox" checked={filters.blockedOnly} onChange={(e) => setFilter({ blockedOnly: e.target.checked })} /> Blocked only
           </label>

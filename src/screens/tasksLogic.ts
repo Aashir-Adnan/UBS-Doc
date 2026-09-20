@@ -1,4 +1,4 @@
-export interface TaskPerson { discordId: string; name: string }
+export interface TaskPerson { discordId: string; name: string; avatarUrl?: string }
 export interface TaskRef { id: string; title: string; status?: string }
 export interface TaskRow {
   id: string; title: string; type: string; status: string; implementationStatus: string | null
@@ -9,7 +9,7 @@ export interface TaskRow {
   passedApiTests: number | null; passedQaTests: number | null; passedAcceptanceCriteria: number | null
   projectId: string | null; projectName: string | null
 }
-export interface ProjectMember { discordId: string; name: string; username: string | null; role: string | null; source: 'explicit' | 'inferred' }
+export interface ProjectMember { discordId: string; name: string; username: string | null; avatarUrl?: string; role: string | null; source: 'explicit' | 'inferred' }
 export interface ProjectGroup {
   id: string | null; name: string; docsSlug: string | null; members: ProjectMember[]
   counts: { open: number; in_progress: number; pending: number; done: number; blocked: number }
@@ -17,7 +17,7 @@ export interface ProjectGroup {
 }
 export interface TeamProjectRef { id: string; name: string; docsSlug: string | null; role: string }
 export interface TeamMember {
-  discordId: string; name: string; username: string | null; roleNames: string[]
+  discordId: string; name: string; username: string | null; avatarUrl?: string; roleNames: string[]
   status: string; verified: boolean; projects: TeamProjectRef[]
 }
 export interface TasksPayload { generatedAt: string; projects: ProjectGroup[]; members: TeamMember[] }
@@ -98,3 +98,19 @@ export const ROLE_LABEL: Record<string, string> = {
   frontend_developer: 'Frontend Developer', qa: 'QA', design: 'Design',
 }
 export const roleLabel = (role: string) => ROLE_LABEL[role] ?? role
+
+// A task's discipline. The bot stores lowercase keys (backend/frontend/qa/design);
+// a task from before that change may still carry free text, which is shown as-is.
+export const SCOPE_LABEL: Record<string, string> = { backend: 'Backend', frontend: 'Frontend', qa: 'QA', design: 'Design' }
+const isFixedScope = (s: string) => Object.prototype.hasOwnProperty.call(SCOPE_LABEL, s)
+export const scopeLabel = (scope: string | null | undefined): string | null => {
+  const s = (scope ?? '').trim()
+  if (!s) return null
+  return isFixedScope(s) ? SCOPE_LABEL[s] : s
+}
+// Which chip colour a scope takes; anything that is not one of the four is 'other'.
+export type ScopeTone = 'backend' | 'frontend' | 'qa' | 'design' | 'other'
+export const scopeTone = (scope: string | null | undefined): ScopeTone => {
+  const s = (scope ?? '').trim()
+  return isFixedScope(s) ? (s as ScopeTone) : 'other'
+}
