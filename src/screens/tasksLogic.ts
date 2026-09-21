@@ -9,8 +9,11 @@ export type ActivityChange =
   | { field: 'assignees'; added: TaskActor[]; removed: TaskActor[] }
   | { field: 'project'; from: string | null; to: string | null }
   | { field: 'blocked_by'; action: 'added' | 'removed'; title: string }
+  | { field: 'subtask'; action: 'added'; title: string }
 export interface TaskActivityEntry { at: string | null; actor: TaskActor | null; viaSite: boolean; changes: ActivityChange[] }
 export interface TaskRef { id: string; title: string; status?: string }
+// One item of a task's subtask checklist (a subtask is also a row in the task list).
+export interface TaskSubtask { id: string; title: string; status: string; assignees: TaskPerson[] }
 export interface TaskRow {
   id: string; title: string; type: string; status: string; implementationStatus: string | null
   assignees: TaskPerson[]; blockedBy: TaskRef[]; blocks: TaskRef[]; isBlocked: boolean
@@ -21,6 +24,11 @@ export interface TaskRow {
   // since activity logging began has none.
   updatedBy?: (TaskActor & { at: string | null; viaSite: boolean }) | null
   activity?: TaskActivityEntry[]
+  // Hierarchy (one level). Optional: an older backend sends none of it, and a task
+  // with no subtasks has an empty list. `parent` is set on a subtask.
+  parent?: TaskRef | null
+  subtasks?: TaskSubtask[]
+  subtaskProgress?: { done: number; total: number }
   passedApiTests: number | null; passedQaTests: number | null; passedAcceptanceCriteria: number | null
   projectId: string | null; projectName: string | null
 }

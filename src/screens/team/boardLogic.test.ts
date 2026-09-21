@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   COLUMNS, columnOf, statusForColumn, groupByColumn, dropOutcome, classifyDropError,
-  releaseOverride, retireOverrides, blockedLabel, edgeScrollDelta,
+  releaseOverride, retireOverrides, blockedLabel, edgeScrollDelta, dropBlockReason, plainRuleMessage,
 } from './boardLogic'
 import type { TaskRow, TaskRef } from '../tasksLogic'
 
@@ -218,5 +218,33 @@ describe('edgeScrollDelta', () => {
     expect(Math.abs(edgeScrollDelta(110, box))).toBeGreaterThan(Math.abs(edgeScrollDelta(180, box)))
     expect(edgeScrollDelta(1500, box)).toBe(28)
     expect(edgeScrollDelta(0, box)).toBe(-28)
+  })
+})
+
+describe('dropBlockReason', () => {
+  const withSubs = { ...t('P', 'in_progress'), subtasks: [{ id: 'a', title: 'Sub a', status: 'open', assignees: [] }, { id: 'b', title: 'Sub b', status: 'done', assignees: [] }] }
+  it('refuses a drop onto Done while a subtask is open, and says which', () => {
+    expect(dropBlockReason(withSubs, 'done')).toBe('Finish its subtasks first (1 open: Sub a).')
+  })
+  it('allows every other column, and a task already in Done', () => {
+    expect(dropBlockReason(withSubs, 'open')).toBeNull()
+    expect(dropBlockReason(withSubs, 'pending')).toBeNull()
+    expect(dropBlockReason(withSubs, 'in_progress')).toBeNull()
+    expect(dropBlockReason({ ...withSubs, status: 'closed' }, 'done')).toBeNull()
+  })
+  it('allows Done once every subtask is finished, or with no subtasks', () => {
+    expect(dropBlockReason({ ...withSubs, subtasks: [{ id: 'b', title: 'Sub b', status: 'done', assignees: [] }] }, 'done')).toBeNull()
+    expect(dropBlockReason(t('X', 'open'), 'done')).toBeNull()
+  })
+})
+
+describe('the bot\'s refusal as a toast', () => {
+  const message = "**Parent** can't be marked done yet — 2 subtasks are still open:\n• Sub a\n• Sub b"
+  it('flattens the markdown and the bullet list to one plain line', () => {
+    expect(plainRuleMessage(message)).toBe("Parent can't be marked done yet — 2 subtasks are still open: Sub a · Sub b")
+  })
+  it('is what a 409 shows, ahead of the offline and generic wordings', () => {
+    expect(classifyDropError({ status: 409, message })).toEqual({ kind: 'other', text: plainRuleMessage(message) })
+    expect(classifyDropError({ status: 409, message: '' }).text).toBe('That move is not allowed right now.')
   })
 })

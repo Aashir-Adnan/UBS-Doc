@@ -2,6 +2,7 @@
 // the drop-outcome decision the Board screen uses to decide whether to call
 // setTaskStatus at all. No React, no DOM — see Board.tsx for the drag/drop UI.
 import { isTerminal, type TaskRef, type TaskRow } from '../tasksLogic'
+import { finishBlockedReason } from './hierarchyLogic'
 
 export interface BoardColumn { key: string; label: string; status: string }
 
@@ -49,6 +50,25 @@ export function dropOutcome(task: TaskRow, columnKey: string): DropOutcome {
   return { change: true, status: statusForColumn(columnKey) }
 }
 
+// A drop that would finish a task that still has open subtasks is refused before
+// any request is made (the bot would refuse it too), with the reason to show.
+// Null when the drop is fine.
+export function dropBlockReason(task: TaskRow, columnKey: string): string | null {
+  if (statusForColumn(columnKey) === 'done' && columnOf(task.status) !== 'done') return finishBlockedReason(task)
+  return null
+}
+
+// The bot's rule sentence is Discord markdown over several lines (**title**,
+// "• subtask"); a toast is one plain line.
+export function plainRuleMessage(message: string): string {
+  return message
+    .replace(/\*\*/g, '')
+    .replace(/\s*\n\s*•\s*/g, ' · ')
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/:\s*·\s*/, ': ')
+    .trim()
+}
+
 export type DropErrorKind = 'forbidden' | 'offline' | 'other'
 export interface DropError { kind: DropErrorKind; text: string }
 
@@ -64,6 +84,9 @@ export function classifyDropError(err: { status?: number; message?: string }): D
   const offline: DropError = { kind: 'offline', text: 'Discord bot is offline, try again.' }
   const misconfigured: DropError = { kind: 'other', text: 'Discord bot link is misconfigured. Tell an admin.' }
   if (status === 403) return forbidden
+  // 409: the bot refused a change the rules do not allow (finishing a task with
+  // open subtasks). It is a sentence for the visitor, not a fault to retry.
+  if (status === 409) return { kind: 'other', text: plainRuleMessage(message) || 'That move is not allowed right now.' }
   // A missing DISCORD_BOT_SECRET, a bot that answered 401/503, and a reply
   // CSAAS could not parse all arrive under the same 502/503 as "unreachable",
   // so the sentence has to be read before the status is trusted. None of them

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Ban } from 'lucide-react'
+import { Ban, ListChecks } from 'lucide-react'
 import { c, card, txt, muted, chipGray, chipRed } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
@@ -8,7 +8,7 @@ import { allTasks, applyFilters, statusTone, STATUS_LABEL, type TaskRow } from '
 import { useActingPermissions } from '../../components/portal/tenantProjects/useActingPermissions'
 import { setTaskStatus } from '../../components/discordTasks/api'
 import {
-  COLUMNS, groupByColumn, dropOutcome, classifyDropError, releaseOverride, retireOverrides, blockedLabel, edgeScrollDelta,
+  COLUMNS, groupByColumn, dropOutcome, dropBlockReason, classifyDropError, releaseOverride, retireOverrides, blockedLabel, edgeScrollDelta,
   type BoardColumn,
 } from './boardLogic'
 import { toneChip } from './chips'
@@ -17,6 +17,7 @@ import { useTeam } from './TeamLayout'
 import { AvatarStack } from './Avatar'
 import ScopeBadge from './ScopeBadge'
 import { whoLine } from './activityLogic'
+import { topLevel, progressText } from './hierarchyLogic'
 import TaskPreview from './TaskPreview'
 
 // The Board tab: the same filtered corpus as the Tasks tab, laid out in the
@@ -58,7 +59,9 @@ export default function Board() {
   // The board has no status filter of its own — its columns are the statuses —
   // so the shared filter bar's status value is deliberately overridden here.
   const tasks = useMemo(
-    () => allTasks(applyFilters(projects, { ...filters, status: 'all' })),
+    // Subtasks live in their parent's checklist; the board shows top-level tasks,
+    // each with a progress chip.
+    () => topLevel(allTasks(applyFilters(projects, { ...filters, status: 'all' }))),
     [projects, filters],
   )
   // Optimistic statuses are applied at render time only; nothing mutates the
@@ -124,8 +127,11 @@ export default function Board() {
     if (!task) return
     const outcome = dropOutcome(task, col.key)
     if (!outcome.change) return
+    // A task with open subtasks cannot be finished: say so without a round trip.
+    const blocked = dropBlockReason(task, col.key)
+    if (blocked) { showToast(blocked, 'error'); return }
     void move(task, outcome.status)
-  }, [canMove, shown, move])
+  }, [canMove, shown, move, showToast])
 
   if (loading && !payload) {
     return (
@@ -269,6 +275,11 @@ function Card({ t, col, theme, search, canMove }: { t: TaskRow; col: BoardColumn
         <ScopeBadge scope={t.scope} theme={theme} showEmpty />
         {t.type === 'bug' && (
           <span className={c('text-[11px] font-bold px-2 py-0.5 rounded-md', chipRed(theme))}>Bug</span>
+        )}
+        {progressText(t) && (
+          <span title="Subtasks finished" className={c('text-[11px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1', chipGray(theme))}>
+            <ListChecks size={12} className="shrink-0" /> {progressText(t)}
+          </span>
         )}
         {/* Done holds three different statuses (done/closed/resolved), so only
             there does the card spell out which one it actually is. */}
