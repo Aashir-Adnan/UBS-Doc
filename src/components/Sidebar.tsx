@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, BookOpen, Wrench, Info, Database, Map, Activity, Bell, Zap,
   FolderOpen, GitBranch, MessageSquare, FolderGit2, BarChart3, Shield,
-  Sun, Moon, Server, Monitor, Bot, FolderKanban, X
+  Sun, Moon, Server, Monitor, Bot, FolderKanban, X, Users
 } from 'lucide-react'
 import { c } from '../lib'
 import type { Theme } from '../types'
@@ -47,6 +47,7 @@ const TOOLS: NavItem[] = [
   { to: '/tools/notify', label: 'Notify', Icon: Bell },
   { to: '/tools/apiObject', label: 'API Object Builder', Icon: Zap },
   { to: '/tools/projects', label: 'Projects', Icon: FolderOpen },
+  { to: '/tools/team', label: 'Team', Icon: Users },
   { to: '/tools/github', label: 'GitHub', Icon: GitBranch },
   { to: '/tools/meetingWorkflow', label: 'Meetings', Icon: MessageSquare },
   { to: '/tools/repos', label: 'Repositories', Icon: FolderGit2 },

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Database, Map, Activity, Bell, Zap, FolderOpen, GitBranch, MessageSquare, FolderGit2, BarChart3, Shield, LogOut } from 'lucide-react'
+import { Database, Map, Activity, Bell, Zap, FolderOpen, GitBranch, MessageSquare, FolderGit2, BarChart3, Shield, LogOut, Users } from 'lucide-react'
 import { c, muted } from '../lib'
 import { useTheme } from '../app/ThemeContext'
 import { useAuthTyped } from '../components/portal/authTypes'
@@ -13,6 +13,7 @@ const TOOLS = [
   { label: 'Notify', desc: 'Report bugs and request features', Icon: Bell, route: '/tools/notify', from: '#F59E0B', to: '#D97706' },
   { label: 'API Object Builder', desc: 'Generate typed API configuration objects', Icon: Zap, route: '/tools/apiObject', from: '#4F46E5', to: '#10B981' },
   { label: 'Projects', desc: 'Browse team projects and docs', Icon: FolderOpen, route: '/tools/projects', from: '#3B82F6', to: '#4F46E5' },
+  { label: 'Team', desc: 'People, tasks, board and blockers', Icon: Users, route: '/tools/team', from: '#F59E0B', to: '#EF4444' },
   { label: 'GitHub', desc: 'Issues, PRs, and agent workflows', Icon: GitBranch, route: '/tools/github', from: '#6366F1', to: '#7C3AED' },
   { label: 'Meetings', desc: 'Record, transcribe, and analyze meetings', Icon: MessageSquare, route: '/tools/meetingWorkflow', from: '#7C3AED', to: '#4F46E5' },
   { label: 'Repositories', desc: 'Track repos, features, and platforms', Icon: FolderGit2, route: '/tools/repos', from: '#10B981', to: '#3B82F6' },
