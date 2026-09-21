@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ExternalLink, Ban } from 'lucide-react'
+import { ExternalLink, Ban, ListChecks } from 'lucide-react'
 import { c, card, txt, muted, chipRed, chipGray, chipIndigo } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
@@ -14,6 +14,7 @@ import { useTeam } from './TeamLayout'
 import Avatar, { AvatarStack } from './Avatar'
 import ScopeBadge from './ScopeBadge'
 import { whoLine } from './activityLogic'
+import { groupHierarchy, progressText } from './hierarchyLogic'
 
 // The Tasks tab of the Team section: project cards with their task rows, all
 // from the payload the layout fetched. Filtering is client-side — the corpus is
@@ -90,16 +91,23 @@ function ProjectCard({ p, theme, search }: { p: ProjectGroup; theme: Theme; sear
         </div>
       )}
       <ul className={c('divide-y', d ? 'divide-white/6' : 'divide-slate-100')}>
-        {p.tasks.map((t) => <TaskLine key={t.id} t={t} theme={theme} search={search} />)}
+        {/* A parent's subtasks are listed under it; a subtask whose parent is not
+            in view (filtered out) stays a row of its own. */}
+        {groupHierarchy(p.tasks).map((g) => (
+          <Fragment key={g.task.id}>
+            <TaskLine t={g.task} theme={theme} search={search} />
+            {g.children.map((child) => <TaskLine key={child.id} t={child} theme={theme} search={search} nested />)}
+          </Fragment>
+        ))}
       </ul>
     </section>
   )
 }
 
-function TaskLine({ t, theme, search }: { t: TaskRow; theme: Theme; search: string }) {
+function TaskLine({ t, theme, search, nested = false }: { t: TaskRow; theme: Theme; search: string; nested?: boolean }) {
   const tone = statusTone(t)
   return (
-    <li className="py-3 flex flex-wrap items-start gap-x-3 gap-y-1.5">
+    <li className={c('py-3 flex flex-wrap items-start gap-x-3 gap-y-1.5', nested ? 'pl-6 sm:pl-8 border-l-2 ml-2 ' + (theme === 'dark' ? 'border-indigo-400/30' : 'border-indigo-200') : '')}>
       <span className={c('text-[11px] font-bold px-2 py-0.5 rounded-md shrink-0', toneChip[tone](theme))}>{STATUS_LABEL[t.status] ?? t.status}</span>
       <div className="flex-1 min-w-[200px]">
         <p className={c('text-sm font-semibold', txt(theme))}>
@@ -120,7 +128,15 @@ function TaskLine({ t, theme, search }: { t: TaskRow; theme: Theme; search: stri
             {t.type === 'bug' ? ' · bug' : ''}
           </p>
           <ScopeBadge scope={t.scope} theme={theme} />
+          {progressText(t) && (
+            <span title="Subtasks finished" className={c('text-[11px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1', chipGray(theme))}>
+              <ListChecks size={12} /> {progressText(t)}
+            </span>
+          )}
         </div>
+        {t.parent && !nested && (
+          <p className={c('text-[11px] m-0 mt-0.5', muted(theme))}>↳ subtask of {t.parent.title}</p>
+        )}
         {whoLine(t) && <p className={c('text-[11px] m-0 mt-0.5', muted(theme))}>{whoLine(t)}</p>}
         {t.isBlocked && (() => {
           const openBlockers = t.blockedBy.filter((b) => !['closed', 'done', 'resolved'].includes(b.status ?? ''))

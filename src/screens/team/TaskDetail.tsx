@@ -11,6 +11,7 @@ import { useTeam } from './TeamLayout'
 import Avatar from './Avatar'
 import ScopeBadge from './ScopeBadge'
 import UserCard from './UserCard'
+import SubtasksSection from './SubtasksSection'
 import TaskHistory from './TaskHistory'
 import { relativeTime } from './activityLogic'
 
@@ -68,7 +69,7 @@ export default function TaskDetail() {
           <h2 className={c('font-extrabold text-xl sm:text-2xl m-0 flex-1 min-w-[200px]', txt(theme))}>{task.title}</h2>
         </div>
 
-        <p className={c('text-xs font-semibold mb-6', muted(theme))}>
+        <p className={c('text-xs font-semibold', task.parent ? 'mb-2' : 'mb-6', muted(theme))}>
           {task.type}
           {projectName && (
             <>
@@ -81,11 +82,24 @@ export default function TaskDetail() {
           {task.implementationStatus ? ` · ${task.implementationStatus}` : ''}
         </p>
 
+        {task.parent && (
+          <p className={c('text-xs font-semibold mb-6', muted(theme))}>
+            Subtask of{' '}
+            <Link to={`/tools/team/tasks/${task.parent.id}${search}`} className="text-indigo-500 no-underline hover:underline">{task.parent.title}</Link>
+          </p>
+        )}
+
         <Field label="Description" theme={theme}>
           {task.description
             ? <p className={c('text-sm whitespace-pre-wrap m-0', txt(theme))}>{task.description}</p>
             : <p className={c('text-sm m-0', muted(theme))}>No description</p>}
         </Field>
+
+        {(task.subtasks?.length ?? 0) > 0 && (
+          <Field label="Subtasks" theme={theme}>
+            <SubtasksSection task={task} theme={theme} search={search} />
+          </Field>
+        )}
 
         {task.scope && (
           <Field label="Scope" theme={theme}>

@@ -41,6 +41,8 @@ export function describeChange(c: ActivityChange): string {
       return c.to ? `moved it to the ${c.to} project${c.from ? ` (from ${c.from})` : ''}` : `removed it from ${c.from ?? 'its project'}`
     case 'blocked_by':
       return c.action === 'added' ? `made it blocked by "${c.title}"` : `unblocked it from "${c.title}"`
+    case 'subtask':
+      return `added a subtask "${c.title}"`
     default:
       return 'changed this task'
   }
