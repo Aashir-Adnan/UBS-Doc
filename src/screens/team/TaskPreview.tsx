@@ -13,6 +13,8 @@ import ScopeBadge from './ScopeBadge'
 import { whoLine } from './activityLogic'
 import { progressText } from './hierarchyLogic'
 import { timeChip } from './timeLogic'
+import { taskUrl } from './detailLogic'
+import CopyLinkButton from './CopyLinkButton'
 
 // The ⓘ button on a board card and the popover it opens: a read-only summary of
 // the task (description, scope, project, people, blockers) without leaving the
@@ -153,6 +155,9 @@ export default function TaskPreview({ t, theme, search }: { t: TaskRow; theme: T
               className="text-xs font-bold text-indigo-500 no-underline hover:underline">
               Open task
             </Link>
+            {/* Stays open on click: the outside-mousedown handler treats the
+                popover's own children as inside, so you see "Copied". */}
+            <CopyLinkButton url={taskUrl(window.location.origin, t.id)} theme={theme} variant="link" />
             {t.channelUrl && (
               <a href={t.channelUrl} target="_blank" rel="noreferrer"
                 className={c('text-xs font-semibold no-underline inline-flex items-center gap-1 hover:underline', muted(theme))}>

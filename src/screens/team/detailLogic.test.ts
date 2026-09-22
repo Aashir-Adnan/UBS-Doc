@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fmtDate, refTone, refLabel, testCount } from './detailLogic'
+import { fmtDate, refTone, refLabel, testCount, taskUrl } from './detailLogic'
 
 describe('fmtDate', () => {
   it('formats an ISO timestamp with short month, day and year', () => {
@@ -47,5 +47,19 @@ describe('testCount', () => {
     expect(testCount(undefined)).toBe('—')
     expect(testCount(0)).toBe('0')
     expect(testCount(12)).toBe('12')
+  })
+})
+
+describe('taskUrl', () => {
+  it('builds an absolute link to the task detail route', () => {
+    expect(taskUrl('https://ubs.granjur.com', 'abc123')).toBe('https://ubs.granjur.com/tools/team/tasks/abc123')
+  })
+
+  it('does not double the slash when the origin carries a trailing one', () => {
+    expect(taskUrl('https://ubs.granjur.com/', 'abc123')).toBe('https://ubs.granjur.com/tools/team/tasks/abc123')
+  })
+
+  it('encodes an id so a stray character cannot break the path', () => {
+    expect(taskUrl('https://ubs.granjur.com', 'a b/c')).toBe('https://ubs.granjur.com/tools/team/tasks/a%20b%2Fc')
   })
 })

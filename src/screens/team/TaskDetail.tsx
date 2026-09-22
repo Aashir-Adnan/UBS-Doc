@@ -5,7 +5,7 @@ import { c, card, txt, muted, chipGray, chipIndigo } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
 import { findTask, statusTone, STATUS_LABEL, type TaskRef } from '../tasksLogic'
-import { fmtDate, refLabel, refTone, testCount } from './detailLogic'
+import { fmtDate, refLabel, refTone, taskUrl, testCount } from './detailLogic'
 import { toneChip } from './chips'
 import { useTeam } from './TeamLayout'
 import Avatar from './Avatar'
@@ -14,6 +14,7 @@ import UserCard from './UserCard'
 import SubtasksSection from './SubtasksSection'
 import TaskHistory from './TaskHistory'
 import TimeSection from './TimeSection'
+import CopyLinkButton from './CopyLinkButton'
 import { relativeTime } from './activityLogic'
 
 // One task, in full. The payload is the section's — this screen never fetches,
@@ -68,6 +69,11 @@ export default function TaskDetail() {
           </span>
           {/* h2, not h1: TeamLayout's "Team" heading is the page's h1. */}
           <h2 className={c('font-extrabold text-xl sm:text-2xl m-0 flex-1 min-w-[200px]', txt(theme))}>{task.title}</h2>
+          {/* mt-1 lines it up with the status chip, which the row's
+              items-start leaves sitting slightly below the title's cap. */}
+          <div className="mt-1 shrink-0">
+            <CopyLinkButton url={taskUrl(window.location.origin, task.id)} theme={theme} />
+          </div>
         </div>
 
         <p className={c('text-xs font-semibold', task.parent ? 'mb-2' : 'mb-6', muted(theme))}>
