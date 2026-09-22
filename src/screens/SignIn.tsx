@@ -2,20 +2,36 @@ import AnoAI from '../components/ui/animated-shader-background'
 import GoogleSignIn from '../components/portal/GoogleSignIn'
 import BorderBeam from '../components/ui/border-beam'
 import AuroraText from '../components/ui/aurora-text'
+import ThemeSwitch from '../components/ThemeSwitch'
+import { c } from '../lib'
+import { useTheme } from '../app/ThemeContext'
 
-// Always dark-styled, regardless of the app theme (matches the design) — this
-// screen renders standalone, outside AppLayout, so it hosts its own shader
-// background rather than relying on AppLayout's.
+// This screen renders standalone, outside AppLayout, so it hosts its own
+// shader background and its own theme switch rather than relying on the
+// sidebar's. The light recipe below is AppLayout's, deliberately: the root
+// background stays #04070F in both themes and the pale overlay is what covers
+// it, so the two screens cannot drift to different shades of "light".
 export default function SignIn() {
+  const { theme, toggleTheme } = useTheme()
+  const d = theme === 'dark'
+
   return (
     <div className="min-h-screen relative" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", background: '#04070F' }}>
-      <AnoAI className="fixed inset-0 w-full h-full" opacity={0.9} />
-      <div className="fixed inset-0 pointer-events-none" style={{ background: 'rgba(4,7,15,0.38)' }} />
+      <AnoAI className="fixed inset-0 w-full h-full" opacity={d ? 0.9 : 0.18} />
+      <div className="fixed inset-0 pointer-events-none"
+        style={{ background: d ? 'rgba(4,7,15,0.38)' : 'rgba(250,248,255,0.88)' }} />
+
+      {/* Above the card's z-10 so it stays clickable, and inset from the
+          corner far enough to clear a phone's rounded display. */}
+      <div className="fixed top-5 right-5 z-20">
+        <ThemeSwitch theme={theme} toggleTheme={toggleTheme}
+          className={c('shadow-sm border', d ? 'border-white/8' : 'border-slate-200')} />
+      </div>
 
       <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden z-10">
         <div className="relative z-10 w-full max-w-[440px]">
           {/* Card */}
-          <div className="card-dark rounded-3xl p-10 relative overflow-hidden">
+          <div className={c(d ? 'card-dark' : 'card-light', 'rounded-3xl p-10 relative overflow-hidden')}>
             <BorderBeam duration={5} colorFrom="#4F46E5" colorTo="#10B981" />
             {/* Logo */}
             <div className="flex justify-center mb-9">
@@ -37,39 +53,42 @@ export default function SignIn() {
               style={{ letterSpacing: '-0.025em', lineHeight: 1.1 }}>
               <AuroraText>Sign in to UBS</AuroraText>
             </h1>
-            <p className="text-white/48 text-sm text-center mb-8 font-medium">
+            <p className={c('text-sm text-center mb-8 font-medium', d ? 'text-white/48' : 'text-slate-500')}>
               Your team's developer operations hub
             </p>
 
             {/* Google sign-in — real auth, restyled to the design's pill via
-                the .portal-google-btn scope in portal-compat.css */}
-            <div className="portal-google-btn">
+                the .portal-google-btn scope in portal-compat.css. That button
+                is white in both themes; only its white border disappears
+                against a pale card, so light mode re-draws the edge here
+                rather than in the shared stylesheet. */}
+            <div className={c('portal-google-btn', !d && '[&_.google-button]:border-slate-200')}>
               <GoogleSignIn />
             </div>
 
             {/* Divider */}
             <div className="flex items-center gap-4 my-7">
-              <div className="flex-1 h-px bg-white/8" />
-              <span className="text-white/22 text-xs font-semibold">or</span>
-              <div className="flex-1 h-px bg-white/8" />
+              <div className={c('flex-1 h-px', d ? 'bg-white/8' : 'bg-slate-200')} />
+              <span className={c('text-xs font-semibold', d ? 'text-white/22' : 'text-slate-400')}>or</span>
+              <div className={c('flex-1 h-px', d ? 'bg-white/8' : 'bg-slate-200')} />
             </div>
 
             {/* Helper */}
-            <div className="rounded-xl px-5 py-4 bg-white/[0.04] border border-white/6">
-              <p className="text-center text-xs text-white/40 leading-relaxed">
-                Access is limited to <span className="text-indigo-400 font-semibold font-mono">@granjur.com</span> accounts,
+            <div className={c('rounded-xl px-5 py-4 border', d ? 'bg-white/[0.04] border-white/6' : 'bg-slate-50 border-slate-200')}>
+              <p className={c('text-center text-xs leading-relaxed', d ? 'text-white/40' : 'text-slate-500')}>
+                Access is limited to <span className={c('font-semibold font-mono', d ? 'text-indigo-400' : 'text-indigo-600')}>@granjur.com</span> accounts,
                 or an organization account provisioned by your administrator.
               </p>
             </div>
 
             {/* Footer */}
-            <p className="text-center text-[11px] text-white/22 mt-6">
+            <p className={c('text-center text-[11px] mt-6', d ? 'text-white/22' : 'text-slate-400')}>
               By continuing, you agree to UBS's internal usage policy.
             </p>
           </div>
 
           {/* Floating hint */}
-          <p className="text-center text-white/28 text-xs mt-5 font-medium">
+          <p className={c('text-center text-xs mt-5 font-medium', d ? 'text-white/28' : 'text-slate-400')}>
             UBS Dev Tools Portal · v2.4.1
           </p>
         </div>

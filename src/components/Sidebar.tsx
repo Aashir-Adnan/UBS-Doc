@@ -3,11 +3,12 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, BookOpen, Wrench, Info, Database, Map, Activity, Bell, Zap,
   FolderOpen, GitBranch, MessageSquare, FolderGit2, BarChart3, Shield,
-  Sun, Moon, Server, Monitor, Bot, FolderKanban, X, Users
+  Server, Monitor, Bot, FolderKanban, X, Users
 } from 'lucide-react'
 import { c } from '../lib'
 import type { Theme } from '../types'
 import OrgSwitcher from './portal/tenantProjects/OrgSwitcher'
+import ThemeSwitch from './ThemeSwitch'
 
 interface SidebarProps {
   /** Drawer state below lg; ignored at lg+ where the rail is permanent. */
@@ -157,13 +158,7 @@ export default function Sidebar({ theme, toggleTheme, open = false, onClose }: S
 
       {/* Theme toggle */}
       <div className={c('px-4 py-4 mt-auto border-t', d ? 'border-indigo-500/10' : 'border-slate-100')}>
-        <div className={c(
-          'flex p-1 rounded-full',
-          d ? 'bg-white/5' : 'bg-slate-100'
-        )}>
-          <ThemeBtn label="Light" icon={<Sun size={11} />} active={!d} onClick={() => d && toggleTheme()} dark={d} />
-          <ThemeBtn label="Dark" icon={<Moon size={11} />} active={d} onClick={() => !d && toggleTheme()} dark={d} />
-        </div>
+        <ThemeSwitch theme={theme} toggleTheme={toggleTheme} />
       </div>
     </aside>
   )
@@ -190,21 +185,3 @@ function NavRow({ icon, label, active, dark, onClick }: {
   )
 }
 
-function ThemeBtn({ label, icon, active, onClick, dark }: {
-  label: string; icon: ReactNode; active: boolean; onClick: () => void; dark: boolean
-}) {
-  return (
-    <button onClick={onClick} className={c(
-      'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-full text-[11px] font-bold tr',
-      active
-        ? dark
-          ? 'bg-indigo-500/30 text-indigo-300 shadow-sm'
-          : 'bg-white text-indigo-600 shadow-sm'
-        : dark
-          ? 'text-white/30 hover:text-white/55'
-          : 'text-slate-400 hover:text-slate-600'
-    )}>
-      {icon} {label}
-    </button>
-  )
-}
