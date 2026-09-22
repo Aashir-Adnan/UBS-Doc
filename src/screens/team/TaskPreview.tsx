@@ -12,6 +12,7 @@ import Avatar from './Avatar'
 import ScopeBadge from './ScopeBadge'
 import { whoLine } from './activityLogic'
 import { progressText } from './hierarchyLogic'
+import { timeChip } from './timeLogic'
 
 // The ⓘ button on a board card and the popover it opens: a read-only summary of
 // the task (description, scope, project, people, blockers) without leaving the
@@ -117,6 +118,10 @@ export default function TaskPreview({ t, theme, search }: { t: TaskRow; theme: T
 
           {progressText(t) && (
             <p className={c('text-xs font-semibold m-0 mb-3', muted(theme))}>Subtasks {progressText(t)} finished</p>
+          )}
+
+          {timeChip(t) && (
+            <p className={c('text-xs font-semibold m-0 mb-3', muted(theme))}>{timeChip(t)} logged</p>
           )}
 
           {t.description

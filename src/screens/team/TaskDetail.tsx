@@ -13,6 +13,7 @@ import ScopeBadge from './ScopeBadge'
 import UserCard from './UserCard'
 import SubtasksSection from './SubtasksSection'
 import TaskHistory from './TaskHistory'
+import TimeSection from './TimeSection'
 import { relativeTime } from './activityLogic'
 
 // One task, in full. The payload is the section's — this screen never fetches,
@@ -98,6 +99,12 @@ export default function TaskDetail() {
         {(task.subtasks?.length ?? 0) > 0 && (
           <Field label="Subtasks" theme={theme}>
             <SubtasksSection task={task} theme={theme} search={search} />
+          </Field>
+        )}
+
+        {(task.timeLogged !== undefined || task.estimateMinutes !== undefined) && (
+          <Field label="Time" theme={theme}>
+            <TimeSection task={task} theme={theme} />
           </Field>
         )}
 
