@@ -33,3 +33,11 @@ export function refLabel(status: string | null | undefined): string {
 export function testCount(value: number | null | undefined): string {
   return value === null || value === undefined ? '—' : String(value)
 }
+
+// The link you paste into chat when asking someone for an update. Built from
+// the task id alone: the board's own <Link>s carry the current filter string
+// so navigating keeps your view, but a link handed to someone else must not —
+// dropping them into your filters is not what "here is the task" means.
+export function taskUrl(origin: string, taskId: string): string {
+  return `${origin.replace(/\/+$/, '')}/tools/team/tasks/${encodeURIComponent(taskId)}`
+}
