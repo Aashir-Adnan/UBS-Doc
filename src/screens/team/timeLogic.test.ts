@@ -151,7 +151,10 @@ describe('toCsv', () => {
 
 describe('csvFilename', () => {
   it('slugifies the person and carries the range', () => {
-    expect(csvFilename('Ali Raza', new Date('2026-09-21T00:00:00Z'), new Date('2026-09-28T00:00:00Z')))
+    // Built as local midnights, not UTC instants: csvFilename is only ever
+    // fed weekRange's local-midnight output, and reading UTC instants here
+    // would make this test's result depend on the host's timezone offset.
+    expect(csvFilename('Ali Raza', new Date(2026, 8, 21), new Date(2026, 8, 28)))
       .toBe('time-ali-raza-2026-09-21-to-2026-09-27.csv')
   })
 })
