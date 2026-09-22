@@ -12,7 +12,8 @@ export function fetchDiscordTasks(): Promise<TasksPayload> {
 // defaults to the current UTC week when omitted), but the Time tab always
 // passes both so the report matches the week the picker shows. `scope` is
 // 'self' when the caller lacks view_discord_time and the server narrowed the
-// query to just their own rows.
+// query to just their own rows. `project` echoes the docsSlug the request
+// filtered by (null when none).
 export interface TimeReportPerson { discordId: string; name: string; avatarUrl?: string; minutes: number }
 export interface TimeReportProject { id: string | null; name: string; minutes: number }
 export interface TimeReportPayload {

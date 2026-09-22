@@ -36,7 +36,7 @@ const STATUS = { open: '#F59E0B', inProgress: '#6366F1', done: '#10B981' }
 export default function Stats() {
   const { theme } = useTheme()
   const d = theme === 'dark'
-  const { payload, loading, filters, setFilter, setTimeSelfScoped } = useTeam()
+  const { payload, loading, error, filters, setFilter, setTimeSelfScoped } = useTeam()
   const [kind, setKind] = useState<RangeKind>('30d')
   const [bounds, setBounds] = useState(() => rangeBounds(kind, new Date()))
   const [series, setSeries] = useState<ProjectStatsPayload | null>(null)
@@ -80,7 +80,16 @@ export default function Stats() {
       </div>
     )
   }
-  if (!payload) return null
+  if (!payload) {
+    // The shell keeps its own tasks banner off this tab (it owns a banner for
+    // the series fetch instead), so a failed tasks fetch has to be said here
+    // or the tab is simply blank.
+    return (
+      <div className={c('rounded-xl px-4 py-3 mb-5 text-sm font-medium border', d ? 'bg-red-500/10 border-red-500/25 text-red-300' : 'bg-red-50 border-red-200 text-red-600')}>
+        Could not load tasks{error ? `: ${error}` : ''}.
+      </div>
+    )
+  }
 
   const selected = filters.projectSlug ? scoped.find((p) => p.docsSlug === filters.projectSlug) ?? null : null
 
@@ -122,6 +131,7 @@ export default function Stats() {
           project={selected} stats={current?.projects.find((p) => p.id === selected.id) ?? null}
           approximate={current?.approximateCompletion ?? false} bounds={bounds} dim={seriesLoading && !!series}
           assigneeId={filters.assigneeId} nameOf={nameOf} theme={theme}
+          selfScoped={current?.timeScope === 'self'}
         />
       ) : scoped.length === 0 ? (
         <div className={c(card(theme), 'rounded-2xl px-8 py-14 text-center')}>
@@ -217,9 +227,9 @@ function earliestDay(stats: ProjectStats | null): Date | null {
 
 // ---- detail -----------------------------------------------------------------
 
-function ProjectDetail({ project, stats, approximate, bounds, dim, assigneeId, nameOf, theme }: {
+function ProjectDetail({ project, stats, approximate, bounds, dim, assigneeId, nameOf, theme, selfScoped }: {
   project: ProjectGroup; stats: ProjectStats | null; approximate: boolean; bounds: ReturnType<typeof rangeBounds>; dim: boolean
-  assigneeId: string | null; nameOf: (id: string) => string; theme: Theme
+  assigneeId: string | null; nameOf: (id: string) => string; theme: Theme; selfScoped: boolean
 }) {
   const d = theme === 'dark'
   const tasks = project.tasks
@@ -241,6 +251,7 @@ function ProjectDetail({ project, stats, approximate, bounds, dim, assigneeId, n
   const rows = members
     .map((m) => ({ m, b: memberBreakdown(m.discordId, tasks), minutes: stats ? minutesInRange(stats.time, m.discordId) : 0 }))
     .sort((a, b) => b.b.open - a.b.open || a.m.name.localeCompare(b.m.name))
+  const cycle = stats?.cycleMinutes != null ? formatDuration(stats.cycleMinutes) : null
 
   return (
     <div className="flex flex-col gap-5">
@@ -250,9 +261,14 @@ function ProjectDetail({ project, stats, approximate, bounds, dim, assigneeId, n
         <Kpi label="In progress" value={String(inProgress)} theme={theme} />
         <Kpi label="Blocked" value={String(blocked)} theme={theme} tone={blocked ? 'bad' : undefined} />
         <Kpi label="Done" value={String(done)} theme={theme} />
-        <Kpi label="Estimate vs logged" value={est ? `${formatDuration(est.logged)} / ${formatDuration(est.estimate)}` : 'No estimates'} theme={theme}
-          tone={est && est.logged > est.estimate ? 'bad' : undefined} />
-        <Kpi label="Avg cycle time" value={stats?.cycleMinutes != null ? formatDuration(stats.cycleMinutes) ?? '—' : '—'} theme={theme} />
+        {/* timeLogged on the tasks payload is not permission-gated; under self
+            scope this tile would show the team's total beneath a note
+            promising own hours only. */}
+        {!selfScoped && (
+          <Kpi label="Logged vs estimate" value={est ? `${formatDuration(est.logged)} / ${formatDuration(est.estimate)}` : 'No estimates'} theme={theme}
+            tone={est && est.logged > est.estimate ? 'bad' : undefined} />
+        )}
+        <Kpi label="Avg cycle time" value={cycle ?? '—'} theme={theme} />
       </div>
 
       <Panel title="Members" theme={theme}>
