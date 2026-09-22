@@ -6,12 +6,15 @@ import type { Theme } from '../../types'
 import { fetchTimeReport, type TimeReportPayload } from '../../components/discordTasks/api'
 import { formatDuration, shiftWeek, weekRange } from './timeLogic'
 import Avatar from './Avatar'
+import { useTeam } from './TeamLayout'
 
 // The Time tab: its own fetch of GET /api/discord/time/report, entirely
 // separate from the shared TasksList/People/Board payload TeamLayout owns —
 // the report is keyed by a week range, not by the task filters that apply to
 // the other tabs, so it holds its own range/data/loading/error state and
-// refetches whenever the range changes.
+// refetches whenever the range changes. It also refetches whenever the
+// shared payload's identity changes, i.e. whenever the header's Refresh
+// button is pressed — TimeTab never reads the payload itself.
 
 const rangeFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
 
@@ -25,6 +28,7 @@ function rangeLabel(range: { since: Date; until: Date }): string {
 export default function TimeTab() {
   const { theme } = useTheme()
   const d = theme === 'dark'
+  const { payload } = useTeam()
   const [range, setRange] = useState(() => weekRange(new Date()))
   const [data, setData] = useState<TimeReportPayload | null>(null)
   const [loading, setLoading] = useState(true)
@@ -35,11 +39,11 @@ export default function TimeTab() {
     setLoading(true)
     setError(null)
     fetchTimeReport(range.since, range.until)
-      .then((payload) => { if (!cancelled) setData(payload) })
+      .then((report) => { if (!cancelled) setData(report) })
       .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [range])
+  }, [range, payload])
 
   if (loading && !data) {
     return (
@@ -80,32 +84,37 @@ export default function TimeTab() {
         </p>
       )}
 
-      {!loading && !error && people.length === 0 && projects.length === 0 ? (
-        <div className={c(card(theme), 'rounded-2xl px-8 py-14 text-center')}>
-          <p className={c('text-sm font-medium m-0', muted(theme))}>No time logged this week.</p>
-        </div>
-      ) : (
-        <div className="grid gap-5 sm:grid-cols-2">
-          <TimeCard title="By person" theme={theme}>
-            {people.map((p) => (
-              <li key={p.discordId} className="py-2.5 flex items-center gap-3">
-                <Avatar person={p} size={22} theme={theme} />
-                <span className={c('text-sm font-semibold flex-1 min-w-0 truncate', txt(theme))}>{p.name}</span>
-                <span className={c('text-xs font-bold tabular-nums', muted(theme))}>{formatDuration(p.minutes) ?? '0m'}</span>
-              </li>
-            ))}
-          </TimeCard>
+      {/* A week-to-week refetch (not the first load, which has its own full-card
+          loading state above) dims the numbers in place instead of swapping
+          them with no visual feedback while `data` still shows the old week. */}
+      <div className={c('tr', loading && data ? 'opacity-50' : '')}>
+        {!loading && !error && people.length === 0 && projects.length === 0 ? (
+          <div className={c(card(theme), 'rounded-2xl px-8 py-14 text-center')}>
+            <p className={c('text-sm font-medium m-0', muted(theme))}>No time logged this week.</p>
+          </div>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2">
+            <TimeCard title="By person" theme={theme}>
+              {people.map((p) => (
+                <li key={p.discordId} className="py-2.5 flex items-center gap-3">
+                  <Avatar person={p} size={22} theme={theme} />
+                  <span className={c('text-sm font-semibold flex-1 min-w-0 truncate', txt(theme))}>{p.name}</span>
+                  <span className={c('text-xs font-bold tabular-nums', muted(theme))}>{formatDuration(p.minutes) ?? '0m'}</span>
+                </li>
+              ))}
+            </TimeCard>
 
-          <TimeCard title="By project" theme={theme}>
-            {projects.map((p) => (
-              <li key={p.id ?? 'none'} className="py-2.5 flex items-center gap-3">
-                <span className={c('text-sm font-semibold flex-1 min-w-0 truncate', txt(theme))}>{p.name}</span>
-                <span className={c('text-xs font-bold tabular-nums', muted(theme))}>{formatDuration(p.minutes) ?? '0m'}</span>
-              </li>
-            ))}
-          </TimeCard>
-        </div>
-      )}
+            <TimeCard title="By project" theme={theme}>
+              {projects.map((p) => (
+                <li key={p.id ?? 'none'} className="py-2.5 flex items-center gap-3">
+                  <span className={c('text-sm font-semibold flex-1 min-w-0 truncate', txt(theme))}>{p.name}</span>
+                  <span className={c('text-xs font-bold tabular-nums', muted(theme))}>{formatDuration(p.minutes) ?? '0m'}</span>
+                </li>
+              ))}
+            </TimeCard>
+          </div>
+        )}
+      </div>
     </>
   )
 }

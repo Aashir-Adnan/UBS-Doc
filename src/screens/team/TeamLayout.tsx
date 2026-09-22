@@ -144,8 +144,9 @@ export default function TeamLayout() {
           </div>
         )}
 
-        {/* The one error banner for the section — tabs never render their own. */}
-        {error && (
+        {/* Only about the shared tasks payload — meaningless on the Time tab,
+            which fetches a different endpoint and shows its own error banner. */}
+        {tab !== 'time' && error && (
           <div className={c('rounded-xl px-4 py-3 mb-5 text-sm font-medium border', d ? 'bg-red-500/10 border-red-500/25 text-red-300' : 'bg-red-50 border-red-200 text-red-600')}>
             Could not load tasks: {error}
           </div>

@@ -52,11 +52,12 @@ export function topContributors<T extends { name: string; minutes: number }>(
   list: T[],
   max: number,
 ): Array<T | { name: string; minutes: number }> {
+  max = Math.max(0, max)
   if (max >= list.length) return list
   const head = list.slice(0, max)
   const rest = list.slice(max)
   const minutes = rest.reduce((sum, x) => sum + x.minutes, 0)
-  return [...head, { name: `${rest.length} others`, minutes }]
+  return [...head, { name: `${rest.length} ${rest.length === 1 ? 'other' : 'others'}`, minutes }]
 }
 
 // The small duration chip drawn on a task row: null when there is nothing

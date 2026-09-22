@@ -97,6 +97,12 @@ describe('topContributors', () => {
     expect(out[1]).toBe(list[1])
   })
 
+  it('singularizes the trailing row to "1 other" when exactly one is rolled up', () => {
+    const out = topContributors(list, 3)
+    expect(out.map((x) => x.name)).toEqual(['Ana', 'Ben', 'Cy', '1 other'])
+    expect(out[3].minutes).toBe(30)
+  })
+
   it('keeps exactly max items with no trailing row when the count is exact', () => {
     const out = topContributors(list, 4)
     expect(out).toEqual(list)
