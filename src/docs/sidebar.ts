@@ -619,7 +619,6 @@ export const SIDEBAR: SidebarNode[] = [
             label: 'Questionairre For Client',
             items: [
               'projects/badar-hms/questionnaire/questionnaire_for_client',
-              'projects/badar-hms/questionnaire/opera_integration_questionnaire',
             ],
           },
           'projects/badar-hms/Opera_Config',
