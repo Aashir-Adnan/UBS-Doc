@@ -28,12 +28,13 @@ describe('activeTab', () => {
 })
 
 describe('TEAM_TABS', () => {
-  it('lists People, Tasks, Board and Time with their paths', () => {
+  it('lists People, Tasks, Board, Time and Stats with their paths', () => {
     expect(TEAM_TABS.map((t) => [t.key, t.path])).toEqual([
       ['people', '/tools/team'],
       ['tasks', '/tools/team/tasks'],
       ['board', '/tools/team/board'],
       ['time', '/tools/team/time'],
+      ['stats', '/tools/team/stats'],
     ])
   })
 })
@@ -42,5 +43,13 @@ describe('the Time tab', () => {
   it('is a tab and resolves from its path', () => {
     expect(TEAM_TABS.map((t) => t.key)).toContain('time')
     expect(activeTab('/tools/team/time')).toBe('time')
+  })
+})
+
+describe('the Stats tab', () => {
+  it('is a tab and resolves from its path', () => {
+    expect(TEAM_TABS.map((t) => t.key)).toContain('stats')
+    expect(activeTab('/tools/team/stats')).toBe('stats')
+    expect(activeTab('/tools/team/stats/')).toBe('stats')
   })
 })

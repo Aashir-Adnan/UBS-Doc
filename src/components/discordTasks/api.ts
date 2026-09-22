@@ -18,13 +18,18 @@ export interface TimeReportProject { id: string | null; name: string; minutes: n
 export interface TimeReportPayload {
   since: string
   until: string
+  project: string | null
   people: TimeReportPerson[]
   projects: TimeReportProject[]
   scope: 'all' | 'self'
 }
 
-export function fetchTimeReport(since: Date, until: Date): Promise<TimeReportPayload> {
-  const q = `since=${encodeURIComponent(since.toISOString())}&until=${encodeURIComponent(until.toISOString())}`
+// `project` is a docsSlug; omitted means every project. The server echoes it
+// back so a response can be matched to the filter that asked for it.
+const projectParam = (slug?: string | null) => (slug ? `&project=${encodeURIComponent(slug)}` : '')
+
+export function fetchTimeReport(since: Date, until: Date, projectSlug?: string | null): Promise<TimeReportPayload> {
+  const q = `since=${encodeURIComponent(since.toISOString())}&until=${encodeURIComponent(until.toISOString())}${projectParam(projectSlug)}`
   return mwGet(`/discord/time/report?${q}`) as Promise<TimeReportPayload>
 }
 
@@ -60,12 +65,13 @@ export interface TimeEntry {
 export interface TimeEntriesPayload {
   since: string
   until: string
+  project: string | null
   person: { discordId: string; name: string; avatarUrl?: string }
   entries: TimeEntry[]
   truncated: boolean
 }
-export async function fetchTimeEntries(discordId: string, since: Date, until: Date): Promise<TimeEntriesPayload> {
-  const q = `discordId=${encodeURIComponent(discordId)}&since=${encodeURIComponent(since.toISOString())}&until=${encodeURIComponent(until.toISOString())}`
+export async function fetchTimeEntries(discordId: string, since: Date, until: Date, projectSlug?: string | null): Promise<TimeEntriesPayload> {
+  const q = `discordId=${encodeURIComponent(discordId)}&since=${encodeURIComponent(since.toISOString())}&until=${encodeURIComponent(until.toISOString())}${projectParam(projectSlug)}`
   const res = await fetch(`${API_BASE_URL}/api/discord/time/entries?${q}`)
   const text = await res.text()
   let data: Record<string, unknown> = {}
@@ -82,6 +88,52 @@ export async function fetchTimeEntries(discordId: string, since: Date, until: Da
   }
   const payload = data.payload as { return?: unknown } | undefined
   return (payload?.return ?? payload ?? data) as TimeEntriesPayload
+}
+
+// GET /api/discord/projects/stats?since=&until=&project= — per-project,
+// per-day series for the Stats tab. Every series is sparse and ascending;
+// `since` null means all time. `timeScope` is 'self' when the caller lacks
+// view_discord_time and `time` holds only their own rows.
+export interface DayPoint { day: string; n: number }
+export interface TimePoint { day: string; discordId: string; minutes: number }
+export interface StaleTask { taskId: string; title: string; lastActivityAt: string | null }
+export interface ProjectStats {
+  id: string
+  name: string
+  docsSlug: string | null
+  created: DayPoint[]
+  completed: DayPoint[]
+  events: DayPoint[]
+  time: TimePoint[]
+  stale: StaleTask[]
+  cycleMinutes: number | null
+}
+export interface ProjectStatsPayload {
+  since: string | null
+  until: string
+  project: string | null
+  timeScope: 'all' | 'self'
+  approximateCompletion: boolean
+  projects: ProjectStats[]
+}
+
+export async function fetchProjectStats(since: Date | null, until: Date, projectSlug?: string | null): Promise<ProjectStatsPayload> {
+  const parts = [`until=${encodeURIComponent(until.toISOString())}`]
+  if (since) parts.push(`since=${encodeURIComponent(since.toISOString())}`)
+  if (projectSlug) parts.push(`project=${encodeURIComponent(projectSlug)}`)
+  const res = await fetch(`${API_BASE_URL}/api/discord/projects/stats?${parts.join('&')}`)
+  const text = await res.text()
+  let data: Record<string, unknown> = {}
+  if (text) {
+    try { data = JSON.parse(text) } catch { data = {} }
+  }
+  if (!res.ok) {
+    const specific = typeof data.payload === 'string' && data.payload ? data.payload : ''
+    const message = specific || (data.message as string) || (data.error as string) || res.statusText
+    throw new ApiError(message, res.status)
+  }
+  const payload = data.payload as { return?: unknown } | undefined
+  return (payload?.return ?? payload ?? data) as ProjectStatsPayload
 }
 
 export interface SetTaskStatusResult {
