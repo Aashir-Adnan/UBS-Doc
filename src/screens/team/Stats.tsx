@@ -38,24 +38,28 @@ export default function Stats() {
   const d = theme === 'dark'
   const { payload, loading, filters, setFilter, setTimeSelfScoped } = useTeam()
   const [kind, setKind] = useState<RangeKind>('30d')
+  const [bounds, setBounds] = useState(() => rangeBounds(kind, new Date()))
   const [series, setSeries] = useState<ProjectStatsPayload | null>(null)
   const [seriesLoading, setSeriesLoading] = useState(true)
   const [seriesError, setSeriesError] = useState<string | null>(null)
 
-  // `now` is pinned per range change so the effect below and the bucket keys
-  // agree on the same instant.
-  const bounds = useMemo(() => rangeBounds(kind, new Date()), [kind])
-
   useEffect(() => {
+    // Nothing to fetch until the shell's own payload exists: the Outlet mounts
+    // before it, and the effect would otherwise fire twice per visit. `now` is
+    // re-pinned on every trigger (range, project, Refresh), so a tab left open
+    // does not keep asking for yesterday's window.
+    if (!payload) return
     let cancelled = false
+    const next = rangeBounds(kind, new Date())
+    setBounds(next)
     setSeriesLoading(true)
     setSeriesError(null)
-    fetchProjectStats(bounds.since, bounds.until, filters.projectSlug)
+    fetchProjectStats(next.since, next.until, filters.projectSlug)
       .then((res) => { if (!cancelled) { setSeries(res); setTimeSelfScoped(res.timeScope === 'self') } })
       .catch((e) => { if (!cancelled) setSeriesError(e instanceof Error ? e.message : String(e)) })
       .finally(() => { if (!cancelled) setSeriesLoading(false) })
     return () => { cancelled = true }
-  }, [bounds, filters.projectSlug, payload, setTimeSelfScoped])
+  }, [kind, filters.projectSlug, payload, setTimeSelfScoped])
 
   const projects = payload?.projects ?? []
   // Project filter only — never assignee/status/blocked — so the counts match
@@ -192,7 +196,7 @@ function Ring({ pct, theme, size = 44 }: { pct: number | null; theme: Theme; siz
     <div className="relative shrink-0" style={{ width: size, height: size }} title={pct === null ? 'No tasks' : `${pct}% done`}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={4} />
-        {pct !== null && (
+        {pct !== null && pct > 0 && (
           <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={STATUS.done} strokeWidth={4} strokeLinecap="round"
             strokeDasharray={`${(pct / 100) * circ} ${circ}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
         )}
