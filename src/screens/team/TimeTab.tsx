@@ -70,6 +70,14 @@ export default function TimeTab() {
     [payload],
   )
   const [detail, setDetail] = useState<TimeEntriesPayload | null>(null)
+  // Its own loading/error, separate from the week report's: the two fetches
+  // are independent (one keyed by range alone, one by person+range), and
+  // sharing a flag would let one fetch's outcome mask or clobber the other's
+  // (a stale detail error surviving deselect, a healthy person fetch erasing
+  // a real report failure, or a cancelled detail request leaving the shared
+  // flag stuck true forever).
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -85,16 +93,18 @@ export default function TimeTab() {
   // Independent of the report fetch above: only runs when a person is
   // selected, and ignores its own out-of-order responses the same way, so a
   // slow request for a previously selected person can't overwrite a newer
-  // one's data.
+  // one's data. Deselecting resets all three of this effect's own pieces of
+  // state, not just `detail`, so neither a stale error nor a stuck loading
+  // flag can survive the person being cleared.
   useEffect(() => {
-    if (!personId) { setDetail(null); return }
+    if (!personId) { setDetail(null); setDetailError(null); setDetailLoading(false); return }
     let cancelled = false
-    setLoading(true)
-    setError(null)
+    setDetailLoading(true)
+    setDetailError(null)
     fetchTimeEntries(personId, range.since, range.until)
       .then((detailPayload) => { if (!cancelled) setDetail(detailPayload) })
-      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)) })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      .catch((e) => { if (!cancelled) setDetailError(e instanceof Error ? e.message : String(e)) })
+      .finally(() => { if (!cancelled) setDetailLoading(false) })
     return () => { cancelled = true }
   }, [personId, range, payload])
 
@@ -158,9 +168,7 @@ export default function TimeTab() {
 
       {/* A week-to-week refetch (not the first load, which has its own full-card
           loading state above) dims the numbers in place instead of swapping
-          them with no visual feedback while `data` still shows the old week.
-          The same dim covers a person-detail refetch, since it shares the
-          same `loading` flag. */}
+          them with no visual feedback while `data` still shows the old week. */}
       <div className={c('tr', loading && data ? 'opacity-50' : '')}>
         {!loading && !error && people.length === 0 && projects.length === 0 ? (
           <div className={c(card(theme), 'rounded-2xl px-8 py-14 text-center')}>
@@ -189,8 +197,18 @@ export default function TimeTab() {
           </div>
         )}
 
+        {personId && detailError && (
+          <div className={c('rounded-xl px-4 py-3 mt-5 text-sm font-medium border', d ? 'bg-red-500/10 border-red-500/25 text-red-300' : 'bg-red-50 border-red-200 text-red-600')}>
+            Could not load this person&rsquo;s time: {detailError}
+          </div>
+        )}
+
+        {/* Dims only this section during a person-detail refetch (e.g.
+            switching people or nudging the week while one is selected) —
+            keyed off `detailLoading`, never the week report's own `loading`,
+            so the two fetches' in-flight states can't bleed into each other. */}
         {personId && detail && (
-          <div className="mt-5">
+          <div className={c('tr mt-5', detailLoading && detail ? 'opacity-50' : '')}>
             {detail.truncated && (
               <p className={c('text-xs font-medium mb-3', muted(theme))}>
                 Showing the first 5000 entries — narrow the range for a complete total.
