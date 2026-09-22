@@ -173,6 +173,30 @@ export const SIDEBAR: SidebarNode[] = [
               'hms-documentation/major-implementations/additional-package-nights/backend-implementation',
             ],
           },
+          {
+            label: 'Startup Environment Validation',
+            items: [
+              'hms-documentation/major-implementations/startup-env-validation/startup-env-validation',
+            ],
+          },
+          {
+            label: 'Deployment & Crash Alert Emails',
+            items: [
+              'hms-documentation/major-implementations/deployment-alert-emails/deployment-alert-emails',
+            ],
+          },
+          {
+            label: 'API Object Collision Warnings',
+            items: [
+              'hms-documentation/major-implementations/api-object-collision-warnings/api-object-collision-warnings',
+            ],
+          },
+          {
+            label: 'Database Backups',
+            items: [
+              'hms-documentation/major-implementations/database-backups/database-backups',
+            ],
+          },
         ],
       },
       {

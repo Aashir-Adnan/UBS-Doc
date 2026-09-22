@@ -204,6 +204,28 @@ request, not a failure.
 The commit phase can still attach `warning`-severity problems (a failed slice, an
 unresolved category) — those do not block and do not fail the request.
 
+### Imported tenants start as `pending`
+
+A tenant **created** by a commit run is stored with `status: "pending"`
+(`perEntity.provisioning.status`). Pending tenants are hidden from every guest
+API — hotels, services, packages, search, landing — until staff review the
+imported data and activate the tenant through the Tenants CRUD:
+
+```http
+PUT /api/crud/tenants?id=<tenantId>
+{ "tenants_status": "active", ...the full tenant row... }
+```
+
+Send the full tenant row on that update: the CRUD's `Update` writes every
+column, so omitted fields are cleared (only `tenants_status` is null-safe).
+
+While pending, the tenant still shows in the staff Tenants list, but its own
+staff (the Tenant Admin created by the import) cannot log in to it. Activation
+fails if another active tenant already uses the same `tenant_name`.
+
+A re-run against an existing tenant (matched by `tenant_code`, or chosen with
+`targetTenantId`) never changes its status.
+
 ---
 
 ## The report
@@ -356,7 +378,7 @@ Every gap-fill is recorded in `defaultsApplied[]`. The important ones:
 | location | `location_type` | inferred from label keyword, else tree depth (`building` / `floor` / `zone`) |
 | package | `duration_unit` | `nights` |
 | package | `currency` | `Hotel Info` `currency_code` |
-| tenant | `status` | `active` |
+| tenant | `status` | `pending` for a newly created tenant (a reused / targeted tenant keeps its status) |
 | tenant | `tenant_locale` | `en` |
 | tenant | admin name | split of `hotel_name` (`contact_email` becomes the admin email) |
 
@@ -402,7 +424,8 @@ operation (including the package `configs` diff object) — is a v2 follow-up.
 
 The tenant has locations, delivery units, services (with `catalog_pricing` and
 `hms_config`), packages, and translations — the same end state as running
-chapters 1-5 by hand. Guests can browse and book it.
+chapters 1-5 by hand. A newly created tenant is `pending`: guests can browse
+and book it only after staff set `tenants_status` to `active`.
 
 The in-repo companion doc is
 `backend/Src/Apis/ProjectSpecificApis/TenantImport/README.md` (internal phase

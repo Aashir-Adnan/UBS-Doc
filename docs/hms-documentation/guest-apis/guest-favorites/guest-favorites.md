@@ -26,7 +26,20 @@ All endpoints require the **AUTH_PLATFORM** (guest JWT). The `userId` is resolve
 
 **GET** `/api/guest/favorites`
 
-Returns all active favorites for the authenticated user, grouped by type.
+Returns the authenticated user's active favorites whose service or package is still **active**, grouped by type.
+
+### Which favorites are returned
+
+A favorite is listed only when both are true:
+
+1. The `guest_favorites` row has `status = 'active'`, i.e. it wasn't removed.
+2. The item it points at still exists and has `status = 'active'`:
+   - a room favorite needs its `services` row active;
+   - a package favorite needs its `packages` row active.
+
+Favorites whose service or package is `inactive`, `probation` (pending deletion) or `archived` (parked so it can't take bookings), or no longer exists, are left out of the response. The `guest_favorites` row itself is not changed. If the item becomes active again, the favorite reappears without the guest re-adding it.
+
+This matches the add endpoints, which only accept an active service or package.
 
 ### Request Payload
 

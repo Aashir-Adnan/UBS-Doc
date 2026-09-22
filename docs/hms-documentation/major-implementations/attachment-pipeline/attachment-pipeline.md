@@ -44,7 +44,28 @@ No access token is required. Catalog imagery has to load for a signed-out visito
 The envelope normally travels in the `encryptedrequest` **header**. A browser cannot set a header on an `<img src>`, so an attachment URL meant for direct rendering would be unusable.
 
 For that one case the envelope is built **server-side** and carried as `?encryptedRequest=…`. It is decrypted and validated identically — a transport, not a bypass. Because AES-ECB is deterministic, the same attachment and actor always produce the same URL, so browser and CDN caching still work.
+
+The query string is accepted **only where an object opts in**, with `requestMetaData.envelopeInQuery: true`, and only on `GET`. `UploadServe` is the one object that does. The header and the body still take precedence when present. The same flag exempts those requests from the `x-client-*` device-header requirement, which an `<img>` can't meet either.
 :::
+
+---
+
+## Platform checks
+
+Both endpoints serve the admin dashboard and the guest apps, so each declares its own platform block with the **shared** lists, rather than inheriting the admin-only ones from `Crud_Template`:
+
+| Check | Value | Effect |
+|---|---|---|
+| `platformIP` | `*` | Any network address |
+| `supported` | `resolveSharedSupportedPlatforms()` | Any name in `PLATFORM_SUPPORTED` or `GUEST_PLATFORM_SUPPORTED` |
+| `domains` | `resolveSharedPlatformDomains()` | An `Origin` in `PLATFORM_ALLOWED_DOMAINS` or `GUEST_PLATFORM_ALLOWED_DOMAINS`, or no `Origin` at all |
+
+A failed check returns `E51` before anything is decrypted.
+
+- **Upload** is a `fetch()` call, so the browser sends `Origin` and the page's domain must be on one of the two lists.
+- **Serve**, rendered through `<img src>`, sends no `Origin`, so the domain list doesn't apply wherever the image is embedded. Protection comes from the encrypted actor and the per-attachment visibility check below.
+
+See [Edge Access Control](../edge-access-control/edge-access-control.md) for how the three checks and their environment variables work.
 
 ---
 
@@ -180,6 +201,22 @@ The provider is chosen by the `FILE_STORAGE_PROVIDER` environment variable. All 
 | `s3` | `uploads/<id>-<epoch><ext>` | signed URL, proxied |
 | `gcs` | `uploads/<id>-<epoch><ext>` | signed URL, proxied |
 
+**Writes and reads choose the provider differently.**
+
+- **Writes** (`POST /api/upload/file`) use `getStorageProvider()`: always the provider named by `FILE_STORAGE_PROVIDER`.
+- **Reads** (`/api/upload/serve`, `GET /get/file`) use `getStorageProviderForKey(key)`, which picks by the **stored key**, so rows written under another setting still resolve:
+
+| Stored key | Read through |
+|---|---|
+| `uploads/…` | the configured cloud provider: `gcs` when `FILE_STORAGE_PROVIDER=gcs`, otherwise `s3` |
+| `Uploads/…` or an absolute path | `local`, whatever the setting |
+
+Both functions share one instance per provider, so the configured provider has a single client.
+
+:::note Cloud rows on a local machine
+A development database copied from a cloud environment holds `uploads/…` keys. With `FILE_STORAGE_PROVIDER=local`, those rows are read through the S3 provider, so they only render when the `S3_*` credentials are set.
+:::
+
 Two details that look cosmetic and are not:
 
 - **The capital `U` is the switch.** Cloud detection matches lowercase `uploads/` only. A local key written in lowercase would be routed to a signed-URL proxy that cannot sign it.
@@ -199,6 +236,14 @@ The extension is taken from the uploaded filename when it has one, otherwise fro
 | `403` | missing or unresolvable `actionPerformerURDD`, or the slot belongs to another user |
 | `404` | the attachment id does not exist |
 | `409` | a file was already uploaded for this attachment |
+
+**Both endpoints**
+
+| Status | Code | Meaning |
+|---|---|---|
+| `400` | `E51` | a platform check failed: the platform name isn't in either `*_SUPPORTED` list, or the page's `Origin` isn't in either `*_ALLOWED_DOMAINS` list |
+| `400` | `E14` | no envelope found (serve: not a `GET`, or `envelopeInQuery` missing from the object) |
+| `400` | `E10` | the envelope couldn't be decrypted |
 
 **Serve**
 
@@ -227,3 +272,10 @@ node Services/SysScripts/TestScripts/fileFlowEdgeCases.test.js
 Storage-provider selection is memoised per process, so the script spawns itself once per provider and aggregates the results. The S3 and GCS providers run for real — only the network call at the very edge is stubbed, so key derivation and branch selection stay genuinely exercised.
 
 30 cases per provider: the provider contract, every upload rejection and acceptance path, visibility for each reference model, the staff override, and delivery headers. All fixtures are torn down afterwards, including on failure.
+
+`Services/SysScripts/TestScripts/uploadServeQueryEnvelope.test.js` covers the query-string envelope and read routing:
+
+- the envelope is read from the query only for `GET` plus `envelopeInQuery`, with header and body taking precedence;
+- the platform peek finds `PlatformName` in a query-only envelope;
+- the device-header exemption applies only to that case;
+- `getStorageProviderForKey` routing under `FILE_STORAGE_PROVIDER` = `local`, `s3` and `gcs`, and reuse of the `getStorageProvider()` instance.

@@ -352,4 +352,6 @@ These are internal error codes returned in error messages from the framework mid
 
 `E10` specifically covers: missing encrypted payload, missing encryption details, or invalid `PlatformName`/`PlatformVersion`.
 
+`E51` means no entry in the step's `platform` array matched the request. Either `PlatformName` is not in that entry's `supported` list, or `req.ip` is not in its `platformIP` list. In HMS both lists come from environment variables (`PLATFORM_SUPPORTED` / `GUEST_PLATFORM_SUPPORTED`, `PLATFORM_ALLOWED_IPS` / `GUEST_PLATFORM_ALLOWED_IPS`). See [Edge Access Control](../hms-documentation/major-implementations/edge-access-control/edge-access-control.md).
+
 ---

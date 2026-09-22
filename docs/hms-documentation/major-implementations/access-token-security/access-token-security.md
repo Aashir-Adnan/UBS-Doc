@@ -11,14 +11,18 @@ HMS uses a dual-token authentication system (access token + refresh token) with 
 
 | Token | Lifetime | Storage | Purpose |
 |-------|----------|---------|---------|
-| **Access token** | ~60 min (staff) / ~24 h (guest, configurable) | `user_devices.device_token` | Authenticates every API request |
+| **Access token** | `ACCESS_TOKEN_SECONDS` (3600s, staff and guest) | `user_devices.device_token` | Authenticates every API request |
 | **Refresh token** | 24 hours | `user_devices.guest_refresh_token` | Issues new access tokens without re-login (guests only) |
 
 ### Token Lifetimes (configurable)
 
-- **Staff**: `TOKEN_LIFETIME_MINUTES` (env) — default 60 minutes
-- **Guest access**: `GUEST_ACCESS_TOKEN_SECONDS` (env) — default 86400 (24 hours)
-- **Renewal threshold**: `TOKEN_RENEWAL_THRESHOLD_SECONDS` — when a token has this many seconds left, the middleware auto-renews it
+- **Access token (staff and guest)**: `ACCESS_TOKEN_SECONDS` (env) — read by `Services/SysFunctions/tokenConfig.js`; falls back to 3600 when unset. Guest tokens reuse the same value (`guestJwt.js`).
+- **Renewal threshold**: derived as **20% of `ACCESS_TOKEN_SECONDS`** (720s for a 3600s token). It is not read from env — when a token has this many seconds left, the middleware auto-renews it.
+- **Guest refresh token**: `GUEST_REFRESH_TOKEN_SECONDS` (or `GUEST_REFRESH_TOKEN_DAYS`) — falls back to 86400 (24 hours).
+
+:::note
+`TOKEN_LIFETIME_MINUTES`, `TOKEN_RENEWAL_THRESHOLD_SECONDS` and `GUEST_ACCESS_TOKEN_SECONDS` are **not read by any code**. Startup environment validation reports them as ignored — see [Startup Environment Validation](../startup-env-validation/startup-env-validation.md).
+:::
 
 ---
 
@@ -35,7 +39,7 @@ Request → deviceHeadersValidator → execReqProcessFuncs → accessTokenValida
 1. Calls `validateToken()` which:
    - **JWT decode**: Verifies signature and checks expiry via `checkExpiration()`
    - **needs_refresh check**: Queries `user_devices.needs_refresh` — if `1`, sets `decryptedPayload._needsRefresh = true`
-2. If the token is near expiry (within `TOKEN_RENEWAL_THRESHOLD_SECONDS`), auto-generates a new token via `generateToken()` and returns it in the `x-new-accesstoken` response header
+2. If the token is near expiry (within the renewal threshold — 20% of `ACCESS_TOKEN_SECONDS`), auto-generates a new token via `generateToken()` and returns it in the `x-new-accesstoken` response header
 3. The response sender injects `needs_refresh: true` into the response payload when the flag is set
 
 ### needs_refresh Check (validateToken.js)
