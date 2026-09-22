@@ -127,3 +127,45 @@ describe('timeChip', () => {
     expect(timeChip({ timeLogged: 125 })).toBe('2h 5m')
   })
 })
+
+import { csvFilename, entriesByTask, toCsv } from './timeLogic'
+import type { TimeEntry } from '../../components/discordTasks/api'
+
+describe('toCsv', () => {
+  it('writes a header and quotes only what needs it', () => {
+    const csv = toCsv([['Date', 'Task'], ['2026-09-22 09:00', 'Simple']])
+    expect(csv).toBe('Date,Task\r\n2026-09-22 09:00,Simple')
+  })
+
+  it('quotes fields containing a comma, a quote or a newline', () => {
+    // Task titles and notes routinely contain all three; getting this wrong
+    // corrupts the file silently rather than failing loudly.
+    const csv = toCsv([['a,b', 'say "hi"', 'line1\nline2']])
+    expect(csv).toBe('"a,b","say ""hi""","line1\nline2"')
+  })
+
+  it('renders null and undefined as empty, not as the word null', () => {
+    expect(toCsv([[null, undefined, 0]])).toBe(',,0')
+  })
+})
+
+describe('csvFilename', () => {
+  it('slugifies the person and carries the range', () => {
+    expect(csvFilename('Ali Raza', new Date('2026-09-21T00:00:00Z'), new Date('2026-09-28T00:00:00Z')))
+      .toBe('time-ali-raza-2026-09-21-to-2026-09-27.csv')
+  })
+})
+
+describe('entriesByTask', () => {
+  it('totals per task, keeps general work separate, and sorts by minutes', () => {
+    const rows = entriesByTask([
+      { taskId: 't1', taskTitle: 'Login', projectName: 'Core', minutes: 30 },
+      { taskId: null, taskTitle: null, projectName: null, minutes: 45 },
+      { taskId: 't1', taskTitle: 'Login', projectName: 'Core', minutes: 60 },
+    ] as unknown as TimeEntry[])
+    expect(rows).toEqual([
+      { taskId: 't1', taskTitle: 'Login', projectName: 'Core', minutes: 90 },
+      { taskId: null, taskTitle: 'General work', projectName: null, minutes: 45 },
+    ])
+  })
+})

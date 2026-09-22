@@ -3,6 +3,7 @@
 // DOM. `formatDuration` mirrors the bot's own utility exactly, except it
 // returns `null` (not an em dash) for nothing to show, so callers decide what
 // to render.
+import type { TimeEntry } from '../../components/discordTasks/api'
 export function formatDuration(minutes: number | null | undefined): string | null {
   if (minutes === null || minutes === undefined || !Number.isFinite(Number(minutes))) return null
   const total = Math.max(0, Math.round(Number(minutes)))
@@ -66,4 +67,42 @@ export function topContributors<T extends { name: string; minutes: number }>(
 // section's total display does want to show.
 export function timeChip(task: { timeLogged?: number }): string | null {
   return task.timeLogged && task.timeLogged > 0 ? formatDuration(task.timeLogged) : null
+}
+
+// RFC 4180: a field is quoted only when it contains a comma, a double quote,
+// CR or LF, and embedded quotes are doubled. Task titles and notes contain all
+// of these, and getting it wrong corrupts the file without any error.
+export function toCsv(rows: Array<Array<string | number | null | undefined>>): string {
+  const cell = (v: string | number | null | undefined): string => {
+    const s = v === null || v === undefined ? '' : String(v)
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  return rows.map((r) => r.map(cell).join(',')).join('\r\n')
+}
+
+const isoDay = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+/** `until` is exclusive, so the filename names the last day actually covered. */
+export function csvFilename(name: string, since: Date, until: Date): string {
+  const slug = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'person'
+  const lastDay = new Date(until.getFullYear(), until.getMonth(), until.getDate() - 1)
+  return `time-${slug}-${isoDay(since)}-to-${isoDay(lastDay)}.csv`
+}
+
+/** Per-task totals for one person, general work kept as its own row. */
+export function entriesByTask(entries: TimeEntry[]): Array<{ taskId: string | null; taskTitle: string; projectName: string | null; minutes: number }> {
+  const byKey = new Map<string, { taskId: string | null; taskTitle: string; projectName: string | null; minutes: number }>()
+  for (const e of entries || []) {
+    const key = e.taskId ?? '__general__'
+    const row = byKey.get(key) ?? {
+      taskId: e.taskId ?? null,
+      taskTitle: e.taskTitle ?? 'General work',
+      projectName: e.projectName ?? null,
+      minutes: 0,
+    }
+    row.minutes += Number(e.minutes) || 0
+    byKey.set(key, row)
+  }
+  return [...byKey.values()].sort((a, b) => b.minutes - a.minutes)
 }

@@ -28,6 +28,33 @@ export function fetchTimeReport(since: Date, until: Date): Promise<TimeReportPay
   return mwGet(`/discord/time/report?${q}`) as Promise<TimeReportPayload>
 }
 
+// GET /api/discord/time/entries?discordId=&since=&until= — one person's raw
+// entries for the range, sorted ascending by clockInAt server-side (callers
+// must not re-sort). `taskId`/`taskTitle` null means general work.
+export interface TimeEntry {
+  id: string
+  clockInAt: string
+  clockOutAt: string | null
+  minutes: number
+  taskId: string | null
+  taskTitle: string | null
+  projectId: string | null
+  projectName: string | null
+  note: string | null
+  source: string
+}
+export interface TimeEntriesPayload {
+  since: string
+  until: string
+  person: { discordId: string; name: string; avatarUrl?: string }
+  entries: TimeEntry[]
+  truncated: boolean
+}
+export function fetchTimeEntries(discordId: string, since: Date, until: Date): Promise<TimeEntriesPayload> {
+  const q = `discordId=${encodeURIComponent(discordId)}&since=${encodeURIComponent(since.toISOString())}&until=${encodeURIComponent(until.toISOString())}`
+  return mwGet(`/discord/time/entries?${q}`) as Promise<TimeEntriesPayload>
+}
+
 // mwPost() throws `data.error || text`, but CSAAS error bodies for this route
 // carry `message` (see DiscordTasksStatus_object), which would otherwise show
 // the caller raw JSON. setTaskStatus does its own fetch so it can read
