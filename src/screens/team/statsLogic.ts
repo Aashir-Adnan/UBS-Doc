@@ -78,9 +78,9 @@ export function stackByMember(
   const keyIndex = new Map(keys.map((k, i) => [k, i]))
   const rows = keys.map(() => [] as number[])
   for (const p of points) {
-    if (!index.has(p.discordId)) { index.set(p.discordId, members.length); members.push({ discordId: p.discordId, name: nameOf(p.discordId) }) }
     const ki = keyIndex.get(bucket === 'week' ? weekKeyOf(p.day) : p.day)
     if (ki === undefined) continue
+    if (!index.has(p.discordId)) { index.set(p.discordId, members.length); members.push({ discordId: p.discordId, name: nameOf(p.discordId) }) }
     const mi = index.get(p.discordId)!
     rows[ki][mi] = (rows[ki][mi] ?? 0) + p.minutes
   }

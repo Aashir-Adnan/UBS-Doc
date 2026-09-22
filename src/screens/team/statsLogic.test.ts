@@ -74,6 +74,14 @@ describe('series', () => {
     )
     expect(out.rows).toEqual([[30], [0]])
   })
+  it('stackByMember omits a member whose points all fall outside the given keys', () => {
+    const out = stackByMember(
+      [{ day: '2026-09-01', discordId: 'u1', minutes: 10 }, { day: '2026-09-05', discordId: 'u2', minutes: 20 }],
+      ['2026-09-01', '2026-09-02'], 'day', (id) => (id === 'u1' ? 'Ana' : 'Ben'),
+    )
+    expect(out.members).toEqual([{ discordId: 'u1', name: 'Ana' }])
+    expect(out.rows).toEqual([[10], [0]])
+  })
   it('memberColor cycles the palette', () => {
     expect(memberColor(0)).toBe(MEMBER_COLORS[0])
     expect(memberColor(MEMBER_COLORS.length)).toBe(MEMBER_COLORS[0])
