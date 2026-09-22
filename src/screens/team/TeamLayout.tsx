@@ -112,7 +112,7 @@ export default function TeamLayout() {
           </div>
           <div className="flex items-center gap-3">
             {/* The search box filters the shared tasks payload — meaningless
-                on the Time tab's separately-fetched report. */}
+                on the Time and Stats tabs' separately-fetched reports. */}
             {taskControls && (
               <SearchInput value={filters.query} onChange={(v) => setFilter({ query: v })} placeholder="Search tasks…" width={240} theme={theme} />
             )}
@@ -164,8 +164,9 @@ export default function TeamLayout() {
           )}
         </div>
 
-        {/* Only about the shared tasks payload — meaningless on the Time tab,
-            which fetches a different endpoint and shows its own error banner. */}
+        {/* Only about the shared tasks payload — meaningless on the Time and
+            Stats tabs, which fetch their own endpoints and show their own
+            error banners. */}
         {taskControls && error && (
           <div className={c('rounded-xl px-4 py-3 mb-5 text-sm font-medium border', d ? 'bg-red-500/10 border-red-500/25 text-red-300' : 'bg-red-50 border-red-200 text-red-600')}>
             Could not load tasks: {error}

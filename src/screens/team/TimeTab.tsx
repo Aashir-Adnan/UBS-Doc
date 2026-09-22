@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { c, card, txt, muted } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
@@ -10,11 +10,12 @@ import { useTeam } from './TeamLayout'
 
 // The Time tab: its own fetch of GET /api/discord/time/report, entirely
 // separate from the shared TasksList/People/Board payload TeamLayout owns —
-// the report is keyed by a week range, not by the task filters that apply to
-// the other tabs, so it holds its own range/data/loading/error state and
-// refetches whenever the range changes. It also refetches whenever the
-// shared payload's identity changes, i.e. whenever the header's Refresh
-// button is pressed — TimeTab never reads the payload itself.
+// the report is keyed by the week range and the shared Project filter, not
+// by the rest of the task filters that apply to the other tabs, so it holds
+// its own range/data/loading/error state and refetches whenever the range or
+// the Project filter changes. It also refetches whenever the shared payload's
+// identity changes, i.e. whenever the header's Refresh button is pressed —
+// TimeTab never reads the payload itself.
 //
 // A second, independent fetch (GET /api/discord/time/entries) backs the
 // per-person section: the shared Assignee filter (read from useTeam(), not
@@ -68,8 +69,13 @@ export default function TimeTab() {
   // Assignee select for them (timeSelfScoped) and this ignores the filter.
   // Under self scope with nothing logged, `people` is empty: then there is
   // no person to show, not a fallback to the filter — which would request
-  // somebody else's entries and 403.
-  const personId = data?.scope === 'self' ? (data.people[0]?.discordId ?? '') : (filters.assigneeId ?? '')
+  // somebody else's entries and 403. The scope is unknown until the first
+  // report lands (`data` is null on every mount, while `filters` is section
+  // state that survives the hop from another tab), so no entries request is
+  // made before then — falling back to `filters.assigneeId` in that window
+  // would fire a request for whoever was selected on Tasks, which 403s for a
+  // self-scoped caller.
+  const personId = !data ? '' : data.scope === 'self' ? (data.people[0]?.discordId ?? '') : (filters.assigneeId ?? '')
   const projectSlug = filters.projectSlug
   const [detail, setDetail] = useState<TimeEntriesPayload | null>(null)
   // Its own loading/error, separate from the week report's: the two fetches
@@ -93,12 +99,15 @@ export default function TimeTab() {
     return () => { cancelled = true }
   }, [range, payload, projectSlug, setTimeSelfScoped])
 
-  // Independent of the report fetch above: only runs when a person is
-  // selected, and ignores its own out-of-order responses the same way, so a
-  // slow request for a previously selected person can't overwrite a newer
-  // one's data. Deselecting resets all three of this effect's own pieces of
-  // state, not just `detail`, so neither a stale error nor a stuck loading
-  // flag can survive the person being cleared.
+  // Independent of the report fetch above: `personId` comes from the shared
+  // Assignee filter (or, under self scope, is derived from `data` as the
+  // caller themselves — see the comment above), and this effect runs
+  // whenever there is one. It ignores its own out-of-order responses the
+  // same way, so a slow request for a previously selected person can't
+  // overwrite a newer one's data. Clearing the person (filter cleared, tab
+  // switched away and back before the first report lands, etc.) resets all
+  // three of this effect's own pieces of state, not just `detail`, so
+  // neither a stale error nor a stuck loading flag can survive it.
   useEffect(() => {
     if (!personId) { setDetail(null); setDetailError(null); setDetailErrorStatus(null); setDetailLoading(false); return }
     let cancelled = false
