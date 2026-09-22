@@ -5,7 +5,7 @@ export const plotW = CHART.w - CHART.padL - CHART.padR
 export const plotH = CHART.h - CHART.padT - CHART.padB
 
 export const gridColor = (t: Theme) => (t === 'dark' ? 'rgba(255,255,255,0.08)' : '#E2E8F0')
-export const textColor = (t: Theme) => (t === 'dark' ? 'rgba(255,255,255,0.45)' : '#94A3B8')
+export const textColor = (t: Theme) => (t === 'dark' ? 'rgba(255,255,255,0.45)' : '#64748B')
 
 // Four y gridlines from 0 to max; and which x labels to print so they never
 // overlap (at most ~7 across the width).
@@ -17,6 +17,7 @@ export function xLabelIndexes(count: number, maxLabels = 7): number[] {
 }
 // '2026-09-21' -> '21 Sep'
 export function shortLabel(key: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return ''
   const [, m, d] = key.split('-').map(Number)
   return `${d} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]}`
 }
