@@ -179,6 +179,24 @@ export const SIDEBAR: SidebarNode[] = [
               'hms-documentation/major-implementations/startup-env-validation/startup-env-validation',
             ],
           },
+          {
+            label: 'Deployment & Crash Alert Emails',
+            items: [
+              'hms-documentation/major-implementations/deployment-alert-emails/deployment-alert-emails',
+            ],
+          },
+          {
+            label: 'API Object Collision Warnings',
+            items: [
+              'hms-documentation/major-implementations/api-object-collision-warnings/api-object-collision-warnings',
+            ],
+          },
+          {
+            label: 'Database Backups',
+            items: [
+              'hms-documentation/major-implementations/database-backups/database-backups',
+            ],
+          },
         ],
       },
       {
@@ -601,6 +619,7 @@ export const SIDEBAR: SidebarNode[] = [
             label: 'Questionairre For Client',
             items: [
               'projects/badar-hms/questionnaire/questionnaire_for_client',
+              'projects/badar-hms/questionnaire/opera_integration_questionnaire',
             ],
           },
           'projects/badar-hms/Opera_Config',

@@ -33,10 +33,12 @@ Their real protection is configured in Google Cloud Console, not in this repo: H
 
 | Layer | Setting | Why |
 |---|---|---|
-| Platform | inline block, equivalent to `PUBLIC_ENCRYPTED_PLATFORM` | Transport consistency with every other public endpoint — AES-ECB with the platform key. The client decrypts it, so this is not secrecy. Inline rather than the shared profile only so it can carry its own `platformIP`. |
+| Platform | inline block, equivalent to `PUBLIC_ENCRYPTED_PLATFORM` | Transport consistency with every other public endpoint — AES-ECB with the platform key. The client decrypts it, so this is not secrecy. Inline rather than the shared profile so it can carry its own `platformIP`, `domains` and `supported`. |
 | `verification.accessToken` | `false` | The frontend needs the Google client ID to render the sign-in button, i.e. before any user exists. |
 | `requestMetaData.permission` | `null` | No RBAC gate; there is nothing tenant-scoped in the response. |
-| `platformIP` | union of both allowlists | `resolveSharedPlatformIPs()` — the union of `PLATFORM_ALLOWED_IPS` and `GUEST_PLATFORM_ALLOWED_IPS`. See [Behavioural notes](#behavioural-notes). |
+| `supported` | union of both platform-name lists | `resolveSharedSupportedPlatforms()` — the union of `PLATFORM_SUPPORTED` and `GUEST_PLATFORM_SUPPORTED`, for the same reason as `domains`. |
+| `domains` | union of both domain lists | `resolveSharedPlatformDomains()` — the union of `PLATFORM_ALLOWED_DOMAINS` and `GUEST_PLATFORM_ALLOWED_DOMAINS`. See [Behavioural notes](#behavioural-notes). |
+| `platformIP` | `*` | Any address. Behind Cloudflare an IP list can't tell callers apart; see [Edge Access Control](../major-implementations/edge-access-control/edge-access-control.md). |
 
 ---
 
@@ -94,9 +96,11 @@ The frontend must therefore treat a missing key as *"this feature is not configu
 
 **Values are read per request, not cached at boot.** `process.env` is consulted inside the pre-processor, so a value changed in the environment takes effect on the next process restart without any code change. There is no in-process cache to invalidate.
 
-**IP allowlisting is the union of both lists.** This endpoint is one of the few that must serve *both* audiences: the admin dashboard and the guest apps each need these keys before anyone signs in. Its `platformIP` therefore comes from `resolveSharedPlatformIPs()` — the union of `PLATFORM_ALLOWED_IPS` and `GUEST_PLATFORM_ALLOWED_IPS`, with a `*` in either list yielding `*`. Restricting it to one list alone would break the other audience's bootstrap, and a third dedicated variable would have to be kept in sync with both by hand.
+**Domain and platform-name allowlisting use the union of both lists.** This endpoint is one of the few that must serve *both* audiences: the admin dashboard and the guest apps each need these keys before anyone signs in. Its `domains` comes from `resolveSharedPlatformDomains()` and its `supported` from `resolveSharedSupportedPlatforms()`. Each is the union of the admin and guest variables, and a `*` in either list means `*`. Restricting it to one list alone would break the other audience's bootstrap, and a third dedicated variable would have to be kept in sync with both by hand.
 
-A host in neither list fails platform resolution with `E51` before reaching the handler. This is easy to miss when the frontend is served from a different host than the one used during development.
+`domains` must be declared here explicitly. An inline block that omits it inherits the admin-only `PLATFORM_ALLOWED_DOMAINS` from `Crud_Template`, and the guest site would be refused.
+
+A page whose `Origin` is in neither domain list fails platform resolution with `E51` before reaching the handler. This is easy to miss when the frontend is served from a different host than the one used during development. Requests without an `Origin` (mobile apps) are not domain-checked. `platformIP` is `*`, so the network address never causes a refusal.
 
 **Authentication must stay off.** `verification.accessToken` and `communication.encryption.accessToken` are both `false`, and must remain so. Setting either to `true` creates a bootstrap deadlock: the frontend needs `googleClientId` to render the sign-in button, so it holds no access token when it calls this endpoint — and with `encryption.accessToken: true` it could not even encrypt the request.
 
@@ -106,7 +110,8 @@ A host in neither list fails platform resolution with `E51` before reaching the 
 
 | Condition | Code | Notes |
 |---|---|---|
-| Request IP in neither `PLATFORM_ALLOWED_IPS` nor `GUEST_PLATFORM_ALLOWED_IPS` | `E51` | Platform resolution failure — returned before the handler runs. |
+| `Origin` in neither `PLATFORM_ALLOWED_DOMAINS` nor `GUEST_PLATFORM_ALLOWED_DOMAINS` | `E51` | Platform resolution failure — returned before the handler runs. |
+| Platform name in neither `PLATFORM_SUPPORTED` nor `GUEST_PLATFORM_SUPPORTED` | `E51` | Same failure; the name comes from the encrypted envelope. |
 | Method other than `GET` | `E52` | Only `List` is declared. |
 
 There is no error path for missing configuration; unset variables are omitted from a `200` response.

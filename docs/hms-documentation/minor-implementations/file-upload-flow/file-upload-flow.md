@@ -222,6 +222,17 @@ don't paste them into logs, tickets, or analytics. It is still strictly tighter 
 The encryption is deterministic, so the same attachment and actor always produce the same string —
 browser and CDN caching still work.
 
+Nothing extra is needed on the frontend for this to work:
+
+- **No device headers.** `/api/upload/serve` is exempt from the `x-client-*` header requirement
+  for these `GET`s, because an `<img>` can't send them.
+- **No domain check.** An `<img src>` sends no `Origin` header, so the serve URL renders on any
+  page it's embedded in.
+
+The upload itself (`POST /api/upload/file`) is a normal `fetch()` call, so it **is**
+domain-checked. The page must be on a domain in `PLATFORM_ALLOWED_DOMAINS` or
+`GUEST_PLATFORM_ALLOWED_DOMAINS`, or the server answers `E51`. Both default to `*`.
+
 ### `GET /api/get/file` still works
 
 ```

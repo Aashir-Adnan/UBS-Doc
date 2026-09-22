@@ -22,7 +22,7 @@ Almost every configuration-driven dependency in the backend used to fail **silen
 | `EMAIL_USER` / `EMAIL_PASS` | No email channel was registered, so OTP, welcome and config-change mails were all dropped | when a user reported a missing OTP |
 | Firebase service account | `getFirebaseApp()` returned `null`, so every push notification vanished | never, by itself |
 | `ACCESS_TOKEN_SECONDS` | Token lifetime fell back to 3600s without a warning | never, by itself |
-| `TENANCY_CHECK` | Tenant isolation was off, and queries returned other tenants' rows | a data leak |
+| `TENANCY_CHECK` | Tenant isolation was off, and queries returned other tenants' rows. Unset now means **on**. | a data leak |
 | `FILE_STORAGE_PROVIDER` typo | Uploads went to local disk instead of S3/GCS | when files disappeared after a redeploy |
 | `SECRET_KEY` empty | Every encrypted endpoint answered `E10` / `E14` | the first request |
 
@@ -43,41 +43,36 @@ The order matters. Several modules read `process.env` when they are first loaded
 
 ### Always required (every environment)
 
-These **20 variables** must be present in every `backend/.env`. If any is missing, the server does not start.
+These **16 variables** must be present in every `backend/.env`. If any is missing, the server does not start.
 
 | # | Variable | Group | Rule | Example |
 |---|---|---|---|---|
 | 1 | `SECRET_KEY` | Core runtime | non-blank | a random string |
-| 2 | `NODE_ENV` | Core runtime | non-blank | `production` / `staging` / `development` |
-| 3 | `SERVER_PORT` | Core runtime | positive integer | `3000` |
-| 4 | `TENANCY_CHECK` | Core runtime | non-blank | `1` |
-| 5 | `FILE_STORAGE_PROVIDER` | Core runtime | `local`, `s3` or `gcs` | `local` |
-| 6 | `DB_TYPE` | Main database | non-blank | `mysql` |
-| 7 | `DB_HOST` | Main database | non-blank | `127.0.0.1` |
-| 8 | `DB_USER` | Main database | non-blank | `root` |
-| 9 | `DB_PW` | Main database | **must be declared, may be empty** | `root` |
-| 10 | `DB_DATABASE` | Main database | non-blank | `hms_db_10_0` |
-| 11 | `DB_PORT` | Main database | positive integer | `3306` |
-| 12 | `SECURITY_DB_HOST` | Security database | non-blank | `127.0.0.1` |
-| 13 | `SECURITY_DB_USER` | Security database | non-blank | `root` |
-| 14 | `SECURITY_DB_PW` | Security database | **must be declared, may be empty** | *(empty)* |
-| 15 | `SECURITY_DB_DATABASE` | Security database | non-blank | `securitydb` |
-| 16 | `SECURITY_DB_PORT` | Security database | positive integer | `3306` |
-| 17 | `ACCESS_TOKEN_SECONDS` | Token lifetimes | positive integer | `3600` |
-| 18 | `GUEST_REFRESH_TOKEN_SECONDS` | Token lifetimes | positive integer; **may be replaced by** `GUEST_REFRESH_TOKEN_DAYS` | `86400` |
-| 19 | `EMAIL_USER` | Outbound email | non-blank | `no-reply@example.com` |
-| 20 | `EMAIL_PASS` | Outbound email | non-blank | a Google app password |
+| 2 | `SERVER_PORT` | Core runtime | positive integer | `3000` |
+| 3 | `FILE_STORAGE_PROVIDER` | Core runtime | `local`, `s3` or `gcs` | `local` |
+| 4 | `DB_TYPE` | Main database | non-blank | `mysql` |
+| 5 | `DB_HOST` | Main database | non-blank | `127.0.0.1` |
+| 6 | `DB_USER` | Main database | non-blank | `root` |
+| 7 | `DB_PW` | Main database | **must be declared, may be empty** | `root` |
+| 8 | `DB_DATABASE` | Main database | non-blank | `hms_db_10_0` |
+| 9 | `DB_PORT` | Main database | positive integer | `3306` |
+| 10 | `SECURITY_DB_HOST` | Security database | non-blank | `127.0.0.1` |
+| 11 | `SECURITY_DB_USER` | Security database | non-blank | `root` |
+| 12 | `SECURITY_DB_PW` | Security database | **must be declared, may be empty** | *(empty)* |
+| 13 | `SECURITY_DB_DATABASE` | Security database | non-blank | `securitydb` |
+| 14 | `SECURITY_DB_PORT` | Security database | positive integer | `3306` |
+| 15 | `EMAIL_USER` | Outbound email | non-blank | `no-reply@example.com` |
+| 16 | `EMAIL_PASS` | Outbound email | non-blank | a Google app password |
 
 ### Minimum `.env`
 
-Copy this and fill in the values. It is the smallest file that passes validation:
+Copy this and fill in the values. The required block is the smallest file that passes validation. The recommended block sets the optional keys explicitly, so nothing depends on a code fallback.
 
 ```bash
+# ── Required ────────────────────────────────────────────
 # Core runtime
 SECRET_KEY=
-NODE_ENV=development
 SERVER_PORT=3000
-TENANCY_CHECK=1
 FILE_STORAGE_PROVIDER=local
 
 # Main database
@@ -95,15 +90,15 @@ SECURITY_DB_PW=
 SECURITY_DB_DATABASE=securitydb
 SECURITY_DB_PORT=3306
 
-# Token lifetimes
-ACCESS_TOKEN_SECONDS=3600
-GUEST_REFRESH_TOKEN_SECONDS=86400
-
 # Outbound email
 EMAIL_USER=
 EMAIL_PASS=
 
-# Optional, but recommended (see the OTP fallback warning below)
+# ── Optional, recommended ───────────────────────────────
+NODE_ENV=development
+TENANCY_CHECK=1
+ACCESS_TOKEN_SECONDS=3600
+GUEST_REFRESH_TOKEN_SECONDS=86400
 OTP_TTL_SECONDS=300
 OTP_MAX_ATTEMPTS=5
 ```
@@ -130,7 +125,21 @@ Setting `FILE_STORAGE_PROVIDER=s3` or `FILE_STORAGE_PROVIDER=gcs` also turns on 
 
 ### Optional everywhere
 
-`GUEST_REFRESH_TOKEN_DAYS`, `OTP_TTL_SECONDS` and `OTP_MAX_ATTEMPTS` are never required. If set, each must be a positive integer.
+These keys are never required. If a key is set, its value must still be valid.
+
+| Variable | When unset | Rule when set |
+|---|---|---|
+| `NODE_ENV` | No single default: error responses omit stack traces (those need `development`), and Stripe config assumes `development` | — |
+| `TENANCY_CHECK` | **`1` — tenant isolation on** | `1`/`0`, `true`/`false`, `on`/`off`, `yes`/`no`, in any casing |
+| `ACCESS_TOKEN_SECONDS` | `3600` | positive integer |
+| `GUEST_REFRESH_TOKEN_SECONDS` | `GUEST_REFRESH_TOKEN_DAYS`, otherwise `86400` | positive integer |
+| `GUEST_REFRESH_TOKEN_DAYS` | used only when the seconds key is unset | positive integer |
+| `OTP_TTL_SECONDS` | 60s or 300s depending on the code path (see the warning below) | positive integer |
+| `OTP_MAX_ATTEMPTS` | `5` | positive integer |
+
+:::caution TENANCY_CHECK now defaults to on
+Before this change, an unset or blank `TENANCY_CHECK` switched tenant isolation **off**. Now it switches it **on**, and only `0`, `false`, `off` or `no` turn it off. Environments that set `TENANCY_CHECK=1` see no change. An environment that omitted the key will stop showing other tenants' rows in tenant-scoped lists after this deploys.
+:::
 
 ---
 
@@ -163,19 +172,17 @@ The contract works on two levels:
 | Group | Variable | Rule |
 |---|---|---|
 | Core runtime | `SECRET_KEY` | required |
-| | `NODE_ENV` | required |
 | | `SERVER_PORT` | required · positive integer |
-| | `TENANCY_CHECK` | required |
 | | `FILE_STORAGE_PROVIDER` | required · `local`, `s3` or `gcs` |
+| | `NODE_ENV` | optional |
+| | `TENANCY_CHECK` | optional · recognised on/off value · defaults to `1` |
 | Main database | `DB_TYPE`, `DB_HOST`, `DB_USER`, `DB_DATABASE` | required |
 | | `DB_PW` | may be empty |
 | | `DB_PORT` | required · positive integer |
 | Security database | `SECURITY_DB_HOST`, `SECURITY_DB_USER`, `SECURITY_DB_DATABASE` | required |
 | | `SECURITY_DB_PW` | may be empty |
 | | `SECURITY_DB_PORT` | required · positive integer |
-| Token lifetimes and OTP | `ACCESS_TOKEN_SECONDS` | required · positive integer |
-| | `GUEST_REFRESH_TOKEN_SECONDS` | required unless `GUEST_REFRESH_TOKEN_DAYS` is set · positive integer |
-| | `GUEST_REFRESH_TOKEN_DAYS` | optional · positive integer |
+| Token lifetimes and OTP | `ACCESS_TOKEN_SECONDS`, `GUEST_REFRESH_TOKEN_SECONDS`, `GUEST_REFRESH_TOKEN_DAYS` | optional · positive integer |
 | | `OTP_TTL_SECONDS`, `OTP_MAX_ATTEMPTS` | optional · positive integer |
 | Outbound email | `EMAIL_USER`, `EMAIL_PASS` | required |
 
@@ -214,10 +221,10 @@ Some keys look like configuration, but **no code reads them**. The validator nev
   ENVIRONMENT VALIDATION FAILED — 2 problem(s)
 ════════════════════════════════════════════════════════════════════════
 
-  Token lifetimes & OTP
-    [MISSING] ACCESS_TOKEN_SECONDS
-        needed  : Access-token lifetime, and the only token-lifetime key any code reads…
-        example : ACCESS_TOKEN_SECONDS=3600
+  Outbound email (SMTP)
+    [MISSING] EMAIL_USER
+        needed  : SMTP account. Absent, the notification manager registers no email channel…
+        example : EMAIL_USER=no-reply@example.com
 
   Deployment / crash alert emails
     [INVALID] OPS_ALERT_EMAILS
@@ -250,13 +257,22 @@ The report goes straight to `stderr`, so `LOG_MESSAGES=false` cannot hide it.
 
 | # | Decision | Outcome |
 |---|---|---|
-| 1 | Add `ACCESS_TOKEN_SECONDS` and `GUEST_REFRESH_TOKEN_SECONDS` to `.env` | **Added.** |
+| 1 | Add `ACCESS_TOKEN_SECONDS` and `GUEST_REFRESH_TOKEN_SECONDS` to `.env` | **Added.** Both keys were later made optional, so an environment without them still boots. |
 | 2 | Which token lifetimes to use | **Keep the values already in effect:** `ACCESS_TOKEN_SECONDS=3600`, `GUEST_REFRESH_TOKEN_SECONDS=86400`. Session length does not change. |
 | 3 | Remove the three ignored token keys from `.env` | **Removed.** They stay on the ignored list, so the warning returns if a key is added back. |
 | 4 | `SECRET_KEY` is 7 characters | **Keep its current length.** No length warning is printed. A missing or blank key still stops the boot. |
 | 5 | Add the alert-email settings to this contract | **Yes**, as the conditional *Deployment / crash alerts* group. |
 
-`OTP_TTL_SECONDS` and `OTP_MAX_ATTEMPTS` were also changed from required to **optional**.
+These keys were later changed from required to **optional**:
+- `NODE_ENV`
+- `TENANCY_CHECK` (now defaults to `1`)
+- `ACCESS_TOKEN_SECONDS`
+- `GUEST_REFRESH_TOKEN_SECONDS`
+- `GUEST_REFRESH_TOKEN_DAYS`
+- `OTP_TTL_SECONDS`
+- `OTP_MAX_ATTEMPTS`
+
+See [Optional everywhere](#optional-everywhere).
 
 :::warning OTP fallbacks disagree
 When `OTP_TTL_SECONDS` is unset, `sendGuestOtp.js` and `otpVerif.js` fall back to **60 seconds**, but `OTPGeneration.js` and the OTP email text fall back to **300 seconds**. A guest can then receive an email saying the code is valid for five minutes while it expires after one. Set `OTP_TTL_SECONDS` explicitly in every environment until the fallbacks are unified.
@@ -266,14 +282,11 @@ When `OTP_TTL_SECONDS` is unset, `sendGuestOtp.js` and `otpVerif.js` fall back t
 
 ## Deployment checklist
 
-Before this branch reaches an environment, that environment's `.env` needs:
+Before this branch reaches an environment:
 
-```
-ACCESS_TOKEN_SECONDS=3600
-GUEST_REFRESH_TOKEN_SECONDS=86400
-```
-
-It also needs every variable in [Required variables](#required-variables), plus the full set for each integration it uses. Recommended: `OTP_TTL_SECONDS=300`, because of the fallback mismatch above.
+1. Confirm the environment has all 16 variables in [Required variables](#required-variables), plus the full set for each integration it uses.
+2. Check whether it sets `TENANCY_CHECK`. If the key is missing, tenant isolation turns **on** after the deploy.
+3. Recommended: set the optional keys from the template explicitly, especially `OTP_TTL_SECONDS=300`, because of the fallback mismatch above.
 
 To check an environment without starting the server, run this from `backend/`:
 
