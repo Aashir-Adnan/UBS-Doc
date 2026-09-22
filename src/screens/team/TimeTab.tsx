@@ -1,11 +1,12 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { c, card, txt, muted } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
-import { fetchTimeReport, type TimeReportPayload } from '../../components/discordTasks/api'
-import { formatDuration, shiftWeek, weekRange } from './timeLogic'
+import { fetchTimeEntries, fetchTimeReport, type TimeEntriesPayload, type TimeReportPayload } from '../../components/discordTasks/api'
+import { csvFilename, entriesByTask, formatDuration, shiftWeek, toCsv, weekRange } from './timeLogic'
 import Avatar from './Avatar'
+import FilterSelect from './FilterSelect'
 import { useTeam } from './TeamLayout'
 
 // The Time tab: its own fetch of GET /api/discord/time/report, entirely
@@ -15,6 +16,14 @@ import { useTeam } from './TeamLayout'
 // refetches whenever the range changes. It also refetches whenever the
 // shared payload's identity changes, i.e. whenever the header's Refresh
 // button is pressed — TimeTab never reads the payload itself.
+//
+// A second, independent fetch (GET /api/discord/time/entries) backs the
+// person filter: selecting someone from the roster pulls their raw entries
+// for the same range, for the per-task breakdown, the entries list and the
+// CSV export. The person select is local to this tab and reads the roster
+// from `useTeam().payload.members` — not `assigneeOptions(projects)` — since
+// people log time against general work and against tasks they are not
+// assigned to.
 
 const rangeFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
 
@@ -25,6 +34,27 @@ function rangeLabel(range: { since: Date; until: Date }): string {
   return `${rangeFmt.format(range.since)} – ${rangeFmt.format(lastDay)}`
 }
 
+// Built in the browser from what is already on screen, so the file can never
+// disagree with what the user is looking at, and there is no export endpoint
+// to authorise or rate-limit.
+function downloadCsv(d: TimeEntriesPayload, range: { since: Date; until: Date }) {
+  const rows: Array<Array<string | number | null>> = [
+    ['Date', 'Person', 'Project', 'Task', 'Minutes', 'Note', 'Source'],
+    ...d.entries.map((e) => {
+      const at = new Date(e.clockInAt)
+      const stamp = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')} ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+      return [stamp, d.person.name, e.projectName, e.taskTitle ?? 'General work', e.minutes, e.note, e.source]
+    }),
+  ]
+  const blob = new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = csvFilename(d.person.name, range.since, range.until)
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function TimeTab() {
   const { theme } = useTheme()
   const d = theme === 'dark'
@@ -33,6 +63,13 @@ export default function TimeTab() {
   const [data, setData] = useState<TimeReportPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const [personId, setPersonId] = useState<string>('')
+  const members = useMemo(
+    () => [...(payload?.members ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+    [payload],
+  )
+  const [detail, setDetail] = useState<TimeEntriesPayload | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -45,6 +82,22 @@ export default function TimeTab() {
     return () => { cancelled = true }
   }, [range, payload])
 
+  // Independent of the report fetch above: only runs when a person is
+  // selected, and ignores its own out-of-order responses the same way, so a
+  // slow request for a previously selected person can't overwrite a newer
+  // one's data.
+  useEffect(() => {
+    if (!personId) { setDetail(null); return }
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    fetchTimeEntries(personId, range.since, range.until)
+      .then((detailPayload) => { if (!cancelled) setDetail(detailPayload) })
+      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [personId, range, payload])
+
   if (loading && !data) {
     return (
       <div className={c(card(theme), 'rounded-2xl px-8 py-14 text-center')}>
@@ -55,6 +108,7 @@ export default function TimeTab() {
 
   const people = data?.people ?? []
   const projects = data?.projects ?? []
+  const taskRows = detail ? entriesByTask(detail.entries) : []
 
   return (
     <>
@@ -69,6 +123,24 @@ export default function TimeTab() {
             className={c('h-9 w-9 inline-flex items-center justify-center rounded-xl tr', d ? 'text-white/50 hover:bg-white/6' : 'text-slate-400 hover:bg-slate-100')}>
             <ChevronRight size={16} />
           </button>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <FilterSelect label="Person" theme={theme} value={personId} onChange={setPersonId}>
+            <option value="">Select a person…</option>
+            {members.map((m) => <option key={m.discordId} value={m.discordId}>{m.name}</option>)}
+          </FilterSelect>
+          {personId && (
+            <button
+              type="button"
+              onClick={() => { if (detail) downloadCsv(detail, range) }}
+              disabled={!detail || detail.entries.length === 0}
+              title="Download CSV"
+              className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm"
+            >
+              <Download size={14} /> Download CSV
+            </button>
+          )}
         </div>
       </div>
 
@@ -86,7 +158,9 @@ export default function TimeTab() {
 
       {/* A week-to-week refetch (not the first load, which has its own full-card
           loading state above) dims the numbers in place instead of swapping
-          them with no visual feedback while `data` still shows the old week. */}
+          them with no visual feedback while `data` still shows the old week.
+          The same dim covers a person-detail refetch, since it shares the
+          same `loading` flag. */}
       <div className={c('tr', loading && data ? 'opacity-50' : '')}>
         {!loading && !error && people.length === 0 && projects.length === 0 ? (
           <div className={c(card(theme), 'rounded-2xl px-8 py-14 text-center')}>
@@ -112,6 +186,45 @@ export default function TimeTab() {
                 </li>
               ))}
             </TimeCard>
+          </div>
+        )}
+
+        {personId && detail && (
+          <div className="mt-5">
+            {detail.truncated && (
+              <p className={c('text-xs font-medium mb-3', muted(theme))}>
+                Showing the first 5000 entries — narrow the range for a complete total.
+              </p>
+            )}
+            <div className="grid gap-5 sm:grid-cols-2">
+              <TimeCard title="By task" theme={theme}>
+                {taskRows.map((row) => (
+                  <li key={row.taskId ?? '__general__'} className="py-2.5">
+                    <div className="flex items-center gap-3">
+                      <span className={c('text-sm font-semibold flex-1 min-w-0 truncate', txt(theme))}>{row.taskTitle}</span>
+                      <span className={c('text-xs font-bold tabular-nums', muted(theme))}>{formatDuration(row.minutes) ?? '0m'}</span>
+                    </div>
+                    {row.projectName && (
+                      <p className={c('text-xs mt-0.5 truncate m-0', muted(theme))}>{row.projectName}</p>
+                    )}
+                  </li>
+                ))}
+              </TimeCard>
+
+              <TimeCard title="Entries" theme={theme}>
+                {detail.entries.map((e) => (
+                  <li key={e.id} className="py-2.5">
+                    <div className="flex items-center gap-3">
+                      <span className={c('text-sm font-semibold flex-1 min-w-0 truncate', txt(theme))}>{e.taskTitle ?? 'General work'}</span>
+                      <span className={c('text-xs font-bold tabular-nums', muted(theme))}>{formatDuration(e.minutes) ?? '0m'}</span>
+                    </div>
+                    <p className={c('text-xs mt-0.5 truncate m-0', muted(theme))}>
+                      {rangeFmt.format(new Date(e.clockInAt))}{e.note ? ` · ${e.note}` : ''}
+                    </p>
+                  </li>
+                ))}
+              </TimeCard>
+            </div>
           </div>
         )}
       </div>
