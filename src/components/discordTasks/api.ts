@@ -34,10 +34,10 @@ export function fetchTimeReport(since: Date, until: Date, projectSlug?: string |
 }
 
 // mwGet() throws `new Error(await r.text())` — the raw CSAAS error body — so a
-// 403 would otherwise render as `{"status":403,"message":…}`. `fetchTimeEntries`
-// does its own fetch (the same pattern as `setTaskStatus` below) so it can
-// prefer `payload`, then `message`, then `statusText`, and carry the HTTP
-// status as `ApiError.status` for the caller to render a sentence instead.
+// 403 would otherwise render as `{"status":403,"message":…}`. The functions
+// below use `apiCall` instead so they can prefer `payload`, then `message`,
+// then `statusText`, and carry the HTTP status as `ApiError.status` for the
+// caller to render a sentence instead.
 export class ApiError extends Error {
   status: number
   constructor(message: string, status: number) {
@@ -45,6 +45,31 @@ export class ApiError extends Error {
     this.name = 'ApiError'
     this.status = status
   }
+}
+
+// One fetch for every discordTasks call that needs a real HTTP status: reads
+// the body as text (an error body is not always JSON), prefers the server's
+// specific `payload` sentence over the generic catalogue `message`, carries
+// the status on ApiError, and unwraps the framework's payload.return. CSAAS
+// error bodies are { status, message, payload, source, scc }: `message` is
+// generic catalogue text ("You do not have permission…") while `payload`
+// carries the sentence that names the actual problem ("Permission
+// 'update_discord_tasks' is required for this action"). Prefer the specific
+// one; on success `payload` is an object, so the string check is the tell.
+async function apiCall<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}/api${path}`, init)
+  const text = await res.text()
+  let data: Record<string, unknown> = {}
+  if (text) {
+    try { data = JSON.parse(text) } catch { data = {} }
+  }
+  if (!res.ok) {
+    const specific = typeof data.payload === 'string' && data.payload ? data.payload : ''
+    const message = specific || (data.message as string) || (data.error as string) || res.statusText
+    throw new ApiError(message, res.status)
+  }
+  const payload = data.payload as { return?: unknown } | undefined
+  return (payload?.return ?? payload ?? data) as T
 }
 
 // GET /api/discord/time/entries?discordId=&since=&until= — one person's raw
@@ -72,22 +97,7 @@ export interface TimeEntriesPayload {
 }
 export async function fetchTimeEntries(discordId: string, since: Date, until: Date, projectSlug?: string | null): Promise<TimeEntriesPayload> {
   const q = `discordId=${encodeURIComponent(discordId)}&since=${encodeURIComponent(since.toISOString())}&until=${encodeURIComponent(until.toISOString())}${projectParam(projectSlug)}`
-  const res = await fetch(`${API_BASE_URL}/api/discord/time/entries?${q}`)
-  const text = await res.text()
-  let data: Record<string, unknown> = {}
-  if (text) {
-    try { data = JSON.parse(text) } catch { data = {} }
-  }
-  if (!res.ok) {
-    // See ApiError above / setTaskStatus below: `payload` carries the specific
-    // sentence when it is a string, `message` is generic catalogue text, and
-    // `statusText` is the last resort.
-    const specific = typeof data.payload === 'string' && data.payload ? data.payload : ''
-    const message = specific || (data.message as string) || (data.error as string) || res.statusText
-    throw new ApiError(message, res.status)
-  }
-  const payload = data.payload as { return?: unknown } | undefined
-  return (payload?.return ?? payload ?? data) as TimeEntriesPayload
+  return apiCall<TimeEntriesPayload>(`/discord/time/entries?${q}`)
 }
 
 // GET /api/discord/projects/stats?since=&until=&project= — per-project,
@@ -121,19 +131,7 @@ export async function fetchProjectStats(since: Date | null, until: Date, project
   const parts = [`until=${encodeURIComponent(until.toISOString())}`]
   if (since) parts.push(`since=${encodeURIComponent(since.toISOString())}`)
   if (projectSlug) parts.push(`project=${encodeURIComponent(projectSlug)}`)
-  const res = await fetch(`${API_BASE_URL}/api/discord/projects/stats?${parts.join('&')}`)
-  const text = await res.text()
-  let data: Record<string, unknown> = {}
-  if (text) {
-    try { data = JSON.parse(text) } catch { data = {} }
-  }
-  if (!res.ok) {
-    const specific = typeof data.payload === 'string' && data.payload ? data.payload : ''
-    const message = specific || (data.message as string) || (data.error as string) || res.statusText
-    throw new ApiError(message, res.status)
-  }
-  const payload = data.payload as { return?: unknown } | undefined
-  return (payload?.return ?? payload ?? data) as ProjectStatsPayload
+  return apiCall<ProjectStatsPayload>(`/discord/projects/stats?${parts.join('&')}`)
 }
 
 export interface SetTaskStatusResult {
@@ -143,26 +141,9 @@ export interface SetTaskStatusResult {
 }
 
 export async function setTaskStatus(taskId: string, status: string): Promise<SetTaskStatusResult> {
-  const res = await fetch(`${API_BASE_URL}/api/discord/tasks/status`, {
+  return apiCall<SetTaskStatusResult>('/discord/tasks/status', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ task_id: taskId, status }),
   })
-  const text = await res.text()
-  let data: Record<string, unknown> = {}
-  if (text) {
-    try { data = JSON.parse(text) } catch { data = {} }
-  }
-  if (!res.ok) {
-    // CSAAS error bodies are { status, message, payload, source, scc }: `message`
-    // is generic catalogue text ("You do not have permission…") while `payload`
-    // carries the sentence that names the actual problem ("Permission
-    // 'update_discord_tasks' is required for this action"). Prefer the specific
-    // one; on success `payload` is an object, so the string check is the tell.
-    const specific = typeof data.payload === 'string' && data.payload ? data.payload : ''
-    const message = specific || (data.message as string) || (data.error as string) || res.statusText
-    throw new ApiError(message, res.status)
-  }
-  const payload = data.payload as { return?: unknown } | undefined
-  return (payload?.return ?? payload ?? data) as SetTaskStatusResult
 }
