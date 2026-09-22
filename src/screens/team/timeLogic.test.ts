@@ -127,3 +127,112 @@ describe('timeChip', () => {
     expect(timeChip({ timeLogged: 125 })).toBe('2h 5m')
   })
 })
+
+import { csvFilename, csvRows, entriesByTask, toCsv } from './timeLogic'
+import type { TimeEntriesPayload, TimeEntry } from '../../components/discordTasks/api'
+
+describe('toCsv', () => {
+  it('writes a header and quotes only what needs it', () => {
+    const csv = toCsv([['Date', 'Task'], ['2026-09-22 09:00', 'Simple']])
+    expect(csv).toBe('Date,Task\r\n2026-09-22 09:00,Simple')
+  })
+
+  it('quotes fields containing a comma, a quote or a newline', () => {
+    // Task titles and notes routinely contain all three; getting this wrong
+    // corrupts the file silently rather than failing loudly.
+    const csv = toCsv([['a,b', 'say "hi"', 'line1\nline2']])
+    expect(csv).toBe('"a,b","say ""hi""","line1\nline2"')
+  })
+
+  it('renders null and undefined as empty, not as the word null', () => {
+    expect(toCsv([[null, undefined, 0]])).toBe(',,0')
+  })
+
+  it('escapes a string cell starting with =, +, - or @ with a leading single quote', () => {
+    // note/taskTitle are free text typed by any guild member; a leading
+    // formula character is evaluated by Excel/Sheets on open, and RFC 4180
+    // quoting alone does not stop it.
+    const csv = toCsv([['=cmd|calc', '+1', '-a', '@mention', 'plain']])
+    expect(csv).toBe("'=cmd|calc,'+1,'-a,'@mention,plain")
+  })
+
+  it('still quotes an escaped cell that also needs RFC 4180 quoting', () => {
+    const csv = toCsv([['=a,b']])
+    expect(csv).toBe('"\'=a,b"')
+  })
+
+  it('does not escape a numeric cell, so a real negative number (e.g. Minutes) stays a plain number', () => {
+    expect(toCsv([[-30, 30]])).toBe('-30,30')
+  })
+})
+
+describe('csvFilename', () => {
+  it('slugifies the person and carries the range', () => {
+    // Built as local midnights, not UTC instants: csvFilename is only ever
+    // fed weekRange's local-midnight output, and reading UTC instants here
+    // would make this test's result depend on the host's timezone offset.
+    expect(csvFilename('Ali Raza', new Date(2026, 8, 21), new Date(2026, 8, 28)))
+      .toBe('time-ali-raza-2026-09-21-to-2026-09-27.csv')
+  })
+})
+
+describe('entriesByTask', () => {
+  it('totals per task, keeps general work separate, and sorts by minutes', () => {
+    const rows = entriesByTask([
+      { taskId: 't1', taskTitle: 'Login', projectName: 'Core', minutes: 30 },
+      { taskId: null, taskTitle: null, projectName: null, minutes: 45 },
+      { taskId: 't1', taskTitle: 'Login', projectName: 'Core', minutes: 60 },
+    ] as unknown as TimeEntry[])
+    expect(rows).toEqual([
+      { taskId: 't1', taskTitle: 'Login', projectName: 'Core', minutes: 90 },
+      { taskId: null, taskTitle: 'General work', projectName: null, minutes: 45 },
+    ])
+  })
+})
+
+describe('csvRows', () => {
+  // Built from local Date components, then round-tripped through
+  // toISOString(), exactly the shape a real clockInAt string has. csvRows
+  // reads it back with local getters, so as long as the fixture and the
+  // assertion agree on "local" (both do, implicitly, on whatever machine runs
+  // this test), the expected stamp holds regardless of the host's UTC
+  // offset — unlike a fixture hand-written as a UTC ISO string, which would
+  // shift by the offset and fail on negative-UTC-offset machines.
+  const clockInAt = new Date(2026, 1, 5, 8, 5, 0).toISOString() // local: 2026-02-05 08:05
+
+  const payload = {
+    since: '2026-02-02T00:00:00.000Z',
+    until: '2026-02-09T00:00:00.000Z',
+    person: { discordId: 'u1', name: 'Ana' },
+    truncated: false,
+    entries: [
+      {
+        id: 'e1', clockInAt, clockOutAt: null, minutes: 65,
+        taskId: 't1', taskTitle: 'Login', projectId: 'p1', projectName: 'Core',
+        note: 'fixed a bug', source: 'discord',
+      },
+      {
+        id: 'e2', clockInAt, clockOutAt: null, minutes: 20,
+        taskId: null, taskTitle: null, projectId: null, projectName: null,
+        note: null, source: 'discord',
+      },
+    ],
+  } as unknown as TimeEntriesPayload
+
+  it('is a header row plus one row per entry, with a zero-padded YYYY-MM-DD HH:mm stamp', () => {
+    const rows = csvRows(payload)
+    expect(rows[0]).toEqual(['Date', 'Person', 'Project', 'Task', 'Minutes', 'Note', 'Source'])
+    expect(rows[1][0]).toBe('2026-02-05 08:05')
+    expect(rows[1]).toEqual(['2026-02-05 08:05', 'Ana', 'Core', 'Login', 65, 'fixed a bug', 'discord'])
+  })
+
+  it('falls back a null taskTitle to "General work"', () => {
+    const rows = csvRows(payload)
+    expect(rows[2][3]).toBe('General work')
+  })
+
+  it('renders a null projectName and note as empty columns end-to-end through toCsv', () => {
+    const lines = toCsv(csvRows(payload)).split('\r\n')
+    expect(lines[2]).toBe('2026-02-05 08:05,Ana,,General work,20,,discord')
+  })
+})

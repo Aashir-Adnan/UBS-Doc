@@ -28,11 +28,11 @@ export function fetchTimeReport(since: Date, until: Date): Promise<TimeReportPay
   return mwGet(`/discord/time/report?${q}`) as Promise<TimeReportPayload>
 }
 
-// mwPost() throws `data.error || text`, but CSAAS error bodies for this route
-// carry `message` (see DiscordTasksStatus_object), which would otherwise show
-// the caller raw JSON. setTaskStatus does its own fetch so it can read
-// `message` first and carry the HTTP status for the Board's toast logic
-// (403 -> permission sentence, 502 -> "bot is offline", etc.).
+// mwGet() throws `new Error(await r.text())` — the raw CSAAS error body — so a
+// 403 would otherwise render as `{"status":403,"message":…}`. `fetchTimeEntries`
+// does its own fetch (the same pattern as `setTaskStatus` below) so it can
+// prefer `payload`, then `message`, then `statusText`, and carry the HTTP
+// status as `ApiError.status` for the caller to render a sentence instead.
 export class ApiError extends Error {
   status: number
   constructor(message: string, status: number) {
@@ -40,6 +40,48 @@ export class ApiError extends Error {
     this.name = 'ApiError'
     this.status = status
   }
+}
+
+// GET /api/discord/time/entries?discordId=&since=&until= — one person's raw
+// entries for the range, sorted ascending by clockInAt server-side (callers
+// must not re-sort). `taskId`/`taskTitle` null means general work.
+export interface TimeEntry {
+  id: string
+  clockInAt: string
+  clockOutAt: string | null
+  minutes: number
+  taskId: string | null
+  taskTitle: string | null
+  projectId: string | null
+  projectName: string | null
+  note: string | null
+  source: string
+}
+export interface TimeEntriesPayload {
+  since: string
+  until: string
+  person: { discordId: string; name: string; avatarUrl?: string }
+  entries: TimeEntry[]
+  truncated: boolean
+}
+export async function fetchTimeEntries(discordId: string, since: Date, until: Date): Promise<TimeEntriesPayload> {
+  const q = `discordId=${encodeURIComponent(discordId)}&since=${encodeURIComponent(since.toISOString())}&until=${encodeURIComponent(until.toISOString())}`
+  const res = await fetch(`${API_BASE_URL}/api/discord/time/entries?${q}`)
+  const text = await res.text()
+  let data: Record<string, unknown> = {}
+  if (text) {
+    try { data = JSON.parse(text) } catch { data = {} }
+  }
+  if (!res.ok) {
+    // See ApiError above / setTaskStatus below: `payload` carries the specific
+    // sentence when it is a string, `message` is generic catalogue text, and
+    // `statusText` is the last resort.
+    const specific = typeof data.payload === 'string' && data.payload ? data.payload : ''
+    const message = specific || (data.message as string) || (data.error as string) || res.statusText
+    throw new ApiError(message, res.status)
+  }
+  const payload = data.payload as { return?: unknown } | undefined
+  return (payload?.return ?? payload ?? data) as TimeEntriesPayload
 }
 
 export interface SetTaskStatusResult {
