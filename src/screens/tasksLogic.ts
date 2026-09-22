@@ -14,6 +14,9 @@ export interface TaskActivityEntry { at: string | null; actor: TaskActor | null;
 export interface TaskRef { id: string; title: string; status?: string }
 // One item of a task's subtask checklist (a subtask is also a row in the task list).
 export interface TaskSubtask { id: string; title: string; status: string; assignees: TaskPerson[] }
+// One person's share of a task's logged time, as the backend already sorts it
+// (desc by minutes) for `timeByPerson` and the site-wide time report alike.
+export interface TaskTime { discordId: string; name: string; avatarUrl?: string; minutes: number }
 export interface TaskRow {
   id: string; title: string; type: string; status: string; implementationStatus: string | null
   assignees: TaskPerson[]; blockedBy: TaskRef[]; blocks: TaskRef[]; isBlocked: boolean
@@ -31,6 +34,11 @@ export interface TaskRow {
   subtaskProgress?: { done: number; total: number }
   passedApiTests: number | null; passedQaTests: number | null; passedAcceptanceCriteria: number | null
   projectId: string | null; projectName: string | null
+  // Time tracking. Optional: an older backend sends none of it, and a task
+  // with no logged time has `timeByPerson: []` (not missing) once it ships.
+  timeLogged?: number
+  estimateMinutes?: number | null
+  timeByPerson?: TaskTime[]
 }
 export interface ProjectMember { discordId: string; name: string; username: string | null; avatarUrl?: string; role: string | null; source: 'explicit' | 'inferred' }
 export interface ProjectGroup {
