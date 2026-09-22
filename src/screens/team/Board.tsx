@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Ban, ListChecks } from 'lucide-react'
+import { Ban, ListChecks, Clock } from 'lucide-react'
 import { c, card, txt, muted, chipGray, chipRed } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
@@ -18,6 +18,7 @@ import { AvatarStack } from './Avatar'
 import ScopeBadge from './ScopeBadge'
 import { whoLine } from './activityLogic'
 import { topLevel, progressText } from './hierarchyLogic'
+import { timeChip } from './timeLogic'
 import TaskPreview from './TaskPreview'
 
 // The Board tab: the same filtered corpus as the Tasks tab, laid out in the
@@ -279,6 +280,11 @@ function Card({ t, col, theme, search, canMove }: { t: TaskRow; col: BoardColumn
         {progressText(t) && (
           <span title="Subtasks finished" className={c('text-[11px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1', chipGray(theme))}>
             <ListChecks size={12} className="shrink-0" /> {progressText(t)}
+          </span>
+        )}
+        {timeChip(t) && (
+          <span title="Time logged" className={c('text-[11px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1', chipGray(theme))}>
+            <Clock size={12} className="shrink-0" /> {timeChip(t)}
           </span>
         )}
         {/* Done holds three different statuses (done/closed/resolved), so only
