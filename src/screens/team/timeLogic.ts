@@ -3,7 +3,7 @@
 // DOM. `formatDuration` mirrors the bot's own utility exactly, except it
 // returns `null` (not an em dash) for nothing to show, so callers decide what
 // to render.
-import type { TimeEntry } from '../../components/discordTasks/api'
+import type { TimeEntriesPayload, TimeEntry } from '../../components/discordTasks/api'
 export function formatDuration(minutes: number | null | undefined): string | null {
   if (minutes === null || minutes === undefined || !Number.isFinite(Number(minutes))) return null
   const total = Math.max(0, Math.round(Number(minutes)))
@@ -72,9 +72,20 @@ export function timeChip(task: { timeLogged?: number }): string | null {
 // RFC 4180: a field is quoted only when it contains a comma, a double quote,
 // CR or LF, and embedded quotes are doubled. Task titles and notes contain all
 // of these, and getting it wrong corrupts the file without any error.
+//
+// `note` and `taskTitle` are free text typed by any guild member. A value
+// starting with =, +, - or @ is evaluated as a formula when the file is
+// opened in Excel or Sheets, and RFC 4180 quoting alone does not stop this —
+// so those values are prefixed with a literal single quote to force text,
+// before the quoting logic above runs. Numeric cells (`typeof v === 'number'`,
+// e.g. Minutes) are exempt: they can never carry attacker-controlled text —
+// they come from our own data model, never free typing — and a genuine
+// negative value like -30 must stay a plain number, not become a quoted
+// string.
 export function toCsv(rows: Array<Array<string | number | null | undefined>>): string {
   const cell = (v: string | number | null | undefined): string => {
-    const s = v === null || v === undefined ? '' : String(v)
+    let s = v === null || v === undefined ? '' : String(v)
+    if (typeof v !== 'number' && /^[=+\-@]/.test(s)) s = `'${s}`
     return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
   return rows.map((r) => r.map(cell).join(',')).join('\r\n')
@@ -105,4 +116,18 @@ export function entriesByTask(entries: TimeEntry[]): Array<{ taskId: string | nu
     byKey.set(key, row)
   }
   return [...byKey.values()].sort((a, b) => b.minutes - a.minutes)
+}
+
+/** Header row plus one row per entry, ready for `toCsv`. `clockInAt` is
+ * parsed and stamped using local getters (not UTC), so the exported
+ * `YYYY-MM-DD HH:mm` matches the timezone the tab is being viewed in. */
+export function csvRows(payload: TimeEntriesPayload): Array<Array<string | number | null>> {
+  return [
+    ['Date', 'Person', 'Project', 'Task', 'Minutes', 'Note', 'Source'],
+    ...payload.entries.map((e) => {
+      const at = new Date(e.clockInAt)
+      const stamp = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')} ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+      return [stamp, payload.person.name, e.projectName, e.taskTitle ?? 'General work', e.minutes, e.note, e.source]
+    }),
+  ]
 }
