@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ExternalLink, Ban, ListChecks } from 'lucide-react'
+import { ExternalLink, Ban, ListChecks, Clock } from 'lucide-react'
 import { c, card, txt, muted, chipRed, chipGray, chipIndigo } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
@@ -15,6 +15,7 @@ import Avatar, { AvatarStack } from './Avatar'
 import ScopeBadge from './ScopeBadge'
 import { whoLine } from './activityLogic'
 import { groupHierarchy, progressText } from './hierarchyLogic'
+import { timeChip } from './timeLogic'
 
 // The Tasks tab of the Team section: project cards with their task rows, all
 // from the payload the layout fetched. Filtering is client-side — the corpus is
@@ -131,6 +132,11 @@ function TaskLine({ t, theme, search, nested = false }: { t: TaskRow; theme: The
           {progressText(t) && (
             <span title="Subtasks finished" className={c('text-[11px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1', chipGray(theme))}>
               <ListChecks size={12} /> {progressText(t)}
+            </span>
+          )}
+          {timeChip(t) && (
+            <span title="Time logged" className={c('text-[11px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1', chipGray(theme))}>
+              <Clock size={12} /> {timeChip(t)}
             </span>
           )}
         </div>

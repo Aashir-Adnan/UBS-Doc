@@ -91,7 +91,11 @@ export default function TeamLayout() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <SearchInput value={filters.query} onChange={(v) => setFilter({ query: v })} placeholder="Search tasks…" width={240} theme={theme} />
+            {/* The search box filters the shared tasks payload — meaningless
+                on the Time tab's separately-fetched report. */}
+            {tab !== 'time' && (
+              <SearchInput value={filters.query} onChange={(v) => setFilter({ query: v })} placeholder="Search tasks…" width={240} theme={theme} />
+            )}
             <button type="button" onClick={() => void refresh()} disabled={loading} title="Refresh"
               className={c('h-11 w-11 inline-flex items-center justify-center rounded-xl tr', d ? 'text-white/50 hover:bg-white/6' : 'text-slate-400 hover:bg-slate-100', loading ? 'opacity-50' : '')}>
               <RefreshCw size={16} className={loading ? 'spin' : ''} />
@@ -114,29 +118,35 @@ export default function TeamLayout() {
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 mb-6">
-          {/* Status is a tasks-list concept: the board has its own columns and
-              People counts open work, so it only shows on the Tasks tab. */}
-          {tab === 'tasks' && (
-            <FilterSelect label="Status" theme={theme} value={filters.status} onChange={(v) => setFilter({ status: v as Filters['status'] })}>
-              <option value="all">All statuses</option><option value="active">Active</option><option value="done">Done</option>
+        {/* None of Project/Assignee/Blocked-only apply to the Time tab's
+            separately-fetched report — leaving them visible-but-inert would
+            wrongly suggest they filter it. */}
+        {tab !== 'time' && (
+          <div className="flex flex-wrap items-center gap-3 mb-6">
+            {/* Status is a tasks-list concept: the board has its own columns and
+                People counts open work, so it only shows on the Tasks tab. */}
+            {tab === 'tasks' && (
+              <FilterSelect label="Status" theme={theme} value={filters.status} onChange={(v) => setFilter({ status: v as Filters['status'] })}>
+                <option value="all">All statuses</option><option value="active">Active</option><option value="done">Done</option>
+              </FilterSelect>
+            )}
+            <FilterSelect label="Project" theme={theme} value={filters.projectSlug ?? ''} onChange={(v) => setFilter({ projectSlug: v || null })}>
+              <option value="">All projects</option>
+              {projects.filter((p) => p.docsSlug).map((p) => <option key={p.docsSlug!} value={p.docsSlug!}>{p.name}</option>)}
             </FilterSelect>
-          )}
-          <FilterSelect label="Project" theme={theme} value={filters.projectSlug ?? ''} onChange={(v) => setFilter({ projectSlug: v || null })}>
-            <option value="">All projects</option>
-            {projects.filter((p) => p.docsSlug).map((p) => <option key={p.docsSlug!} value={p.docsSlug!}>{p.name}</option>)}
-          </FilterSelect>
-          <FilterSelect label="Assignee" theme={theme} value={filters.assigneeId ?? ''} onChange={(v) => setFilter({ assigneeId: v || null })}>
-            <option value="">Anyone</option>
-            {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </FilterSelect>
-          <label className={c('flex items-center gap-2 text-xs font-semibold cursor-pointer', muted(theme))}>
-            <input type="checkbox" checked={filters.blockedOnly} onChange={(e) => setFilter({ blockedOnly: e.target.checked })} /> Blocked only
-          </label>
-        </div>
+            <FilterSelect label="Assignee" theme={theme} value={filters.assigneeId ?? ''} onChange={(v) => setFilter({ assigneeId: v || null })}>
+              <option value="">Anyone</option>
+              {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </FilterSelect>
+            <label className={c('flex items-center gap-2 text-xs font-semibold cursor-pointer', muted(theme))}>
+              <input type="checkbox" checked={filters.blockedOnly} onChange={(e) => setFilter({ blockedOnly: e.target.checked })} /> Blocked only
+            </label>
+          </div>
+        )}
 
-        {/* The one error banner for the section — tabs never render their own. */}
-        {error && (
+        {/* Only about the shared tasks payload — meaningless on the Time tab,
+            which fetches a different endpoint and shows its own error banner. */}
+        {tab !== 'time' && error && (
           <div className={c('rounded-xl px-4 py-3 mb-5 text-sm font-medium border', d ? 'bg-red-500/10 border-red-500/25 text-red-300' : 'bg-red-50 border-red-200 text-red-600')}>
             Could not load tasks: {error}
           </div>
