@@ -13,8 +13,9 @@ import Avatar from './Avatar'
 export default function TimeSection({ task, theme }: { task: TaskRow; theme: Theme }) {
   const d = theme === 'dark'
   const logged = task.timeLogged ?? 0
-  const hasEstimate = task.estimateMinutes !== null && task.estimateMinutes !== undefined
-  const pct = estimatePercent(logged, task.estimateMinutes) ?? 0
+  const rawPct = estimatePercent(logged, task.estimateMinutes)
+  const hasEstimate = rawPct !== null
+  const pct = rawPct ?? 0
   const over = isOverEstimate(logged, task.estimateMinutes)
   // Already sorted descending by the backend; never re-sorted here.
   const contributors = topContributors(task.timeByPerson ?? [], 5)
