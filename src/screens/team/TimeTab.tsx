@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { c, card, txt, muted } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
@@ -6,27 +6,24 @@ import type { Theme } from '../../types'
 import { ApiError, fetchTimeEntries, fetchTimeReport, type TimeEntriesPayload, type TimeReportPayload } from '../../components/discordTasks/api'
 import { csvFilename, csvRows, entriesByTask, formatDuration, shiftWeek, toCsv, weekRange } from './timeLogic'
 import Avatar from './Avatar'
-import FilterSelect from './FilterSelect'
 import { useTeam } from './TeamLayout'
 
 // The Time tab: its own fetch of GET /api/discord/time/report, entirely
 // separate from the shared TasksList/People/Board payload TeamLayout owns —
-// the report is keyed by a week range, not by the task filters that apply to
-// the other tabs, so it holds its own range/data/loading/error state and
-// refetches whenever the range changes. It also refetches whenever the
-// shared payload's identity changes, i.e. whenever the header's Refresh
-// button is pressed — TimeTab never reads the payload itself.
+// the report is keyed by the week range and the shared Project filter, not
+// by the rest of the task filters that apply to the other tabs, so it holds
+// its own range/data/loading/error state and refetches whenever the range or
+// the Project filter changes. It also refetches whenever the shared payload's
+// identity changes, i.e. whenever the header's Refresh button is pressed —
+// TimeTab never reads the payload itself.
 //
 // A second, independent fetch (GET /api/discord/time/entries) backs the
-// person filter: selecting someone from the roster pulls their raw entries
-// for the same range, for the per-task breakdown, the entries list and the
-// CSV export. The person select is local to this tab and, when the report is
-// not self-scoped, reads the roster from `useTeam().payload.members` — not
-// `assigneeOptions(projects)` — since people log time against general work
-// and against tasks they are not assigned to. When the report *is*
-// self-scoped (the caller lacks view_discord_time), the select is built from
-// `data.people` instead, which the server has already narrowed to just the
-// caller — see the `members` memo below.
+// per-person section: the shared Assignee filter (read from useTeam(), not
+// a local select) pulls that person's raw entries for the same range, for
+// the per-task breakdown, the entries list and the CSV export. The shared
+// Project filter narrows both fetches server-side. When the report is
+// self-scoped (the caller lacks view_discord_time) the person is always the
+// caller, whatever the filter says, and the shell hides the select.
 
 const rangeFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
 
@@ -61,24 +58,25 @@ function downloadCsv(d: TimeEntriesPayload, range: { since: Date; until: Date })
 export default function TimeTab() {
   const { theme } = useTheme()
   const d = theme === 'dark'
-  const { payload } = useTeam()
+  const { payload, filters, setTimeSelfScoped } = useTeam()
   const [range, setRange] = useState(() => weekRange(new Date()))
   const [data, setData] = useState<TimeReportPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [personId, setPersonId] = useState<string>('')
   // Spec §5: a caller without view_discord_time only ever receives their own
-  // data, so for them the select must be fixed to themselves. `data.people`
-  // under scope 'self' is exactly the caller (the server already narrowed the
-  // report to just their own rows) — the roster (`payload.members`) is only
-  // right to offer when the report is *not* self-scoped, since otherwise it
-  // lists everyone while every choice but one would 403.
-  const members = useMemo(() => {
-    const roster: Array<{ discordId: string; name: string }> =
-      data?.scope === 'self' ? (data.people ?? []) : (payload?.members ?? [])
-    return [...roster].sort((a, b) => a.name.localeCompare(b.name))
-  }, [data, payload])
+  // data, so for them the person is always themselves — the shell hides the
+  // Assignee select for them (timeSelfScoped) and this ignores the filter.
+  // Under self scope with nothing logged, `people` is empty: then there is
+  // no person to show, not a fallback to the filter — which would request
+  // somebody else's entries and 403. The scope is unknown until the first
+  // report lands (`data` is null on every mount, while `filters` is section
+  // state that survives the hop from another tab), so no entries request is
+  // made before then — falling back to `filters.assigneeId` in that window
+  // would fire a request for whoever was selected on Tasks, which 403s for a
+  // self-scoped caller.
+  const personId = !data ? '' : data.scope === 'self' ? (data.people[0]?.discordId ?? '') : (filters.assigneeId ?? '')
+  const projectSlug = filters.projectSlug
   const [detail, setDetail] = useState<TimeEntriesPayload | null>(null)
   // Its own loading/error, separate from the week report's: the two fetches
   // are independent (one keyed by range alone, one by person+range), and
@@ -94,26 +92,29 @@ export default function TimeTab() {
     let cancelled = false
     setLoading(true)
     setError(null)
-    fetchTimeReport(range.since, range.until)
-      .then((report) => { if (!cancelled) setData(report) })
+    fetchTimeReport(range.since, range.until, projectSlug)
+      .then((report) => { if (!cancelled) { setData(report); setTimeSelfScoped(report.scope === 'self') } })
       .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [range, payload])
+  }, [range, payload, projectSlug, setTimeSelfScoped])
 
-  // Independent of the report fetch above: only runs when a person is
-  // selected, and ignores its own out-of-order responses the same way, so a
-  // slow request for a previously selected person can't overwrite a newer
-  // one's data. Deselecting resets all three of this effect's own pieces of
-  // state, not just `detail`, so neither a stale error nor a stuck loading
-  // flag can survive the person being cleared.
+  // Independent of the report fetch above: `personId` comes from the shared
+  // Assignee filter (or, under self scope, is derived from `data` as the
+  // caller themselves — see the comment above), and this effect runs
+  // whenever there is one. It ignores its own out-of-order responses the
+  // same way, so a slow request for a previously selected person can't
+  // overwrite a newer one's data. Clearing the person (filter cleared, tab
+  // switched away and back before the first report lands, etc.) resets all
+  // three of this effect's own pieces of state, not just `detail`, so
+  // neither a stale error nor a stuck loading flag can survive it.
   useEffect(() => {
     if (!personId) { setDetail(null); setDetailError(null); setDetailErrorStatus(null); setDetailLoading(false); return }
     let cancelled = false
     setDetailLoading(true)
     setDetailError(null)
     setDetailErrorStatus(null)
-    fetchTimeEntries(personId, range.since, range.until)
+    fetchTimeEntries(personId, range.since, range.until, projectSlug)
       .then((detailPayload) => { if (!cancelled) setDetail(detailPayload) })
       .catch((e) => {
         if (cancelled) return
@@ -122,7 +123,7 @@ export default function TimeTab() {
       })
       .finally(() => { if (!cancelled) setDetailLoading(false) })
     return () => { cancelled = true }
-  }, [personId, range, payload])
+  }, [personId, range, payload, projectSlug])
 
   if (loading && !data) {
     return (
@@ -155,6 +156,7 @@ export default function TimeTab() {
   const shown = detail
     && detail.person.discordId === personId
     && detail.since === range.since.toISOString()
+    && (detail.project ?? null) === (projectSlug ?? null)
     ? detail
     : null
   const taskRows = shown ? entriesByTask(shown.entries) : []
@@ -175,10 +177,6 @@ export default function TimeTab() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <FilterSelect label="Person" theme={theme} value={personId} onChange={setPersonId}>
-            <option value="">Select a person…</option>
-            {members.map((m) => <option key={m.discordId} value={m.discordId}>{m.name}</option>)}
-          </FilterSelect>
           {personId && (
             <button
               type="button"
