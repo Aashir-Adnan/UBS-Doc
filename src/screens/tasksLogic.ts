@@ -11,9 +11,11 @@ export type ActivityChange =
   | { field: 'blocked_by'; action: 'added' | 'removed'; title: string }
   | { field: 'subtask'; action: 'added'; title: string }
 export interface TaskActivityEntry { at: string | null; actor: TaskActor | null; viaSite: boolean; changes: ActivityChange[] }
-export interface TaskRef { id: string; title: string; status?: string }
+// `hidden`: a task in a project the viewer cannot see — CSAAS sends only its id,
+// status and a fixed title ("A task in another project"); render it as plain text.
+export interface TaskRef { id: string; title: string; status?: string; hidden?: boolean }
 // One item of a task's subtask checklist (a subtask is also a row in the task list).
-export interface TaskSubtask { id: string; title: string; status: string; assignees: TaskPerson[] }
+export interface TaskSubtask { id: string; title: string; status: string; assignees: TaskPerson[]; hidden?: boolean }
 // One person's share of a task's logged time, as the backend already sorts it
 // (desc by minutes) for `timeByPerson` and the site-wide time report alike.
 export interface TaskTime { discordId: string; name: string; avatarUrl?: string; minutes: number }
@@ -54,8 +56,10 @@ export interface TeamMember {
   kind?: 'staff' | 'client'
 }
 export interface RepoRef { id: string; name: string; url: string }
+// Who is looking (identity link). Absent from an older backend: behave as before.
+export interface Viewer { linked: boolean; seesAll: boolean; isAdmin: boolean; discordIds: string[]; name: string | null }
 // `repositories` feeds the create form; absent from an older backend.
-export interface TasksPayload { generatedAt: string; projects: ProjectGroup[]; members: TeamMember[]; repositories?: RepoRef[] }
+export interface TasksPayload { generatedAt: string; projects: ProjectGroup[]; members: TeamMember[]; repositories?: RepoRef[]; viewer?: Viewer }
 
 // Flattens every task across every project group into one list, in group then
 // in-group order — the shape graph/board/team logic operate on when they need
