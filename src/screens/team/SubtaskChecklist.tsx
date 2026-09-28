@@ -51,13 +51,13 @@ export default function SubtaskChecklist({ task, theme, search, canToggle, busyI
                 aria-label={`${done ? 'Reopen' : 'Finish'} ${s.title}`}
                 disabled={!canToggle || busy || !!s.hidden}
                 onClick={() => onToggle(s.id)}
-                title={canToggle ? (done ? 'Reopen this subtask' : 'Mark this subtask done') : 'You need permission to update tasks'}
+                title={s.hidden ? 'In another project' : canToggle ? (done ? 'Reopen this subtask' : 'Mark this subtask done') : 'You need permission to update tasks'}
                 className={c(
                   'w-5 h-5 rounded-md border inline-flex items-center justify-center shrink-0 tr',
                   done
                     ? 'bg-emerald-500 border-emerald-500 text-white'
                     : d ? 'border-white/25 text-transparent' : 'border-slate-300 text-transparent',
-                  canToggle && !busy ? 'cursor-pointer hover:border-indigo-400' : 'cursor-default',
+                  canToggle && !busy && !s.hidden ? 'cursor-pointer hover:border-indigo-400' : 'cursor-default',
                   busy ? 'opacity-50' : '',
                 )}
               >
