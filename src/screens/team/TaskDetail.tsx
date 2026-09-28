@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ExternalLink, Pencil } from 'lucide-react'
 import { c, card, txt, muted, chipGray, chipIndigo } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
@@ -34,6 +34,7 @@ export default function TaskDetail() {
   const { payload, loading, refresh } = useTeam()
   // Back goes to the list the visitor came from, filters and all.
   const location = useLocation()
+  const navigate = useNavigate()
   const { search } = location
   const backTo = `/tools/team/tasks${search}`
   const { has } = useActingPermissions()
@@ -45,9 +46,16 @@ export default function TaskDetail() {
   }, [])
   // A different task in the same screen starts in read mode.
   useEffect(() => { setEditing(false) }, [taskId])
-  // The create page lands here with a note about where the channel went.
+  // The create page lands here with a note about where the channel went. Clear
+  // it from history state right after showing it, or a browser reload replays
+  // the same navigation state and the toast reappears.
   const notice = (location.state as { notice?: string } | null)?.notice
-  useEffect(() => { if (notice) show(notice, 'info') }, [notice, show])
+  useEffect(() => {
+    if (!notice) return
+    show(notice, 'info')
+    navigate(location.pathname + location.search, { replace: true, state: null })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notice, show])
 
   const onSaved = useCallback(async (result: UpdateTaskResult) => {
     setEditing(false)

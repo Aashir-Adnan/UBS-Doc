@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { TaskRow, TasksPayload } from '../tasksLogic'
 import {
   formFromTask, diffChanges, validateForm, emptyCreateForm, validateCreateForm, createPayload,
-  blockerCandidates, saveErrorText, scopeOptionsFor,
+  blockerCandidates, saveErrorText, createErrorText, scopeOptionsFor,
 } from './taskFormLogic'
 
 function task(over: Partial<TaskRow> = {}): TaskRow {
@@ -107,8 +107,31 @@ describe('saveErrorText', () => {
     expect(saveErrorText({ status: 502, message: 'Discord bot is not reachable' })).toBe('Discord bot is offline, try again.')
     expect(saveErrorText({ message: 'Failed to fetch' })).toBe('Discord bot is offline, try again.')
     expect(saveErrorText({ status: 409, message: "**Git Sync** can't be marked done yet — 1 subtask is still open:\n• Tests" })).toBe("Git Sync can't be marked done yet — 1 subtask is still open: Tests")
-    expect(saveErrorText({ status: 400, message: 'u9 is not a member of this Discord server.' })).toBe('u9 is not a member of this Discord server.')
+    expect(saveErrorText({ status: 400, message: 'Member …u9 is not a member of this Discord server.' })).toBe('Member …u9 is not a member of this Discord server.')
     expect(saveErrorText({})).toBe('Could not save. Try again.')
+  })
+})
+
+describe('createErrorText', () => {
+  const MAYBE_CREATED = 'The Discord bot did not answer in time. The task may already have been created — check the Tasks list before trying again.'
+
+  it('a 502 timeout says the task may already exist, not "try again"', () => {
+    expect(createErrorText({ status: 502, message: 'Discord bot is not reachable' })).toBe(MAYBE_CREATED)
+  })
+  it('a network failure (no status) says the same thing', () => {
+    expect(createErrorText({ message: 'Failed to fetch' })).toBe(MAYBE_CREATED)
+  })
+  it('the bot\'s own "server not available" 502 also says the task may already exist', () => {
+    expect(createErrorText({ status: 502, message: 'The Discord server is not available to the bot right now.' })).toBe(MAYBE_CREATED)
+  })
+  it('a 400 bot rejection sentence passes through unchanged', () => {
+    expect(createErrorText({ status: 400, message: 'Member …u9 is not a member of this Discord server.' })).toBe('Member …u9 is not a member of this Discord server.')
+  })
+  it('403 passes through exactly as saveErrorText phrases it', () => {
+    expect(createErrorText({ status: 403, message: 'x' })).toBe('You need the update_discord_tasks permission to change tasks. Ask an admin.')
+  })
+  it('a misconfiguration sentence passes through unchanged (raised before any write)', () => {
+    expect(createErrorText({ status: 502, message: 'Discord bot rejected the request (configuration)' })).toBe('Discord bot link is misconfigured. Tell an admin.')
   })
 })
 

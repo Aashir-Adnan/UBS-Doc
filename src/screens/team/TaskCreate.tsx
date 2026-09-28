@@ -8,7 +8,7 @@ import { createTask } from '../../components/discordTasks/api'
 import { useActingPermissions } from '../../components/portal/tenantProjects/useActingPermissions'
 import { useTeam } from './TeamLayout'
 import MemberPicker from './MemberPicker'
-import { SCOPE_OPTIONS, createPayload, emptyCreateForm, saveErrorText, validateCreateForm, type CreateForm } from './taskFormLogic'
+import { SCOPE_OPTIONS, createErrorText, createPayload, emptyCreateForm, validateCreateForm, type CreateForm } from './taskFormLogic'
 
 // A new Feature or Bug, made by the Discord bot exactly as /create-task makes
 // it: the row, its ticket doc, the bug's GitHub issue, and its channel in the
@@ -59,8 +59,12 @@ export default function TaskCreate() {
       await refresh()
       navigate(`/tools/team/tasks/${result.task.id}`, { state: { notice: result.note || 'Task created. Its Discord channel is ready.' } })
     } catch (err) {
-      setError(saveErrorText(err as { status?: number; message?: string }))
+      setError(createErrorText(err as { status?: number; message?: string }))
       setSaving(false)
+      // A timeout or 502 here does not mean the create failed — the row, channel
+      // or GitHub issue may already exist. Refresh so it shows up in the list
+      // without the visitor having to reload by hand.
+      void refresh()
     }
   }
 

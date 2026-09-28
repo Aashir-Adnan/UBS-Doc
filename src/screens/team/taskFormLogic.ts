@@ -180,3 +180,29 @@ export function saveErrorText(err: { status?: number; message?: string }): strin
   if (/not reachable|failed to fetch|networkerror|load failed/i.test(message)) return 'Discord bot is offline, try again.'
   return plainRuleMessage(message) || 'Could not save. Try again.'
 }
+
+/**
+ * The sentence for a failed *create*. A create writes the task row before it
+ * makes the Discord channel (and, for a bug, opens a GitHub issue) — so unlike
+ * an edit, a timeout or a 502 here does not mean nothing happened. Retrying on
+ * "try again" would make a duplicate row, channel and issue, so those cases get
+ * their own sentence pointing at the Tasks list instead. Everything else
+ * (a real 400/403/409 rejection, or one of the three misconfiguration
+ * sentences) is unambiguous and passes through exactly as saveErrorText phrases it.
+ */
+export function createErrorText(err: { status?: number; message?: string }): string {
+  const status = err?.status
+  const message = (err?.message ?? '').trim()
+  if (status === 403 || status === 400 || status === 409) return saveErrorText(err)
+  // The three configuration sentences (see saveErrorText) are unambiguous too: they are
+  // raised before any write is attempted, so "try again" is correct, not misleading.
+  if (/not configured|rejected the request|unreadable reply/i.test(message)) return saveErrorText(err)
+  const maybeCreated =
+    status === 502 || status === 503 ||
+    /not reachable|failed to fetch|networkerror|load failed/i.test(message) ||
+    (typeof status === 'number' && status >= 500)
+  if (maybeCreated) {
+    return 'The Discord bot did not answer in time. The task may already have been created — check the Tasks list before trying again.'
+  }
+  return saveErrorText(err)
+}
