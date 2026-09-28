@@ -7,7 +7,7 @@ const BASE = 'http://api.test'
 globalThis.window = globalThis.window || (globalThis as unknown as Window)
 ;(window as unknown as { __API_BASE_URL__: string }).__API_BASE_URL__ = BASE
 
-const { setTaskStatus, ApiError } = await import('./api')
+const { setTaskStatus, ApiError, updateTask, createTask, addSubtask } = await import('./api')
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status })
@@ -89,5 +89,44 @@ describe('setTaskStatus', () => {
     } catch (err) {
       expect(err).toBeInstanceOf(ApiError)
     }
+  })
+})
+
+describe('task writes', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+  beforeEach(() => { fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock) })
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('updateTask posts task_id and only the changes', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ payload: { return: { task: { id: 'T1', status: 'done' }, warning: '', lines: [], unchanged: false } } }))
+    const r = await updateTask('T1', { status: 'done', holder_ids: ['u1'] })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`${BASE}/api/discord/tasks/update`)
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ task_id: 'T1', changes: { status: 'done', holder_ids: ['u1'] } })
+    expect(r.task.status).toBe('done')
+  })
+
+  it('createTask posts the input as-is and unwraps the result', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ payload: { return: { task: { id: 'N1', type: 'feature', status: 'open', projectId: 'P1' }, channelId: 'c1', fellBack: null, note: '' } } }))
+    const input = { type: 'feature' as const, title: 'x', description: null, project_id: 'P1', scope: null, modules: [], holder_ids: [], repository_ids: [], tracks: { api_tests: false, qa_tests: false, acceptance_criteria: false } }
+    const r = await createTask(input)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`${BASE}/api/discord/tasks/create`)
+    expect(JSON.parse(init.body)).toEqual(input)
+    expect(r.task.id).toBe('N1')
+  })
+
+  it('addSubtask posts parent_id, title and holder_ids', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ payload: { return: { task: { id: 'S1', status: 'open', parentId: 'T1' } } } }))
+    await addSubtask('T1', 'Write tests', ['u2'])
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`${BASE}/api/discord/tasks/subtask`)
+    expect(JSON.parse(init.body)).toEqual({ parent_id: 'T1', title: 'Write tests', holder_ids: ['u2'] })
+  })
+
+  it('a refusal carries the specific sentence and the status', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ status: 400, message: 'Invalid request', payload: 'Pick a project for the task.' }, 400))
+    await expect(updateTask('T1', { title: 'x' })).rejects.toMatchObject({ name: 'ApiError', status: 400, message: 'Pick a project for the task.' })
   })
 })
