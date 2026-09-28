@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
-import { ExternalLink } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { ExternalLink, Pencil } from 'lucide-react'
 import { c, card, txt, muted, chipGray, chipIndigo } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
+import { useActingPermissions } from '../../components/portal/tenantProjects/useActingPermissions'
 import type { Theme } from '../../types'
 import { findTask, statusTone, STATUS_LABEL, type TaskRef } from '../tasksLogic'
 import { fmtDate, refLabel, refTone, taskUrl, testCount } from './detailLogic'
@@ -16,6 +18,11 @@ import TaskHistory from './TaskHistory'
 import TimeSection from './TimeSection'
 import CopyLinkButton from './CopyLinkButton'
 import { relativeTime } from './activityLogic'
+import type { UpdateTaskResult } from '../../components/discordTasks/api'
+import TaskEditForm from './TaskEditForm'
+import AddSubtask from './AddSubtask'
+import Toast, { type ToastTone } from './Toast'
+import { plainRuleMessage } from './boardLogic'
 
 // One task, in full. The payload is the section's — this screen never fetches,
 // so a deep link into it renders once TeamLayout's single request lands.
@@ -24,10 +31,38 @@ export default function TaskDetail() {
   const { theme } = useTheme()
   const d = theme === 'dark'
   const { taskId } = useParams()
-  const { payload, loading } = useTeam()
+  const { payload, loading, refresh } = useTeam()
   // Back goes to the list the visitor came from, filters and all.
-  const { search } = useLocation()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { search } = location
   const backTo = `/tools/team/tasks${search}`
+  const { has } = useActingPermissions()
+  const canEdit = has('update_discord_tasks')
+  const [editing, setEditing] = useState(false)
+  const [toast, setToast] = useState<{ message: string; tone: ToastTone; seq: number } | null>(null)
+  const show = useCallback((message: string, tone: ToastTone) => {
+    setToast((prev) => ({ message, tone, seq: (prev?.seq ?? 0) + 1 }))
+  }, [])
+  // A different task in the same screen starts in read mode.
+  useEffect(() => { setEditing(false) }, [taskId])
+  // The create page lands here with a note about where the channel went. Clear
+  // it from history state right after showing it, or a browser reload replays
+  // the same navigation state and the toast reappears.
+  const notice = (location.state as { notice?: string } | null)?.notice
+  useEffect(() => {
+    if (!notice) return
+    show(notice, 'info')
+    navigate(location.pathname + location.search, { replace: true, state: null })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notice, show])
+
+  const onSaved = useCallback(async (result: UpdateTaskResult) => {
+    setEditing(false)
+    const warning = plainRuleMessage(result.warning || '')
+    if (warning) show(warning, 'info')
+    await refresh()
+  }, [refresh, show])
 
   if (loading && !payload) {
     return (
@@ -71,120 +106,136 @@ export default function TaskDetail() {
           <h2 className={c('font-extrabold text-xl sm:text-2xl m-0 flex-1 min-w-[200px]', txt(theme))}>{task.title}</h2>
           {/* mt-1 lines it up with the status chip, which the row's
               items-start leaves sitting slightly below the title's cap. */}
-          <div className="mt-1 shrink-0">
+          <div className="mt-1 shrink-0 flex items-center gap-2">
+            {canEdit && !editing && (
+              <button type="button" onClick={() => setEditing(true)}
+                className={c('btn-outline-indigo inline-flex items-center gap-1.5 px-3 py-1.5 text-xs', d ? 'dark-variant' : '')}>
+                <Pencil size={13} /> Edit
+              </button>
+            )}
             <CopyLinkButton url={taskUrl(window.location.origin, task.id)} theme={theme} />
           </div>
         </div>
 
-        <p className={c('text-xs font-semibold', task.parent ? 'mb-2' : 'mb-6', muted(theme))}>
-          {task.type}
-          {projectName && (
-            <>
-              {' · '}
-              {project.docsSlug
-                ? <Link to={`/tools/team/tasks?project=${encodeURIComponent(project.docsSlug)}`} className="text-indigo-500 no-underline hover:underline">{projectName}</Link>
-                : projectName}
-            </>
-          )}
-          {task.implementationStatus ? ` · ${task.implementationStatus}` : ''}
-        </p>
-
-        {task.parent && (
-          <p className={c('text-xs font-semibold mb-6', muted(theme))}>
-            Subtask of{' '}
-            <Link to={`/tools/team/tasks/${task.parent.id}${search}`} className="text-indigo-500 no-underline hover:underline">{task.parent.title}</Link>
-          </p>
-        )}
-
-        <Field label="Description" theme={theme}>
-          {task.description
-            ? <p className={c('text-sm whitespace-pre-wrap m-0', txt(theme))}>{task.description}</p>
-            : <p className={c('text-sm m-0', muted(theme))}>No description</p>}
-        </Field>
-
-        {(task.subtasks?.length ?? 0) > 0 && (
-          <Field label="Subtasks" theme={theme}>
-            <SubtasksSection task={task} theme={theme} search={search} />
-          </Field>
-        )}
-
-        {(task.timeLogged !== undefined || task.estimateMinutes !== undefined) && (
-          <Field label="Time" theme={theme}>
-            <TimeSection task={task} theme={theme} />
-          </Field>
-        )}
-
-        {task.scope && (
-          <Field label="Scope" theme={theme}>
-            <ScopeBadge scope={task.scope} theme={theme} />
-          </Field>
-        )}
-
-        {task.modules.length > 0 && (
-          <Field label="Modules" theme={theme}>
-            <div className="flex flex-wrap gap-1.5">
-              {task.modules.map((m) => (
-                <span key={m} className={c('text-[11px] font-semibold px-2.5 py-1 rounded-full', chipGray(theme))}>{m}</span>
-              ))}
-            </div>
-          </Field>
-        )}
-
-        <Field label="Tests" theme={theme}>
-          <div className="flex flex-wrap gap-3">
-            <Stat label="API tests" value={testCount(task.passedApiTests)} theme={theme} />
-            <Stat label="QA tests" value={testCount(task.passedQaTests)} theme={theme} />
-            <Stat label="Acceptance criteria" value={testCount(task.passedAcceptanceCriteria)} theme={theme} />
+        {editing ? (
+          <div className="mt-4">
+            <TaskEditForm task={task} payload={payload} theme={theme} onCancel={() => setEditing(false)} onSaved={(r) => void onSaved(r)} />
           </div>
-        </Field>
+        ) : (
+          <>
+            <p className={c('text-xs font-semibold', task.parent ? 'mb-2' : 'mb-6', muted(theme))}>
+              {task.type}
+              {projectName && (
+                <>
+                  {' · '}
+                  {project.docsSlug
+                    ? <Link to={`/tools/team/tasks?project=${encodeURIComponent(project.docsSlug)}`} className="text-indigo-500 no-underline hover:underline">{projectName}</Link>
+                    : projectName}
+                </>
+              )}
+              {task.implementationStatus ? ` · ${task.implementationStatus}` : ''}
+            </p>
 
-        <Field label="Assignees" theme={theme}>
-          {task.assignees.length ? (
-            <div className="flex flex-wrap gap-1.5">
-              {task.assignees.map((a) => (
-                <span key={a.discordId} className={c('text-[11px] font-semibold px-2.5 py-1 rounded-full', chipIndigo(theme))}>
-                  <Avatar person={a} size={18} theme={theme} />
-                  {a.name}
-                </span>
-              ))}
+            {task.parent && (
+              <p className={c('text-xs font-semibold mb-6', muted(theme))}>
+                Subtask of{' '}
+                <Link to={`/tools/team/tasks/${task.parent.id}${search}`} className="text-indigo-500 no-underline hover:underline">{task.parent.title}</Link>
+              </p>
+            )}
+
+            <Field label="Description" theme={theme}>
+              {task.description
+                ? <p className={c('text-sm whitespace-pre-wrap m-0', txt(theme))}>{task.description}</p>
+                : <p className={c('text-sm m-0', muted(theme))}>No description</p>}
+            </Field>
+
+            {((task.subtasks?.length ?? 0) > 0 || (canEdit && !task.parent)) && (
+              <Field label="Subtasks" theme={theme}>
+                {(task.subtasks?.length ?? 0) > 0 && <SubtasksSection task={task} theme={theme} search={search} />}
+                {canEdit && !task.parent && <AddSubtask task={task} payload={payload} theme={theme} />}
+              </Field>
+            )}
+
+            {(task.timeLogged !== undefined || task.estimateMinutes !== undefined) && (
+              <Field label="Time" theme={theme}>
+                <TimeSection task={task} theme={theme} />
+              </Field>
+            )}
+
+            {task.scope && (
+              <Field label="Scope" theme={theme}>
+                <ScopeBadge scope={task.scope} theme={theme} />
+              </Field>
+            )}
+
+            {task.modules.length > 0 && (
+              <Field label="Modules" theme={theme}>
+                <div className="flex flex-wrap gap-1.5">
+                  {task.modules.map((m) => (
+                    <span key={m} className={c('text-[11px] font-semibold px-2.5 py-1 rounded-full', chipGray(theme))}>{m}</span>
+                  ))}
+                </div>
+              </Field>
+            )}
+
+            <Field label="Tests" theme={theme}>
+              <div className="flex flex-wrap gap-3">
+                <Stat label="API tests" value={testCount(task.passedApiTests)} theme={theme} />
+                <Stat label="QA tests" value={testCount(task.passedQaTests)} theme={theme} />
+                <Stat label="Acceptance criteria" value={testCount(task.passedAcceptanceCriteria)} theme={theme} />
+              </div>
+            </Field>
+
+            <Field label="Assignees" theme={theme}>
+              {task.assignees.length ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {task.assignees.map((a) => (
+                    <span key={a.discordId} className={c('text-[11px] font-semibold px-2.5 py-1 rounded-full', chipIndigo(theme))}>
+                      <Avatar person={a} size={18} theme={theme} />
+                      {a.name}
+                    </span>
+                  ))}
+                </div>
+              ) : <p className={c('text-sm m-0', muted(theme))}>Unassigned</p>}
+            </Field>
+
+            {task.blockedBy.length > 0 && (
+              <Field label="Blocked by" theme={theme}>
+                <RefList refs={task.blockedBy} theme={theme} search={search} />
+              </Field>
+            )}
+
+            {task.blocks.length > 0 && (
+              <Field label="Blocks" theme={theme}>
+                <RefList refs={task.blocks} theme={theme} search={search} />
+              </Field>
+            )}
+
+            <div className="mt-6 mb-5 grid gap-4 sm:grid-cols-2">
+              <Field label="Created by" theme={theme}>
+                <UserCard actor={task.createdBy} caption={created} theme={theme} />
+              </Field>
+              <Field label="Last updated by" theme={theme}>
+                {task.updatedBy
+                  ? <UserCard actor={task.updatedBy} caption={[relativeTime(task.updatedBy.at) ?? updated, task.updatedBy.viaSite ? 'via the site' : null].filter(Boolean).join(' · ') || null} theme={theme} />
+                  : <p className={c('text-sm m-0', muted(theme))}>{updated ? `No edits recorded yet · last change ${updated}` : 'No edits recorded yet'}</p>}
+              </Field>
             </div>
-          ) : <p className={c('text-sm m-0', muted(theme))}>Unassigned</p>}
-        </Field>
 
-        {task.blockedBy.length > 0 && (
-          <Field label="Blocked by" theme={theme}>
-            <RefList refs={task.blockedBy} theme={theme} search={search} />
-          </Field>
-        )}
+            <Field label="History" theme={theme}>
+              <TaskHistory task={task} theme={theme} />
+            </Field>
 
-        {task.blocks.length > 0 && (
-          <Field label="Blocks" theme={theme}>
-            <RefList refs={task.blocks} theme={theme} search={search} />
-          </Field>
-        )}
-
-        <div className="mt-6 mb-5 grid gap-4 sm:grid-cols-2">
-          <Field label="Created by" theme={theme}>
-            <UserCard actor={task.createdBy} caption={created} theme={theme} />
-          </Field>
-          <Field label="Last updated by" theme={theme}>
-            {task.updatedBy
-              ? <UserCard actor={task.updatedBy} caption={[relativeTime(task.updatedBy.at) ?? updated, task.updatedBy.viaSite ? 'via the site' : null].filter(Boolean).join(' · ') || null} theme={theme} />
-              : <p className={c('text-sm m-0', muted(theme))}>{updated ? `No edits recorded yet · last change ${updated}` : 'No edits recorded yet'}</p>}
-          </Field>
-        </div>
-
-        <Field label="History" theme={theme}>
-          <TaskHistory task={task} theme={theme} />
-        </Field>
-
-        {task.channelUrl && (
-          <a href={task.channelUrl} target="_blank" rel="noreferrer"
-            className={c('btn-outline-indigo inline-flex items-center gap-2 px-5 py-2.5 text-sm mt-5 no-underline', d ? 'dark-variant' : '')}>
-            <ExternalLink size={14} /> Open the Discord channel
-          </a>
+            {task.channelUrl && (
+              <a href={task.channelUrl} target="_blank" rel="noreferrer"
+                className={c('btn-outline-indigo inline-flex items-center gap-2 px-5 py-2.5 text-sm mt-5 no-underline', d ? 'dark-variant' : '')}>
+                <ExternalLink size={14} /> Open the Discord channel
+              </a>
+            )}
+          </>
         )}
       </article>
+      {toast && <Toast key={toast.seq} message={toast.message} tone={toast.tone} onClose={() => setToast(null)} />}
     </>
   )
 }

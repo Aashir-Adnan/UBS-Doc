@@ -50,8 +50,12 @@ export interface TeamProjectRef { id: string; name: string; docsSlug: string | n
 export interface TeamMember {
   discordId: string; name: string; username: string | null; avatarUrl?: string; roleNames: string[]
   status: string; verified: boolean; projects: TeamProjectRef[]
+  // 'client' for a client account; absent from an older backend (treat as staff).
+  kind?: 'staff' | 'client'
 }
-export interface TasksPayload { generatedAt: string; projects: ProjectGroup[]; members: TeamMember[] }
+export interface RepoRef { id: string; name: string; url: string }
+// `repositories` feeds the create form; absent from an older backend.
+export interface TasksPayload { generatedAt: string; projects: ProjectGroup[]; members: TeamMember[]; repositories?: RepoRef[] }
 
 // Flattens every task across every project group into one list, in group then
 // in-group order — the shape graph/board/team logic operate on when they need

@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ExternalLink, Ban, ListChecks, Clock } from 'lucide-react'
+import { ExternalLink, Ban, ListChecks, Clock, Plus } from 'lucide-react'
 import { c, card, txt, muted, chipRed, chipGray, chipIndigo } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
@@ -11,6 +11,7 @@ import {
 import { toneChip } from './chips'
 import DependencyGraph from './DependencyGraph'
 import { useTeam } from './TeamLayout'
+import { useActingPermissions } from '../../components/portal/tenantProjects/useActingPermissions'
 import Avatar, { AvatarStack } from './Avatar'
 import ScopeBadge from './ScopeBadge'
 import { whoLine } from './activityLogic'
@@ -26,12 +27,20 @@ export default function TasksList() {
   const { payload, loading, error, filters, setFilter } = useTeam()
   const { search } = useLocation()
   const projects = payload?.projects ?? []
+  const canCreate = useActingPermissions().has('update_discord_tasks')
 
   const visible = useMemo(() => applyFilters(projects, filters), [projects, filters])
   const unknownSlug = useMemo(() => unknownProjectSlug(projects, filters.projectSlug), [projects, filters.projectSlug])
 
   return (
     <>
+      {canCreate && (
+        <div className="flex justify-end mb-4">
+          <Link to={`/tools/team/tasks/new${search}`} className="btn-primary px-4 py-2 text-sm no-underline inline-flex items-center gap-2">
+            <Plus size={14} /> New task
+          </Link>
+        </div>
+      )}
       {!loading && !error && unknownSlug && (
         <div className={c(card(theme), 'rounded-2xl px-8 py-14 text-center')}>
           <p className={c('text-sm font-medium mb-4', muted(theme))}>
@@ -59,6 +68,7 @@ function ProjectCard({ p, theme, search }: { p: ProjectGroup; theme: Theme; sear
   const d = theme === 'dark'
   const [showGraph, setShowGraph] = useState(false)
   const hasEdges = p.tasks.some((t) => t.blockedBy.length > 0 || t.blocks.length > 0)
+  const canCreate = useActingPermissions().has('update_discord_tasks')
   return (
     <section className={c(card(theme), 'rounded-2xl p-5 sm:p-6')}>
       <div className="flex flex-wrap items-baseline justify-between gap-3 mb-3">
@@ -67,6 +77,14 @@ function ProjectCard({ p, theme, search }: { p: ProjectGroup; theme: Theme; sear
           <p className={c('text-xs font-semibold', muted(theme))}>
             {p.counts.open} open · {p.counts.in_progress} in progress · {p.counts.done} done{p.counts.blocked ? ` · ${p.counts.blocked} blocked` : ''}
           </p>
+          {canCreate && p.id && (
+            <Link to={`/tools/team/tasks/new?projectId=${encodeURIComponent(p.id)}`}
+              className={c('inline-flex items-center gap-1 text-xs font-semibold no-underline px-2.5 py-1 rounded-lg tr',
+                theme === 'dark' ? 'text-indigo-300 hover:bg-white/8' : 'text-indigo-600 hover:bg-indigo-50')}
+              title={`New task in ${p.name}`}>
+              <Plus size={12} /> Task
+            </Link>
+          )}
           {hasEdges && (
             <button
               type="button"

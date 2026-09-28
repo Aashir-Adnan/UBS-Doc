@@ -148,3 +148,69 @@ export async function setTaskStatus(taskId: string, status: string): Promise<Set
     body: JSON.stringify({ task_id: taskId, status }),
   })
 }
+
+// The site's edit, create and add-subtask. CSAAS checks update_discord_tasks and
+// the request's shape; the Discord bot applies the same rules /update-task and
+// /create-task use and answers with a sentence when it refuses, which apiCall
+// surfaces as ApiError.message (status on ApiError.status).
+
+// Only the fields that changed; an absent key means "leave it alone".
+export interface TaskChanges {
+  status?: string
+  title?: string
+  description?: string | null
+  scope?: string | null
+  implementation_status?: string
+  project_id?: string | null
+  holder_ids?: string[]
+  passed_api_tests?: number
+  passed_qa_tests?: number
+  passed_acceptance_criteria?: number
+  estimate?: string | null
+  blocker_ids?: string[]
+}
+export interface UpdateTaskResult { task: { id: string; status: string }; warning: string; lines: string[]; unchanged: boolean }
+
+export async function updateTask(taskId: string, changes: TaskChanges): Promise<UpdateTaskResult> {
+  return apiCall<UpdateTaskResult>('/discord/tasks/update', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ task_id: taskId, changes }),
+  })
+}
+
+export interface CreateTaskInput {
+  type: 'feature' | 'bug'
+  title: string
+  description: string | null
+  project_id: string
+  scope: string | null
+  modules: string[]
+  holder_ids: string[]
+  repository_ids: string[]
+  tracks: { api_tests: boolean; qa_tests: boolean; acceptance_criteria: boolean }
+}
+export interface CreateTaskResult {
+  task: { id: string; type: string; status: string; projectId: string }
+  channelId: string | null
+  fellBack: 'cap' | 'missing' | null
+  note: string
+}
+
+export async function createTask(input: CreateTaskInput): Promise<CreateTaskResult> {
+  return apiCall<CreateTaskResult>('/discord/tasks/create', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+}
+
+export interface AddSubtaskResult { task: { id: string; status: string; parentId: string } }
+
+export async function addSubtask(parentId: string, title: string, holderIds: string[]): Promise<AddSubtaskResult> {
+  return apiCall<AddSubtaskResult>('/discord/tasks/subtask', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ parent_id: parentId, title, holder_ids: holderIds }),
+  })
+}
