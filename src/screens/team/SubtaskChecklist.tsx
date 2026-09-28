@@ -49,7 +49,7 @@ export default function SubtaskChecklist({ task, theme, search, canToggle, busyI
                 role="checkbox"
                 aria-checked={done}
                 aria-label={`${done ? 'Reopen' : 'Finish'} ${s.title}`}
-                disabled={!canToggle || busy}
+                disabled={!canToggle || busy || !!s.hidden}
                 onClick={() => onToggle(s.id)}
                 title={canToggle ? (done ? 'Reopen this subtask' : 'Mark this subtask done') : 'You need permission to update tasks'}
                 className={c(
@@ -63,12 +63,19 @@ export default function SubtaskChecklist({ task, theme, search, canToggle, busyI
               >
                 <Check size={13} strokeWidth={3} />
               </button>
-              <Link
-                to={`/tools/team/tasks/${s.id}${search}`}
-                className={c('flex-1 min-w-0 text-sm font-semibold no-underline hover:underline truncate', done ? muted(theme) : txt(theme), done ? 'line-through' : '')}
-              >
-                {s.title}
-              </Link>
+              {s.hidden
+                ? (
+                  <span className={c('flex-1 min-w-0 text-sm font-semibold truncate', done ? muted(theme) : txt(theme), done ? 'line-through' : '')}>
+                    {s.title}
+                  </span>
+                ) : (
+                  <Link
+                    to={`/tools/team/tasks/${s.id}${search}`}
+                    className={c('flex-1 min-w-0 text-sm font-semibold no-underline hover:underline truncate', done ? muted(theme) : txt(theme), done ? 'line-through' : '')}
+                  >
+                    {s.title}
+                  </Link>
+                )}
               <AvatarStack people={s.assignees} size={22} theme={theme} />
               <span className={c('text-[11px] font-semibold shrink-0', muted(theme))}>{STATUS_LABEL[s.status] ?? s.status}</span>
             </li>

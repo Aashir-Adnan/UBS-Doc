@@ -9,6 +9,8 @@ import { useTheme } from '../../app/ThemeContext'
 import { fetchDiscordTasks } from '../../components/discordTasks/api'
 import { applyFilters, DEFAULT_FILTERS, type Filters, type TasksPayload } from '../tasksLogic'
 import { activeTab, TEAM_TABS } from './teamNav'
+import LinkCard from './LinkCard'
+import { needsLink, viewerLine } from './identityLogic'
 
 // The Team section shell: one fetch of GET /api/discord/tasks shared by every
 // tab (People, Tasks, Board and task detail), the tab bar, the filter bar and
@@ -90,6 +92,8 @@ export default function TeamLayout() {
 
   const tab = activeTab(pathname)
   const context: TeamContext = { payload, loading, error, refresh, filters, setFilter, people, timeSelfScoped, setTimeSelfScoped }
+  const showLinkCard = needsLink(payload)
+  const viewerText = viewerLine(payload?.viewer)
 
   // Which of the shared controls apply on this tab. Status is a tasks-list
   // concept; search and Blocked-only act on the tasks payload, which the
@@ -109,6 +113,7 @@ export default function TeamLayout() {
             <p className={c('text-sm font-medium', muted(theme))}>
               {payload?.members.length ?? 0} {payload?.members.length === 1 ? 'person' : 'people'} · {total} task{total === 1 ? '' : 's'} · {blocked} blocked
             </p>
+            {viewerText && <p className={c('text-xs font-semibold mt-1 mb-0', muted(theme))}>{viewerText}</p>}
           </div>
           <div className="flex items-center gap-3">
             {/* The search box filters the shared tasks payload — meaningless
@@ -173,7 +178,7 @@ export default function TeamLayout() {
           </div>
         )}
 
-        <Outlet context={context} />
+        {showLinkCard ? <LinkCard theme={theme} onLinked={refresh} /> : <Outlet context={context} />}
       </div>
     </div>
   )
