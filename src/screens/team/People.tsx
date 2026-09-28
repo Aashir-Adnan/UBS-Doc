@@ -6,6 +6,7 @@ import { allTasks, applyFilters, roleLabel, type TaskRow, type TeamMember } from
 import { filterMembers, memberWorkload, sortMembers } from './teamLogic'
 import { useTeam } from './TeamLayout'
 import Avatar from './Avatar'
+import IdentityLinks from './IdentityLinks'
 
 // The People tab: the guild directory as cards, busiest first. Everything
 // comes from the payload TeamLayout fetched — this screen never calls the API.
@@ -56,6 +57,7 @@ export default function People() {
 
   return (
     <>
+      {payload?.viewer?.isAdmin && <IdentityLinks theme={theme} />}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <label className={c('flex items-center gap-2 text-xs font-semibold cursor-pointer', muted(theme))}>
           <input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} />
