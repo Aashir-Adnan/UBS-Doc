@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { TasksPayload } from '../tasksLogic'
-import { needsLink, viewerLine, normalizeCode, codeProblem, linkErrorText } from './identityLogic'
+import { needsLink, showsLinkCard, viewerLine, normalizeCode, codeProblem, linkErrorText } from './identityLogic'
 
 const base = { generatedAt: '', projects: [], members: [] } as TasksPayload
 
@@ -11,6 +11,25 @@ describe('needsLink', () => {
     expect(needsLink({ ...base, viewer: { linked: false, seesAll: false, isAdmin: false, discordIds: [], name: null } })).toBe(true)
     expect(needsLink({ ...base, viewer: { linked: false, seesAll: true, isAdmin: true, discordIds: [], name: null } })).toBe(false)
     expect(needsLink({ ...base, viewer: { linked: true, seesAll: false, isAdmin: false, discordIds: ['1'], name: 'Ana' } })).toBe(false)
+  })
+})
+
+describe('showsLinkCard', () => {
+  const unlinked = { ...base, viewer: { linked: false, seesAll: false, isAdmin: false, discordIds: [], name: null } }
+  it('replaces People, Tasks and Board for an unlinked caller', () => {
+    expect(showsLinkCard(unlinked, 'people')).toBe(true)
+    expect(showsLinkCard(unlinked, 'tasks')).toBe(true)
+    expect(showsLinkCard(unlinked, 'board')).toBe(true)
+  })
+  it('never replaces Time or Stats (they follow view_discord_time, not the link)', () => {
+    expect(showsLinkCard(unlinked, 'time')).toBe(false)
+    expect(showsLinkCard(unlinked, 'stats')).toBe(false)
+  })
+  it('never shows when no link is needed', () => {
+    expect(showsLinkCard(null, 'people')).toBe(false)
+    expect(showsLinkCard(base, 'tasks')).toBe(false)
+    expect(showsLinkCard({ ...base, viewer: { linked: true, seesAll: false, isAdmin: false, discordIds: ['1'], name: 'Ana' } }, 'board')).toBe(false)
+    expect(showsLinkCard({ ...base, viewer: { linked: false, seesAll: true, isAdmin: true, discordIds: [], name: null } }, 'people')).toBe(false)
   })
 })
 

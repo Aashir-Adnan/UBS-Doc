@@ -10,7 +10,7 @@ import { fetchDiscordTasks } from '../../components/discordTasks/api'
 import { applyFilters, DEFAULT_FILTERS, type Filters, type TasksPayload } from '../tasksLogic'
 import { activeTab, TEAM_TABS } from './teamNav'
 import LinkCard from './LinkCard'
-import { needsLink, viewerLine } from './identityLogic'
+import { showsLinkCard, viewerLine } from './identityLogic'
 import { normalizePayload } from './payloadLogic'
 
 // The Team section shell: one fetch of GET /api/discord/tasks shared by every
@@ -89,7 +89,9 @@ export default function TeamLayout() {
 
   const tab = activeTab(pathname)
   const context: TeamContext = { payload, loading, error, refresh, filters, setFilter, people, timeSelfScoped, setTimeSelfScoped }
-  const showLinkCard = needsLink(payload)
+  // Only on People, Tasks and Board: Time and Stats follow view_discord_time,
+  // not the link, so an unlinked caller still reaches them.
+  const showLinkCard = showsLinkCard(payload, tab)
   const viewerText = viewerLine(payload?.viewer)
 
   // Which of the shared controls apply on this tab. Status is a tasks-list
@@ -126,25 +128,26 @@ export default function TeamLayout() {
           </div>
         </div>
 
-        {/* Tabs and filters lead to tabs — dead weight over the link card,
-            which replaces the Outlet with nothing to filter. */}
+        {/* Tabs are links, not state: each keeps the current query string so a
+            project or assignee filter survives the hop between tabs. Always
+            shown — an unlinked caller still reaches Time and Stats from here. */}
+        <div className={c('flex border-b mb-6 overflow-x-auto', d ? 'border-white/8' : 'border-slate-200')}>
+          {TEAM_TABS.map((t) => (
+            <Link key={t.key} to={`${t.path}${search}`}
+              className={c(
+                'flex-shrink-0 px-5 py-3 text-sm font-semibold relative tr whitespace-nowrap no-underline',
+                tab === t.key ? 'text-indigo-500' : d ? 'text-white/35 hover:text-white/65' : 'text-slate-400 hover:text-slate-700',
+              )}>
+              {t.label}
+              {tab === t.key && <div className="absolute bottom-0 inset-x-0 h-0.5 bg-indigo-500 rounded-t" />}
+            </Link>
+          ))}
+        </div>
+
+        {/* Filters are dead weight over the link card, which replaces the
+            Outlet with nothing to filter; everywhere else they show. */}
         {!showLinkCard && (
           <>
-            {/* Tabs are links, not state: each keeps the current query string so a
-                project or assignee filter survives the hop between tabs. */}
-            <div className={c('flex border-b mb-6 overflow-x-auto', d ? 'border-white/8' : 'border-slate-200')}>
-              {TEAM_TABS.map((t) => (
-                <Link key={t.key} to={`${t.path}${search}`}
-                  className={c(
-                    'flex-shrink-0 px-5 py-3 text-sm font-semibold relative tr whitespace-nowrap no-underline',
-                    tab === t.key ? 'text-indigo-500' : d ? 'text-white/35 hover:text-white/65' : 'text-slate-400 hover:text-slate-700',
-                  )}>
-                  {t.label}
-                  {tab === t.key && <div className="absolute bottom-0 inset-x-0 h-0.5 bg-indigo-500 rounded-t" />}
-                </Link>
-              ))}
-            </div>
-
             {/* Project and Assignee apply everywhere; the rest only where the tasks payload is what is on screen. */}
             <div className="flex flex-wrap items-center gap-3 mb-6">
               {/* Status is a tasks-list concept: the board has its own columns and

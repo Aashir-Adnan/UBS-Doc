@@ -1,4 +1,5 @@
 import type { TasksPayload, Viewer } from '../tasksLogic'
+import type { TeamTabKey } from './teamNav'
 
 // The link card and the "signed in as" line (identity link, 2026-09-28). The
 // backend decides who is linked; this only turns its `viewer` into what to show.
@@ -11,6 +12,15 @@ const CODE_RE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/
 export function needsLink(payload: TasksPayload | null | undefined): boolean {
   const v = payload?.viewer
   return !!v && !v.linked && !v.seesAll
+}
+
+// Only the tabs built on the tasks payload (People, Tasks, Board) need a
+// link. Time and Stats follow view_discord_time, not the link, so they stay
+// reachable while unlinked (the card never replaces them).
+const LINKED_TABS: ReadonlySet<TeamTabKey> = new Set<TeamTabKey>(['people', 'tasks', 'board'])
+
+export function showsLinkCard(payload: TasksPayload | null | undefined, tab: TeamTabKey): boolean {
+  return needsLink(payload) && LINKED_TABS.has(tab)
 }
 
 export function viewerLine(viewer: Viewer | undefined): string | null {
