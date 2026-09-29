@@ -80,8 +80,31 @@ export function findTask(payload: TasksPayload, id: string): { task: TaskRow; pr
 }
 
 export type StatusFilter = 'all' | 'active' | 'done'
-export interface Filters { status: StatusFilter; projectSlug: string | null; assigneeId: string | null; blockedOnly: boolean; query: string }
-export const DEFAULT_FILTERS: Filters = { status: 'all', projectSlug: null, assigneeId: null, blockedOnly: false, query: '' }
+// A task's discipline, as a filter. 'none' is a task with no fixed scope:
+// unset, blank, or free text from before 2026-09-29.
+export type ScopeFilter = 'all' | 'backend' | 'frontend' | 'qa' | 'design' | 'none'
+export const SCOPE_FILTERS: { value: ScopeFilter; label: string }[] = [
+  { value: 'all', label: 'All scopes' },
+  { value: 'backend', label: 'Backend' },
+  { value: 'frontend', label: 'Frontend' },
+  { value: 'qa', label: 'QA' },
+  { value: 'design', label: 'Design' },
+  { value: 'none', label: 'No scope' },
+]
+export interface Filters { status: StatusFilter; projectSlug: string | null; assigneeId: string | null; blockedOnly: boolean; query: string; scope: ScopeFilter }
+export const DEFAULT_FILTERS: Filters = { status: 'all', projectSlug: null, assigneeId: null, blockedOnly: false, query: '', scope: 'all' }
+
+// `?scope=` from the address bar; anything unknown (a typo, an old link) is 'all'.
+export const parseScopeFilter = (v: string | null | undefined): ScopeFilter =>
+  SCOPE_FILTERS.find((o) => o.value === v)?.value ?? 'all'
+
+// The Scope control shows on these tabs only, so the filter applies only there.
+export const scopeAppliesOn = (tab: string): boolean => tab === 'tasks' || tab === 'board'
+
+// People counts open work per member: only the project narrows the tasks it
+// counts; the member-side filters (and scope, which has no control there) do not.
+export const peopleCorpusFilters = (f: Filters): Filters =>
+  ({ ...f, status: 'all', assigneeId: null, blockedOnly: false, query: '', scope: 'all' })
 
 const TERMINAL = new Set(['closed', 'done', 'resolved'])
 export const isTerminal = (s: string) => TERMINAL.has(s)
@@ -97,6 +120,7 @@ export function applyFilters(projects: ProjectGroup[], f: Filters): ProjectGroup
         if (f.status === 'done' && !isTerminal(t.status)) return false
         if (f.assigneeId && !t.assignees.some((a) => a.discordId === f.assigneeId)) return false
         if (f.blockedOnly && !t.isBlocked) return false
+        if (f.scope !== 'all' && (fixedScope(t.scope) ?? 'none') !== f.scope) return false
         if (needle && !(t.title ?? '').toLowerCase().includes(needle)) return false
         return true
       }),
@@ -152,4 +176,10 @@ export type ScopeTone = 'backend' | 'frontend' | 'qa' | 'design' | 'other'
 export const scopeTone = (scope: string | null | undefined): ScopeTone => {
   const s = (scope ?? '').trim()
   return isFixedScope(s) ? (s as ScopeTone) : 'other'
+}
+
+// The fixed scope a task carries, or null (unset, blank, or legacy free text).
+export const fixedScope = (scope: string | null | undefined): 'backend' | 'frontend' | 'qa' | 'design' | null => {
+  const s = (scope ?? '').trim().toLowerCase()
+  return isFixedScope(s) ? (s as 'backend' | 'frontend' | 'qa' | 'design') : null
 }

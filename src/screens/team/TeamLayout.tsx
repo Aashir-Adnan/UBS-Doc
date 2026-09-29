@@ -7,7 +7,7 @@ import { c, muted, Breadcrumb } from '../../lib'
 import FilterSelect from './FilterSelect'
 import { useTheme } from '../../app/ThemeContext'
 import { fetchDiscordTasks } from '../../components/discordTasks/api'
-import { applyFilters, DEFAULT_FILTERS, type Filters, type TasksPayload } from '../tasksLogic'
+import { applyFilters, DEFAULT_FILTERS, SCOPE_FILTERS, parseScopeFilter, scopeAppliesOn, type Filters, type TasksPayload } from '../tasksLogic'
 import { activeTab, TEAM_TABS } from './teamNav'
 import LinkCard from './LinkCard'
 import { showsLinkCard, viewerLine } from './identityLogic'
@@ -48,7 +48,7 @@ export default function TeamLayout() {
   const [payload, setPayload] = useState<TasksPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [filters, setFilters] = useState<Filters>({ ...DEFAULT_FILTERS, projectSlug: params.get('project') })
+  const [filters, setFilters] = useState<Filters>({ ...DEFAULT_FILTERS, projectSlug: params.get('project'), scope: parseScopeFilter(params.get('scope')) })
   const [timeSelfScoped, setTimeSelfScoped] = useState(false)
 
   const refresh = useCallback(async () => {
@@ -62,20 +62,28 @@ export default function TeamLayout() {
   }, [])
   useEffect(() => { void refresh() }, [refresh])
 
-  // Only the project filter is mirrored into the URL (`?project=`) — that is
-  // the one Projects.tsx deep-links into, and the one Tasks.tsx already synced.
+  // The project and scope filters are mirrored into the URL (`?project=`,
+  // `?scope=`): Projects.tsx deep-links into the first, and both survive the
+  // hop between tabs and can be shared.
   const setFilter = useCallback((patch: Partial<Filters>) => {
     const next = { ...filters, ...patch }
     setFilters(next)
-    if ('projectSlug' in patch) {
+    if ('projectSlug' in patch || 'scope' in patch) {
       const p = new URLSearchParams(params)
       if (next.projectSlug) p.set('project', next.projectSlug); else p.delete('project')
+      if (next.scope !== 'all') p.set('scope', next.scope); else p.delete('scope')
       setParams(p, { replace: true })
     }
   }, [filters, params, setParams])
 
   const projects = payload?.projects ?? []
-  const visible = useMemo(() => applyFilters(projects, filters), [projects, filters])
+  const tab = activeTab(pathname)
+  // The header counts follow what is filterable on this tab: scope has no
+  // control on People, Time or Stats, so it does not narrow them.
+  const visible = useMemo(
+    () => applyFilters(projects, scopeAppliesOn(tab) ? filters : { ...filters, scope: 'all' }),
+    [projects, filters, tab],
+  )
   // The roster, not `assigneeOptions(projects)`: people log time on general
   // work and on tasks they are not assigned to, so a Time/Stats person filter
   // built from assignees would be missing people who have data. On Tasks, a
@@ -87,7 +95,6 @@ export default function TeamLayout() {
   const total = visible.reduce((n, p) => n + p.tasks.length, 0)
   const blocked = visible.reduce((n, p) => n + p.tasks.filter((t) => t.isBlocked).length, 0)
 
-  const tab = activeTab(pathname)
   const context: TeamContext = { payload, loading, error, refresh, filters, setFilter, people, timeSelfScoped, setTimeSelfScoped }
   // Only on People, Tasks and Board: Time and Stats follow view_discord_time,
   // not the link, so an unlinked caller still reaches them.
@@ -161,6 +168,11 @@ export default function TeamLayout() {
                 <option value="">All projects</option>
                 {projects.filter((p) => p.docsSlug).map((p) => <option key={p.docsSlug!} value={p.docsSlug!}>{p.name}</option>)}
               </FilterSelect>
+              {scopeAppliesOn(tab) && (
+                <FilterSelect label="Scope" theme={theme} value={filters.scope} onChange={(v) => setFilter({ scope: parseScopeFilter(v) })}>
+                  {SCOPE_FILTERS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </FilterSelect>
+              )}
               {showAssignee && (
                 <FilterSelect label="Assignee" theme={theme} value={filters.assigneeId ?? ''} onChange={(v) => setFilter({ assigneeId: v || null })}>
                   <option value="">Anyone</option>
