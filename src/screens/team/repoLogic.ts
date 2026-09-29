@@ -1,5 +1,5 @@
 import type { ProjectRepoLink, RepoRef } from '../tasksLogic'
-import { SCOPE_LABEL } from '../tasksLogic'
+import { SCOPE_LABEL, scopeLabel } from '../tasksLogic'
 
 // Which repository a task's GitHub issue goes to — the site's half of the
 // same rule the bot applies (bot/src/services/taskRepo.js, roadmap sub-project
@@ -35,6 +35,24 @@ export function resolveTaskRepo(
   }
   if (mine.length === 1 && !mine[0].scope) return { repository: byId.get(String(mine[0].repositoryId))!, reason: 'only-repo' }
   return { repository: null, reason: scope ? 'no-repo-for-scope' : 'no-scope' }
+}
+
+/**
+ * The create page's "Issue goes to …" line, mirroring the bot's confirm-step
+ * text (bot/src/commands/create-task.js `repositoryFieldText`): the scope
+ * parenthetical is shown only when `reason === 'scope'` actually chose the
+ * repository by scope — the rule-2 fallback ('only-repo') found it because
+ * it was the project's only, untagged link, which says nothing about the
+ * task's own scope, so showing that scope next to it would imply routing
+ * that did not happen.
+ */
+export function issueTargetText(
+  result: { repository: RepoRef | null; reason: RepoReason },
+  scope: string | null | undefined,
+): string {
+  if (!result.repository) return 'No repository for this project and scope — no issue'
+  const label = result.reason === 'scope' ? scopeLabel(scope) : null
+  return label ? `Issue goes to ${result.repository.name} (${label})` : `Issue goes to ${result.repository.name}`
 }
 
 // One project's links as `{ name, scope }[]`, sorted by scope display order

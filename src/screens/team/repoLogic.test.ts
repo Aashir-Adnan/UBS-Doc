@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveTaskRepo, repoReasonText, projectRepoList } from './repoLogic'
+import { resolveTaskRepo, repoReasonText, projectRepoList, issueTargetText } from './repoLogic'
 import type { RepoRef, ProjectRepoLink } from '../tasksLogic'
 
 // Mirrors the bot's rule tests (bot/src/services/taskRepo.test.js) — same
@@ -49,6 +49,27 @@ describe('repoReasonText', () => {
     expect(repoReasonText('no-project')).toBe('the task has no project')
     expect(repoReasonText('no-scope')).toBe('the task has no scope')
     expect(repoReasonText('no-repo-for-scope')).toBe('the project has no repository for this scope')
+  })
+})
+
+describe('issueTargetText', () => {
+  // Mirrors the bot's repositoryFieldText test (create-task.test.js): the
+  // scope parenthetical appears only when the scope rule (reason 'scope')
+  // is what chose the repository, never for the rule-2 'only-repo' fallback,
+  // regardless of whether the task itself carries a scope.
+  it('adds the scope only when the scope rule chose the repository', () => {
+    expect(issueTargetText({ repository: R1, reason: 'scope' }, 'frontend')).toBe('Issue goes to Framework_Node (Frontend)')
+  })
+
+  it('the only-repo fallback shows the bare name, whether or not the task has a scope', () => {
+    expect(issueTargetText({ repository: R1, reason: 'only-repo' }, 'frontend')).toBe('Issue goes to Framework_Node')
+    expect(issueTargetText({ repository: R1, reason: 'only-repo' }, null)).toBe('Issue goes to Framework_Node')
+  })
+
+  it('no repository resolved: the refusal line, regardless of reason', () => {
+    expect(issueTargetText({ repository: null, reason: 'no-repo-for-scope' }, 'frontend')).toBe('No repository for this project and scope — no issue')
+    expect(issueTargetText({ repository: null, reason: 'no-scope' }, null)).toBe('No repository for this project and scope — no issue')
+    expect(issueTargetText({ repository: null, reason: 'no-project' }, null)).toBe('No repository for this project and scope — no issue')
   })
 })
 

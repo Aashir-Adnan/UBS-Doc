@@ -6,10 +6,9 @@ import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
 import { createTask } from '../../components/discordTasks/api'
 import { useActingPermissions } from '../../components/portal/tenantProjects/useActingPermissions'
-import { scopeLabel } from '../tasksLogic'
 import { useTeam } from './TeamLayout'
 import MemberPicker from './MemberPicker'
-import { resolveTaskRepo } from './repoLogic'
+import { issueTargetText, resolveTaskRepo } from './repoLogic'
 import { SCOPE_OPTIONS, createErrorText, createPayload, emptyCreateForm, validateCreateForm, type CreateForm } from './taskFormLogic'
 
 // A new Feature or Bug, made by the Discord bot exactly as /create-task makes
@@ -32,10 +31,11 @@ export default function TaskCreate() {
   // Which repository this task's GitHub issue would go to, by the same rule
   // the bot applies (repoLogic.ts / bot's taskRepo.js) — recomputed whenever
   // the project or scope changes.
-  const resolvedRepo = useMemo(
-    () => resolveTaskRepo({ projectId: form.projectId || null, scope: form.scope || null }, { projectRepos: payload?.projectRepos, repositories: payload?.repositories }).repository,
+  const repoResult = useMemo(
+    () => resolveTaskRepo({ projectId: form.projectId || null, scope: form.scope || null }, { projectRepos: payload?.projectRepos, repositories: payload?.repositories }),
     [payload, form.projectId, form.scope],
   )
+  const resolvedRepo = repoResult.repository
 
   // `?project=<docsSlug>` (the Tasks list's filter) preselects once the payload has the slugs.
   useEffect(() => {
@@ -129,11 +129,7 @@ export default function TaskCreate() {
           )}
 
           <Labeled label="GitHub" theme={theme}>
-            <p className={c('text-sm m-0 mb-2', muted(theme))}>
-              {resolvedRepo
-                ? <>Issue goes to <strong className={txt(theme)}>{resolvedRepo.name}</strong> ({scopeLabel(form.scope) ?? 'No scope'})</>
-                : 'No repository for this project and scope — no issue'}
-            </p>
+            <p className={c('text-sm m-0 mb-2', muted(theme))}>{issueTargetText(repoResult, form.scope || null)}</p>
             <label className={c('inline-flex items-center gap-2 text-sm', txt(theme))}>
               <input type="checkbox" checked={!!resolvedRepo && form.createIssue} disabled={saving || !resolvedRepo}
                 onChange={(e) => set('createIssue', e.target.checked)} />
