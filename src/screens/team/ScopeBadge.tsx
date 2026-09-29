@@ -1,4 +1,4 @@
-import { c, chipIndigo, chipMint, chipAmber, chipViolet, chipGray } from '../../lib'
+import { c, chipIndigo, chipMint, chipSky, chipAmber, chipViolet, chipGray } from '../../lib'
 import type { Theme } from '../../types'
 import { scopeLabel, scopeTone, type ScopeTone } from '../tasksLogic'
 
@@ -6,6 +6,7 @@ import { scopeLabel, scopeTone, type ScopeTone } from '../tasksLogic'
 const TONE_CHIP: Record<ScopeTone, (t: Theme) => string> = {
   backend: chipIndigo,
   frontend: chipMint,
+  mobile: chipSky,
   qa: chipAmber,
   design: chipViolet,
   other: chipGray,

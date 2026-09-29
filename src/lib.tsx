@@ -59,6 +59,12 @@ export function chipViolet(theme: Theme) {
     : 'chip bg-violet-50 text-violet-600 border border-violet-100'
 }
 
+export function chipSky(theme: Theme) {
+  return theme === 'dark'
+    ? 'chip bg-sky-500/15 text-sky-300 border border-sky-500/20'
+    : 'chip bg-sky-50 text-sky-600 border border-sky-100'
+}
+
 export function chipGray(theme: Theme) {
   return theme === 'dark'
     ? 'chip bg-white/6 text-white/45 border border-white/8'

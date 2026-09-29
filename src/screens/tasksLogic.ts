@@ -56,10 +56,19 @@ export interface TeamMember {
   kind?: 'staff' | 'client'
 }
 export interface RepoRef { id: string; name: string; url: string }
+// One project's link to a repository, tagged with a scope or none (a
+// single-repository project's only link, still untagged). Feeds `repoLogic`
+// (which repo a task's GitHub issue goes to) and the project cards' summary.
+export interface ProjectRepoLink { projectId: string; repositoryId: string; scope: string | null }
 // Who is looking (identity link). Absent from an older backend: behave as before.
 export interface Viewer { linked: boolean; seesAll: boolean; isAdmin: boolean; discordIds: string[]; name: string | null }
 // `repositories` feeds the create form; absent from an older backend.
-export interface TasksPayload { generatedAt: string; projects: ProjectGroup[]; members: TeamMember[]; repositories?: RepoRef[]; viewer?: Viewer }
+// `projectRepos` is only for projects the viewer can see; absent from an
+// older backend (treat as `[]`, same as a project with no links).
+export interface TasksPayload {
+  generatedAt: string; projects: ProjectGroup[]; members: TeamMember[]
+  repositories?: RepoRef[]; projectRepos?: ProjectRepoLink[]; viewer?: Viewer
+}
 
 // Flattens every task across every project group into one list, in group then
 // in-group order — the shape graph/board/team logic operate on when they need
@@ -82,11 +91,12 @@ export function findTask(payload: TasksPayload, id: string): { task: TaskRow; pr
 export type StatusFilter = 'all' | 'active' | 'done'
 // A task's discipline, as a filter. 'none' is a task with no fixed scope:
 // unset, blank, or free text from before 2026-09-29.
-export type ScopeFilter = 'all' | 'backend' | 'frontend' | 'qa' | 'design' | 'none'
+export type ScopeFilter = 'all' | 'backend' | 'frontend' | 'mobile' | 'qa' | 'design' | 'none'
 export const SCOPE_FILTERS: { value: ScopeFilter; label: string }[] = [
   { value: 'all', label: 'All scopes' },
   { value: 'backend', label: 'Backend' },
   { value: 'frontend', label: 'Frontend' },
+  { value: 'mobile', label: 'Mobile' },
   { value: 'qa', label: 'QA' },
   { value: 'design', label: 'Design' },
   { value: 'none', label: 'No scope' },
@@ -162,24 +172,26 @@ export const ROLE_LABEL: Record<string, string> = {
 }
 export const roleLabel = (role: string) => ROLE_LABEL[role] ?? role
 
-// A task's discipline. The bot stores lowercase keys (backend/frontend/qa/design);
-// a task from before that change may still carry free text, which is shown as-is.
-export const SCOPE_LABEL: Record<string, string> = { backend: 'Backend', frontend: 'Frontend', qa: 'QA', design: 'Design' }
+// A task's discipline. The bot stores lowercase keys (backend/frontend/mobile/
+// qa/design); a task from before that change may still carry free text, which
+// is shown as-is. Order here is the display order used everywhere a list of
+// the fixed scopes is built (project cards' repository summary, etc).
+export const SCOPE_LABEL: Record<string, string> = { backend: 'Backend', frontend: 'Frontend', mobile: 'Mobile', qa: 'QA', design: 'Design' }
 const isFixedScope = (s: string) => Object.prototype.hasOwnProperty.call(SCOPE_LABEL, s)
 export const scopeLabel = (scope: string | null | undefined): string | null => {
   const s = (scope ?? '').trim()
   if (!s) return null
   return isFixedScope(s) ? SCOPE_LABEL[s] : s
 }
-// Which chip colour a scope takes; anything that is not one of the four is 'other'.
-export type ScopeTone = 'backend' | 'frontend' | 'qa' | 'design' | 'other'
+// Which chip colour a scope takes; anything that is not one of the five is 'other'.
+export type ScopeTone = 'backend' | 'frontend' | 'mobile' | 'qa' | 'design' | 'other'
 export const scopeTone = (scope: string | null | undefined): ScopeTone => {
   const s = (scope ?? '').trim()
   return isFixedScope(s) ? (s as ScopeTone) : 'other'
 }
 
 // The fixed scope a task carries, or null (unset, blank, or legacy free text).
-export const fixedScope = (scope: string | null | undefined): 'backend' | 'frontend' | 'qa' | 'design' | null => {
+export const fixedScope = (scope: string | null | undefined): 'backend' | 'frontend' | 'mobile' | 'qa' | 'design' | null => {
   const s = (scope ?? '').trim().toLowerCase()
-  return isFixedScope(s) ? (s as 'backend' | 'frontend' | 'qa' | 'design') : null
+  return isFixedScope(s) ? (s as 'backend' | 'frontend' | 'mobile' | 'qa' | 'design') : null
 }

@@ -109,7 +109,7 @@ describe('task writes', () => {
 
   it('createTask posts the input as-is and unwraps the result', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ payload: { return: { task: { id: 'N1', type: 'feature', status: 'open', projectId: 'P1' }, channelId: 'c1', fellBack: null, note: '' } } }))
-    const input = { type: 'feature' as const, title: 'x', description: null, project_id: 'P1', scope: null, modules: [], holder_ids: [], repository_ids: [], tracks: { api_tests: false, qa_tests: false, acceptance_criteria: false } }
+    const input = { type: 'feature' as const, title: 'x', description: null, project_id: 'P1', scope: null, modules: [], holder_ids: [], repository_ids: [], create_issue: false, tracks: { api_tests: false, qa_tests: false, acceptance_criteria: false } }
     const r = await createTask(input)
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe(`${BASE}/api/discord/tasks/create`)

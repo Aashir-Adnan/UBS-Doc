@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { c, card, txt, muted } from '../../lib'
@@ -6,8 +6,10 @@ import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
 import { createTask } from '../../components/discordTasks/api'
 import { useActingPermissions } from '../../components/portal/tenantProjects/useActingPermissions'
+import { scopeLabel } from '../tasksLogic'
 import { useTeam } from './TeamLayout'
 import MemberPicker from './MemberPicker'
+import { resolveTaskRepo } from './repoLogic'
 import { SCOPE_OPTIONS, createErrorText, createPayload, emptyCreateForm, validateCreateForm, type CreateForm } from './taskFormLogic'
 
 // A new Feature or Bug, made by the Discord bot exactly as /create-task makes
@@ -26,7 +28,14 @@ export default function TaskCreate() {
   const set = <K extends keyof CreateForm>(key: K, value: CreateForm[K]) => setForm((f) => ({ ...f, [key]: value }))
 
   const projects = (payload?.projects ?? []).filter((p): p is typeof p & { id: string } => p.id !== null)
-  const repositories = payload?.repositories ?? []
+
+  // Which repository this task's GitHub issue would go to, by the same rule
+  // the bot applies (repoLogic.ts / bot's taskRepo.js) — recomputed whenever
+  // the project or scope changes.
+  const resolvedRepo = useMemo(
+    () => resolveTaskRepo({ projectId: form.projectId || null, scope: form.scope || null }, { projectRepos: payload?.projectRepos, repositories: payload?.repositories }).repository,
+    [payload, form.projectId, form.scope],
+  )
 
   // `?project=<docsSlug>` (the Tasks list's filter) preselects once the payload has the slugs.
   useEffect(() => {
@@ -50,12 +59,12 @@ export default function TaskCreate() {
   if (!payload) return null
 
   async function submit() {
-    const problem = validateCreateForm(form)
+    const problem = validateCreateForm(form, resolvedRepo)
     if (problem) { setError(problem); return }
     setSaving(true)
     setError(null)
     try {
-      const result = await createTask(createPayload(form))
+      const result = await createTask(createPayload(form, resolvedRepo))
       await refresh()
       navigate(`/tools/team/tasks/${result.task.id}`, { state: { notice: result.note || 'Task created. Its Discord channel is ready.' } })
     } catch (err) {
@@ -69,10 +78,6 @@ export default function TaskCreate() {
   }
 
   const isBug = form.type === 'bug'
-  const toggleRepo = (id: string) => {
-    if (isBug) set('repositoryIds', form.repositoryIds[0] === id ? [] : [id])
-    else set('repositoryIds', form.repositoryIds.includes(id) ? form.repositoryIds.filter((x) => x !== id) : [...form.repositoryIds, id])
-  }
 
   return (
     <>
@@ -84,7 +89,7 @@ export default function TaskCreate() {
           <div role="radiogroup" aria-label="Task type" className="flex gap-2">
             {(['feature', 'bug'] as const).map((t) => (
               <button key={t} type="button" role="radio" aria-checked={form.type === t} disabled={saving}
-                onClick={() => setForm((f) => ({ ...f, type: t, repositoryIds: t === 'bug' ? f.repositoryIds.slice(0, 1) : f.repositoryIds }))}
+                onClick={() => set('type', t)}
                 className={c('px-4 py-2 text-sm font-semibold rounded-xl border tr',
                   form.type === t ? 'bg-indigo-500 border-indigo-500 text-white' : d ? 'border-white/15 text-white/70' : 'border-slate-300 text-slate-600')}>
                 {t === 'feature' ? 'Feature' : 'Bug'}
@@ -123,23 +128,17 @@ export default function TaskCreate() {
             </Labeled>
           )}
 
-          <Labeled label={isBug ? 'Repository (opens a GitHub issue)' : 'Repositories'} theme={theme}>
-            {repositories.length === 0
-              ? <p className={c('text-sm m-0', muted(theme))}>No repositories are registered with the bot.</p>
-              : (
-                <div className="flex flex-wrap gap-2">
-                  {repositories.map((r) => {
-                    const on = form.repositoryIds.includes(r.id)
-                    return (
-                      <button key={r.id} type="button" aria-pressed={on} disabled={saving} onClick={() => toggleRepo(r.id)} title={r.url}
-                        className={c('px-3 py-1.5 text-xs font-semibold rounded-full border tr',
-                          on ? 'bg-indigo-500 border-indigo-500 text-white' : d ? 'border-white/15 text-white/70' : 'border-slate-300 text-slate-600')}>
-                        {r.name}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
+          <Labeled label="GitHub" theme={theme}>
+            <p className={c('text-sm m-0 mb-2', muted(theme))}>
+              {resolvedRepo
+                ? <>Issue goes to <strong className={txt(theme)}>{resolvedRepo.name}</strong> ({scopeLabel(form.scope) ?? 'No scope'})</>
+                : 'No repository for this project and scope — no issue'}
+            </p>
+            <label className={c('inline-flex items-center gap-2 text-sm', txt(theme))}>
+              <input type="checkbox" checked={!!resolvedRepo && form.createIssue} disabled={saving || !resolvedRepo}
+                onChange={(e) => set('createIssue', e.target.checked)} />
+              Open a GitHub issue
+            </label>
           </Labeled>
 
           <fieldset className="border-0 p-0 m-0">

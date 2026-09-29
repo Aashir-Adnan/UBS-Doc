@@ -1,4 +1,4 @@
-import type { TaskRow, TasksPayload } from '../tasksLogic'
+import type { RepoRef, TaskRow, TasksPayload } from '../tasksLogic'
 import type { CreateTaskInput, TaskChanges } from '../../components/discordTasks/api'
 import { formatDuration } from './timeLogic'
 import { plainRuleMessage } from './boardLogic'
@@ -16,6 +16,7 @@ export const STATUS_OPTIONS = ['open', 'pending', 'in_progress', 'resolved', 'cl
 export const SCOPE_OPTIONS = [
   { value: 'backend', label: 'Backend' },
   { value: 'frontend', label: 'Frontend' },
+  { value: 'mobile', label: 'Mobile' },
   { value: 'qa', label: 'QA' },
   { value: 'design', label: 'Design' },
 ]
@@ -110,6 +111,13 @@ export function scopeOptionsFor(current: string): { value: string; label: string
   return opts
 }
 
+// A refusal shown before any request is sent: a bug whose project/scope
+// resolve to no repository at all (the bot would refuse it anyway; saying so
+// up front skips the round trip). Same sentence regardless of which of the
+// bot's reasons (no-scope / no-repo-for-scope) caused it — the project is
+// always chosen by this point, so "no-project" cannot happen here.
+export const NO_REPO_FOR_BUG_MESSAGE = 'This project has no repository for this scope — link one in Discord with /projects → Link repo.'
+
 export interface CreateForm {
   type: 'feature' | 'bug'
   title: string
@@ -118,26 +126,34 @@ export interface CreateForm {
   scope: string
   modules: string // comma-separated, as typed
   holderIds: string[]
-  repositoryIds: string[]
+  // The "Open a GitHub issue" checkbox. Default on; the create page disables
+  // and unchecks it when resolveTaskRepo finds no repository for the project/scope.
+  createIssue: boolean
   tracksApi: boolean
   tracksQa: boolean
   tracksAc: boolean
 }
 
 export function emptyCreateForm(projectId = ''): CreateForm {
-  return { type: 'feature', title: '', description: '', projectId, scope: '', modules: '', holderIds: [], repositoryIds: [], tracksApi: false, tracksQa: false, tracksAc: false }
+  return { type: 'feature', title: '', description: '', projectId, scope: '', modules: '', holderIds: [], createIssue: true, tracksApi: false, tracksQa: false, tracksAc: false }
 }
 
-export function validateCreateForm(f: CreateForm): string | null {
+/**
+ * `resolvedRepo` is what `resolveTaskRepo` (repoLogic.ts) found for the
+ * form's current project + scope — the create page computes it from the
+ * payload's `projectRepos`/`repositories` and passes it in here, so this
+ * stays a pure function of its arguments like the rest of the form logic.
+ */
+export function validateCreateForm(f: CreateForm, resolvedRepo: RepoRef | null): string | null {
   if (!f.title.trim()) return 'A task needs a title.'
   if (f.title.trim().length > TITLE_MAX) return `The title can be at most ${TITLE_MAX} characters.`
   if (f.description.trim().length > DESCRIPTION_MAX) return `The description can be at most ${DESCRIPTION_MAX} characters.`
   if (!f.projectId) return 'Pick a project for the task.'
-  if (f.type === 'bug' && f.repositoryIds.length > 1) return 'A bug can name one repository.'
+  if (f.type === 'bug' && !resolvedRepo) return NO_REPO_FOR_BUG_MESSAGE
   return null
 }
 
-export function createPayload(f: CreateForm): CreateTaskInput {
+export function createPayload(f: CreateForm, resolvedRepo: RepoRef | null): CreateTaskInput {
   const isBug = f.type === 'bug'
   return {
     type: f.type,
@@ -147,7 +163,10 @@ export function createPayload(f: CreateForm): CreateTaskInput {
     scope: f.scope || null,
     modules: isBug ? [] : [...new Set(f.modules.split(',').map((m) => m.trim()).filter(Boolean))],
     holder_ids: [...f.holderIds],
-    repository_ids: isBug ? f.repositoryIds.slice(0, 1) : [...f.repositoryIds],
+    // The bot applies the same repository rule itself from project + scope;
+    // the site no longer picks a repository, only whether to open an issue.
+    repository_ids: [],
+    create_issue: !!resolvedRepo && f.createIssue,
     tracks: { api_tests: f.tracksApi, qa_tests: f.tracksQa, acceptance_criteria: f.tracksAc },
   }
 }
