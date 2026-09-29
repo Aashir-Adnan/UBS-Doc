@@ -27,7 +27,7 @@ export default function TasksList() {
   const { payload, loading, error, filters, setFilter } = useTeam()
   const { search } = useLocation()
   const projects = payload?.projects ?? []
-  const canCreate = useActingPermissions().has('update_discord_tasks')
+  const canCreate = useActingPermissions().hasOnAnyRole('update_discord_tasks')
 
   const visible = useMemo(() => applyFilters(projects, filters), [projects, filters])
   const unknownSlug = useMemo(() => unknownProjectSlug(projects, filters.projectSlug), [projects, filters.projectSlug])
@@ -68,7 +68,7 @@ function ProjectCard({ p, theme, search }: { p: ProjectGroup; theme: Theme; sear
   const d = theme === 'dark'
   const [showGraph, setShowGraph] = useState(false)
   const hasEdges = p.tasks.some((t) => t.blockedBy.length > 0 || t.blocks.length > 0)
-  const canCreate = useActingPermissions().has('update_discord_tasks')
+  const canCreate = useActingPermissions().hasOnAnyRole('update_discord_tasks')
   return (
     <section className={c(card(theme), 'rounded-2xl p-5 sm:p-6')}>
       <div className="flex flex-wrap items-baseline justify-between gap-3 mb-3">

@@ -19,7 +19,7 @@ export default function TaskCreate() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const { payload, loading, refresh } = useTeam()
-  const { has, loaded } = useActingPermissions()
+  const { hasOnAnyRole, loaded } = useActingPermissions()
   const [form, setForm] = useState<CreateForm>(() => emptyCreateForm(params.get('projectId') ?? ''))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -39,7 +39,7 @@ export default function TaskCreate() {
   if (!loaded || (loading && !payload)) {
     return <div className={c(card(theme), 'rounded-2xl px-8 py-14 text-center')}><p className={c('text-sm font-medium m-0', muted(theme))}>Loading…</p></div>
   }
-  if (!has('update_discord_tasks')) {
+  if (!hasOnAnyRole('update_discord_tasks')) {
     return (
       <div className={c(card(theme), 'rounded-2xl px-8 py-14 text-center')}>
         <p className={c('text-sm font-medium mb-4', muted(theme))}>You need the update_discord_tasks permission to create tasks. Ask an admin.</p>

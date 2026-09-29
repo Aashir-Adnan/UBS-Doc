@@ -1,4 +1,5 @@
 import { useActingUrdd } from './useActingUrdd';
+import { anyRoleHas } from './permissionLogic';
 
 // Permissions of the acting user, read from the URDD currently selected in the org
 // switcher. Backed entirely by the org slice that useActingUrdd already populates
@@ -12,7 +13,7 @@ import { useActingUrdd } from './useActingUrdd';
 // permissions array, has() returns false for everything. There is deliberately no
 // role-name fallback — the server gates on permissions, so the UI must too.
 export function useActingPermissions() {
-  const { status, activeOrg } = useActingUrdd();
+  const { status, activeOrg, urdds } = useActingUrdd();
 
   const list = status === 'ready' && Array.isArray(activeOrg?.permissions)
     ? activeOrg.permissions
@@ -22,11 +23,16 @@ export function useActingPermissions() {
   // presence of the name is the whole check.
   const has = (name) => !!list && list.some((p) => p.permission_name === name);
 
+  // Discord-task screens only: held on ANY of the person's roles, not just the one
+  // selected in the switcher (see permissionLogic.js). Same fail-closed rule.
+  const hasOnAnyRole = (name) => status === 'ready' && anyRoleHas(urdds, name);
+
   return {
     // false while loading/erroring — callers can distinguish "not allowed" from
     // "don't know yet" for copy, but must not treat unknown as allowed.
     loaded: list !== null,
     permissions: list || [],
     has,
+    hasOnAnyRole,
   };
 }
