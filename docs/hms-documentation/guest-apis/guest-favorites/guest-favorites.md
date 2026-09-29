@@ -26,7 +26,7 @@ All endpoints require the **AUTH_PLATFORM** (guest JWT). The `userId` is resolve
 
 **GET** `/api/guest/favorites`
 
-Returns the authenticated user's active favorites whose service or package is still **active**, grouped by type.
+Returns the authenticated user's active favorites whose service or package is still **active**, grouped by type. Optionally paginated — see [Pagination](#pagination).
 
 ### Which favorites are returned
 
@@ -46,6 +46,13 @@ This matches the add endpoints, which only accept an active service or package.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `actionPerformerURDD` | `number` | Yes | The guest's URDD ID. |
+
+### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `page` | `number` | No | `1` | 1-based page number. Values below 1 are clamped to 1. |
+| `pageSize` | `number` | No | — | Rows per page, clamped to 1–100. **Omit it to receive every favorite in one response.** |
 
 ### Response (200)
 
@@ -68,7 +75,13 @@ This matches the add endpoints, which only accept an active service or package.
       "serviceId": null,
       "favorited": true
     }
-  ]
+  ],
+  "pagination": {
+    "page": 1,
+    "pageSize": 20,
+    "totalItems": 34,
+    "totalPages": 2
+  }
 }
 ```
 
@@ -80,6 +93,29 @@ This matches the add endpoints, which only accept an active service or package.
 | `rooms[].serviceId` | `number` | The favorited service (stay room) ID. |
 | `packages[].packageId` | `number` | The favorited package ID. |
 | `*.favorited` | `boolean` | Always `true` for listed items. |
+| `pagination.page` | `number` | The page returned. |
+| `pagination.pageSize` | `number` | Rows per page. Equals `totalItems` when unpaginated. |
+| `pagination.totalItems` | `number` | Total matching favorites, across all pages. |
+| `pagination.totalPages` | `number` | Number of pages at this `pageSize`. `1` when unpaginated. |
+
+### Pagination
+
+Favorites are ordered **newest first** (`created_at DESC`, then `id DESC`), which gives pages a stable order to walk.
+
+Pagination applies to the **combined** favorites list, which is then split into `rooms` and `packages` for the response. So a page of 20 contains 20 favorites in total, not 20 of each, and either array may be empty on a given page. `totalItems` is likewise the combined count.
+
+**Omitting `pageSize` returns every favorite**, exactly as before this parameter existed — so existing clients are unaffected and the `pagination` block simply reports one page covering everything. Pagination only engages when a client sends `pageSize`.
+
+Edge cases:
+
+- `pageSize` above 100 is clamped to 100; `0` or negative is clamped to 1.
+- A non-numeric `pageSize` is treated as absent, returning everything.
+- A `page` past the last one returns empty `rooms` and `packages` but still reports the true `totalItems` and `totalPages`, so a client can recover rather than concluding the guest has no favorites.
+
+```
+GET /api/guest/favorites                     -> every favorite, one page
+GET /api/guest/favorites?page=2&pageSize=20  -> favorites 21-40
+```
 
 ---
 
