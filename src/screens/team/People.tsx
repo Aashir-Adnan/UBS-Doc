@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { c, card, txt, muted, chipGray, chipIndigo, chipMint, chipAmber } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
-import { allTasks, applyFilters, roleLabel, type TaskRow, type TeamMember } from '../tasksLogic'
+import { allTasks, applyFilters, peopleCorpusFilters, roleLabel, type TaskRow, type TeamMember } from '../tasksLogic'
 import { filterMembers, memberWorkload, sortMembers } from './teamLogic'
 import { useTeam } from './TeamLayout'
 import Avatar from './Avatar'
@@ -28,7 +28,7 @@ export default function People() {
   // Status, assignee, blocked-only and the search box are member-side concerns
   // that filterMembers applies to the roster, not to the tasks being counted.
   const scopedProjects = useMemo(
-    () => applyFilters(projects, { ...filters, status: 'all', assigneeId: null, blockedOnly: false, query: '' }),
+    () => applyFilters(projects, peopleCorpusFilters(filters)),
     [projects, filters],
   )
   const scopedTasks = useMemo(() => allTasks(scopedProjects), [scopedProjects])

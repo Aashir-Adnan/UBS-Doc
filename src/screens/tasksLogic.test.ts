@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   applyFilters, assigneeOptions, statusTone, unknownProjectSlug, roleLabel, DEFAULT_FILTERS,
-  findTask, allTasks, scopeLabel, scopeTone, type ProjectGroup, type TeamMember,
+  findTask, allTasks, scopeLabel, scopeTone, fixedScope, parseScopeFilter, scopeAppliesOn,
+  peopleCorpusFilters, SCOPE_FILTERS, type ProjectGroup, type TeamMember,
 } from './tasksLogic'
 
 const t = (id: string, status: string, assignees: string[], isBlocked = false, title = id) => ({
@@ -131,5 +132,50 @@ describe('scopeLabel / scopeTone', () => {
   it('does not read an inherited object key as a scope', () => {
     expect(scopeTone('constructor')).toBe('other')
     expect(scopeLabel('constructor')).toBe('constructor')
+  })
+})
+
+describe('scope filter', () => {
+  const withScope = (id: string, scope: string | null) => ({ ...t(id, 'open', []), scope })
+  const scoped: ProjectGroup[] = [
+    { id: 'p1', name: 'Framework', docsSlug: 'framework', members: [], counts: { open: 5, in_progress: 0, pending: 0, done: 0, blocked: 0 },
+      tasks: [withScope('BE', 'backend'), withScope('FE', 'Frontend'), withScope('LEG', 'GitSync'), withScope('NUL', null), withScope('BL', '  ')] },
+  ]
+  const ids = (f: Partial<typeof DEFAULT_FILTERS>) => applyFilters(scoped, { ...DEFAULT_FILTERS, ...f }).flatMap((p) => p.tasks.map((x) => x.id))
+
+  it('all keeps everything', () => {
+    expect(DEFAULT_FILTERS.scope).toBe('all')
+    expect(ids({})).toEqual(['BE', 'FE', 'LEG', 'NUL', 'BL'])
+  })
+  it('a named scope matches case-insensitively', () => {
+    expect(ids({ scope: 'backend' })).toEqual(['BE'])
+    expect(ids({ scope: 'frontend' })).toEqual(['FE'])
+    expect(ids({ scope: 'qa' })).toEqual([])
+  })
+  it('"none" catches unset, blank and pre-2026-09-29 free text', () => {
+    expect(ids({ scope: 'none' })).toEqual(['LEG', 'NUL', 'BL'])
+  })
+  it('fixedScope reads only the four', () => {
+    expect(fixedScope(' QA ')).toBe('qa')
+    expect(fixedScope('GitSync')).toBeNull()
+    expect(fixedScope(null)).toBeNull()
+  })
+  it('parseScopeFilter reads ?scope= and treats anything unknown as all', () => {
+    expect(SCOPE_FILTERS.map((o) => o.value)).toEqual(['all', 'backend', 'frontend', 'qa', 'design', 'none'])
+    expect(SCOPE_FILTERS.map((o) => o.label)).toEqual(['All scopes', 'Backend', 'Frontend', 'QA', 'Design', 'No scope'])
+    expect(parseScopeFilter('design')).toBe('design')
+    expect(parseScopeFilter('none')).toBe('none')
+    expect(parseScopeFilter('Design')).toBe('all')
+    expect(parseScopeFilter('gitsync')).toBe('all')
+    expect(parseScopeFilter(null)).toBe('all')
+  })
+  it('applies only on the Tasks and Board tabs', () => {
+    expect(scopeAppliesOn('tasks')).toBe(true)
+    expect(scopeAppliesOn('board')).toBe(true)
+    for (const tab of ['people', 'time', 'stats']) expect(scopeAppliesOn(tab)).toBe(false)
+  })
+  it('the People corpus ignores scope with the other member-side filters', () => {
+    const f = peopleCorpusFilters({ ...DEFAULT_FILTERS, scope: 'qa', status: 'done', assigneeId: 'u1', blockedOnly: true, query: 'x', projectSlug: 'framework' })
+    expect(f).toEqual({ ...DEFAULT_FILTERS, projectSlug: 'framework' })
   })
 })
