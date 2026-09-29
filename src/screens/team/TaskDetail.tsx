@@ -37,8 +37,8 @@ export default function TaskDetail() {
   const navigate = useNavigate()
   const { search } = location
   const backTo = `/tools/team/tasks${search}`
-  const { has } = useActingPermissions()
-  const canEdit = has('update_discord_tasks')
+  const { hasOnAnyRole } = useActingPermissions()
+  const canEdit = hasOnAnyRole('update_discord_tasks')
   const [editing, setEditing] = useState(false)
   const [toast, setToast] = useState<{ message: string; tone: ToastTone; seq: number } | null>(null)
   const show = useCallback((message: string, tone: ToastTone) => {

@@ -44,8 +44,8 @@ export default function Board() {
   const { theme } = useTheme()
   const { payload, loading, error, filters, refresh } = useTeam()
   const { search } = useLocation()
-  const { has, loaded } = useActingPermissions()
-  const canMove = has('update_discord_tasks')
+  const { hasOnAnyRole, loaded } = useActingPermissions()
+  const canMove = hasOnAnyRole('update_discord_tasks')
 
   const [overrides, setOverrides] = useState<Record<string, string>>({})
   // The newest status requested per card, readable synchronously. A setState

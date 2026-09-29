@@ -20,8 +20,8 @@ interface ToastState { message: string; tone: ToastTone; seq: number }
 
 export default function SubtasksSection({ task, theme, search }: { task: TaskRow; theme: Theme; search: string }) {
   const { refresh } = useTeam()
-  const { has, loaded } = useActingPermissions()
-  const canToggle = has('update_discord_tasks')
+  const { hasOnAnyRole, loaded } = useActingPermissions()
+  const canToggle = hasOnAnyRole('update_discord_tasks')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [toast, setToast] = useState<ToastState | null>(null)
 

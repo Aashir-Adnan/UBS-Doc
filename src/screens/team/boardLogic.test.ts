@@ -128,6 +128,14 @@ describe('classifyDropError', () => {
     expect(classifyDropError({})).toEqual({ kind: 'other', text: 'Could not move the card.' })
     expect(classifyDropError({ status: 500, message: '' }).text).toBe('Could not move the card.')
   })
+  it("shows CSAAS's own sentence for a 403 that is not about the permission", () => {
+    expect(classifyDropError({ status: 403, message: 'Link your Discord account to change tasks.' }))
+      .toEqual({ kind: 'forbidden', text: 'Link your Discord account to change tasks.' })
+    expect(classifyDropError({ status: 403, message: 'You can only change tasks in projects you are part of.' }))
+      .toEqual({ kind: 'forbidden', text: 'You can only change tasks in projects you are part of.' })
+    expect(classifyDropError({ status: 403, message: '' }).text).toBe("You can't move tasks. Ask an admin for the update_discord_tasks permission.")
+  })
+
   it('lets the status win over the text: a 403 whose message mentions offline is still forbidden', () => {
     expect(classifyDropError({ status: 403, message: 'bot is offline' }).kind).toBe('forbidden')
   })

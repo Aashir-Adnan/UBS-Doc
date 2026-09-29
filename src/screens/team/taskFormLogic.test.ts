@@ -101,7 +101,11 @@ describe('blockerCandidates', () => {
 
 describe('saveErrorText', () => {
   it('status first, then the sentence', () => {
-    expect(saveErrorText({ status: 403, message: 'x' })).toBe('You need the update_discord_tasks permission to change tasks. Ask an admin.')
+    expect(saveErrorText({ status: 403, message: "Permission 'update_discord_tasks' is required for this action" })).toBe('You need the update_discord_tasks permission to change tasks. Ask an admin.')
+    expect(saveErrorText({ status: 403, message: '' })).toBe('You need the update_discord_tasks permission to change tasks. Ask an admin.')
+    // A 403 that is not about the permission shows CSAAS's own sentence (identity link, project scoping).
+    expect(saveErrorText({ status: 403, message: 'Link your Discord account to change tasks.' })).toBe('Link your Discord account to change tasks.')
+    expect(saveErrorText({ status: 403, message: 'You can only change tasks in projects you are part of.' })).toBe('You can only change tasks in projects you are part of.')
     expect(saveErrorText({ status: 404, message: 'Task not found' })).toBe('This task no longer exists. Refresh the page.')
     expect(saveErrorText({ status: 502, message: 'Discord bot rejected the request (configuration)' })).toBe('Discord bot link is misconfigured. Tell an admin.')
     expect(saveErrorText({ status: 502, message: 'Discord bot is not reachable' })).toBe('Discord bot is offline, try again.')
@@ -128,7 +132,8 @@ describe('createErrorText', () => {
     expect(createErrorText({ status: 400, message: 'Member …u9 is not a member of this Discord server.' })).toBe('Member …u9 is not a member of this Discord server.')
   })
   it('403 passes through exactly as saveErrorText phrases it', () => {
-    expect(createErrorText({ status: 403, message: 'x' })).toBe('You need the update_discord_tasks permission to change tasks. Ask an admin.')
+    expect(createErrorText({ status: 403, message: "Permission 'update_discord_tasks' is required for this action" })).toBe('You need the update_discord_tasks permission to change tasks. Ask an admin.')
+    expect(createErrorText({ status: 403, message: 'You can only change tasks in projects you are part of.' })).toBe('You can only change tasks in projects you are part of.')
   })
   it('a misconfiguration sentence passes through unchanged (raised before any write)', () => {
     expect(createErrorText({ status: 502, message: 'Discord bot rejected the request (configuration)' })).toBe('Discord bot link is misconfigured. Tell an admin.')

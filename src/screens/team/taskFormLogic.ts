@@ -172,7 +172,12 @@ export function blockerCandidates(payload: TasksPayload, selfId: string, chosen:
 export function saveErrorText(err: { status?: number; message?: string }): string {
   const status = err?.status
   const message = (err?.message ?? '').trim()
-  if (status === 403) return 'You need the update_discord_tasks permission to change tasks. Ask an admin.'
+  // Not every 403 is the permission (identity link, project scoping): show CSAAS's own
+  // sentence unless the refusal is about the permission or says nothing.
+  if (status === 403) {
+    const permission = 'You need the update_discord_tasks permission to change tasks. Ask an admin.'
+    return !message || /permission/i.test(message) ? permission : plainRuleMessage(message) || permission
+  }
   if (status === 404) return 'This task no longer exists. Refresh the page.'
   // The three configuration failures arrive as 502/503 like "unreachable"; retrying does not fix them.
   if (/not configured|rejected the request|unreadable reply/i.test(message)) return 'Discord bot link is misconfigured. Tell an admin.'

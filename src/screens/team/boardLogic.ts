@@ -83,7 +83,13 @@ export function classifyDropError(err: { status?: number; message?: string }): D
   const forbidden: DropError = { kind: 'forbidden', text: "You can't move tasks. Ask an admin for the update_discord_tasks permission." }
   const offline: DropError = { kind: 'offline', text: 'Discord bot is offline, try again.' }
   const misconfigured: DropError = { kind: 'other', text: 'Discord bot link is misconfigured. Tell an admin.' }
-  if (status === 403) return forbidden
+  // A 403 is not always the permission: CSAAS also refuses with 403 when the caller's
+  // account is not linked to Discord, or the task is outside their projects. Show its
+  // own sentence then; blame the permission only when that is what it said.
+  if (status === 403) {
+    if (!message || /permission/i.test(message)) return forbidden
+    return { kind: 'forbidden', text: plainRuleMessage(message) || forbidden.text }
+  }
   // 409: the bot refused a change the rules do not allow (finishing a task with
   // open subtasks). It is a sentence for the visitor, not a fault to retry.
   if (status === 409) return { kind: 'other', text: plainRuleMessage(message) || 'That move is not allowed right now.' }
