@@ -139,7 +139,9 @@ export default function TaskDetail() {
             {task.parent && (
               <p className={c('text-xs font-semibold mb-6', muted(theme))}>
                 Subtask of{' '}
-                <Link to={`/tools/team/tasks/${task.parent.id}${search}`} className="text-indigo-500 no-underline hover:underline">{task.parent.title}</Link>
+                {task.parent.hidden
+                  ? <span>{task.parent.title}</span>
+                  : <Link to={`/tools/team/tasks/${task.parent.id}${search}`} className="text-indigo-500 no-underline hover:underline">{task.parent.title}</Link>}
               </p>
             )}
 
@@ -272,7 +274,9 @@ function RefList({ refs, theme, search }: { refs: TaskRef[]; theme: Theme; searc
           <span className={c('text-[11px] font-bold px-2 py-0.5 rounded-md shrink-0', toneChip[refTone(r.status)](theme))}>
             {refLabel(r.status)}
           </span>
-          <Link to={`/tools/team/tasks/${r.id}${search}`} className={c('text-sm font-semibold no-underline hover:underline', txt(theme))}>{r.title}</Link>
+          {r.hidden
+            ? <span className={c('text-sm font-semibold', muted(theme))}>{r.title}</span>
+            : <Link to={`/tools/team/tasks/${r.id}${search}`} className={c('text-sm font-semibold no-underline hover:underline', txt(theme))}>{r.title}</Link>}
         </li>
       ))}
     </ul>

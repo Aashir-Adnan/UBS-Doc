@@ -9,6 +9,9 @@ import { useTheme } from '../../app/ThemeContext'
 import { fetchDiscordTasks } from '../../components/discordTasks/api'
 import { applyFilters, DEFAULT_FILTERS, type Filters, type TasksPayload } from '../tasksLogic'
 import { activeTab, TEAM_TABS } from './teamNav'
+import LinkCard from './LinkCard'
+import { showsLinkCard, viewerLine } from './identityLogic'
+import { normalizePayload } from './payloadLogic'
 
 // The Team section shell: one fetch of GET /api/discord/tasks shared by every
 // tab (People, Tasks, Board and task detail), the tab bar, the filter bar and
@@ -52,11 +55,7 @@ export default function TeamLayout() {
     setLoading(true); setError(null)
     try {
       const data = await fetchDiscordTasks()
-      setPayload({
-        generatedAt: data?.generatedAt ?? '',
-        projects: Array.isArray(data?.projects) ? data.projects : [],
-        members: Array.isArray(data?.members) ? data.members : [],
-      })
+      setPayload(normalizePayload(data))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally { setLoading(false) }
@@ -90,6 +89,10 @@ export default function TeamLayout() {
 
   const tab = activeTab(pathname)
   const context: TeamContext = { payload, loading, error, refresh, filters, setFilter, people, timeSelfScoped, setTimeSelfScoped }
+  // Only on People, Tasks and Board: Time and Stats follow view_discord_time,
+  // not the link, so an unlinked caller still reaches them.
+  const showLinkCard = showsLinkCard(payload, tab)
+  const viewerText = viewerLine(payload?.viewer)
 
   // Which of the shared controls apply on this tab. Status is a tasks-list
   // concept; search and Blocked-only act on the tasks payload, which the
@@ -109,11 +112,13 @@ export default function TeamLayout() {
             <p className={c('text-sm font-medium', muted(theme))}>
               {payload?.members.length ?? 0} {payload?.members.length === 1 ? 'person' : 'people'} · {total} task{total === 1 ? '' : 's'} · {blocked} blocked
             </p>
+            {viewerText && <p className={c('text-xs font-semibold mt-1 mb-0', muted(theme))}>{viewerText}</p>}
           </div>
           <div className="flex items-center gap-3">
             {/* The search box filters the shared tasks payload — meaningless
-                on the Time and Stats tabs' separately-fetched reports. */}
-            {taskControls && (
+                on the Time and Stats tabs' separately-fetched reports, and on
+                the link card, which has no tasks payload to filter. */}
+            {taskControls && !showLinkCard && (
               <SearchInput value={filters.query} onChange={(v) => setFilter({ query: v })} placeholder="Search tasks…" width={240} theme={theme} />
             )}
             <button type="button" onClick={() => void refresh()} disabled={loading} title="Refresh"
@@ -124,7 +129,8 @@ export default function TeamLayout() {
         </div>
 
         {/* Tabs are links, not state: each keeps the current query string so a
-            project or assignee filter survives the hop between tabs. */}
+            project or assignee filter survives the hop between tabs. Always
+            shown — an unlinked caller still reaches Time and Stats from here. */}
         <div className={c('flex border-b mb-6 overflow-x-auto', d ? 'border-white/8' : 'border-slate-200')}>
           {TEAM_TABS.map((t) => (
             <Link key={t.key} to={`${t.path}${search}`}
@@ -138,42 +144,48 @@ export default function TeamLayout() {
           ))}
         </div>
 
-        {/* Project and Assignee apply everywhere; the rest only where the tasks payload is what is on screen. */}
-        <div className="flex flex-wrap items-center gap-3 mb-6">
-          {/* Status is a tasks-list concept: the board has its own columns and
-              People counts open work, so it only shows on the Tasks tab. */}
-          {tab === 'tasks' && (
-            <FilterSelect label="Status" theme={theme} value={filters.status} onChange={(v) => setFilter({ status: v as Filters['status'] })}>
-              <option value="all">All statuses</option><option value="active">Active</option><option value="done">Done</option>
-            </FilterSelect>
-          )}
-          <FilterSelect label="Project" theme={theme} value={filters.projectSlug ?? ''} onChange={(v) => setFilter({ projectSlug: v || null })}>
-            <option value="">All projects</option>
-            {projects.filter((p) => p.docsSlug).map((p) => <option key={p.docsSlug!} value={p.docsSlug!}>{p.name}</option>)}
-          </FilterSelect>
-          {showAssignee && (
-            <FilterSelect label="Assignee" theme={theme} value={filters.assigneeId ?? ''} onChange={(v) => setFilter({ assigneeId: v || null })}>
-              <option value="">Anyone</option>
-              {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </FilterSelect>
-          )}
-          {taskControls && (
-            <label className={c('flex items-center gap-2 text-xs font-semibold cursor-pointer', muted(theme))}>
-              <input type="checkbox" checked={filters.blockedOnly} onChange={(e) => setFilter({ blockedOnly: e.target.checked })} /> Blocked only
-            </label>
-          )}
-        </div>
+        {/* Filters are dead weight over the link card, which replaces the
+            Outlet with nothing to filter; everywhere else they show. */}
+        {!showLinkCard && (
+          <>
+            {/* Project and Assignee apply everywhere; the rest only where the tasks payload is what is on screen. */}
+            <div className="flex flex-wrap items-center gap-3 mb-6">
+              {/* Status is a tasks-list concept: the board has its own columns and
+                  People counts open work, so it only shows on the Tasks tab. */}
+              {tab === 'tasks' && (
+                <FilterSelect label="Status" theme={theme} value={filters.status} onChange={(v) => setFilter({ status: v as Filters['status'] })}>
+                  <option value="all">All statuses</option><option value="active">Active</option><option value="done">Done</option>
+                </FilterSelect>
+              )}
+              <FilterSelect label="Project" theme={theme} value={filters.projectSlug ?? ''} onChange={(v) => setFilter({ projectSlug: v || null })}>
+                <option value="">All projects</option>
+                {projects.filter((p) => p.docsSlug).map((p) => <option key={p.docsSlug!} value={p.docsSlug!}>{p.name}</option>)}
+              </FilterSelect>
+              {showAssignee && (
+                <FilterSelect label="Assignee" theme={theme} value={filters.assigneeId ?? ''} onChange={(v) => setFilter({ assigneeId: v || null })}>
+                  <option value="">Anyone</option>
+                  {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </FilterSelect>
+              )}
+              {taskControls && (
+                <label className={c('flex items-center gap-2 text-xs font-semibold cursor-pointer', muted(theme))}>
+                  <input type="checkbox" checked={filters.blockedOnly} onChange={(e) => setFilter({ blockedOnly: e.target.checked })} /> Blocked only
+                </label>
+              )}
+            </div>
+          </>
+        )}
 
         {/* Only about the shared tasks payload — meaningless on the Time and
             Stats tabs, which fetch their own endpoints and show their own
             error banners. */}
-        {taskControls && error && (
+        {taskControls && !showLinkCard && error && (
           <div className={c('rounded-xl px-4 py-3 mb-5 text-sm font-medium border', d ? 'bg-red-500/10 border-red-500/25 text-red-300' : 'bg-red-50 border-red-200 text-red-600')}>
             Could not load tasks: {error}
           </div>
         )}
 
-        <Outlet context={context} />
+        {showLinkCard ? <LinkCard theme={theme} onLinked={refresh} /> : <Outlet context={context} />}
       </div>
     </div>
   )

@@ -1,7 +1,7 @@
 // Pure dependency-graph layout: turns a task list's blockedBy/blocks edges
 // into a left-to-right layered graph (DependencyGraph.tsx renders it as SVG).
 // No React, no DOM.
-import { isTerminal, type TaskRow } from '../tasksLogic'
+import { isTerminal, type TaskRef, type TaskRow } from '../tasksLogic'
 
 export interface GraphNode {
   id: string
@@ -11,6 +11,11 @@ export interface GraphNode {
   blocked: boolean
   terminal: boolean
   depth: number
+  // False for a reference this graph cannot open: a task in another project
+  // (the backend marks its ref `hidden`) or, defensively, any id this task
+  // set doesn't itself contain (an older backend, or a broken reference).
+  // Only a real entry of the given `tasks` list is ever clickable.
+  clickable: boolean
 }
 
 export interface GraphEdge { from: string; to: string }
@@ -30,19 +35,25 @@ export const DEFAULT_GAP_Y = 16
 
 export function layoutGraph(tasks: TaskRow[], options: GraphLayoutOptions = {}): GraphLayout {
   const { nodeW = DEFAULT_NODE_W, nodeH = DEFAULT_NODE_H, gapX = DEFAULT_GAP_X, gapY = DEFAULT_GAP_Y } = options
-  const ids = new Set(tasks.map((t) => t.id))
+  const taskById = new Map(tasks.map((t) => [t.id, t]))
 
   // De-duplicate edges: a blocking relationship is often declared from both
-  // ends (A.blocks includes B, B.blockedBy includes A) and only edges wholly
-  // inside the given task set count.
+  // ends (A.blocks includes B, B.blockedBy includes A). An edge's far end may
+  // be a task this set doesn't contain at all — a cross-project reference the
+  // backend sent as a hidden stub, or (defensively) any id with no matching
+  // task here — so it still gets an edge and a stub node, just not a real
+  // task backing it; `refMeta` remembers that ref's own title/status so the
+  // stub node can still be drawn.
   const edgeMap = new Map<string, GraphEdge>()
-  const addEdge = (from: string, to: string) => {
-    if (from === to || !ids.has(from) || !ids.has(to)) return
+  const refMeta = new Map<string, { title: string; hidden: boolean; status?: string }>()
+  const addEdge = (from: string, to: string, far: TaskRef) => {
+    if (from === to) return
     edgeMap.set(`${from}->${to}`, { from, to })
+    if (!taskById.has(far.id)) refMeta.set(far.id, { title: far.title, hidden: !!far.hidden, status: far.status })
   }
   for (const task of tasks) {
-    for (const blocker of task.blockedBy) addEdge(blocker.id, task.id)
-    for (const blocked of task.blocks) addEdge(task.id, blocked.id)
+    for (const blocker of task.blockedBy) addEdge(blocker.id, task.id, blocker)
+    for (const blocked of task.blocks) addEdge(task.id, blocked.id, blocked)
   }
   const edges = [...edgeMap.values()]
 
@@ -82,29 +93,40 @@ export function layoutGraph(tasks: TaskRow[], options: GraphLayoutOptions = {}):
     if (!changed) break
   }
 
-  // Row = the node's index within its depth column, in the original task
-  // order (stable, deterministic layout across re-renders).
+  // Row = the node's index within its depth column, in a stable order: the
+  // given task list's own order first (so a real task's position never
+  // shifts because of an external reference), then any stub nodes (ids with
+  // no matching task) in the order their edges were first seen.
+  const orderedIds = [
+    ...tasks.map((t) => t.id).filter((id) => includedIds.has(id)),
+    ...[...refMeta.keys()].filter((id) => includedIds.has(id)),
+  ]
   const columns = new Map<number, string[]>()
-  for (const task of tasks) {
-    if (!includedIds.has(task.id)) continue
-    const d = depth.get(task.id) ?? 0
+  for (const id of orderedIds) {
+    const d = depth.get(id) ?? 0
     if (!columns.has(d)) columns.set(d, [])
-    columns.get(d)!.push(task.id)
+    columns.get(d)!.push(id)
   }
 
   const nodes: GraphNode[] = []
-  for (const task of tasks) {
-    if (!includedIds.has(task.id)) continue
-    const d = depth.get(task.id) ?? 0
-    const row = columns.get(d)!.indexOf(task.id)
+  for (const id of orderedIds) {
+    const d = depth.get(id) ?? 0
+    const row = columns.get(d)!.indexOf(id)
+    const task = taskById.get(id)
+    const meta = refMeta.get(id)
     nodes.push({
-      id: task.id,
-      title: task.title,
+      id,
+      title: task ? task.title : (meta?.title ?? id),
       x: d * (nodeW + gapX),
       y: row * (nodeH + gapY),
-      blocked: task.isBlocked,
-      terminal: isTerminal(task.status),
+      blocked: task ? task.isBlocked : false,
+      terminal: task ? isTerminal(task.status) : isTerminal(meta?.status ?? ''),
       depth: d,
+      // A stub node (no `task`) stands for a reference this graph can't
+      // resolve — a hidden cross-project ref or an id it otherwise doesn't
+      // recognize — so it's never clickable regardless of what the ref itself
+      // claims.
+      clickable: !!task,
     })
   }
 

@@ -49,26 +49,33 @@ export default function SubtaskChecklist({ task, theme, search, canToggle, busyI
                 role="checkbox"
                 aria-checked={done}
                 aria-label={`${done ? 'Reopen' : 'Finish'} ${s.title}`}
-                disabled={!canToggle || busy}
+                disabled={!canToggle || busy || !!s.hidden}
                 onClick={() => onToggle(s.id)}
-                title={canToggle ? (done ? 'Reopen this subtask' : 'Mark this subtask done') : 'You need permission to update tasks'}
+                title={s.hidden ? 'In another project' : canToggle ? (done ? 'Reopen this subtask' : 'Mark this subtask done') : 'You need permission to update tasks'}
                 className={c(
                   'w-5 h-5 rounded-md border inline-flex items-center justify-center shrink-0 tr',
                   done
                     ? 'bg-emerald-500 border-emerald-500 text-white'
                     : d ? 'border-white/25 text-transparent' : 'border-slate-300 text-transparent',
-                  canToggle && !busy ? 'cursor-pointer hover:border-indigo-400' : 'cursor-default',
+                  canToggle && !busy && !s.hidden ? 'cursor-pointer hover:border-indigo-400' : 'cursor-default',
                   busy ? 'opacity-50' : '',
                 )}
               >
                 <Check size={13} strokeWidth={3} />
               </button>
-              <Link
-                to={`/tools/team/tasks/${s.id}${search}`}
-                className={c('flex-1 min-w-0 text-sm font-semibold no-underline hover:underline truncate', done ? muted(theme) : txt(theme), done ? 'line-through' : '')}
-              >
-                {s.title}
-              </Link>
+              {s.hidden
+                ? (
+                  <span className={c('flex-1 min-w-0 text-sm font-semibold truncate', done ? muted(theme) : txt(theme), done ? 'line-through' : '')}>
+                    {s.title}
+                  </span>
+                ) : (
+                  <Link
+                    to={`/tools/team/tasks/${s.id}${search}`}
+                    className={c('flex-1 min-w-0 text-sm font-semibold no-underline hover:underline truncate', done ? muted(theme) : txt(theme), done ? 'line-through' : '')}
+                  >
+                    {s.title}
+                  </Link>
+                )}
               <AvatarStack people={s.assignees} size={22} theme={theme} />
               <span className={c('text-[11px] font-semibold shrink-0', muted(theme))}>{STATUS_LABEL[s.status] ?? s.status}</span>
             </li>

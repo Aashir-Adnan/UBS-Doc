@@ -7,7 +7,7 @@ const BASE = 'http://api.test'
 globalThis.window = globalThis.window || (globalThis as unknown as Window)
 ;(window as unknown as { __API_BASE_URL__: string }).__API_BASE_URL__ = BASE
 
-const { setTaskStatus, ApiError, updateTask, createTask, addSubtask } = await import('./api')
+const { setTaskStatus, ApiError, updateTask, createTask, addSubtask, linkDiscord, fetchIdentityLinks, unlinkDiscord } = await import('./api')
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status })
@@ -128,5 +128,37 @@ describe('task writes', () => {
   it('a refusal carries the specific sentence and the status', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ status: 400, message: 'Invalid request', payload: 'Pick a project for the task.' }, 400))
     await expect(updateTask('T1', { title: 'x' })).rejects.toMatchObject({ name: 'ApiError', status: 400, message: 'Pick a project for the task.' })
+  })
+})
+
+describe('identity calls', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+  beforeEach(() => { fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock) })
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('linkDiscord posts the code', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ payload: { return: { linked: true, seesAll: false, isAdmin: false, links: [] } } }))
+    const r = await linkDiscord('ABC234')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`${BASE}/api/discord/identity/link`)
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ code: 'ABC234' })
+    expect(r.linked).toBe(true)
+  })
+
+  it('a refused code carries the sentence and status', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ status: 400, message: 'Invalid request', payload: 'That code is not valid. Run /link in Discord for a new one.' }, 400))
+    await expect(linkDiscord('ZZZ999')).rejects.toMatchObject({ status: 400, message: 'That code is not valid. Run /link in Discord for a new one.' })
+  })
+
+  it('fetchIdentityLinks and unlinkDiscord hit the admin endpoints', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ payload: { return: { links: [] } } }))
+    await fetchIdentityLinks()
+    expect(fetchMock.mock.calls[0][0]).toBe(`${BASE}/api/discord/identity/links`)
+    fetchMock.mockResolvedValueOnce(jsonResponse({ payload: { return: { removed: 1 } } }))
+    await unlinkDiscord(0, 'g1')
+    const [url, init] = fetchMock.mock.calls[1]
+    expect(url).toBe(`${BASE}/api/discord/identity/unlink`)
+    expect(JSON.parse(init.body)).toEqual({ user_id: 0, guild_config_id: 'g1' })
   })
 })

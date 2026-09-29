@@ -65,15 +65,19 @@ export default function DependencyGraph({ tasks, theme }: { tasks: TaskRow[]; th
         })}
         {g.nodes.map((n) => {
           const stroke = n.blocked ? palette.red : n.terminal ? palette.terminal : palette.indigo
+          // A node the graph can't resolve to a real task here (a hidden
+          // cross-project ref, or any id outside this task set) renders as
+          // plain, non-interactive text — nothing to open, so no link
+          // semantics, no key handler, no pointer cursor.
           return (
             <g
               key={n.id}
-              role="link"
-              tabIndex={0}
+              role={n.clickable ? 'link' : undefined}
+              tabIndex={n.clickable ? 0 : undefined}
               aria-label={n.title}
-              onClick={() => open(n.id)}
-              onKeyDown={(e) => { if (e.key === 'Enter') open(n.id) }}
-              style={{ cursor: 'pointer' }}
+              onClick={n.clickable ? () => open(n.id) : undefined}
+              onKeyDown={n.clickable ? (e) => { if (e.key === 'Enter') open(n.id) } : undefined}
+              style={{ cursor: n.clickable ? 'pointer' : 'default' }}
             >
               <rect x={n.x} y={n.y} width={DEFAULT_NODE_W} height={DEFAULT_NODE_H} rx={8} fill={palette.bg} stroke={stroke} strokeWidth={1.5} />
               <text x={n.x + 12} y={n.y + DEFAULT_NODE_H / 2 + 4} fill={palette.text} fontSize={12} fontWeight={600}>

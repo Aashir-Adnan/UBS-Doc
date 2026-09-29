@@ -214,3 +214,43 @@ export async function addSubtask(parentId: string, title: string, holderIds: str
     body: JSON.stringify({ parent_id: parentId, title, holder_ids: holderIds }),
   })
 }
+
+// Identity link (2026-09-28): the site account ↔ Discord member link that scopes
+// what the Team section shows. CSAAS links by verified email automatically; these
+// calls cover the code fallback and the admin list.
+export interface IdentityMe {
+  linked: boolean
+  seesAll: boolean
+  isAdmin: boolean
+  links: { guildConfigId: string; discordId: string; name: string | null; via: 'email' | 'code' | 'admin' }[]
+}
+export interface IdentityLink {
+  userId: number
+  email: string | null
+  name: string | null
+  guildConfigId: string
+  discordId: string
+  discordName: string | null
+  via: 'email' | 'code' | 'admin'
+  linkedAt: string | null
+}
+
+export async function linkDiscord(code: string): Promise<IdentityMe> {
+  return apiCall<IdentityMe>('/discord/identity/link', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ code }),
+  })
+}
+
+export async function fetchIdentityLinks(): Promise<{ links: IdentityLink[] }> {
+  return apiCall<{ links: IdentityLink[] }>('/discord/identity/links')
+}
+
+export async function unlinkDiscord(userId: number, guildConfigId: string): Promise<{ removed: number }> {
+  return apiCall<{ removed: number }>('/discord/identity/unlink', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ user_id: userId, guild_config_id: guildConfigId }),
+  })
+}

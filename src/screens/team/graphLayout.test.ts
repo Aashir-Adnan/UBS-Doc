@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { layoutGraph, clipTitle } from './graphLayout'
-import type { TaskRow } from '../tasksLogic'
+import type { TaskRef, TaskRow } from '../tasksLogic'
 
 const t = (id: string, status: string, blockedBy: string[] = [], blocks: string[] = [], isBlocked = false): TaskRow => ({
   id, title: `Task ${id}`, type: 'feature', status, implementationStatus: null,
@@ -39,11 +39,27 @@ describe('layoutGraph', () => {
     expect(nodes).toHaveLength(2)
   })
 
-  it('ignores an edge that points outside the given task set', () => {
+  it('draws an edge that points outside the given task set as a non-clickable stub node', () => {
     const tasks = [t('A', 'open', ['ghost'])]
     const { nodes, edges } = layoutGraph(tasks)
-    expect(nodes).toHaveLength(0)
-    expect(edges).toHaveLength(0)
+    expect(edges).toEqual([{ from: 'ghost', to: 'A' }])
+    expect(nodes).toHaveLength(2)
+    const a = nodes.find((n) => n.id === 'A')!
+    const ghost = nodes.find((n) => n.id === 'ghost')!
+    expect(a.clickable).toBe(true)
+    expect(ghost.clickable).toBe(false)
+    expect(ghost.title).toBe('Task ghost')
+  })
+
+  it('marks a ref explicitly flagged hidden as a non-clickable stub node using its own title', () => {
+    const hiddenRef: TaskRef = { id: 'other-project-task', title: 'A task in another project', status: 'open', hidden: true }
+    const task: TaskRow = { ...t('A', 'open'), blockedBy: [hiddenRef] }
+    const { nodes } = layoutGraph([task])
+    const stub = nodes.find((n) => n.id === 'other-project-task')!
+    expect(stub.clickable).toBe(false)
+    expect(stub.title).toBe('A task in another project')
+    const a = nodes.find((n) => n.id === 'A')!
+    expect(a.clickable).toBe(true)
   })
 
   it('terminates on a malformed cycle instead of hanging', () => {
