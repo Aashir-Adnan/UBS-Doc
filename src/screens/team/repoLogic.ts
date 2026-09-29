@@ -55,6 +55,34 @@ export function issueTargetText(
   return label ? `Issue goes to ${result.repository.name} (${label})` : `Issue goes to ${result.repository.name}`
 }
 
+/**
+ * The bug fallback picker's options (spec §5): when the rule finds no
+ * repository for a bug, the site lets the visitor pick one and sends it as
+ * `repository_ids[0]` — the bot accepts it only in that case. Every repository
+ * linked to the project (in the project cards' order), or, when the project
+ * has no usable link, every repository (by name). Empty only when there are no
+ * repositories at all (or no project) — the one case the form still refuses.
+ */
+export function bugRepoChoices(
+  projectId: string | null,
+  projectRepos: ProjectRepoLink[] | undefined,
+  repositories: RepoRef[] | undefined,
+): RepoRef[] {
+  if (!projectId) return []
+  const all = repositories ?? []
+  const byId = new Map(all.map((r) => [String(r.id), r]))
+  const scopeOrder = Object.keys(SCOPE_LABEL)
+  const rank = (scope: string | null) => (scope ? scopeOrder.indexOf(scope) : scopeOrder.length)
+  const seen = new Set<string>()
+  const linked = (projectRepos ?? [])
+    .filter((l) => String(l.projectId) === String(projectId) && byId.has(String(l.repositoryId)))
+    .sort((a, b) => rank(a.scope) - rank(b.scope) || byId.get(String(a.repositoryId))!.name.localeCompare(byId.get(String(b.repositoryId))!.name))
+    .map((l) => byId.get(String(l.repositoryId))!)
+    .filter((r) => (seen.has(String(r.id)) ? false : (seen.add(String(r.id)), true)))
+  if (linked.length) return linked
+  return [...all].sort((a, b) => a.name.localeCompare(b.name))
+}
+
 // One project's links as `{ name, scope }[]`, sorted by scope display order
 // (the fixed scopes, in SCOPE_LABEL's order) then repository name, with an
 // untagged link last. Feeds the project cards' "Repositories: …" line.

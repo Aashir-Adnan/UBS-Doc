@@ -8,8 +8,11 @@ import { createTask } from '../../components/discordTasks/api'
 import { useActingPermissions } from '../../components/portal/tenantProjects/useActingPermissions'
 import { useTeam } from './TeamLayout'
 import MemberPicker from './MemberPicker'
-import { issueTargetText, resolveTaskRepo } from './repoLogic'
-import { SCOPE_OPTIONS, createErrorText, createPayload, emptyCreateForm, validateCreateForm, type CreateForm } from './taskFormLogic'
+import { bugRepoChoices, issueTargetText, projectRepoList, resolveTaskRepo } from './repoLogic'
+import {
+  NO_REPO_AT_ALL_MESSAGE, SCOPE_OPTIONS, bugIssueRepo, bugRepoHint, createErrorText, createPayload, emptyCreateForm,
+  validateCreateForm, type CreateForm,
+} from './taskFormLogic'
 
 // A new Feature or Bug, made by the Discord bot exactly as /create-task makes
 // it: the row, its ticket doc, the bug's GitHub issue, and its channel in the
@@ -36,6 +39,17 @@ export default function TaskCreate() {
     [payload, form.projectId, form.scope],
   )
   const resolvedRepo = repoResult.repository
+  // A bug the rule gives no repository picks one (spec §5, the bug fallback):
+  // the project's linked repositories, else every repository.
+  const repoChoices = useMemo(
+    () => bugRepoChoices(form.projectId || null, payload?.projectRepos, payload?.repositories),
+    [payload, form.projectId],
+  )
+  const projectLinkCount = useMemo(
+    () => projectRepoList(form.projectId || null, payload?.projectRepos, payload?.repositories).length,
+    [payload, form.projectId],
+  )
+  const issueRepo = bugIssueRepo(form, resolvedRepo, repoChoices)
 
   // `?project=<docsSlug>` (the Tasks list's filter) preselects once the payload has the slugs.
   useEffect(() => {
@@ -59,14 +73,17 @@ export default function TaskCreate() {
   if (!payload) return null
 
   async function submit() {
-    const problem = validateCreateForm(form, resolvedRepo)
+    const problem = validateCreateForm(form, resolvedRepo, repoChoices)
     if (problem) { setError(problem); return }
     setSaving(true)
     setError(null)
     try {
-      const result = await createTask(createPayload(form, resolvedRepo))
+      const result = await createTask(createPayload(form, resolvedRepo, repoChoices))
       await refresh()
-      navigate(`/tools/team/tasks/${result.task.id}`, { state: { notice: result.note || 'Task created. Its Discord channel is ready.' } })
+      // The bot's note carries where the channel went and what happened to the
+      // GitHub issue (Issue: <url> / Issue: not opened — <reason> / Issue: off), one per line.
+      const notice = result.note ? `Task created.\n${result.note}` : 'Task created. Its Discord channel is ready.'
+      navigate(`/tools/team/tasks/${result.task.id}`, { state: { notice } })
     } catch (err) {
       setError(createErrorText(err as { status?: number; message?: string }))
       setSaving(false)
@@ -78,6 +95,8 @@ export default function TaskCreate() {
   }
 
   const isBug = form.type === 'bug'
+  const needsPick = isBug && !resolvedRepo && !!form.projectId
+  const pickHint = bugRepoHint(form, resolvedRepo, projectLinkCount)
 
   return (
     <>
@@ -128,10 +147,29 @@ export default function TaskCreate() {
             </Labeled>
           )}
 
+          {needsPick && (
+            <Labeled label="Repository" theme={theme}>
+              {repoChoices.length ? (
+                <>
+                  {pickHint && <p className={c('text-sm m-0 mb-2', muted(theme))}>{pickHint}</p>}
+                  <select className="input-base" value={form.repoPick} required aria-required="true"
+                    onChange={(e) => set('repoPick', e.target.value)} disabled={saving}>
+                    <option value="">Pick a repository…</option>
+                    {repoChoices.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+                </>
+              ) : (
+                <p className="text-sm font-semibold text-red-500 m-0">{NO_REPO_AT_ALL_MESSAGE}</p>
+              )}
+            </Labeled>
+          )}
+
           <Labeled label="GitHub" theme={theme}>
-            <p className={c('text-sm m-0 mb-2', muted(theme))}>{issueTargetText(repoResult, form.scope || null)}</p>
+            <p className={c('text-sm m-0 mb-2', muted(theme))}>
+              {issueRepo && !resolvedRepo ? `Issue goes to ${issueRepo.name}` : issueTargetText(repoResult, form.scope || null)}
+            </p>
             <label className={c('inline-flex items-center gap-2 text-sm', txt(theme))}>
-              <input type="checkbox" checked={!!resolvedRepo && form.createIssue} disabled={saving || !resolvedRepo}
+              <input type="checkbox" checked={!!issueRepo && form.createIssue} disabled={saving || !issueRepo}
                 onChange={(e) => set('createIssue', e.target.checked)} />
               Open a GitHub issue
             </label>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveTaskRepo, repoReasonText, projectRepoList, issueTargetText } from './repoLogic'
+import { resolveTaskRepo, repoReasonText, projectRepoList, issueTargetText, bugRepoChoices } from './repoLogic'
 import type { RepoRef, ProjectRepoLink } from '../tasksLogic'
 
 // Mirrors the bot's rule tests (bot/src/services/taskRepo.test.js) — same
@@ -106,5 +106,31 @@ describe('projectRepoList', () => {
   it('returns [] for a project with no links, and for a null project id', () => {
     expect(projectRepoList('p3', projectRepos, repositories)).toEqual([])
     expect(projectRepoList(null, projectRepos, repositories)).toEqual([])
+  })
+})
+
+// F5 (final review, 2026-09-30): the bug fallback picker's options (spec §5).
+describe('bugRepoChoices', () => {
+  const R3: RepoRef = { id: 'r3', name: 'Alpha_Docs', url: 'https://github.com/ubs-dev-org/Alpha_Docs' }
+  const all = [R1, R2, R3]
+
+  it("offers every repository linked to the project, in the project cards' order", () => {
+    const links: ProjectRepoLink[] = [link('r2', 'frontend'), link('r1', 'backend'), link('r3', 'backend', 'p2')]
+    expect(bugRepoChoices('p1', links, all)).toEqual([R1, R2])
+  })
+
+  it('offers every repository when the project has no links', () => {
+    expect(bugRepoChoices('p1', [link('r1', 'backend', 'p2')], all)).toEqual([R3, R1, R2])
+    expect(bugRepoChoices('p1', undefined, all)).toEqual([R3, R1, R2])
+  })
+
+  it('offers nothing only when there are no repositories at all, or no project', () => {
+    expect(bugRepoChoices('p1', [], [])).toEqual([])
+    expect(bugRepoChoices('p1', undefined, undefined)).toEqual([])
+    expect(bugRepoChoices(null, [link('r1')], all)).toEqual([])
+  })
+
+  it('ignores a link to a deleted repository (falls back to all when that was the only one)', () => {
+    expect(bugRepoChoices('p1', [link('gone', 'backend')], all)).toEqual([R3, R1, R2])
   })
 })

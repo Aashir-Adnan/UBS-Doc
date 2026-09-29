@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { RepoRef, TaskRow, TasksPayload } from '../tasksLogic'
 import {
   formFromTask, diffChanges, validateForm, emptyCreateForm, validateCreateForm, createPayload,
-  blockerCandidates, saveErrorText, createErrorText, scopeOptionsFor,
+  blockerCandidates, saveErrorText, createErrorText, scopeOptionsFor, bugIssueRepo, bugRepoHint,
 } from './taskFormLogic'
 
 const R1: RepoRef = { id: 'r1', name: 'Framework_Node', url: 'https://github.com/ubs-dev-org/Framework_Node' }
@@ -68,16 +68,61 @@ describe('validateForm', () => {
 })
 
 describe('create form', () => {
-  const NO_REPO_MESSAGE = 'This project has no repository for this scope — link one in Discord with /projects → Link repo.'
+  const NO_REPO_MESSAGE = 'This project has no repository — add one in Discord with /repos add.'
+  const R2: RepoRef = { id: 'r2', name: 'Framework_React', url: 'https://github.com/ubs-dev-org/Framework_React' }
 
   it('validates title and project', () => {
     expect(validateCreateForm({ ...emptyCreateForm('P1'), title: '' }, null)).toBe('A task needs a title.')
     expect(validateCreateForm({ ...emptyCreateForm(''), title: 'x' }, null)).toBe('Pick a project for the task.')
     expect(validateCreateForm({ ...emptyCreateForm('P1'), title: 'x' }, null)).toBeNull()
   })
-  it('refuses a bug with no resolvable repository, client-side, with the exact sentence', () => {
+  it('refuses a bug only when there is no repository at all to pick, with the exact sentence', () => {
     expect(validateCreateForm({ ...emptyCreateForm('P1'), title: 'x', type: 'bug' }, null)).toBe(NO_REPO_MESSAGE)
+    expect(validateCreateForm({ ...emptyCreateForm('P1'), title: 'x', type: 'bug' }, null, [])).toBe(NO_REPO_MESSAGE)
     expect(validateCreateForm({ ...emptyCreateForm('P1'), title: 'x', type: 'bug' }, R1)).toBeNull()
+  })
+
+  // F5 (final review, 2026-09-30; spec §5): the bug fallback picker.
+  it('a bug the rule gives no repository must pick one of the choices', () => {
+    const bug = { ...emptyCreateForm('P1'), title: 'x', type: 'bug' as const }
+    expect(validateCreateForm(bug, null, [R1, R2])).toBe('Pick a repository for the bug.')
+    expect(validateCreateForm({ ...bug, repoPick: 'gone' }, null, [R1, R2])).toBe('Pick a repository for the bug.')
+    expect(validateCreateForm({ ...bug, repoPick: 'r2' }, null, [R1, R2])).toBeNull()
+  })
+  it('the pick is ignored when the rule resolves a repository', () => {
+    const bug = { ...emptyCreateForm('P1'), title: 'x', type: 'bug' as const, repoPick: 'r2' }
+    expect(validateCreateForm(bug, R1, [R1, R2])).toBeNull()
+    expect(createPayload(bug, R1, [R1, R2])).toMatchObject({ repository_ids: [], create_issue: true })
+    expect(bugIssueRepo(bug, R1, [R1, R2])).toEqual(R1)
+  })
+  it('the payload carries the pick as repository_ids for a bug the rule gives none', () => {
+    const bug = { ...emptyCreateForm('P1'), title: 'x', type: 'bug' as const, repoPick: 'r2' }
+    expect(createPayload(bug, null, [R1, R2])).toMatchObject({ type: 'bug', repository_ids: ['r2'], create_issue: true })
+    expect(createPayload({ ...bug, createIssue: false }, null, [R1, R2])).toMatchObject({ repository_ids: ['r2'], create_issue: false })
+    expect(bugIssueRepo(bug, null, [R1, R2])).toEqual(R2)
+  })
+  it('a pick that is not among the choices is never sent', () => {
+    const bug = { ...emptyCreateForm('P1'), title: 'x', type: 'bug' as const, repoPick: 'gone' }
+    expect(createPayload(bug, null, [R1, R2])).toMatchObject({ repository_ids: [], create_issue: false })
+    expect(bugIssueRepo(bug, null, [R1, R2])).toBeNull()
+  })
+  it('a feature never sends a pick', () => {
+    const feature = { ...emptyCreateForm('P1'), title: 'x', repoPick: 'r2' }
+    expect(createPayload(feature, null, [R1, R2])).toMatchObject({ repository_ids: [], create_issue: false })
+    expect(bugIssueRepo(feature, null, [R1, R2])).toBeNull()
+  })
+  it('defaults the pick to empty', () => {
+    expect(emptyCreateForm('P1').repoPick).toBe('')
+  })
+  it('hints at the scope only for a scope-less bug in a project with several links', () => {
+    const HINT = 'Pick a scope to choose the repository automatically, or pick one below.'
+    const bug = { ...emptyCreateForm('P1'), title: 'x', type: 'bug' as const }
+    expect(bugRepoHint(bug, null, 2)).toBe(HINT)
+    expect(bugRepoHint(bug, null, 1)).toBeNull()
+    expect(bugRepoHint(bug, null, 0)).toBeNull()
+    expect(bugRepoHint({ ...bug, scope: 'design' }, null, 2)).toBeNull()
+    expect(bugRepoHint(bug, R1, 2)).toBeNull()
+    expect(bugRepoHint({ ...bug, type: 'feature' }, null, 2)).toBeNull()
   })
   it('allows a feature with no resolvable repository', () => {
     expect(validateCreateForm({ ...emptyCreateForm('P1'), title: 'x', type: 'feature' }, null)).toBeNull()
