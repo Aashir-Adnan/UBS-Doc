@@ -204,7 +204,7 @@ export default function TeamLayout() {
           </div>
         )}
 
-        {showLinkCard ? <LinkCard theme={theme} onLinked={refresh} /> : <Outlet context={context} />}
+        {showLinkCard ? <LinkCard theme={theme} onLinked={async () => { await refresh(); void clock.refresh() }} /> : <Outlet context={context} />}
       </div>
       {clock.toast && <Toast key={clock.toast.seq} message={clock.toast.message} tone={clock.toast.tone} onClose={clock.dismissToast} />}
     </div>

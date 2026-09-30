@@ -4,6 +4,7 @@
 import type { ClockInResult, ClockOutResult, ClockStatus, ClockedInPerson } from '../../components/discordTasks/api'
 import { isTerminal, type ProjectGroup } from '../tasksLogic'
 import { formatDuration } from './timeLogic'
+import { plainRuleMessage } from './boardLogic'
 
 export const GENERAL_WORK = 'General work'
 const MAX_CHOICES = 50
@@ -46,6 +47,19 @@ export function clockTaskChoices(projects: ProjectGroup[], query: string): Clock
 // status, so a running clock never loses its Clock out button to a blip.
 export const isClockUnavailable = (linked: boolean | null, lastFetchFailed: boolean): boolean =>
   lastFetchFailed && linked === null
+
+// What the unavailable pill says. A 4xx other than 404 that carries a sentence
+// (e.g. 400 "No staff member matches that Discord account.") is the backend
+// telling this person why; a 404 (older backend without the endpoints), a 5xx
+// or a network error keeps the bare text.
+export const CLOCK_UNAVAILABLE = 'Clock unavailable'
+export function clockUnavailableText(error: unknown): string {
+  const e = error as { status?: unknown; message?: unknown } | null
+  const status = typeof e?.status === 'number' ? e.status : 0
+  if (status < 400 || status >= 500 || status === 404) return CLOCK_UNAVAILABLE
+  const sentence = typeof e?.message === 'string' ? plainRuleMessage(e.message) : ''
+  return sentence || CLOCK_UNAVAILABLE
+}
 
 // A task the viewer cannot see arrives as taskTitle 'a task' (taskId null); a
 // missing title on a real task id is never shown as General work.

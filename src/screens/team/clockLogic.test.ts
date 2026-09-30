@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { clockedInTaskLabel, isClockUnavailable, formatElapsed, elapsedNow, clockTaskChoices, taskClockAction, clockOutcomeText, clockOutText } from './clockLogic'
+import { clockedInTaskLabel, isClockUnavailable, formatElapsed, elapsedNow, clockTaskChoices, taskClockAction, clockOutcomeText, clockOutText, clockUnavailableText } from './clockLogic'
 import type { ClockStatus, ClockInResult } from '../../components/discordTasks/api'
 import type { ProjectGroup, TaskRow } from '../tasksLogic'
 
@@ -100,6 +100,20 @@ describe('clockedInTaskLabel', () => {
   it('says a task when the id is set but the title is missing', () => expect(clockedInTaskLabel({ taskId: 't1', taskTitle: null })).toBe('a task'))
   it('says General work with neither', () => expect(clockedInTaskLabel({ taskId: null, taskTitle: null })).toBe('General work'))
   it('keeps the backend hidden-task shape as a task', () => expect(clockedInTaskLabel({ taskId: null, taskTitle: 'a task' })).toBe('a task'))
+})
+
+describe('clockUnavailableText', () => {
+  const err = (status: number | undefined, message: string) => Object.assign(new Error(message), status === undefined ? {} : { status })
+  it('shows the backend sentence for a 400', () => {
+    expect(clockUnavailableText(err(400, 'No staff member matches that Discord account.'))).toBe('No staff member matches that Discord account.')
+  })
+  it('keeps the bare text for a 404', () => expect(clockUnavailableText(err(404, 'Not found'))).toBe('Clock unavailable'))
+  it('keeps the bare text for a 500 with a message', () => expect(clockUnavailableText(err(500, 'Boom'))).toBe('Clock unavailable'))
+  it('keeps the bare text when there is no status', () => expect(clockUnavailableText(new Error('Failed to fetch'))).toBe('Clock unavailable'))
+  it('keeps the bare text for a 400 with an empty message', () => {
+    expect(clockUnavailableText(err(400, ''))).toBe('Clock unavailable')
+    expect(clockUnavailableText(err(400, '  '))).toBe('Clock unavailable')
+  })
 })
 
 describe('isClockUnavailable', () => {

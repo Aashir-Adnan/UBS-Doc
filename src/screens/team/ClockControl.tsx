@@ -7,7 +7,7 @@ import {
   type ClockStatus,
 } from '../../components/discordTasks/api'
 import type { ProjectGroup } from '../tasksLogic'
-import { clockOutText, clockOutcomeText, clockTaskChoices, elapsedNow, formatElapsed, isClockUnavailable } from './clockLogic'
+import { CLOCK_UNAVAILABLE, clockUnavailableText, clockOutText, clockOutcomeText, clockTaskChoices, elapsedNow, formatElapsed, isClockUnavailable } from './clockLogic'
 import { plainRuleMessage } from './boardLogic'
 import type { ToastTone } from './Toast'
 
@@ -29,6 +29,8 @@ export interface ClockState {
   // null until the first status fetch settles.
   linked: boolean | null
   unavailable: boolean
+  // What the unavailable pill says: the backend's sentence for a refused call.
+  unavailableText: string
   status: ClockStatus
   // When the status was fetched; elapsed time ticks forward from this, never
   // from the status's clockInAt.
@@ -45,6 +47,7 @@ export interface ClockState {
 export function useClock(): ClockState {
   const [linked, setLinked] = useState<boolean | null>(null)
   const [failed, setFailed] = useState(false)
+  const [unavailableText, setUnavailableText] = useState(CLOCK_UNAVAILABLE)
   const [status, setStatus] = useState<ClockStatus>(INACTIVE)
   const [fetchedAt, setFetchedAt] = useState(() => Date.now())
   const [busy, setBusy] = useState(false)
@@ -67,16 +70,22 @@ export function useClock(): ClockState {
       setStatus(r && r.linked && r.status ? r.status : INACTIVE)
       setFetchedAt(Date.now())
       setFailed(false)
-    } catch {
+    } catch (e) {
       if (!alive.current || mine !== seq.current) return
+      setUnavailableText(clockUnavailableText(e))
       setFailed(true)
     }
   }, [])
 
+  // Polls while the tab is visible; a hidden tab skips the tick (it would only
+  // keep the session alive and cost a backend call), and coming back to the tab
+  // refreshes once.
   useEffect(() => {
     void refresh()
-    const id = setInterval(() => { void refresh() }, REFRESH_MS)
-    return () => clearInterval(id)
+    const id = setInterval(() => { if (!document.hidden) void refresh() }, REFRESH_MS)
+    const onVisible = () => { if (!document.hidden) void refresh() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible) }
   }, [refresh])
 
   const clockInOn = useCallback(async (taskId: string | null) => {
@@ -91,6 +100,7 @@ export function useClock(): ClockState {
       return true
     } catch (e) {
       show(plainRuleMessage(e instanceof Error ? e.message : '') || 'Could not clock in.', 'error')
+      void refresh()
       return false
     } finally { if (alive.current) setBusy(false) }
   }, [refresh, show])
@@ -105,12 +115,13 @@ export function useClock(): ClockState {
       return true
     } catch (e) {
       show(plainRuleMessage(e instanceof Error ? e.message : '') || 'Could not clock out.', 'error')
+      void refresh()
       return false
     } finally { if (alive.current) setBusy(false) }
   }, [refresh, show])
 
   const unavailable = isClockUnavailable(linked, failed)
-  return { linked, unavailable, status, fetchedAt, busy, refresh, clockInOn, clockOutNow, toast, dismissToast }
+  return { linked, unavailable, unavailableText, status, fetchedAt, busy, refresh, clockInOn, clockOutNow, toast, dismissToast }
 }
 
 // Closes on Escape and on a press outside `ref`.
@@ -128,7 +139,7 @@ function useDismiss(open: boolean, onClose: () => void, ref: React.RefObject<HTM
 export default function ClockControl({ clock, projects }: { clock: ClockState; projects: ProjectGroup[] }) {
   const { theme } = useTheme()
   const d = theme === 'dark'
-  const { linked, unavailable, status, fetchedAt, busy } = clock
+  const { linked, unavailable, unavailableText, status, fetchedAt, busy } = clock
   const [now, setNow] = useState(() => Date.now())
   const [pickerOpen, setPickerOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -156,7 +167,7 @@ export default function ClockControl({ clock, projects }: { clock: ClockState; p
 
   const pill = c('inline-flex items-center gap-2 h-11 px-3 rounded-xl text-xs font-semibold', muted(theme))
 
-  if (unavailable) return <span className={pill}><Clock size={14} /> Clock unavailable</span>
+  if (unavailable) return <span className={pill}><Clock size={14} /> {unavailableText}</span>
   if (linked === null) return null
   if (!linked) return <span className={pill}><Clock size={14} /> Link your Discord account to clock in</span>
 
