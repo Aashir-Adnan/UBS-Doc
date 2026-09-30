@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { clockedInTaskLabel, isClockUnavailable, formatElapsed, elapsedNow, clockTaskChoices, taskClockAction, clockOutcomeText, clockOutText, clockUnavailableText } from './clockLogic'
+import { clockedInTaskLabel, isClockUnavailable, formatElapsed, elapsedNow, clockTaskChoices, taskClockAction, clockOutcomeText, clockOutText, clockUnavailableText, clockTagFor, clockTagText, clockTagTitle } from './clockLogic'
 import type { ClockStatus, ClockInResult } from '../../components/discordTasks/api'
 import type { ProjectGroup, TaskRow } from '../tasksLogic'
 
@@ -122,5 +122,44 @@ describe('isClockUnavailable', () => {
     expect(isClockUnavailable(true, true)).toBe(false)
     expect(isClockUnavailable(false, true)).toBe(false)
     expect(isClockUnavailable(null, false)).toBe(false)
+  })
+})
+
+describe('clockTagFor', () => {
+  const on = (taskId: string | null): ClockStatus => ({ active: true, entryId: 'e1', taskId, taskTitle: 'T', projectName: null, clockInAt: '2026-09-30T10:00:00Z', elapsedSeconds: 60 })
+  const person = (discordId: string, name: string, taskId: string | null) => ({ discordId, name, taskId })
+  const off: ClockStatus = { active: false }
+
+  it('is null when nobody is on the task', () => {
+    expect(clockTagFor(['t1'], off, [], [])).toBeNull()
+    expect(clockTagFor(['t1'], on('t2'), [person('2', 'Ali', 't3')], ['1'])).toBeNull()
+    expect(clockTagFor(['t1'], on(null), [person('2', 'Ali', null)], ['1'])).toBeNull()
+  })
+  it('marks the viewer from their own status, with no people list', () => {
+    expect(clockTagFor(['t1'], on('t1'), [], ['1'])).toEqual({ mine: true, others: [] })
+  })
+  it('names other people and leaves the viewer out of them', () => {
+    const people = [person('1', 'Me', 't1'), person('2', 'Ali', 't1'), person('3', 'Sara', 't2')]
+    expect(clockTagFor(['t1'], on('t1'), people, ['1'])).toEqual({ mine: true, others: ['Ali'] })
+    expect(clockTagFor(['t2'], on('t1'), people, ['1'])).toEqual({ mine: false, others: ['Sara'] })
+  })
+  it('counts a clock on a subtask for its parent card', () => {
+    expect(clockTagFor(['t1', 's1'], on('s1'), [person('2', 'Ali', 's1')], ['1'])).toEqual({ mine: true, others: ['Ali'] })
+  })
+  it('falls back to the Discord id for a nameless person and never matches a redacted entry', () => {
+    expect(clockTagFor(['t1'], off, [person('2', '', 't1'), person('3', 'Hidden', null)], [])).toEqual({ mine: false, others: ['2'] })
+  })
+})
+
+describe('clockTagText', () => {
+  it('words each case', () => {
+    expect(clockTagText({ mine: true, others: [] })).toBe('You are clocked in')
+    expect(clockTagText({ mine: true, others: ['Ali'] })).toBe('You + 1 clocked in')
+    expect(clockTagText({ mine: false, others: ['Ali'] })).toBe('Ali clocked in')
+    expect(clockTagText({ mine: false, others: ['Ali', 'Sara'] })).toBe('2 clocked in')
+  })
+  it('lists everyone for the tooltip', () => {
+    expect(clockTagTitle({ mine: true, others: ['Ali', 'Sara'] })).toBe('Clocked in now: you, Ali, Sara')
+    expect(clockTagTitle({ mine: false, others: ['Ali'] })).toBe('Clocked in now: Ali')
   })
 })

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Ban, ListChecks, Clock } from 'lucide-react'
-import { c, card, txt, muted, chipGray, chipRed } from '../../lib'
+import { Ban, ListChecks, Clock, Timer } from 'lucide-react'
+import { c, card, txt, muted, chipGray, chipRed, chipMint } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
 import { allTasks, applyFilters, statusTone, STATUS_LABEL, type TaskRow } from '../tasksLogic'
 import { useActingPermissions } from '../../components/portal/tenantProjects/useActingPermissions'
-import { setTaskStatus } from '../../components/discordTasks/api'
+import { fetchClockedIn, setTaskStatus, type ClockedInPerson } from '../../components/discordTasks/api'
 import {
   COLUMNS, groupByColumn, dropOutcome, dropBlockReason, classifyDropError, releaseOverride, retireOverrides, blockedLabel, edgeScrollDelta,
   type BoardColumn,
@@ -20,6 +20,7 @@ import { whoLine } from './activityLogic'
 import { topLevel, progressText } from './hierarchyLogic'
 import { timeChip } from './timeLogic'
 import TaskPreview from './TaskPreview'
+import { clockTagFor, clockTagText, clockTagTitle, type ClockTag } from './clockLogic'
 
 // The Board tab: the same filtered corpus as the Tasks tab, laid out in the
 // four fixed columns, with native HTML drag and drop writing a status change
@@ -42,10 +43,11 @@ interface ToastState { message: string; tone: ToastTone; seq: number }
 
 export default function Board() {
   const { theme } = useTheme()
-  const { payload, loading, error, filters, refresh } = useTeam()
+  const { payload, loading, error, filters, refresh, clock } = useTeam()
   const { search } = useLocation()
   const { hasOnAnyRole, loaded } = useActingPermissions()
   const canMove = hasOnAnyRole('update_discord_tasks')
+  const seesClocks = loaded && hasOnAnyRole('view_discord_time')
 
   const [overrides, setOverrides] = useState<Record<string, string>>({})
   // The newest status requested per card, readable synchronously. A setState
@@ -55,6 +57,18 @@ export default function Board() {
   const scroller = useRef<HTMLDivElement>(null)
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [toast, setToast] = useState<ToastState | null>(null)
+  // Who is clocked in, for the cards' tag. Only holders of view_discord_time
+  // may ask; everyone else still gets their own clock from the shared status.
+  // Refetched with the payload and whenever the viewer's own clock changes; a
+  // failure just leaves the tags showing the viewer's own clock.
+  const [clockedIn, setClockedIn] = useState<ClockedInPerson[]>([])
+  const clockKey = clock.status.active ? clock.status.entryId : ''
+  useEffect(() => {
+    if (!seesClocks) { setClockedIn([]); return }
+    let alive = true
+    fetchClockedIn().then((r) => { if (alive) setClockedIn(r?.people ?? []) }).catch(() => { if (alive) setClockedIn([]) })
+    return () => { alive = false }
+  }, [seesClocks, payload, clockKey])
 
   const projects = payload?.projects ?? []
   // The board has no status filter of its own — its columns are the statuses —
@@ -72,6 +86,15 @@ export default function Board() {
     [tasks, overrides],
   )
   const groups = useMemo(() => groupByColumn(shown), [shown])
+  const myIds = payload?.viewer?.discordIds
+  const clockTags = useMemo(() => {
+    const out: Record<string, ClockTag> = {}
+    for (const t of shown) {
+      const tag = clockTagFor([t.id, ...(t.subtasks ?? []).map((s) => s.id)], clock.status, clockedIn, myIds ?? [])
+      if (tag) out[t.id] = tag
+    }
+    return out
+  }, [shown, clock.status, clockedIn, myIds])
 
   // An override retires only when the payload is seen to carry that status.
   // Nothing else drops one: if a refetch fails and leaves the payload stale,
@@ -183,6 +206,7 @@ export default function Board() {
               theme={theme}
               search={search}
               canMove={canMove}
+              clockTags={clockTags}
               over={dragOver === col.key}
               onDragOver={(e) => {
                 if (!canMove) return
@@ -208,12 +232,13 @@ export default function Board() {
   )
 }
 
-function Column({ col, tasks, theme, search, canMove, over, onDragOver, onDragLeave, onDrop }: {
+function Column({ col, tasks, theme, search, canMove, clockTags, over, onDragOver, onDragLeave, onDrop }: {
   col: BoardColumn
   tasks: TaskRow[]
   theme: Theme
   search: string
   canMove: boolean
+  clockTags: Record<string, ClockTag>
   over: boolean
   onDragOver: (e: DragEvent) => void
   onDragLeave: (e: DragEvent) => void
@@ -239,7 +264,7 @@ function Column({ col, tasks, theme, search, canMove, over, onDragOver, onDragLe
         <span className={c('text-xs font-bold px-2.5 py-0.5 rounded-full', chipGray(theme))}>{tasks.length}</span>
       </div>
       <div className="flex flex-col gap-3">
-        {tasks.map((t) => <Card key={t.id} t={t} col={col} theme={theme} search={search} canMove={canMove} />)}
+        {tasks.map((t) => <Card key={t.id} t={t} col={col} theme={theme} search={search} canMove={canMove} clockTag={clockTags[t.id]} />)}
         {tasks.length === 0 && (
           <p className={c('text-sm font-medium text-center py-8 m-0', muted(theme))}>Nothing here</p>
         )}
@@ -248,7 +273,7 @@ function Column({ col, tasks, theme, search, canMove, over, onDragOver, onDragLe
   )
 }
 
-function Card({ t, col, theme, search, canMove }: { t: TaskRow; col: BoardColumn; theme: Theme; search: string; canMove: boolean }) {
+function Card({ t, col, theme, search, canMove, clockTag }: { t: TaskRow; col: BoardColumn; theme: Theme; search: string; canMove: boolean; clockTag?: ClockTag }) {
   const d = theme === 'dark'
   return (
     <article
@@ -274,6 +299,11 @@ function Card({ t, col, theme, search, canMove }: { t: TaskRow; col: BoardColumn
           badges reads the same down the whole column. */}
       <div className="flex flex-wrap items-center gap-1.5 mb-3">
         <ScopeBadge scope={t.scope} theme={theme} showEmpty />
+        {clockTag && (
+          <span title={clockTagTitle(clockTag)} className={c('text-[11px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1 max-w-full', chipMint(theme))}>
+            <Timer size={12} className="shrink-0" /> <span className="truncate">{clockTagText(clockTag)}</span>
+          </span>
+        )}
         {t.type === 'bug' && (
           <span className={c('text-[11px] font-bold px-2 py-0.5 rounded-md', chipRed(theme))}>Bug</span>
         )}
