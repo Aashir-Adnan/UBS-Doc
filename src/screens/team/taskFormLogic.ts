@@ -244,20 +244,23 @@ export function saveErrorText(err: { status?: number; message?: string }): strin
  * (a real 400/403/409 rejection, or one of the three misconfiguration
  * sentences) is unambiguous and passes through exactly as saveErrorText phrases it.
  */
-export function createErrorText(err: { status?: number; message?: string }): string {
+export function createMayHaveSucceeded(err: { status?: number; message?: string }): boolean {
   const status = err?.status
   const message = (err?.message ?? '').trim()
-  if (status === 403 || status === 400 || status === 409) return saveErrorText(err)
+  if (status === 403 || status === 400 || status === 409) return false
   // The three configuration sentences (see saveErrorText) are unambiguous too: they are
   // raised before any write is attempted, so "try again" is correct, not misleading.
-  if (/not configured|rejected the request|unreadable reply/i.test(message)) return saveErrorText(err)
-  const maybeCreated =
-    status === 502 || status === 503 ||
+  if (/not configured|rejected the request|unreadable reply/i.test(message)) return false
+  return status === 502 || status === 503 ||
     /not reachable|failed to fetch|networkerror|load failed/i.test(message) ||
     (typeof status === 'number' && status >= 500)
-  if (maybeCreated) {
-    return 'The Discord bot did not answer in time. The task may already have been created — check the Tasks list before trying again.'
-  }
+}
+
+export const CREATE_MAYBE_CREATED_TEXT =
+  'The Discord bot did not answer in time. The task may already have been created — check the Tasks list before trying again.'
+
+export function createErrorText(err: { status?: number; message?: string }): string {
+  if (createMayHaveSucceeded(err)) return CREATE_MAYBE_CREATED_TEXT
   return saveErrorText(err)
 }
 

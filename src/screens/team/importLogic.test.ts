@@ -3,6 +3,7 @@ import {
   MAX_IMPORT_TASKS, MAX_IMPORT_BYTES, parseImportFile, importSteps, initialRun, applyStepResult, nextStep,
   importSummary, leftoverFile, importSampleFile, createInputFor, parentTaskIdFor,
   entryTitle, importButtonLabel, checkHeadline, checkFailure, stepFailure, IMPORT_UNAVAILABLE_TEXT, FORMAT_TASK_FIELDS, FORMAT_RULES,
+  FORMAT_SUBTASK_FIELDS, stepFailureResult, RUNNING_NOTICE, FILE_TOO_LARGE_TEXT,
 } from './importLogic'
 import type { ImportFields, ImportVerdict } from '../../components/discordTasks/api'
 
@@ -198,7 +199,64 @@ describe('screen texts', () => {
 
   it('carries the format contract', () => {
     expect(FORMAT_TASK_FIELDS.map((f) => f.name)).toEqual(['type', 'title', 'description', 'scope', 'status', 'modules', 'assignees', 'subtasks'])
+    const rule = (name: string) => FORMAT_TASK_FIELDS.find((f) => f.name === name)?.rule ?? ''
+    expect(rule('title')).toContain('200')
+    expect(rule('description')).toContain('2000')
+    expect(rule('modules')).toContain('20')
+    expect(rule('modules')).toContain('100')
+    expect(rule('assignees')).toContain('50')
+    expect(rule('subtasks')).toContain('25')
+    expect(FORMAT_RULES[0]).toContain('50 tasks')
     expect(FORMAT_RULES[0]).toContain('90 KB')
+    expect(FORMAT_SUBTASK_FIELDS.find((f) => f.name === 'scope')?.rule).toBe("Same values as a task's.")
+    expect(FORMAT_SUBTASK_FIELDS.find((f) => f.name === 'status')?.rule).toBe("Same values as a task's.")
+  })
+
+  it('does not throw on a non-object throw', () => {
+    expect(checkFailure(undefined as never)).toBe('The check failed.')
+    expect(checkFailure('boom' as never)).toBe('The check failed.')
+  })
+
+  it('has the running notice and the too-large text', () => {
+    expect(RUNNING_NOTICE).toBe('The import is still running. Stay on this page until it finishes.')
+    expect(FILE_TOO_LARGE_TEXT).toBe('The file is too large — 90 KB at most.')
+  })
+})
+
+describe('unconfirmed steps', () => {
+  const v = [{ index: 0, ok: true, errors: [], warnings: [], fields: fields('A', ['s1', 's2']) },
+    { index: 1, ok: true, errors: [], warnings: [], fields: fields('B', ['s3']) }] as ImportVerdict[]
+  const steps = importSteps(v)
+
+  it('classifies a maybe-created failure as unconfirmed, a plain rejection as failed', () => {
+    const a = stepFailureResult({ status: 502, message: 'bad gateway' }, 'task')
+    expect(a).toMatchObject({ ok: false, unconfirmed: true })
+    expect((a as { message: string }).message).toContain('may already have been created')
+    expect(stepFailureResult({ message: 'Failed to fetch' }, 'task')).toMatchObject({ unconfirmed: true })
+    expect(stepFailureResult({ status: 500, message: 'x' }, 'task')).toMatchObject({ unconfirmed: true })
+    const sub = stepFailureResult({ status: 503, message: 'x' }, 'subtask') as { message: string }
+    expect(sub.message).toContain('may already have been added')
+    expect(stepFailureResult({ status: 400, message: 'Title is required.' }, 'task')).toEqual({ ok: false, message: 'Title is required.' })
+    expect(stepFailureResult({ status: 503, message: 'Bot is not configured' }, 'task')).not.toHaveProperty('unconfirmed')
+    expect(stepFailureResult(null, 'task')).toEqual({ ok: false, message: 'The request failed.' })
+  })
+
+  it('an unconfirmed task skips its subtasks with its own sentence', () => {
+    const run = applyStepResult(initialRun(steps), steps, 't0', { ok: false, message: 'maybe', unconfirmed: true })
+    expect(run['t0']).toEqual({ state: 'unconfirmed', message: 'maybe' })
+    expect(run['t0.s0']).toEqual({ state: 'skipped', message: 'The task could not be confirmed, so its subtasks were not added.' })
+    expect(run['t1'].state).toBe('pending')
+  })
+
+  it('leaves unconfirmed tasks out of the leftover file and counts them apart in the summary', () => {
+    let run = initialRun(steps)
+    run = applyStepResult(run, steps, 't0', { ok: false, message: 'maybe', unconfirmed: true })
+    run = applyStepResult(run, steps, 't1', { ok: true, taskId: 'x' })
+    run = applyStepResult(run, steps, 't1.s0', { ok: false, message: 'maybe', unconfirmed: true })
+    expect(leftoverFile([{ a: 1 }, { b: 2 }], v, run, steps)).toEqual({ tasks: [] })
+    expect(importSummary(v, run, steps)).toBe('Imported 1 of 2 tasks. 2 could not be confirmed — check the Tasks list.')
+    const one = applyStepResult(initialRun(steps), steps, 't0', { ok: false, message: 'maybe', unconfirmed: true })
+    expect(importSummary(v, one, steps)).toContain(' 1 could not be confirmed — check the Tasks list.')
   })
 })
 

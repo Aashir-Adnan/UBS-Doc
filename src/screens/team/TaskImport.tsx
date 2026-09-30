@@ -9,9 +9,9 @@ import { useActingPermissions } from '../../components/portal/tenantProjects/use
 import { useTeam } from './TeamLayout'
 import { projectChoices } from './taskFormLogic'
 import {
-  FORMAT_RULES, FORMAT_SUBTASK_FIELDS, FORMAT_TASK_FIELDS, PARENT_MISSING_TEXT, applyStepResult, checkFailure, checkHeadline,
+  FILE_TOO_LARGE_TEXT, FILE_UNREADABLE_TEXT, FORMAT_RULES, FORMAT_SUBTASK_FIELDS, FORMAT_TASK_FIELDS, MAX_IMPORT_BYTES, PARENT_MISSING_TEXT, RUNNING_NOTICE, applyStepResult, checkFailure, checkHeadline,
   createInputFor, entryTitle, importButtonLabel, importSampleFile, importSteps, importSummary, initialRun, leftoverFile,
-  nextStep, parentTaskIdFor, parseImportFile, stepFailure, type ImportRun, type ImportStep, type StepResult,
+  nextStep, parentTaskIdFor, parseImportFile, stepFailureResult, type ImportRun, type ImportStep, type StepResult,
 } from './importLogic'
 
 // A file of tasks, checked by the bot without creating anything, then created
@@ -46,7 +46,12 @@ export default function TaskImport() {
   const [running, setRunning] = useState(false)
   const [finished, setFinished] = useState(false)
   const mounted = useRef(true)
-  useEffect(() => () => { mounted.current = false }, [])
+  const runningRef = useRef(false)
+  const checkSeq = useRef(0)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   const projects = projectChoices(payload?.projects ?? [])
   const steps = useMemo(() => (checked ? importSteps(checked.verdicts) : []), [checked])
@@ -85,13 +90,22 @@ export default function TaskImport() {
 
   async function pickFile(file: File | undefined) {
     if (!file) return
-    const content = await file.text()
-    if (!mounted.current) return
+    if (file.size > MAX_IMPORT_BYTES) { setChecked(null); setCheckError(FILE_TOO_LARGE_TEXT); return }
+    const seq = checkSeq.current
+    let content: string
+    try {
+      content = await file.text()
+    } catch {
+      if (mounted.current && seq === checkSeq.current) { setChecked(null); setCheckError(FILE_UNREADABLE_TEXT) }
+      return
+    }
+    if (!mounted.current || seq !== checkSeq.current) return
     setText(content)
     clearCheck()
   }
 
   async function check() {
+    checkSeq.current += 1
     const parsed = parseImportFile(text)
     if ('error' in parsed) { setChecked(null); setCheckError(parsed.error); return }
     setChecking(true)
@@ -121,13 +135,14 @@ export default function TaskImport() {
       const res = await addSubtask(parentId, sub.title, sub.holderIds, { description: sub.description, scope: sub.scope, status: sub.status })
       return { ok: true, taskId: res.task.id }
     } catch (err) {
-      return { ok: false, message: stepFailure(err as { message?: string }) }
+      return stepFailureResult(err as { status?: number; message?: string }, step.kind)
     }
   }
 
   // Strictly one request at a time, always to the end of the queue.
   async function startImport() {
-    if (!checked) return
+    if (!checked || runningRef.current) return
+    runningRef.current = true
     const { verdicts, projectId: pid, createIssues: issues } = checked
     setRunning(true)
     let r = initialRun(steps)
@@ -140,6 +155,7 @@ export default function TaskImport() {
       r = applyStepResult(r, steps, step.key, result)
       if (mounted.current) setRun(r)
     }
+    runningRef.current = false
     void refresh()
     if (mounted.current) { setRunning(false); setFinished(true) }
   }
@@ -154,8 +170,39 @@ export default function TaskImport() {
   const validCount = checked ? checked.verdicts.filter((v) => v.ok).length : 0
   const leftover = checked && finished ? leftoverFile(checked.tasks, checked.verdicts, run, steps) : null
 
+  const list = checked && (
+      <ul className="list-none p-0 m-0 flex flex-col gap-2">
+        {checked.verdicts.map((v) => (
+          <li key={v.index} className={c('rounded-xl border px-4 py-3', d ? 'border-white/10' : 'border-slate-200')}>
+            <Row label={v.fields?.title ?? entryTitle(checked.tasks[v.index], v.index)}
+              meta={v.fields ? `${v.fields.type} · ${v.fields.status.replace('_', ' ')}` : null}
+              verdict={v} state={run[`t${v.index}`]} theme={theme} />
+            {v.fields && v.fields.subtasks.length > 0 && (
+              <ul className="list-none p-0 m-0 mt-2 ml-5 flex flex-col gap-1.5">
+                {v.fields.subtasks.map((s, i) => (
+                  <li key={i}>
+                    <Row label={s.title} meta={s.status.replace('_', ' ')} verdict={null} state={run[`t${v.index}.s${i}`]} theme={theme} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ul>
+  )
+
   return (
     <>
+      {running && checked && (
+        <div role="dialog" aria-modal="true" aria-label="Import in progress"
+          className={c('fixed inset-0 z-[1000] overflow-auto px-4 py-8', d ? 'bg-slate-950' : 'bg-white')}>
+          <div className="mx-auto max-w-[900px] flex flex-col gap-4">
+            <h2 className={c('font-extrabold text-xl m-0', txt(theme))}>Import tasks</h2>
+            <p role="status" className="text-sm font-semibold text-amber-500 m-0">{RUNNING_NOTICE}</p>
+            {list}
+          </div>
+        </div>
+      )}
       <Link to={`/tools/team/tasks${search}`} className={c('inline-block text-sm font-semibold no-underline mb-4 tr',
         d ? 'text-white/40 hover:text-white/70' : 'text-slate-400 hover:text-indigo-600')}>&larr; Back to tasks</Link>
       <article className={c(card(theme), 'rounded-2xl p-5 sm:p-7')}>
@@ -193,24 +240,7 @@ export default function TaskImport() {
           {checked && (
             <section className="flex flex-col gap-3">
               <p className={c('text-sm font-semibold m-0', txt(theme))}>{checkHeadline(checked.verdicts)}</p>
-              <ul className="list-none p-0 m-0 flex flex-col gap-2">
-                {checked.verdicts.map((v) => (
-                  <li key={v.index} className={c('rounded-xl border px-4 py-3', d ? 'border-white/10' : 'border-slate-200')}>
-                    <Row label={v.fields?.title ?? entryTitle(checked.tasks[v.index], v.index)}
-                      meta={v.fields ? `${v.fields.type} · ${v.fields.status.replace('_', ' ')}` : null}
-                      verdict={v} state={run[`t${v.index}`]} theme={theme} />
-                    {v.fields && v.fields.subtasks.length > 0 && (
-                      <ul className="list-none p-0 m-0 mt-2 ml-5 flex flex-col gap-1.5">
-                        {v.fields.subtasks.map((s, i) => (
-                          <li key={i}>
-                            <Row label={s.title} meta={s.status.replace('_', ' ')} verdict={null} state={run[`t${v.index}.s${i}`]} theme={theme} />
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              {!running && list}
               <div className="flex flex-wrap gap-3 items-center">
                 <button type="button" className="btn-primary px-5 py-2.5 text-sm" disabled={validCount === 0 || running || finished} onClick={() => void startImport()}>
                   {running ? 'Importing…' : importButtonLabel(validCount)}
@@ -266,6 +296,7 @@ function Row({ label, meta, verdict, state, theme }: {
           <Link to={`/tools/team/tasks/${state.taskId}`} className="text-xs font-semibold text-emerald-500">Created</Link>
         )}
         {state?.state === 'failed' && <span className="text-xs font-semibold text-red-500">Failed: {state.message}</span>}
+        {state?.state === 'unconfirmed' && <span className="text-xs font-semibold text-amber-500">{state.message}</span>}
         {state?.state === 'skipped' && <span className="text-xs font-semibold text-amber-500">Skipped: {state.message}</span>}
       </div>
       {verdict?.errors.map((e, i) => <p key={`e${i}`} className="text-xs font-semibold text-red-500 m-0 mt-1">{e}</p>)}

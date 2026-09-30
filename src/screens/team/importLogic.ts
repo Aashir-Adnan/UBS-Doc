@@ -3,13 +3,17 @@
 // No React, no fetch, no DOM.
 import type { CreateTaskInput, ImportFields, ImportVerdict } from '../../components/discordTasks/api'
 import { plainRuleMessage } from './boardLogic'
+import { CREATE_MAYBE_CREATED_TEXT, createMayHaveSucceeded } from './taskFormLogic'
 
 export const MAX_IMPORT_TASKS = 50
 export const MAX_IMPORT_BYTES = 90 * 1024
+export const FILE_TOO_LARGE_TEXT = 'The file is too large — 90 KB at most.'
+export const FILE_UNREADABLE_TEXT = 'The file could not be read.'
+export const RUNNING_NOTICE = 'The import is still running. Stay on this page until it finishes.'
 
 // Entries are returned as-is: the backend validates them.
 export function parseImportFile(text: string): { tasks: unknown[] } | { error: string } {
-  if (new TextEncoder().encode(text).length > MAX_IMPORT_BYTES) return { error: 'The file is too large — 90 KB at most.' }
+  if (new TextEncoder().encode(text).length > MAX_IMPORT_BYTES) return { error: FILE_TOO_LARGE_TEXT }
   let data: unknown
   try {
     data = JSON.parse(text.replace(/^﻿/, ''))
@@ -28,9 +32,9 @@ export function parseImportFile(text: string): { tasks: unknown[] } | { error: s
 }
 
 export interface ImportStep { key: string; kind: 'task' | 'subtask'; taskIndex: number; subIndex?: number; title: string }
-export type StepState = 'pending' | 'running' | 'created' | 'failed' | 'skipped'
+export type StepState = 'pending' | 'running' | 'created' | 'failed' | 'skipped' | 'unconfirmed'
 export type ImportRun = Record<string, { state: StepState; message?: string; taskId?: string }>
-export type StepResult = { ok: true; taskId: string } | { ok: false; message: string }
+export type StepResult = { ok: true; taskId: string } | { ok: false; message: string; unconfirmed?: boolean }
 
 // Valid tasks only, in file order: each task, then its subtasks.
 export function importSteps(verdicts: ImportVerdict[]): ImportStep[] {
@@ -57,11 +61,12 @@ export function applyStepResult(run: ImportRun, steps: ImportStep[], key: string
     next[key] = { state: 'created', taskId: result.taskId }
     return next
   }
-  next[key] = { state: 'failed', message: result.message }
+  next[key] = { state: result.unconfirmed ? 'unconfirmed' : 'failed', message: result.message }
   const step = steps.find((s) => s.key === key)
   if (step?.kind === 'task') {
+    const why = result.unconfirmed ? UNCONFIRMED_SKIP_TEXT : PARENT_MISSING_TEXT
     for (const s of steps) {
-      if (s.kind === 'subtask' && s.taskIndex === step.taskIndex) next[s.key] = { state: 'skipped', message: 'The task was not created.' }
+      if (s.kind === 'subtask' && s.taskIndex === step.taskIndex) next[s.key] = { state: 'skipped', message: why }
     }
   }
   return next
@@ -83,6 +88,7 @@ export function importSummary(verdicts: ImportVerdict[], run: ImportRun, steps: 
   const imported = taskSteps.filter((s) => run[s.key]?.state === 'created').length
   const failed = taskSteps.filter((s) => run[s.key]?.state === 'failed').length
   const invalid = verdicts.filter((v) => !v.ok).length
+  const unconfirmed = steps.filter((s) => run[s.key]?.state === 'unconfirmed').length
   const subFailed = steps.filter((s) => s.kind === 'subtask' && run[s.key]?.state === 'failed').length
 
   let text = `Imported ${imported} of ${total} ${total === 1 ? 'task' : 'tasks'}.`
@@ -91,6 +97,7 @@ export function importSummary(verdicts: ImportVerdict[], run: ImportRun, steps: 
   if (failed) parts.push(`${failed} failed`)
   if (parts.length) text += ` ${parts.join(' and ')}.`
   if (subFailed) text += ` ${subFailed} ${subFailed === 1 ? 'subtask' : 'subtasks'} failed.`
+  if (unconfirmed) text += ` ${unconfirmed} could not be confirmed — check the Tasks list.`
   return text
 }
 
@@ -154,9 +161,9 @@ export function checkHeadline(verdicts: ImportVerdict[]): string {
 }
 
 // An older backend has no import-check route (404) or is offline (503).
-export function checkFailure(err: { status?: number; message?: string }): string {
-  if (err.status === 404 || err.status === 503) return IMPORT_UNAVAILABLE_TEXT
-  return plainRuleMessage(err.message ?? '') || 'The check failed.'
+export function checkFailure(err: { status?: number; message?: string } | null | undefined): string {
+  if (err?.status === 404 || err?.status === 503) return IMPORT_UNAVAILABLE_TEXT
+  return plainRuleMessage(err?.message ?? '') || 'The check failed.'
 }
 
 // The sentence for a step whose request threw.
@@ -164,7 +171,20 @@ export function stepFailure(err: { message?: string } | null | undefined): strin
   return plainRuleMessage(err?.message ?? '') || 'The request failed.'
 }
 
+const SUBTASK_MAYBE_ADDED_TEXT =
+  'The Discord bot did not answer in time. The subtask may already have been added — check the Tasks list before trying again.'
+
+// A step's thrown error as its result: a create that may have gone through is
+// unconfirmed (never retried, never in the leftover file), anything else failed.
+export function stepFailureResult(err: { status?: number; message?: string } | null | undefined, kind: 'task' | 'subtask'): StepResult & { ok: false } {
+  if (err && createMayHaveSucceeded(err)) {
+    return { ok: false, unconfirmed: true, message: kind === 'task' ? CREATE_MAYBE_CREATED_TEXT : SUBTASK_MAYBE_ADDED_TEXT }
+  }
+  return { ok: false, message: stepFailure(err) }
+}
+
 export const PARENT_MISSING_TEXT = 'The task was not created.'
+export const UNCONFIRMED_SKIP_TEXT = 'The task could not be confirmed, so its subtasks were not added.'
 
 export const FORMAT_TASK_FIELDS: { name: string; rule: string }[] = [
   { name: 'type', rule: 'Required. feature or bug.' },
@@ -180,8 +200,8 @@ export const FORMAT_TASK_FIELDS: { name: string; rule: string }[] = [
 export const FORMAT_SUBTASK_FIELDS: { name: string; rule: string }[] = [
   { name: 'title', rule: 'Required.' },
   { name: 'description', rule: 'Optional.' },
-  { name: 'scope', rule: 'Optional.' },
-  { name: 'status', rule: 'Optional.' },
+  { name: 'scope', rule: "Same values as a task's." },
+  { name: 'status', rule: "Same values as a task's." },
   { name: 'assignees', rule: 'Optional.' },
 ]
 
