@@ -3,9 +3,10 @@ import { ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { c, card, txt, muted } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
-import { ApiError, fetchTimeEntries, fetchTimeReport, type TimeEntriesPayload, type TimeReportPayload } from '../../components/discordTasks/api'
+import { ApiError, fetchClockedIn, fetchTimeEntries, fetchTimeReport, type ClockedInPerson, type TimeEntriesPayload, type TimeReportPayload } from '../../components/discordTasks/api'
 import { csvFilename, csvRows, entriesByTask, formatDuration, shiftWeek, toCsv, weekRange } from './timeLogic'
 import Avatar from './Avatar'
+import { formatElapsed } from './clockLogic'
 import { useTeam } from './TeamLayout'
 
 // The Time tab: its own fetch of GET /api/discord/time/report, entirely
@@ -63,6 +64,10 @@ export default function TimeTab() {
   const [data, setData] = useState<TimeReportPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Who is clocked in right now. Fetched with the report, only when the report
+  // is scope 'all' (the endpoint needs view_discord_time); null means not
+  // shown — a failed fetch must never break the report.
+  const [active, setActive] = useState<{ people: ClockedInPerson[]; fetchedAt: number } | null>(null)
 
   // Spec §5: a caller without view_discord_time only ever receives their own
   // data, so for them the person is always themselves — the shell hides the
@@ -93,7 +98,14 @@ export default function TimeTab() {
     setLoading(true)
     setError(null)
     fetchTimeReport(range.since, range.until, projectSlug)
-      .then((report) => { if (!cancelled) { setData(report); setTimeSelfScoped(report.scope === 'self') } })
+      .then((report) => {
+        if (cancelled) return
+        setData(report); setTimeSelfScoped(report.scope === 'self')
+        if (report.scope !== 'all') { setActive(null); return }
+        fetchClockedIn()
+          .then((r) => { if (!cancelled) setActive({ people: r.people ?? [], fetchedAt: Date.now() }) })
+          .catch(() => { if (!cancelled) setActive(null) })
+      })
       .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -203,6 +215,8 @@ export default function TimeTab() {
         </p>
       )}
 
+      {data?.scope === 'all' && active && <ClockedInNow people={active.people} fetchedAt={active.fetchedAt} theme={theme} />}
+
       {/* A week-to-week refetch (not the first load, which has its own full-card
           loading state above) dims the numbers in place instead of swapping
           them with no visual feedback while `data` still shows the old week. */}
@@ -302,6 +316,39 @@ function TimeCard({ title, theme, children }: { title: string; theme: Theme; chi
         <ul className={c('divide-y m-0 p-0 list-none', d ? 'divide-white/6' : 'divide-slate-100')}>{children}</ul>
       ) : (
         <p className={c('text-xs font-medium m-0 py-3', muted(theme))}>Nothing here for this range.</p>
+      )}
+    </section>
+  )
+}
+
+// The elapsed text ticks from the server's elapsedSeconds plus the time since
+// the fetch, never from clockInAt (the browser's clock may differ).
+function ClockedInNow({ people, fetchedAt, theme }: { people: ClockedInPerson[]; fetchedAt: number; theme: Theme }) {
+  const d = theme === 'dark'
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  const since = Math.max(0, Math.floor((now - fetchedAt) / 1000))
+  return (
+    <section className={c(card(theme), 'rounded-2xl p-5 mb-5')}>
+      <h2 className={c('font-extrabold text-sm m-0 mb-1', txt(theme))}>Clocked in now</h2>
+      {people.length === 0 ? (
+        <p className={c('text-xs font-medium m-0 py-3', muted(theme))}>Nobody is clocked in.</p>
+      ) : (
+        <ul className={c('divide-y m-0 p-0 list-none', d ? 'divide-white/6' : 'divide-slate-100')}>
+          {people.map((p) => (
+            <li key={p.discordId} className="py-2.5 flex items-center gap-3">
+              <Avatar person={p} size={22} theme={theme} />
+              <span className={c('text-sm font-semibold min-w-0 truncate', txt(theme))}>{p.name}</span>
+              <span className={c('text-xs font-medium flex-1 min-w-0 truncate', muted(theme))}>
+                {p.taskTitle ?? 'General work'}
+              </span>
+              <span className={c('text-xs font-bold tabular-nums', muted(theme))}>{formatElapsed(p.elapsedSeconds + since)}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   )

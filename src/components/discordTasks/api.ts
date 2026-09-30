@@ -255,3 +255,50 @@ export async function unlinkDiscord(userId: number, guildConfigId: string): Prom
     body: JSON.stringify({ user_id: userId, guild_config_id: guildConfigId }),
   })
 }
+
+// Clock in and out from the site. Same bot-backed rules as /clock-in and
+// /clock-out; `apiCall` surfaces the bot's sentence (403 not linked, 404 no
+// such task, 409 not available / not clocked in) as ApiError.message.
+// `elapsedSeconds` is the server's own count at the moment of the response:
+// the site ticks forward from it and never from `clockInAt`, so a browser
+// clock or timezone that differs from the server's cannot skew the display.
+export type ClockStatus =
+  | { active: false }
+  | { active: true; entryId: string; taskId: string | null; taskTitle: string; projectName: string | null; clockInAt: string; elapsedSeconds: number }
+export interface ClockInResult {
+  outcome: 'started' | 'switched' | 'unchanged'
+  stopped: { title: string; minutes: number } | null
+  status: ClockStatus
+}
+export interface ClockOutResult { minutes: number; taskTitle: string | null; taskTotalMinutes: number }
+export interface ClockedInPerson {
+  discordId: string; name: string; avatarUrl?: string
+  taskId: string | null; taskTitle: string | null
+  projectId: string | null; projectName: string | null
+  clockInAt: string; elapsedSeconds: number
+}
+
+export async function clockIn(taskId: string | null): Promise<ClockInResult> {
+  return apiCall<ClockInResult>('/discord/clock/in', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ task_id: taskId }),
+  })
+}
+
+export async function clockOut(note: string): Promise<ClockOutResult> {
+  const trimmed = note.trim()
+  return apiCall<ClockOutResult>('/discord/clock/out', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(trimmed ? { note: trimmed } : {}),
+  })
+}
+
+export async function fetchClockStatus(): Promise<{ linked: boolean; status?: ClockStatus }> {
+  return apiCall<{ linked: boolean; status?: ClockStatus }>('/discord/clock/status')
+}
+
+export async function fetchClockedIn(): Promise<{ people: ClockedInPerson[] }> {
+  return apiCall<{ people: ClockedInPerson[] }>('/discord/time/active')
+}
