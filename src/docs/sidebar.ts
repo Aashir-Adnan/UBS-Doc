@@ -440,6 +440,7 @@ export const SIDEBAR: SidebarNode[] = [
             label: 'Guest Support FAQs',
             items: [
               'hms-documentation/guest-apis/guest-support-faqs/guest-support-faqs',
+              'hms-documentation/guest-apis/guest-support-tickets/guest-support-tickets',
             ],
           },
           {
