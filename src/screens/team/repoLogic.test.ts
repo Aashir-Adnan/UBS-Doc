@@ -139,18 +139,20 @@ describe('bugRepoChoices', () => {
     expect(bugRepoChoices('p1', links, all)).toEqual([R1, R2])
   })
 
-  it('offers every repository when the project has no links', () => {
-    expect(bugRepoChoices('p1', [link('r1', 'backend', 'p2')], all)).toEqual([R3, R1, R2])
-    expect(bugRepoChoices('p1', undefined, all)).toEqual([R3, R1, R2])
+  it('offers nothing when the project has no links (no fallback to every repository)', () => {
+    expect(bugRepoChoices('p1', [link('r1', 'backend', 'p2')], all)).toEqual([])
+    expect(bugRepoChoices('p1', undefined, all)).toEqual([])
+    expect(bugRepoChoices('p1', [], all)).toEqual([])
   })
 
-  it('offers nothing only when there are no repositories at all, or no project', () => {
+  it('offers nothing when there are no repositories, or no project', () => {
     expect(bugRepoChoices('p1', [], [])).toEqual([])
     expect(bugRepoChoices('p1', undefined, undefined)).toEqual([])
     expect(bugRepoChoices(null, [link('r1')], all)).toEqual([])
   })
 
-  it('ignores a link to a deleted repository (falls back to all when that was the only one)', () => {
-    expect(bugRepoChoices('p1', [link('gone', 'backend')], all)).toEqual([R3, R1, R2])
+  it('ignores a link to a deleted repository (nothing offered when that was the only one)', () => {
+    expect(bugRepoChoices('p1', [link('gone', 'backend')], all)).toEqual([])
+    expect(bugRepoChoices('p1', [link('gone', 'backend'), link('r1', 'backend')], all)).toEqual([R1])
   })
 })

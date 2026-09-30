@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { RepoRef, TaskRow, TasksPayload } from '../tasksLogic'
 import {
   formFromTask, diffChanges, validateForm, emptyCreateForm, validateCreateForm, createPayload,
-  blockerCandidates, saveErrorText, createErrorText, scopeOptionsFor, bugIssueRepo, bugRepoHint,
+  blockerCandidates, saveErrorText, createErrorText, scopeOptionsFor, bugIssueRepo, bugRepoHint, showsBugRepoPicker, NO_REPO_OPTION, OPTIONAL_REPO_HELP,
 } from './taskFormLogic'
 
 const R1: RepoRef = { id: 'r1', name: 'Framework_Node', url: 'https://github.com/ubs-dev-org/Framework_Node' }
@@ -68,7 +68,6 @@ describe('validateForm', () => {
 })
 
 describe('create form', () => {
-  const NO_REPO_MESSAGE = 'This project has no repository — add one in Discord with /repos add.'
   const R2: RepoRef = { id: 'r2', name: 'Framework_React', url: 'https://github.com/ubs-dev-org/Framework_React' }
 
   it('validates title and project', () => {
@@ -76,19 +75,34 @@ describe('create form', () => {
     expect(validateCreateForm({ ...emptyCreateForm(''), title: 'x' }, null)).toBe('Pick a project for the task.')
     expect(validateCreateForm({ ...emptyCreateForm('P1'), title: 'x' }, null)).toBeNull()
   })
-  it('refuses a bug only when there is no repository at all to pick, with the exact sentence', () => {
-    expect(validateCreateForm({ ...emptyCreateForm('P1'), title: 'x', type: 'bug' }, null)).toBe(NO_REPO_MESSAGE)
-    expect(validateCreateForm({ ...emptyCreateForm('P1'), title: 'x', type: 'bug' }, null, [])).toBe(NO_REPO_MESSAGE)
-    expect(validateCreateForm({ ...emptyCreateForm('P1'), title: 'x', type: 'bug' }, R1)).toBeNull()
-  })
-
-  // F5 (final review, 2026-09-30; spec §5): the bug fallback picker.
-  it('a bug the rule gives no repository must pick one of the choices', () => {
+  it('never refuses a bug for lack of a repository', () => {
     const bug = { ...emptyCreateForm('P1'), title: 'x', type: 'bug' as const }
-    expect(validateCreateForm(bug, null, [R1, R2])).toBe('Pick a repository for the bug.')
-    expect(validateCreateForm({ ...bug, repoPick: 'gone' }, null, [R1, R2])).toBe('Pick a repository for the bug.')
+    expect(validateCreateForm(bug, null)).toBeNull()
+    expect(validateCreateForm(bug, null, [])).toBeNull()
+    expect(validateCreateForm(bug, null, [R1, R2])).toBeNull()
+    expect(validateCreateForm(bug, R1)).toBeNull()
+    expect(validateCreateForm({ ...bug, repoPick: 'gone' }, null, [R1, R2])).toBeNull()
     expect(validateCreateForm({ ...bug, repoPick: 'r2' }, null, [R1, R2])).toBeNull()
   })
+  it('a bug with no repository (none resolved, none picked) is sent with no repository and no issue', () => {
+    const bug = { ...emptyCreateForm('P1'), title: 'x', type: 'bug' as const }
+    expect(createPayload(bug, null, [R1, R2])).toMatchObject({ type: 'bug', repository_ids: [], create_issue: false })
+    expect(createPayload(bug, null, [])).toMatchObject({ repository_ids: [], create_issue: false })
+    expect(bugIssueRepo(bug, null, [R1, R2])).toBeNull()
+  })
+  it('shows the optional picker only for a bug the rule gives none, in a project with linked repositories', () => {
+    const bug = { ...emptyCreateForm('P1'), title: 'x', type: 'bug' as const }
+    expect(showsBugRepoPicker(bug, null, [R1, R2])).toBe(true)
+    expect(showsBugRepoPicker(bug, null, [])).toBe(false)
+    expect(showsBugRepoPicker(bug, R1, [R1, R2])).toBe(false)
+    expect(showsBugRepoPicker({ ...bug, type: 'feature' }, null, [R1, R2])).toBe(false)
+    expect(showsBugRepoPicker({ ...bug, projectId: '' }, null, [R1, R2])).toBe(false)
+  })
+  it('the picker is labelled optional, with a No repository first option whose value is empty', () => {
+    expect(NO_REPO_OPTION).toEqual({ value: '', label: 'No repository' })
+    expect(OPTIONAL_REPO_HELP).toBe('The repository is optional. Without one, no GitHub issue is opened.')
+  })
+
   it('the pick is ignored when the rule resolves a repository', () => {
     const bug = { ...emptyCreateForm('P1'), title: 'x', type: 'bug' as const, repoPick: 'r2' }
     expect(validateCreateForm(bug, R1, [R1, R2])).toBeNull()

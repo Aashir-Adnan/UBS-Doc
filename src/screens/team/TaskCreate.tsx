@@ -10,7 +10,7 @@ import { useTeam } from './TeamLayout'
 import MemberPicker from './MemberPicker'
 import { bugRepoChoices, issueTargetText, projectRepoList, resolveTaskRepo } from './repoLogic'
 import {
-  NO_REPO_AT_ALL_MESSAGE, SCOPE_OPTIONS, bugIssueRepo, bugRepoHint, createErrorText, createPayload, emptyCreateForm,
+  NO_REPO_OPTION, OPTIONAL_REPO_HELP, SCOPE_OPTIONS, showsBugRepoPicker, bugIssueRepo, bugRepoHint, createErrorText, createPayload, emptyCreateForm,
   projectChoices, validateCreateForm, type CreateForm,
 } from './taskFormLogic'
 
@@ -39,8 +39,8 @@ export default function TaskCreate() {
     [payload, form.projectId, form.scope],
   )
   const resolvedRepo = repoResult.repository
-  // A bug the rule gives no repository picks one (spec §5, the bug fallback):
-  // the project's linked repositories, else every repository.
+  // A bug the rule gives no repository may pick one of the project's own
+  // linked repositories, or none (a bug never needs a repository).
   const repoChoices = useMemo(
     () => bugRepoChoices(form.projectId || null, payload?.projectRepos, payload?.repositories),
     [payload, form.projectId],
@@ -95,7 +95,7 @@ export default function TaskCreate() {
   }
 
   const isBug = form.type === 'bug'
-  const needsPick = isBug && !resolvedRepo && !!form.projectId
+  const needsPick = showsBugRepoPicker(form, resolvedRepo, repoChoices)
   const pickHint = bugRepoHint(form, resolvedRepo, projectLinkCount)
 
   return (
@@ -148,19 +148,14 @@ export default function TaskCreate() {
           )}
 
           {needsPick && (
-            <Labeled label="Repository" theme={theme}>
-              {repoChoices.length ? (
-                <>
-                  {pickHint && <p className={c('text-sm m-0 mb-2', muted(theme))}>{pickHint}</p>}
-                  <select className="input-base" value={form.repoPick} required aria-required="true"
-                    onChange={(e) => set('repoPick', e.target.value)} disabled={saving}>
-                    <option value="">Pick a repository…</option>
-                    {repoChoices.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                  </select>
-                </>
-              ) : (
-                <p className="text-sm font-semibold text-red-500 m-0">{NO_REPO_AT_ALL_MESSAGE}</p>
-              )}
+            <Labeled label="Repository (optional)" theme={theme}>
+              <p className={c('text-sm m-0 mb-2', muted(theme))}>{OPTIONAL_REPO_HELP}</p>
+              {pickHint && <p className={c('text-sm m-0 mb-2', muted(theme))}>{pickHint}</p>}
+              <select className="input-base" value={form.repoPick} aria-label="Repository (optional)"
+                onChange={(e) => set('repoPick', e.target.value)} disabled={saving}>
+                <option value={NO_REPO_OPTION.value}>{NO_REPO_OPTION.label}</option>
+                {repoChoices.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
             </Labeled>
           )}
 

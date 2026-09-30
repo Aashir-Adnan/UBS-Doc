@@ -59,12 +59,12 @@ export function issueTargetText(
 }
 
 /**
- * The bug fallback picker's options (spec §5): when the rule finds no
- * repository for a bug, the site lets the visitor pick one and sends it as
- * `repository_ids[0]` — the bot accepts it only in that case. Every repository
- * linked to the project (in the project cards' order), or, when the project
- * has no usable link, every repository (by name). Empty only when there are no
- * repositories at all (or no project) — the one case the form still refuses.
+ * The optional bug repository picker's options: when the rule finds no
+ * repository for a bug, the site may let the visitor pick one of the
+ * project's OWN linked repositories (in the project cards' order) and sends it
+ * as `repository_ids[0]`. A bug never needs one, so there is no fallback to
+ * every repository: empty when the project has no usable link (no picker is
+ * shown then) or there is no project.
  */
 export function bugRepoChoices(
   projectId: string | null,
@@ -82,8 +82,7 @@ export function bugRepoChoices(
     .sort((a, b) => rank(a.scope) - rank(b.scope) || byId.get(String(a.repositoryId))!.name.localeCompare(byId.get(String(b.repositoryId))!.name))
     .map((l) => byId.get(String(l.repositoryId))!)
     .filter((r) => (seen.has(String(r.id)) ? false : (seen.add(String(r.id)), true)))
-  if (linked.length) return linked
-  return [...all].sort((a, b) => a.name.localeCompare(b.name))
+  return linked
 }
 
 // One project's links as `{ name, scope }[]`, sorted by scope display order

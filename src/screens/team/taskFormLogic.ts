@@ -111,12 +111,13 @@ export function scopeOptionsFor(current: string): { value: string; label: string
   return opts
 }
 
-// A bug needs a repository. The rule (project + scope) picks it when it can;
-// otherwise the create page shows a required picker (spec §5, the bug
-// fallback) listing `bugRepoChoices` (repoLogic.ts), and the pick is sent as
-// `repository_ids[0]`. The form refuses only when there is nothing to pick.
-export const NO_REPO_AT_ALL_MESSAGE = 'This project has no repository — add one in Discord with /repos add.'
-export const PICK_REPO_MESSAGE = 'Pick a repository for the bug.'
+// A bug never needs a repository. The rule (project + scope) picks one when it
+// can; otherwise, when the project has linked repositories, the create page
+// shows an OPTIONAL picker listing `bugRepoChoices` (repoLogic.ts) whose first
+// option is "No repository", and a pick is sent as `repository_ids[0]`. A bug
+// with no repository gets no GitHub issue.
+export const NO_REPO_OPTION = { value: '', label: 'No repository' }
+export const OPTIONAL_REPO_HELP = 'The repository is optional. Without one, no GitHub issue is opened.'
 export const PICK_SCOPE_HINT = 'Pick a scope to choose the repository automatically, or pick one below.'
 
 export interface CreateForm {
@@ -130,7 +131,7 @@ export interface CreateForm {
   // The "Open a GitHub issue" checkbox. Default on; the create page disables
   // and unchecks it when resolveTaskRepo finds no repository for the project/scope.
   createIssue: boolean
-  // The bug fallback picker's repository id ('' = none picked). Used only for
+  // The optional bug repository picker's id ('' = No repository). Used only for
   // a bug the rule gives no repository; ignored otherwise.
   repoPick: string
   tracksApi: boolean
@@ -142,7 +143,7 @@ export function emptyCreateForm(projectId = ''): CreateForm {
   return { type: 'feature', title: '', description: '', projectId, scope: '', modules: '', holderIds: [], createIssue: true, repoPick: '', tracksApi: false, tracksQa: false, tracksAc: false }
 }
 
-/** The picked fallback repository, when the form is a bug the rule gives none and the pick is one of `choices`. */
+/** The picked repository, when the form is a bug the rule gives none and the pick is one of `choices`. */
 function pickedFallback(f: CreateForm, resolvedRepo: RepoRef | null, choices: RepoRef[]): RepoRef | null {
   if (f.type !== 'bug' || resolvedRepo || !f.repoPick) return null
   return choices.find((r) => String(r.id) === f.repoPick) ?? null
@@ -153,8 +154,13 @@ export function bugIssueRepo(f: CreateForm, resolvedRepo: RepoRef | null, choice
   return resolvedRepo ?? pickedFallback(f, resolvedRepo, choices)
 }
 
+/** Whether the create page shows the optional repository picker: a bug in a project, the rule found none, and the project has linked repositories to offer. */
+export function showsBugRepoPicker(f: CreateForm, resolvedRepo: RepoRef | null, choices: RepoRef[]): boolean {
+  return f.type === 'bug' && !!f.projectId && !resolvedRepo && choices.length > 0
+}
+
 /**
- * The line above the fallback picker: a scope-less bug in a project with
+ * The line above the optional picker: a scope-less bug in a project with
  * several links could have been routed by the rule had it a scope.
  * `projectLinkCount` is the project's usable links (`projectRepoList(...).length`).
  */
@@ -165,20 +171,16 @@ export function bugRepoHint(f: CreateForm, resolvedRepo: RepoRef | null, project
 
 /**
  * `resolvedRepo` is what `resolveTaskRepo` (repoLogic.ts) found for the
- * form's current project + scope, and `choices` the bug fallback picker's
- * options (`bugRepoChoices`) — the create page computes both from the
- * payload's `projectRepos`/`repositories` and passes them in here, so this
- * stays a pure function of its arguments like the rest of the form logic.
+ * form's current project + scope, and `choices` the optional picker's
+ * options (`bugRepoChoices`). A bug is never refused for lack of a repository,
+ * so neither changes the verdict; they stay in the signature so the create
+ * page calls the form logic the same way for every check.
  */
-export function validateCreateForm(f: CreateForm, resolvedRepo: RepoRef | null, choices: RepoRef[] = []): string | null {
+export function validateCreateForm(f: CreateForm, _resolvedRepo: RepoRef | null, _choices: RepoRef[] = []): string | null {
   if (!f.title.trim()) return 'A task needs a title.'
   if (f.title.trim().length > TITLE_MAX) return `The title can be at most ${TITLE_MAX} characters.`
   if (f.description.trim().length > DESCRIPTION_MAX) return `The description can be at most ${DESCRIPTION_MAX} characters.`
   if (!f.projectId) return 'Pick a project for the task.'
-  if (f.type === 'bug' && !resolvedRepo) {
-    if (!choices.length) return NO_REPO_AT_ALL_MESSAGE
-    if (!pickedFallback(f, resolvedRepo, choices)) return PICK_REPO_MESSAGE
-  }
   return null
 }
 
@@ -194,7 +196,7 @@ export function createPayload(f: CreateForm, resolvedRepo: RepoRef | null, choic
     modules: isBug ? [] : [...new Set(f.modules.split(',').map((m) => m.trim()).filter(Boolean))],
     holder_ids: [...f.holderIds],
     // The bot applies the same repository rule itself from project + scope;
-    // the site sends a repository only in the bug fallback (spec §5).
+    // the site sends a repository only for a bug's optional pick.
     repository_ids: picked ? [picked.id] : [],
     create_issue: !!(resolvedRepo ?? picked) && f.createIssue,
     tracks: { api_tests: f.tracksApi, qa_tests: f.tracksQa, acceptance_criteria: f.tracksAc },
