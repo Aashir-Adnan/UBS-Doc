@@ -7,7 +7,7 @@ const BASE = 'http://api.test'
 globalThis.window = globalThis.window || (globalThis as unknown as Window)
 ;(window as unknown as { __API_BASE_URL__: string }).__API_BASE_URL__ = BASE
 
-const { setTaskStatus, ApiError, updateTask, createTask, addSubtask, linkDiscord, fetchIdentityLinks, unlinkDiscord } = await import('./api')
+const { setTaskStatus, ApiError, updateTask, createTask, addSubtask, checkImport, linkDiscord, fetchIdentityLinks, unlinkDiscord } = await import('./api')
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status })
@@ -123,6 +123,31 @@ describe('task writes', () => {
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe(`${BASE}/api/discord/tasks/subtask`)
     expect(JSON.parse(init.body)).toEqual({ parent_id: 'T1', title: 'Write tests', holder_ids: ['u2'] })
+  })
+
+  it('createTask sends status only when provided', async () => {
+    fetchMock.mockImplementation(async () => jsonResponse({ payload: { return: { task: { id: 'N1' } } } }))
+    const input = { type: 'feature' as const, title: 'x', description: null, project_id: 'P1', scope: null, modules: [], holder_ids: [], create_issue: false }
+    await createTask({ ...input, status: 'done' })
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).status).toBe('done')
+    await createTask(input)
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).not.toHaveProperty('status')
+  })
+
+  it('addSubtask sends description, scope and status only for the keys provided', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ payload: { return: { task: { id: 'S1' } } } }))
+    await addSubtask('T1', 'Write tests', ['u2'], { description: null, status: 'done' })
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ parent_id: 'T1', title: 'Write tests', holder_ids: ['u2'], description: null, status: 'done' })
+  })
+
+  it('checkImport posts project_id, tasks and create_issues and unwraps the verdicts', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ payload: { return: { tasks: [{ index: 0, ok: false, errors: ['x'], warnings: [], fields: null }] } } }))
+    const r = await checkImport('P1', [{ title: 'a' }], true)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`${BASE}/api/discord/tasks/import-check`)
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ project_id: 'P1', tasks: [{ title: 'a' }], create_issues: true })
+    expect(r.tasks[0].ok).toBe(false)
   })
 
   it('a refusal carries the specific sentence and the status', async () => {
