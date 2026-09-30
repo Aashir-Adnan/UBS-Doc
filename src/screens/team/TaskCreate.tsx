@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { c, card, txt, muted } from '../../lib'
+import { c, card, txt, muted, inputCls } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
 import { createTask } from '../../components/discordTasks/api'
@@ -117,21 +117,21 @@ export default function TaskCreate() {
           </div>
 
           <Labeled label="Title" theme={theme}>
-            <input className="input-base" value={form.title} maxLength={200} onChange={(e) => set('title', e.target.value)} disabled={saving} />
+            <input className={inputCls(theme)} value={form.title} maxLength={200} onChange={(e) => set('title', e.target.value)} disabled={saving} />
           </Labeled>
           <Labeled label="Description" theme={theme}>
-            <textarea className="input-base min-h-[120px]" value={form.description} maxLength={2000} onChange={(e) => set('description', e.target.value)} disabled={saving} />
+            <textarea className={inputCls(theme, 'min-h-[120px]')} value={form.description} maxLength={2000} onChange={(e) => set('description', e.target.value)} disabled={saving} />
           </Labeled>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Labeled label="Project" theme={theme}>
-              <select className="input-base" value={form.projectId} onChange={(e) => set('projectId', e.target.value)} disabled={saving}>
+              <select className={inputCls(theme)} value={form.projectId} onChange={(e) => set('projectId', e.target.value)} disabled={saving}>
                 <option value="">Pick a project…</option>
                 {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </Labeled>
             <Labeled label="Scope" theme={theme}>
-              <select className="input-base" value={form.scope} onChange={(e) => set('scope', e.target.value)} disabled={saving}>
+              <select className={inputCls(theme)} value={form.scope} onChange={(e) => set('scope', e.target.value)} disabled={saving}>
                 <option value="">None</option>
                 {SCOPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
@@ -143,7 +143,7 @@ export default function TaskCreate() {
 
           {!isBug && (
             <Labeled label="Modules (comma-separated)" theme={theme}>
-              <input className="input-base" value={form.modules} placeholder="auth, billing" onChange={(e) => set('modules', e.target.value)} disabled={saving} />
+              <input className={inputCls(theme)} value={form.modules} placeholder="auth, billing" onChange={(e) => set('modules', e.target.value)} disabled={saving} />
             </Labeled>
           )}
 
@@ -151,7 +151,7 @@ export default function TaskCreate() {
             <Labeled label="Repository (optional)" theme={theme}>
               <p className={c('text-sm m-0 mb-2', muted(theme))}>{OPTIONAL_REPO_HELP}</p>
               {pickHint && <p className={c('text-sm m-0 mb-2', muted(theme))}>{pickHint}</p>}
-              <select className="input-base" value={form.repoPick} aria-label="Repository (optional)"
+              <select className={inputCls(theme)} value={form.repoPick} aria-label="Repository (optional)"
                 onChange={(e) => set('repoPick', e.target.value)} disabled={saving}>
                 <option value={NO_REPO_OPTION.value}>{NO_REPO_OPTION.label}</option>
                 {repoChoices.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}

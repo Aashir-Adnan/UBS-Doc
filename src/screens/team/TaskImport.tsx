@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
-import { c, card, txt, muted } from '../../lib'
+import { c, card, txt, muted, inputCls } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
 import { addSubtask, checkImport, createTask, type ImportVerdict } from '../../components/discordTasks/api'
@@ -249,7 +249,7 @@ export default function TaskImport() {
         <h2 className={c('font-extrabold text-xl sm:text-2xl m-0 mb-5', txt(theme))}>Import tasks</h2>
         <div className="flex flex-col gap-5">
           <Labeled label="Project" theme={theme}>
-            <select className="input-base" value={projectId} disabled={locked}
+            <select className={inputCls(theme)} value={projectId} disabled={locked}
               onChange={(e) => { setProjectId(e.target.value); clearCheck() }}>
               <option value="">Pick a project…</option>
               {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -261,7 +261,7 @@ export default function TaskImport() {
               onChange={(e) => { const input = e.target; void pickFile(input.files?.[0]).then(() => { input.value = '' }) }} />
           </Labeled>
           <Labeled label="Or paste the JSON" theme={theme}>
-            <textarea className="input-base min-h-[140px] font-mono text-xs" value={text} disabled={locked}
+            <textarea className={inputCls(theme, 'min-h-[140px] font-mono text-xs')} value={text} disabled={locked}
               onChange={(e) => { setText(e.target.value); clearCheck() }} />
           </Labeled>
           <label className={c('inline-flex items-center gap-2 text-sm', txt(theme))}>

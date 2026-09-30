@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Clock } from 'lucide-react'
-import { c, muted, txt } from '../../lib'
+import { c, muted, txt, inputCls } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import {
   clockIn, clockOut, fetchClockStatus,
@@ -218,7 +218,7 @@ export default function ClockControl({ clock, projects, onLinked }: { clock: Clo
               <h2 className={c('font-extrabold text-base m-0 mb-1', txt(theme))}>Clock out</h2>
               <p className={c('text-xs font-medium m-0 mb-3', muted(theme))}>{status.taskTitle} &middot; {elapsed}</p>
               <label htmlFor="clock-out-note" className={c('block text-[11px] font-bold uppercase tracking-wide mb-1.5', muted(theme))}>Note (optional)</label>
-              <textarea id="clock-out-note" className="input-base" rows={3} maxLength={NOTE_MAX} autoFocus
+              <textarea id="clock-out-note" className={inputCls(theme)} rows={3} maxLength={NOTE_MAX} autoFocus
                 value={note} onChange={(e) => setNote(e.target.value)} placeholder="What did you get done?" />
               <p className={c('text-[11px] text-right m-0 mt-1', muted(theme))}>{note.length}/{NOTE_MAX}</p>
               <div className="flex justify-end gap-2 mt-3">
@@ -246,7 +246,7 @@ export default function ClockControl({ clock, projects, onLinked }: { clock: Clo
       {pickerOpen && (
         <div className={c('absolute right-0 z-30 mt-1 w-[min(320px,calc(100vw-2rem))] rounded-xl border p-2 shadow-lg',
           d ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200')}>
-          <input className="input-base mb-2" placeholder="Search tasks…" value={query} autoFocus autoComplete="off"
+          <input className={inputCls(theme, 'mb-2')} placeholder="Search tasks…" value={query} autoFocus autoComplete="off"
             onChange={(e) => setQuery(e.target.value)} aria-label="Search tasks" />
           <ul role="listbox" className="list-none p-0 m-0 max-h-72 overflow-y-auto">
             {choices.map((ch) => (

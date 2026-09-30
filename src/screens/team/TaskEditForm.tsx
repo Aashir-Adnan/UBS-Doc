@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
-import { c, txt, muted, chipGray } from '../../lib'
+import { c, txt, muted, chipGray, inputCls } from '../../lib'
 import type { Theme } from '../../types'
 import { STATUS_LABEL, type TaskRow, type TasksPayload } from '../tasksLogic'
 import { updateTask, type UpdateTaskResult } from '../../components/discordTasks/api'
@@ -53,7 +53,7 @@ export default function TaskEditForm({ task, payload, theme, onCancel, onSaved }
 
   const count = (key: 'passedApiTests' | 'passedQaTests' | 'passedAcceptanceCriteria', label: string) => (
     <Labeled label={label} theme={theme}>
-      <input className="input-base" inputMode="numeric" value={form[key]} placeholder="not tracked"
+      <input className={inputCls(theme)} inputMode="numeric" value={form[key]} placeholder="not tracked"
         onChange={(e) => set(key, e.target.value)} disabled={saving} />
     </Labeled>
   )
@@ -61,26 +61,26 @@ export default function TaskEditForm({ task, payload, theme, onCancel, onSaved }
   return (
     <form onSubmit={(e) => { e.preventDefault(); void save() }} className="flex flex-col gap-5">
       <Labeled label="Title" theme={theme}>
-        <input className="input-base" value={form.title} maxLength={200} onChange={(e) => set('title', e.target.value)} disabled={saving} />
+        <input className={inputCls(theme)} value={form.title} maxLength={200} onChange={(e) => set('title', e.target.value)} disabled={saving} />
       </Labeled>
       <Labeled label="Description" theme={theme}>
-        <textarea className="input-base min-h-[120px]" value={form.description} maxLength={2000}
+        <textarea className={inputCls(theme, 'min-h-[120px]')} value={form.description} maxLength={2000}
           onChange={(e) => set('description', e.target.value)} disabled={saving} />
       </Labeled>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Labeled label="Status" theme={theme}>
-          <select className="input-base" value={form.status} onChange={(e) => set('status', e.target.value)} disabled={saving}>
+          <select className={inputCls(theme)} value={form.status} onChange={(e) => set('status', e.target.value)} disabled={saving}>
             {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>)}
           </select>
         </Labeled>
         <Labeled label="Scope" theme={theme}>
-          <select className="input-base" value={form.scope} onChange={(e) => set('scope', e.target.value)} disabled={saving}>
+          <select className={inputCls(theme)} value={form.scope} onChange={(e) => set('scope', e.target.value)} disabled={saving}>
             {scopeOptionsFor(formFromTask(task).scope).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </Labeled>
         <Labeled label="Implementation" theme={theme}>
-          <select className="input-base" value={form.implementationStatus} onChange={(e) => set('implementationStatus', e.target.value)} disabled={saving}>
+          <select className={inputCls(theme)} value={form.implementationStatus} onChange={(e) => set('implementationStatus', e.target.value)} disabled={saving}>
             {!form.implementationStatus && <option value="">—</option>}
             {IMPLEMENTATION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
@@ -88,7 +88,7 @@ export default function TaskEditForm({ task, payload, theme, onCancel, onSaved }
       </div>
 
       <Labeled label="Project" theme={theme}>
-        <select className="input-base" value={form.projectId} onChange={(e) => set('projectId', e.target.value)} disabled={saving}>
+        <select className={inputCls(theme)} value={form.projectId} onChange={(e) => set('projectId', e.target.value)} disabled={saving}>
           <option value="">No project</option>
           {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
@@ -105,7 +105,7 @@ export default function TaskEditForm({ task, payload, theme, onCancel, onSaved }
         {count('passedQaTests', 'QA tests passed')}
         {count('passedAcceptanceCriteria', 'Acceptance criteria')}
         <Labeled label="Estimate" theme={theme}>
-          <input className="input-base" value={form.estimate} placeholder="e.g. 8h 30m" onChange={(e) => set('estimate', e.target.value)} disabled={saving} />
+          <input className={inputCls(theme)} value={form.estimate} placeholder="e.g. 8h 30m" onChange={(e) => set('estimate', e.target.value)} disabled={saving} />
         </Labeled>
       </div>
 
@@ -123,7 +123,7 @@ export default function TaskEditForm({ task, payload, theme, onCancel, onSaved }
             ))}
           </ul>
         )}
-        <select className="input-base" value="" disabled={saving || candidates.length === 0}
+        <select className={inputCls(theme)} value="" disabled={saving || candidates.length === 0}
           onChange={(e) => { if (e.target.value) set('blockerIds', [...form.blockerIds, e.target.value]) }}>
           <option value="">{candidates.length ? 'Add a blocking task…' : 'No other tasks'}</option>
           {candidates.map((g) => (
