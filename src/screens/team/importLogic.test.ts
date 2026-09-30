@@ -209,6 +209,7 @@ describe('screen texts', () => {
     expect(rule('subtasks')).toContain('25')
     expect(FORMAT_RULES[0]).toContain('50 tasks')
     expect(FORMAT_RULES[0]).toContain('90 KB')
+    expect(FORMAT_RULES.join(' ')).not.toMatch(/bug needs a repository/i)
     expect(FORMAT_SUBTASK_FIELDS.find((f) => f.name === 'scope')?.rule).toBe("Same values as a task's.")
     expect(FORMAT_SUBTASK_FIELDS.find((f) => f.name === 'status')?.rule).toBe("Same values as a task's.")
   })

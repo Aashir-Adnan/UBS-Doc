@@ -239,7 +239,6 @@ export const FORMAT_RULES: string[] = [
   'A done task is recorded as finished, with no Discord channel and no GitHub issue.',
   'An open or in-progress task gets a Discord channel and, unless Open GitHub issues is unticked, a GitHub issue.',
   'A done task must have every subtask done.',
-  'A bug needs a repository for its scope in the project.',
   'A name that matches nobody, or more than one person, makes the task invalid. Use the email instead.',
   'Unknown fields are ignored.',
 ]
