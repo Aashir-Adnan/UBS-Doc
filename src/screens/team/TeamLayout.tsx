@@ -57,6 +57,7 @@ export default function TeamLayout() {
   const [filters, setFilters] = useState<Filters>({ ...DEFAULT_FILTERS, projectSlug: params.get('project'), scope: parseScopeFilter(params.get('scope')) })
   const [timeSelfScoped, setTimeSelfScoped] = useState(false)
   const clock = useClock()
+  const tab = activeTab(pathname)
 
   const refresh = useCallback(async () => {
     setLoading(true); setError(null)
@@ -77,7 +78,7 @@ export default function TeamLayout() {
     // A project change drops an assignee the new project does not offer, in
     // the same update, so the state never holds a person the list hides.
     if ('projectSlug' in patch && !('assigneeId' in patch)) {
-      next.assigneeId = assigneeAfterProjectChange(personOptions(payload, next.projectSlug), next.assigneeId)
+      next.assigneeId = assigneeAfterProjectChange(personOptions(payload, next.projectSlug, tab), next.assigneeId, tab)
     }
     setFilters(next)
     if ('projectSlug' in patch || 'scope' in patch) {
@@ -86,10 +87,9 @@ export default function TeamLayout() {
       if (next.scope !== 'all') p.set('scope', next.scope); else p.delete('scope')
       setParams(p, { replace: true })
     }
-  }, [filters, params, payload, setParams])
+  }, [filters, params, payload, tab, setParams])
 
   const projects = payload?.projects ?? []
-  const tab = activeTab(pathname)
   // The header counts follow what is filterable on this tab: scope has no
   // control on People, Time or Stats, so it does not narrow them.
   const visible = useMemo(
@@ -99,7 +99,13 @@ export default function TeamLayout() {
   // Follows the Project filter (see personOptions). Still roster-based for a
   // viewer who sees everything: people log time on general work and on tasks
   // they are not assigned to, so Time/Stats need people with no tasks too.
-  const people = useMemo(() => personOptions(payload, filters.projectSlug), [payload, filters.projectSlug])
+  const people = useMemo(() => personOptions(payload, filters.projectSlug, tab), [payload, filters.projectSlug, tab])
+  // A refresh or tab switch can leave an assignee the options no longer offer
+  // (the select would show Anyone while the filter still applied): reset it.
+  useEffect(() => {
+    if (!payload || !filters.assigneeId) return
+    if (assigneeAfterProjectChange(people, filters.assigneeId, tab) !== filters.assigneeId) setFilters((f) => ({ ...f, assigneeId: null }))
+  }, [payload, people, filters.assigneeId, tab])
   const total = visible.reduce((n, p) => n + p.tasks.length, 0)
   const blocked = visible.reduce((n, p) => n + p.tasks.filter((t) => t.isBlocked).length, 0)
 

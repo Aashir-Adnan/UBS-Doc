@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { memberWorkload, sortMembers, filterMembers, personOptions, assigneeAfterProjectChange } from './teamLogic'
+import { memberWorkload, sortMembers, filterMembers, personOptions, assigneeAfterProjectChange, followsProject } from './teamLogic'
 import type { TaskRow, TeamMember, ProjectGroup, TasksPayload } from '../tasksLogic'
 
 const t = (id: string, status: string, assignees: string[], isBlocked = false): TaskRow => ({
@@ -111,36 +111,56 @@ describe('personOptions', () => {
   })
 
   it('a selected project gives its members, sorted, named from the roster', () => {
-    expect(personOptions(payload(false), 'a')).toEqual([{ id: '1', name: 'Amy' }, { id: '2', name: 'Zed' }])
+    expect(personOptions(payload(false), 'a', 'tasks')).toEqual([{ id: '1', name: 'Amy' }, { id: '2', name: 'Zed' }])
   })
   it('a selected project is the same for a viewer who sees everything', () => {
-    expect(personOptions(payload(true), 'b')).toEqual([{ id: '1', name: 'Amy' }, { id: '3', name: 'Bob' }])
+    expect(personOptions(payload(true), 'b', 'tasks')).toEqual([{ id: '1', name: 'Amy' }, { id: '3', name: 'Bob' }])
   })
   it('all projects, not seeing everything: union of visible projects, de-duplicated and sorted', () => {
-    expect(personOptions(payload(false), null)).toEqual([{ id: '1', name: 'Amy' }, { id: '3', name: 'Bob' }, { id: '2', name: 'Zed' }])
+    expect(personOptions(payload(false), null, 'tasks')).toEqual([{ id: '1', name: 'Amy' }, { id: '3', name: 'Bob' }, { id: '2', name: 'Zed' }])
   })
   it('all projects, seeing everything: the full roster', () => {
-    expect(personOptions(payload(true), null).map((p) => p.id)).toEqual(['1', '3', '4', '2'])
+    expect(personOptions(payload(true), null, 'tasks').map((p) => p.id)).toEqual(['1', '3', '4', '2'])
   })
   it('falls back to the member entry name when not on the roster', () => {
     const p = payload(false)
     p.members = []
-    expect(personOptions(p, 'a')).toEqual([{ id: '1', name: 'Amy M' }, { id: '2', name: 'Zed M' }])
+    expect(personOptions(p, 'a', 'tasks')).toEqual([{ id: '1', name: 'Amy M' }, { id: '2', name: 'Zed M' }])
   })
   it('an unknown project slug gives nobody; a missing payload gives nobody', () => {
-    expect(personOptions(payload(false), 'nope')).toEqual([])
-    expect(personOptions(null, null)).toEqual([])
+    expect(personOptions(payload(false), 'nope', 'tasks')).toEqual([])
+    expect(personOptions(null, null, 'tasks')).toEqual([])
+  })
+  it('People, Tasks and Board follow the project; Time and Stats keep the full roster', () => {
+    for (const tab of ['people', 'tasks', 'board'] as const) {
+      expect(followsProject(tab)).toBe(true)
+      expect(personOptions(payload(false), 'a', tab).map((x) => x.id)).toEqual(['1', '2'])
+    }
+    for (const tab of ['time', 'stats'] as const) {
+      expect(followsProject(tab)).toBe(false)
+      expect(personOptions(payload(false), 'a', tab).map((x) => x.id)).toEqual(['1', '3', '4', '2'])
+      expect(personOptions(payload(false), null, tab).map((x) => x.id)).toEqual(['1', '3', '4', '2'])
+    }
+  })
+  it('an unlinked permission holder with no projects still gets the roster on Time', () => {
+    const p = payload(false); p.projects = []
+    expect(personOptions(p, null, 'time').length).toBe(4)
+    expect(personOptions(p, null, 'tasks')).toEqual([])
   })
   it('a missing viewer is treated as not seeing everything', () => {
     const p = payload(true)
     delete p.viewer
-    expect(personOptions(p, null).map((x) => x.id)).toEqual(['1', '3', '2'])
+    expect(personOptions(p, null, 'tasks').map((x) => x.id)).toEqual(['1', '3', '2'])
   })
 })
 
 describe('assigneeAfterProjectChange', () => {
   const opts = [{ id: '1', name: 'Amy' }, { id: '2', name: 'Zed' }]
-  it('keeps an assignee who is offered', () => expect(assigneeAfterProjectChange(opts, '1')).toBe('1'))
-  it('resets an assignee who is not offered', () => expect(assigneeAfterProjectChange(opts, '9')).toBeNull())
-  it('keeps "Anyone"', () => expect(assigneeAfterProjectChange(opts, null)).toBeNull())
+  it('keeps an assignee who is offered', () => expect(assigneeAfterProjectChange(opts, '1', 'tasks')).toBe('1'))
+  it('resets an assignee who is not offered', () => expect(assigneeAfterProjectChange(opts, '9', 'tasks')).toBeNull())
+  it('never resets on Time or Stats', () => {
+    expect(assigneeAfterProjectChange(opts, '9', 'time')).toBe('9')
+    expect(assigneeAfterProjectChange(opts, '9', 'stats')).toBe('9')
+  })
+  it('keeps "Anyone"', () => expect(assigneeAfterProjectChange(opts, null, 'tasks')).toBeNull())
 })
