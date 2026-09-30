@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ExternalLink, Ban, ListChecks, Clock, Plus } from 'lucide-react'
+import { ExternalLink, Ban, ListChecks, Clock, Plus, Upload } from 'lucide-react'
 import { c, card, txt, muted, chipRed, chipGray, chipIndigo } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
@@ -36,7 +36,10 @@ export default function TasksList() {
   return (
     <>
       {canCreate && (
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-end gap-3 mb-4">
+          <Link to={`/tools/team/tasks/import${search}`} className={c('btn-outline-indigo px-4 py-2 text-sm no-underline inline-flex items-center gap-2', theme === 'dark' ? 'dark-variant' : '')}>
+            <Upload size={14} /> Import tasks
+          </Link>
           <Link to={`/tools/team/tasks/new${search}`} className="btn-primary px-4 py-2 text-sm no-underline inline-flex items-center gap-2">
             <Plus size={14} /> New task
           </Link>

@@ -260,3 +260,8 @@ export function createErrorText(err: { status?: number; message?: string }): str
   }
   return saveErrorText(err)
 }
+
+/** The projects a task can be created in (those with an id): the create form's and the import screen's project list. */
+export function projectChoices(projects: TasksPayload['projects']): (TasksPayload['projects'][number] & { id: string })[] {
+  return projects.filter((p): p is typeof p & { id: string } => p.id !== null)
+}

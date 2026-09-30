@@ -2,6 +2,7 @@
 // queue of creates, its reducer, the summary sentence and the leftover file.
 // No React, no fetch, no DOM.
 import type { CreateTaskInput, ImportFields, ImportVerdict } from '../../components/discordTasks/api'
+import { plainRuleMessage } from './boardLogic'
 
 export const MAX_IMPORT_TASKS = 50
 export const MAX_IMPORT_BYTES = 90 * 1024
@@ -137,4 +138,68 @@ export function createInputFor(fields: ImportFields, projectId: string, createIs
     create_issue: createIssue,
     status: fields.status,
   }
+}
+
+export const IMPORT_UNAVAILABLE_TEXT = 'Import is not available yet.'
+
+// The Import button's label: `Import 1 task`, `Import 3 tasks`.
+export function importButtonLabel(valid: number): string {
+  return `Import ${valid} ${valid === 1 ? 'task' : 'tasks'}`
+}
+
+// The line above the preview: `2 of 3 tasks can be imported.`
+export function checkHeadline(verdicts: ImportVerdict[]): string {
+  const valid = verdicts.filter((v) => v.ok).length
+  return `${valid} of ${verdicts.length} ${verdicts.length === 1 ? 'task' : 'tasks'} can be imported.`
+}
+
+// An older backend has no import-check route (404) or is offline (503).
+export function checkFailure(err: { status?: number; message?: string }): string {
+  if (err.status === 404 || err.status === 503) return IMPORT_UNAVAILABLE_TEXT
+  return plainRuleMessage(err.message ?? '') || 'The check failed.'
+}
+
+// The sentence for a step whose request threw.
+export function stepFailure(err: { message?: string } | null | undefined): string {
+  return plainRuleMessage(err?.message ?? '') || 'The request failed.'
+}
+
+export const PARENT_MISSING_TEXT = 'The task was not created.'
+
+export const FORMAT_TASK_FIELDS: { name: string; rule: string }[] = [
+  { name: 'type', rule: 'Required. feature or bug.' },
+  { name: 'title', rule: 'Required. Up to 200 characters.' },
+  { name: 'description', rule: 'Up to 2000 characters.' },
+  { name: 'scope', rule: 'backend, frontend, mobile, qa or design.' },
+  { name: 'status', rule: 'open (the default), in_progress or done.' },
+  { name: 'modules', rule: 'Up to 20 names of up to 100 characters each. Features only.' },
+  { name: 'assignees', rule: 'Up to 50 people, each the email they verified in Discord or their Discord name.' },
+  { name: 'subtasks', rule: 'Up to 25 subtasks.' },
+]
+
+export const FORMAT_SUBTASK_FIELDS: { name: string; rule: string }[] = [
+  { name: 'title', rule: 'Required.' },
+  { name: 'description', rule: 'Optional.' },
+  { name: 'scope', rule: 'Optional.' },
+  { name: 'status', rule: 'Optional.' },
+  { name: 'assignees', rule: 'Optional.' },
+]
+
+export const FORMAT_RULES: string[] = [
+  'A file holds at most 50 tasks and 90 KB.',
+  'The file names no project: every task goes into the project picked on this screen.',
+  'A subtask cannot have subtasks.',
+  'A done task is recorded as finished, with no Discord channel and no GitHub issue.',
+  'An open or in-progress task gets a Discord channel and, unless Open GitHub issues is unticked, a GitHub issue.',
+  'A done task must have every subtask done.',
+  'A bug needs a repository for its scope in the project.',
+  'A name that matches nobody, or more than one person, makes the task invalid. Use the email instead.',
+  'Unknown fields are ignored.',
+]
+
+// A row's label for a file entry the backend called invalid (no fields): its
+// title when it has one, else its 1-based position.
+export function entryTitle(entry: unknown, index: number): string {
+  const title = entry && typeof entry === 'object' ? (entry as { title?: unknown }).title : undefined
+  return typeof title === 'string' && title.trim() ? title : `Task ${index + 1}`
 }

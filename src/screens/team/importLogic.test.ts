@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   MAX_IMPORT_TASKS, MAX_IMPORT_BYTES, parseImportFile, importSteps, initialRun, applyStepResult, nextStep,
   importSummary, leftoverFile, importSampleFile, createInputFor, parentTaskIdFor,
+  entryTitle, importButtonLabel, checkHeadline, checkFailure, stepFailure, IMPORT_UNAVAILABLE_TEXT, FORMAT_TASK_FIELDS, FORMAT_RULES,
 } from './importLogic'
 import type { ImportFields, ImportVerdict } from '../../components/discordTasks/api'
 
@@ -165,5 +166,48 @@ describe('createInputFor', () => {
       type: 'bug', title: 'Search', description: 'd', project_id: 'P1', scope: 'backend', modules: ['M'],
       holder_ids: ['u1'], create_issue: true, status: 'done',
     })
+  })
+})
+
+describe('screen texts', () => {
+  const verdict = (index: number, ok: boolean): ImportVerdict => ({ index, ok, errors: [], warnings: [], fields: ok ? fields(`t${index}`) : null })
+
+  it('labels the import button, singular for one', () => {
+    expect(importButtonLabel(1)).toBe('Import 1 task')
+    expect(importButtonLabel(0)).toBe('Import 0 tasks')
+    expect(importButtonLabel(3)).toBe('Import 3 tasks')
+  })
+
+  it('counts the importable tasks in the headline', () => {
+    expect(checkHeadline([verdict(0, true), verdict(1, false), verdict(2, true)])).toBe('2 of 3 tasks can be imported.')
+    expect(checkHeadline([verdict(0, true)])).toBe('1 of 1 task can be imported.')
+  })
+
+  it('says the import is unavailable on 404 and 503, and gives the server sentence otherwise', () => {
+    expect(checkFailure({ status: 404, message: 'nope' })).toBe(IMPORT_UNAVAILABLE_TEXT)
+    expect(checkFailure({ status: 503, message: 'down' })).toBe(IMPORT_UNAVAILABLE_TEXT)
+    expect(checkFailure({ status: 400, message: '**Bad**\nfile' })).toBe('Bad file')
+    expect(checkFailure({ status: 500 })).toBe('The check failed.')
+  })
+
+  it('gives a step failure the server sentence or a fallback', () => {
+    expect(stepFailure({ message: 'Title is required.' })).toBe('Title is required.')
+    expect(stepFailure({ message: '' })).toBe('The request failed.')
+    expect(stepFailure(null)).toBe('The request failed.')
+  })
+
+  it('carries the format contract', () => {
+    expect(FORMAT_TASK_FIELDS.map((f) => f.name)).toEqual(['type', 'title', 'description', 'scope', 'status', 'modules', 'assignees', 'subtasks'])
+    expect(FORMAT_RULES[0]).toContain('90 KB')
+  })
+})
+
+describe('entryTitle', () => {
+  it('uses the entry title, else its position', () => {
+    expect(entryTitle({ title: 'Login' }, 0)).toBe('Login')
+    expect(entryTitle({ title: '  ' }, 1)).toBe('Task 2')
+    expect(entryTitle({ title: 5 }, 2)).toBe('Task 3')
+    expect(entryTitle('x', 3)).toBe('Task 4')
+    expect(entryTitle(null, 4)).toBe('Task 5')
   })
 })

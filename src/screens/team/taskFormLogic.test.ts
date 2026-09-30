@@ -210,3 +210,11 @@ describe('scopeOptionsFor', () => {
     expect(scopeOptionsFor('GitSync').map((o) => o.value)).toEqual(['', 'backend', 'frontend', 'mobile', 'qa', 'design', 'GitSync'])
   })
 })
+
+describe('projectChoices', () => {
+  it('keeps only projects that have an id', async () => {
+    const { projectChoices } = await import('./taskFormLogic')
+    const list = [{ id: 'p1', name: 'A' }, { id: null, name: 'General' }] as unknown as TasksPayload['projects']
+    expect(projectChoices(list).map((p) => p.id)).toEqual(['p1'])
+  })
+})
