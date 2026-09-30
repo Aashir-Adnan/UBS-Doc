@@ -1,6 +1,6 @@
 // Pure team-roster logic: per-member workload counts, roster sorting, and the
 // shared filter bar's member-side narrowing. No React, no DOM.
-import { isTerminal, type ProjectGroup, type TaskRow, type TeamMember } from '../tasksLogic'
+import { isTerminal, type ProjectGroup, type TaskRow, type TasksPayload, type TeamMember } from '../tasksLogic'
 
 export interface MemberWorkload { open: number; in_progress: number; blocked: number; total: number }
 
@@ -66,4 +66,30 @@ export function filterMembers(members: TeamMember[], projects: ProjectGroup[], f
     if (filters.blockedOnly && memberWorkload(member, allProjectTasks).blocked <= 0) return false
     return true
   })
+}
+
+export interface PersonOption { id: string; name: string }
+
+// The shared Assignee / person select's options, following the Project filter.
+// A selected project offers its members; "All projects" offers the members of
+// every project the viewer can see, except for a viewer who sees everything,
+// who gets the full roster (so Time and Stats can list people with no tasks).
+// Names come from the roster when the person is on it.
+export function personOptions(payload: TasksPayload | null, projectSlug: string | null): PersonOption[] {
+  if (!payload) return []
+  const roster = new Map(payload.members.map((m) => [m.discordId, m.name]))
+  const byId = new Map<string, string>()
+  if (!projectSlug && payload.viewer?.seesAll) {
+    for (const m of payload.members) byId.set(m.discordId, m.name)
+  } else {
+    const groups = projectSlug ? payload.projects.filter((p) => p.docsSlug === projectSlug) : payload.projects
+    for (const g of groups) for (const m of g.members) if (!byId.has(m.discordId)) byId.set(m.discordId, roster.get(m.discordId) ?? m.name)
+  }
+  return [...byId].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+}
+
+// After the Project filter changes: keep the selected assignee only if the new
+// options still offer them, else fall back to "Anyone" (null).
+export function assigneeAfterProjectChange(options: PersonOption[], assigneeId: string | null): string | null {
+  return assigneeId && options.some((o) => o.id === assigneeId) ? assigneeId : null
 }

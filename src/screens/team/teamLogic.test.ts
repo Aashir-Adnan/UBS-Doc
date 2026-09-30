@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { memberWorkload, sortMembers, filterMembers } from './teamLogic'
-import type { TaskRow, TeamMember, ProjectGroup } from '../tasksLogic'
+import { memberWorkload, sortMembers, filterMembers, personOptions, assigneeAfterProjectChange } from './teamLogic'
+import type { TaskRow, TeamMember, ProjectGroup, TasksPayload } from '../tasksLogic'
 
 const t = (id: string, status: string, assignees: string[], isBlocked = false): TaskRow => ({
   id, title: id, type: 'feature', status, implementationStatus: null,
@@ -92,4 +92,55 @@ describe('filterMembers', () => {
     const out = filterMembers(members, projects, { projectSlug: null, assigneeId: null, blockedOnly: true, query: '' })
     expect(out.map((m) => m.discordId)).toEqual(['u1'])
   })
+})
+
+describe('personOptions', () => {
+  const roster = (id: string, name: string): TeamMember => ({
+    discordId: id, name, username: null, roleNames: [], status: 'active', verified: true, projects: [],
+  })
+  const grp = (slug: string | null, members: [string, string][]): ProjectGroup => ({
+    id: slug, name: slug ?? 'none', docsSlug: slug,
+    members: members.map(([discordId, name]) => ({ discordId, name, username: null, role: null, source: 'explicit' as const })),
+    counts: { open: 0, in_progress: 0, pending: 0, done: 0, blocked: 0 }, tasks: [],
+  })
+  const payload = (seesAll: boolean): TasksPayload => ({
+    generatedAt: '',
+    projects: [grp('a', [['2', 'Zed M'], ['1', 'Amy M']]), grp('b', [['1', 'Amy M'], ['3', 'Bob M']])],
+    members: [roster('1', 'Amy'), roster('2', 'Zed'), roster('3', 'Bob'), roster('4', 'Cy')],
+    viewer: { linked: true, seesAll, isAdmin: false, discordIds: [], name: null },
+  })
+
+  it('a selected project gives its members, sorted, named from the roster', () => {
+    expect(personOptions(payload(false), 'a')).toEqual([{ id: '1', name: 'Amy' }, { id: '2', name: 'Zed' }])
+  })
+  it('a selected project is the same for a viewer who sees everything', () => {
+    expect(personOptions(payload(true), 'b')).toEqual([{ id: '1', name: 'Amy' }, { id: '3', name: 'Bob' }])
+  })
+  it('all projects, not seeing everything: union of visible projects, de-duplicated and sorted', () => {
+    expect(personOptions(payload(false), null)).toEqual([{ id: '1', name: 'Amy' }, { id: '3', name: 'Bob' }, { id: '2', name: 'Zed' }])
+  })
+  it('all projects, seeing everything: the full roster', () => {
+    expect(personOptions(payload(true), null).map((p) => p.id)).toEqual(['1', '3', '4', '2'])
+  })
+  it('falls back to the member entry name when not on the roster', () => {
+    const p = payload(false)
+    p.members = []
+    expect(personOptions(p, 'a')).toEqual([{ id: '1', name: 'Amy M' }, { id: '2', name: 'Zed M' }])
+  })
+  it('an unknown project slug gives nobody; a missing payload gives nobody', () => {
+    expect(personOptions(payload(false), 'nope')).toEqual([])
+    expect(personOptions(null, null)).toEqual([])
+  })
+  it('a missing viewer is treated as not seeing everything', () => {
+    const p = payload(true)
+    delete p.viewer
+    expect(personOptions(p, null).map((x) => x.id)).toEqual(['1', '3', '2'])
+  })
+})
+
+describe('assigneeAfterProjectChange', () => {
+  const opts = [{ id: '1', name: 'Amy' }, { id: '2', name: 'Zed' }]
+  it('keeps an assignee who is offered', () => expect(assigneeAfterProjectChange(opts, '1')).toBe('1'))
+  it('resets an assignee who is not offered', () => expect(assigneeAfterProjectChange(opts, '9')).toBeNull())
+  it('keeps "Anyone"', () => expect(assigneeAfterProjectChange(opts, null)).toBeNull())
 })

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link2 } from 'lucide-react'
-import { c, card, txt, muted } from '../../lib'
+import { c, card, txt, muted, inputCls } from '../../lib'
 import type { Theme } from '../../types'
 import { linkDiscord } from '../../components/discordTasks/api'
 import { LINK_HELP, codeProblem, linkErrorText, normalizeCode } from './identityLogic'
@@ -43,7 +43,7 @@ export default function LinkCard({ theme, onLinked, reason }: { theme: Theme; on
       <p className={c('text-sm mb-5', muted(theme))}>{LINK_HELP}</p>
       <form onSubmit={(e) => { e.preventDefault(); void submit() }} className="flex flex-wrap gap-3 items-center">
         <div className="w-[180px]">
-          <input className="input-base font-mono tracking-widest uppercase" value={code} maxLength={9}
+          <input className={inputCls(theme, 'font-mono tracking-widest uppercase')} value={code} maxLength={9}
             placeholder="ABC234" aria-label="Link code" autoComplete="one-time-code"
             onChange={(e) => setCode(e.target.value)} disabled={busy} />
         </div>

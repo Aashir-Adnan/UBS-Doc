@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react'
 import { X, Check } from 'lucide-react'
-import { c, txt, muted, chipIndigo } from '../../lib'
+import { c, txt, muted, chipIndigo, inputCls } from '../../lib'
 import type { Theme } from '../../types'
 import type { TeamMember } from '../tasksLogic'
 import Avatar from './Avatar'
@@ -71,7 +71,7 @@ export default function MemberPicker({ members, projectId, value, onChange, them
       <div className="relative">
         <input
           id={inputId}
-          className="input-base"
+          className={inputCls(theme)}
           placeholder="Search Discord members…"
           value={query}
           disabled={disabled}

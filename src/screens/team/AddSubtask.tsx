@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import { c, muted } from '../../lib'
+import { c, muted, inputCls } from '../../lib'
 import type { Theme } from '../../types'
 import type { TaskRow, TasksPayload } from '../tasksLogic'
 import { addSubtask } from '../../components/discordTasks/api'
@@ -42,7 +42,7 @@ export default function AddSubtask({ task, payload, theme }: { task: TaskRow; pa
     <div className="mt-3">
       <form onSubmit={(e) => { e.preventDefault(); void add() }} className="flex flex-wrap gap-2 items-center">
         <div className="flex-1 min-w-[200px]">
-          <input className="input-base" placeholder="Add a subtask…" value={title} maxLength={200}
+          <input className={inputCls(theme)} placeholder="Add a subtask…" value={title} maxLength={200}
             onChange={(e) => setTitle(e.target.value)} disabled={busy} aria-label="New subtask title" />
         </div>
         <button type="submit" className="btn-primary px-4 py-2 text-sm inline-flex items-center gap-1.5" disabled={busy}>
