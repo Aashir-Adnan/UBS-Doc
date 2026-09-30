@@ -30,9 +30,29 @@ describe('resolveTaskRepo', () => {
     expect(resolveTaskRepo({ projectId: 'p1', scope: 'design' }, { projectRepos: [link('r1'), link('r2')], repositories })).toEqual({ repository: null, reason: 'no-repo-for-scope' })
   })
 
-  it('no project, or no scope with several links', () => {
+  it('no project, or no scope with only tagged links', () => {
     expect(resolveTaskRepo({ projectId: null, scope: 'backend' }, { projectRepos: [], repositories })).toEqual({ repository: null, reason: 'no-project' })
-    expect(resolveTaskRepo({ projectId: 'p1', scope: null }, { projectRepos: [link('r1', 'backend'), link('r2')], repositories })).toEqual({ repository: null, reason: 'no-scope' })
+    expect(resolveTaskRepo({ projectId: 'p1', scope: null }, { projectRepos: [link('r1', 'backend'), link('r2', 'frontend')], repositories })).toEqual({ repository: null, reason: 'no-scope' })
+  })
+
+  // Badar HMS, 2026-09-30: one repository holds backend AND frontend, a second
+  // holds the mobile app. A link carries one scope, so the shared repository is
+  // left untagged and takes every scope no tagged repository claims.
+  it('rule 2: the one untagged link takes every scope no tagged link claims', () => {
+    const projectRepos = [link('r1'), link('r2', 'mobile')]
+    expect(resolveTaskRepo({ projectId: 'p1', scope: 'mobile' }, { projectRepos, repositories })).toEqual({ repository: R2, reason: 'scope' })
+    for (const scope of ['backend', 'frontend', 'qa', 'design', null]) {
+      expect(resolveTaskRepo({ projectId: 'p1', scope }, { projectRepos, repositories })).toEqual({ repository: R1, reason: 'only-repo' })
+    }
+  })
+
+  it('two untagged links beside a tagged one: still none', () => {
+    const R3: RepoRef = { id: 'r3', name: 'Third', url: 'https://github.com/o/third' }
+    const out = resolveTaskRepo(
+      { projectId: 'p1', scope: 'backend' },
+      { projectRepos: [link('r1'), link('r3'), link('r2', 'mobile')], repositories: [...repositories, R3] },
+    )
+    expect(out).toEqual({ repository: null, reason: 'no-repo-for-scope' })
   })
 
   it('links of other projects and links to deleted repositories are ignored', () => {
