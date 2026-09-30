@@ -33,8 +33,8 @@ export function parseImportFile(text: string): { tasks: unknown[] } | { error: s
 
 export interface ImportStep { key: string; kind: 'task' | 'subtask'; taskIndex: number; subIndex?: number; title: string }
 export type StepState = 'pending' | 'running' | 'created' | 'failed' | 'skipped' | 'unconfirmed'
-export type ImportRun = Record<string, { state: StepState; message?: string; taskId?: string }>
-export type StepResult = { ok: true; taskId: string } | { ok: false; message: string; unconfirmed?: boolean }
+export type ImportRun = Record<string, { state: StepState; message?: string; taskId?: string; note?: string }>
+export type StepResult = { ok: true; taskId: string; note?: string } | { ok: false; message: string; unconfirmed?: boolean }
 
 // Valid tasks only, in file order: each task, then its subtasks.
 export function importSteps(verdicts: ImportVerdict[]): ImportStep[] {
@@ -58,7 +58,7 @@ export function initialRun(steps: ImportStep[]): ImportRun {
 export function applyStepResult(run: ImportRun, steps: ImportStep[], key: string, result: StepResult): ImportRun {
   const next: ImportRun = { ...run }
   if (result.ok) {
-    next[key] = { state: 'created', taskId: result.taskId }
+    next[key] = result.note ? { state: 'created', taskId: result.taskId, note: result.note } : { state: 'created', taskId: result.taskId }
     return next
   }
   next[key] = { state: result.unconfirmed ? 'unconfirmed' : 'failed', message: result.message }
@@ -166,6 +166,32 @@ export function checkFailure(err: { status?: number; message?: string } | null |
   return plainRuleMessage(err?.message ?? '') || 'The check failed.'
 }
 
+// CSAAS allows 100 requests a minute per IP and rejects the rest with a 429 before
+// any handler runs, so a limited step created nothing and is safe to retry.
+export const IMPORT_PACE_MS = 700
+export const RATE_LIMIT_WAIT_MS = 20_000
+export const MAX_RATE_LIMIT_RETRIES = 3
+export const RATE_LIMITED_TEXT = 'The server is busy — too many requests. Try again in a minute.'
+export const WAITING_NOTICE = 'Waiting — the server is busy…'
+
+// Milliseconds to wait before retrying the same step, or null to give up.
+export function retryDelayFor(err: unknown, attempt: number): number | null {
+  if (!err || typeof err !== 'object') return null
+  if ((err as { status?: unknown }).status !== 429) return null
+  return attempt < MAX_RATE_LIMIT_RETRIES ? RATE_LIMIT_WAIT_MS : null
+}
+
+// Milliseconds to wait so consecutive requests START at least IMPORT_PACE_MS apart.
+export function paceDelay(lastStartMs: number, nowMs: number): number {
+  return Math.max(0, IMPORT_PACE_MS - (nowMs - lastStartMs))
+}
+
+// A create's result, keeping the note the bot returned (a failed issue, a full section).
+export function createdResult(taskId: string, note?: string | null): StepResult {
+  const shown = plainRuleMessage(note ?? '')
+  return shown ? { ok: true, taskId, note: shown } : { ok: true, taskId }
+}
+
 // The sentence for a step whose request threw.
 export function stepFailure(err: { message?: string } | null | undefined): string {
   return plainRuleMessage(err?.message ?? '') || 'The request failed.'
@@ -177,6 +203,7 @@ const SUBTASK_MAYBE_ADDED_TEXT =
 // A step's thrown error as its result: a create that may have gone through is
 // unconfirmed (never retried, never in the leftover file), anything else failed.
 export function stepFailureResult(err: { status?: number; message?: string } | null | undefined, kind: 'task' | 'subtask'): StepResult & { ok: false } {
+  if (err?.status === 429) return { ok: false, message: RATE_LIMITED_TEXT }
   if (err && createMayHaveSucceeded(err)) {
     return { ok: false, unconfirmed: true, message: kind === 'task' ? CREATE_MAYBE_CREATED_TEXT : SUBTASK_MAYBE_ADDED_TEXT }
   }

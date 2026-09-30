@@ -10,14 +10,16 @@ import { useActingPermissions } from '../../components/portal/tenantProjects/use
 import { useTeam } from './TeamLayout'
 import { projectChoices } from './taskFormLogic'
 import {
-  FILE_TOO_LARGE_TEXT, FILE_UNREADABLE_TEXT, FORMAT_RULES, FORMAT_SUBTASK_FIELDS, FORMAT_TASK_FIELDS, MAX_IMPORT_BYTES, PARENT_MISSING_TEXT, RUNNING_NOTICE, applyStepResult, checkFailure, checkHeadline,
-  createInputFor, entryTitle, importButtonLabel, importSampleFile, importSteps, importSummary, initialRun, leftoverFile,
+  FILE_TOO_LARGE_TEXT, FILE_UNREADABLE_TEXT, FORMAT_RULES, FORMAT_SUBTASK_FIELDS, FORMAT_TASK_FIELDS, MAX_IMPORT_BYTES, PARENT_MISSING_TEXT, RUNNING_NOTICE, WAITING_NOTICE, applyStepResult, checkFailure, checkHeadline,
+  createInputFor, createdResult, paceDelay, retryDelayFor, entryTitle, importButtonLabel, importSampleFile, importSteps, importSummary, initialRun, leftoverFile,
   nextStep, parentTaskIdFor, parseImportFile, stepFailureResult, type ImportRun, type ImportStep, type StepResult,
 } from './importLogic'
 
 // A file of tasks, checked by the bot without creating anything, then created
 // one request at a time: each task, then each of its subtasks.
 interface Checked { tasks: unknown[]; verdicts: ImportVerdict[]; projectId: string; createIssues: boolean }
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
 function downloadJson(name: string, data: unknown) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
@@ -46,6 +48,7 @@ export default function TaskImport() {
   const [run, setRun] = useState<ImportRun>({})
   const [running, setRunning] = useState(false)
   const [finished, setFinished] = useState(false)
+  const [waitingKey, setWaitingKey] = useState<string | null>(null)
   const mounted = useRef(true)
   const runningRef = useRef(false)
   const checkSeq = useRef(0)
@@ -66,6 +69,16 @@ export default function TaskImport() {
     const match = slug ? payload.projects.find((p) => p.docsSlug === slug && p.id) : null
     if (match?.id) setProjectId(match.id)
   }, [payload, params, projectId])
+
+  // The app's root container sits behind the overlay: make it inert so keyboard focus
+  // cannot reach the sidebar or tabs. The overlay is portalled to document.body, a
+  // sibling of #root, so it stays interactive.
+  useEffect(() => {
+    if (!running) return
+    const root = document.getElementById('root')
+    root?.setAttribute('inert', '')
+    return () => root?.removeAttribute('inert')
+  }, [running])
 
   // The overlay is a modal: move focus into it when the import starts.
   useEffect(() => { if (running) dialogRef.current?.focus() }, [running])
@@ -131,18 +144,28 @@ export default function TaskImport() {
   async function runStep(step: ImportStep, r: ImportRun, verdicts: ImportVerdict[], pid: string, issues: boolean): Promise<StepResult> {
     const fields = verdicts.find((v) => v.index === step.taskIndex)?.fields
     if (!fields) return { ok: false, message: PARENT_MISSING_TEXT }
-    try {
+    const send = async (): Promise<StepResult> => {
       if (step.kind === 'task') {
         const res = await createTask(createInputFor(fields, pid, issues))
-        return { ok: true, taskId: res.task.id }
+        return createdResult(res.task.id, res.note)
       }
       const parentId = parentTaskIdFor(r, step)
       if (!parentId) return { ok: false, message: PARENT_MISSING_TEXT }
       const sub = fields.subtasks[step.subIndex ?? 0]
       const res = await addSubtask(parentId, sub.title, sub.holderIds, { description: sub.description, scope: sub.scope, status: sub.status })
       return { ok: true, taskId: res.task.id }
-    } catch (err) {
-      return stepFailureResult(err as { status?: number; message?: string }, step.kind)
+    }
+    // A 429 is rejected before any handler runs, so sending the same step again after a wait is safe.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await send()
+      } catch (err) {
+        const wait = retryDelayFor(err, attempt)
+        if (wait === null) return stepFailureResult(err as { status?: number; message?: string }, step.kind)
+        if (mounted.current) setWaitingKey(step.key)
+        await sleep(wait)
+        if (mounted.current) setWaitingKey(null)
+      }
     }
   }
 
@@ -156,8 +179,12 @@ export default function TaskImport() {
     setRun(r)
     try {
       let step: ImportStep | null
+      let lastStart = -Infinity
       while ((step = nextStep(r, steps))) {
-        r = { ...r, [step.key]: { state: 'running' } }
+        const pace = paceDelay(lastStart, Date.now())
+        if (pace > 0) await sleep(pace)
+        lastStart = Date.now()
+        r ={ ...r, [step.key]: { state: 'running' } }
         if (mounted.current) setRun(r)
         const result = await runStep(step, r, verdicts, pid, issues)
         r = applyStepResult(r, steps, step.key, result)
@@ -166,7 +193,7 @@ export default function TaskImport() {
     } finally {
       runningRef.current = false
       void refresh()
-      if (mounted.current) { setRunning(false); setFinished(true) }
+      if (mounted.current) { setWaitingKey(null); setRunning(false); setFinished(true) }
     }
   }
 
@@ -186,12 +213,12 @@ export default function TaskImport() {
           <li key={v.index} className={c('rounded-xl border px-4 py-3', d ? 'border-white/10' : 'border-slate-200')}>
             <Row label={v.fields?.title ?? entryTitle(checked.tasks[v.index], v.index)}
               meta={v.fields ? `${v.fields.type} · ${v.fields.status.replace('_', ' ')}` : null}
-              verdict={v} state={run[`t${v.index}`]} theme={theme} />
+              verdict={v} state={run[`t${v.index}`]} waiting={waitingKey === `t${v.index}`} live={running} theme={theme} />
             {v.fields && v.fields.subtasks.length > 0 && (
               <ul className="list-none p-0 m-0 mt-2 ml-5 flex flex-col gap-1.5">
                 {v.fields.subtasks.map((s, i) => (
                   <li key={i}>
-                    <Row label={s.title} meta={s.status.replace('_', ' ')} verdict={null} state={run[`t${v.index}.s${i}`]} theme={theme} />
+                    <Row label={s.title} meta={s.status.replace('_', ' ')} verdict={null} state={run[`t${v.index}.s${i}`]} waiting={waitingKey === `t${v.index}.s${i}`} live={running} theme={theme} />
                   </li>
                 ))}
               </ul>
@@ -295,8 +322,8 @@ export default function TaskImport() {
   )
 }
 
-function Row({ label, meta, verdict, state, theme }: {
-  label: string; meta: string | null; verdict: ImportVerdict | null; state: ImportRun[string] | undefined; theme: Theme
+function Row({ label, meta, verdict, state, waiting, live, theme }: {
+  label: string; meta: string | null; verdict: ImportVerdict | null; state: ImportRun[string] | undefined; waiting: boolean; live: boolean; theme: Theme
 }) {
   return (
     <div className="text-sm">
@@ -304,14 +331,15 @@ function Row({ label, meta, verdict, state, theme }: {
         <span className={c('font-semibold', txt(theme))}>{label}</span>
         {meta && <span className={c('text-xs', muted(theme))}>{meta}</span>}
         {verdict?.ok && !state && <span className="text-emerald-500 font-semibold" aria-label="Valid">&#10003;</span>}
-        {state?.state === 'running' && <span className={c('text-xs font-semibold', muted(theme))}>Creating…</span>}
-        {state?.state === 'created' && state.taskId && (
-          <Link to={`/tools/team/tasks/${state.taskId}`} className="text-xs font-semibold text-emerald-500">Created</Link>
-        )}
+        {state?.state === 'running' && <span className={c('text-xs font-semibold', muted(theme))}>{waiting ? WAITING_NOTICE : 'Creating…'}</span>}
+        {state?.state === 'created' && state.taskId && (live
+          ? <span className="text-xs font-semibold text-emerald-500">Created</span>
+          : <Link to={`/tools/team/tasks/${state.taskId}`} className="text-xs font-semibold text-emerald-500">Created</Link>)}
         {state?.state === 'failed' && <span className="text-xs font-semibold text-red-500">Failed: {state.message}</span>}
         {state?.state === 'unconfirmed' && <span className="text-xs font-semibold text-amber-500">{state.message}</span>}
         {state?.state === 'skipped' && <span className="text-xs font-semibold text-amber-500">Skipped: {state.message}</span>}
       </div>
+      {state?.state === 'created' && state.note && <p className="text-xs font-semibold text-amber-500 m-0 mt-1">{state.note}</p>}
       {verdict?.errors.map((e, i) => <p key={`e${i}`} className="text-xs font-semibold text-red-500 m-0 mt-1">{e}</p>)}
       {verdict?.warnings.map((w, i) => <p key={`w${i}`} className="text-xs font-semibold text-amber-500 m-0 mt-1">{w}</p>)}
     </div>

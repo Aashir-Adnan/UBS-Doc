@@ -4,6 +4,7 @@ import {
   importSummary, leftoverFile, importSampleFile, createInputFor, parentTaskIdFor,
   entryTitle, importButtonLabel, checkHeadline, checkFailure, stepFailure, IMPORT_UNAVAILABLE_TEXT, FORMAT_TASK_FIELDS, FORMAT_RULES,
   FORMAT_SUBTASK_FIELDS, stepFailureResult, RUNNING_NOTICE, FILE_TOO_LARGE_TEXT,
+  IMPORT_PACE_MS, RATE_LIMIT_WAIT_MS, RATE_LIMITED_TEXT, retryDelayFor, paceDelay, createdResult,
 } from './importLogic'
 import type { ImportFields, ImportVerdict } from '../../components/discordTasks/api'
 
@@ -267,5 +268,57 @@ describe('entryTitle', () => {
     expect(entryTitle({ title: 5 }, 2)).toBe('Task 3')
     expect(entryTitle('x', 3)).toBe('Task 4')
     expect(entryTitle(null, 4)).toBe('Task 5')
+  })
+})
+
+describe('pacing and the rate limit', () => {
+  it('spaces the start of consecutive requests by at least 700 ms', () => {
+    expect(IMPORT_PACE_MS).toBe(700)
+    expect(paceDelay(1000, 1000 + 700)).toBe(0)
+    expect(paceDelay(1000, 5000)).toBe(0)
+    expect(paceDelay(1000, 1200)).toBe(500)
+    expect(paceDelay(1000, 1000)).toBe(700)
+  })
+
+  it('waits 20 s and retries a 429, at most three times', () => {
+    expect(RATE_LIMIT_WAIT_MS).toBe(20000)
+    expect(retryDelayFor({ status: 429 }, 0)).toBe(20000)
+    expect(retryDelayFor({ status: 429 }, 1)).toBe(20000)
+    expect(retryDelayFor({ status: 429 }, 2)).toBe(20000)
+    expect(retryDelayFor({ status: 429 }, 3)).toBeNull()
+  })
+
+  it('never retries another status or a non-object error', () => {
+    for (const status of [400, 403, 409, 500, 502, 503, undefined]) expect(retryDelayFor({ status }, 0)).toBeNull()
+    expect(retryDelayFor(null, 0)).toBeNull()
+    expect(retryDelayFor(undefined, 0)).toBeNull()
+    expect(retryDelayFor('429', 0)).toBeNull()
+    expect(retryDelayFor(429, 0)).toBeNull()
+  })
+
+  it('a 429 that stays 429 is a plain failure, so the task goes to the leftover file', () => {
+    expect(RATE_LIMITED_TEXT).toBe('The server is busy — too many requests. Try again in a minute.')
+    const r = stepFailureResult({ status: 429, message: 'Too many requests' }, 'task')
+    expect(r).toEqual({ ok: false, message: RATE_LIMITED_TEXT })
+    expect(r).not.toHaveProperty('unconfirmed')
+    expect(stepFailureResult({ status: 429 }, 'subtask')).toEqual({ ok: false, message: RATE_LIMITED_TEXT })
+  })
+})
+
+describe('the create note', () => {
+  it('a created result keeps a non-empty note, tidied for display', () => {
+    expect(createdResult('t1', 'The GitHub issue could not be opened.')).toEqual({ ok: true, taskId: 't1', note: 'The GitHub issue could not be opened.' })
+    expect(createdResult('t1', '**Section full**\n• used the Features category')).toEqual({ ok: true, taskId: 't1', note: 'Section full · used the Features category' })
+  })
+  it('an empty or missing note is left off', () => {
+    expect(createdResult('t1', '')).toEqual({ ok: true, taskId: 't1' })
+    expect(createdResult('t1', '  ')).toEqual({ ok: true, taskId: 't1' })
+    expect(createdResult('t1', undefined)).toEqual({ ok: true, taskId: 't1' })
+  })
+  it('applyStepResult stores the note on the created step', () => {
+    const v = [{ index: 0, ok: true, errors: [], warnings: [], fields: fields('A') }] as ImportVerdict[]
+    const steps = importSteps(v)
+    const run = applyStepResult(initialRun(steps), steps, 't0', createdResult('x1', 'No issue.'))
+    expect(run.t0).toEqual({ state: 'created', taskId: 'x1', note: 'No issue.' })
   })
 })
