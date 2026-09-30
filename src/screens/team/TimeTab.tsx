@@ -6,7 +6,7 @@ import type { Theme } from '../../types'
 import { ApiError, fetchClockedIn, fetchTimeEntries, fetchTimeReport, type ClockedInPerson, type TimeEntriesPayload, type TimeReportPayload } from '../../components/discordTasks/api'
 import { csvFilename, csvRows, entriesByTask, formatDuration, shiftWeek, toCsv, weekRange } from './timeLogic'
 import Avatar from './Avatar'
-import { formatElapsed } from './clockLogic'
+import { clockedInTaskLabel, formatElapsed } from './clockLogic'
 import { useTeam } from './TeamLayout'
 
 // The Time tab: its own fetch of GET /api/discord/time/report, entirely
@@ -343,7 +343,7 @@ function ClockedInNow({ people, fetchedAt, theme }: { people: ClockedInPerson[];
               <Avatar person={p} size={22} theme={theme} />
               <span className={c('text-sm font-semibold min-w-0 truncate', txt(theme))}>{p.name}</span>
               <span className={c('text-xs font-medium flex-1 min-w-0 truncate', muted(theme))}>
-                {p.taskTitle ?? 'General work'}
+                {clockedInTaskLabel(p)}
               </span>
               <span className={c('text-xs font-bold tabular-nums', muted(theme))}>{formatElapsed(p.elapsedSeconds + since)}</span>
             </li>

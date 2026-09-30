@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatElapsed, elapsedNow, clockTaskChoices, taskClockAction, clockOutcomeText, clockOutText } from './clockLogic'
+import { clockedInTaskLabel, isClockUnavailable, formatElapsed, elapsedNow, clockTaskChoices, taskClockAction, clockOutcomeText, clockOutText } from './clockLogic'
 import type { ClockStatus, ClockInResult } from '../../components/discordTasks/api'
 import type { ProjectGroup, TaskRow } from '../tasksLogic'
 
@@ -92,5 +92,21 @@ describe('outcome texts', () => {
   it('clock out', () => {
     expect(clockOutText({ minutes: 80, taskTitle: 'Fix login', taskTotalMinutes: 200 })).toBe('Clocked out — 1h 20m.')
     expect(clockOutText({ minutes: 0, taskTitle: null, taskTotalMinutes: 0 })).toBe('Clocked out — 0m.')
+  })
+})
+
+describe('clockedInTaskLabel', () => {
+  it('uses a non-empty title', () => expect(clockedInTaskLabel({ taskId: 't1', taskTitle: 'Fix login' })).toBe('Fix login'))
+  it('says a task when the id is set but the title is missing', () => expect(clockedInTaskLabel({ taskId: 't1', taskTitle: null })).toBe('a task'))
+  it('says General work with neither', () => expect(clockedInTaskLabel({ taskId: null, taskTitle: null })).toBe('General work'))
+  it('keeps the backend hidden-task shape as a task', () => expect(clockedInTaskLabel({ taskId: null, taskTitle: 'a task' })).toBe('a task'))
+})
+
+describe('isClockUnavailable', () => {
+  it('is unavailable only when nothing ever succeeded', () => {
+    expect(isClockUnavailable(null, true)).toBe(true)
+    expect(isClockUnavailable(true, true)).toBe(false)
+    expect(isClockUnavailable(false, true)).toBe(false)
+    expect(isClockUnavailable(null, false)).toBe(false)
   })
 })

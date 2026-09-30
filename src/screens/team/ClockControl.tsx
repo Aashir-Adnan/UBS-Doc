@@ -7,7 +7,7 @@ import {
   type ClockStatus,
 } from '../../components/discordTasks/api'
 import type { ProjectGroup } from '../tasksLogic'
-import { clockOutText, clockOutcomeText, clockTaskChoices, elapsedNow, formatElapsed } from './clockLogic'
+import { clockOutText, clockOutcomeText, clockTaskChoices, elapsedNow, formatElapsed, isClockUnavailable } from './clockLogic'
 import { plainRuleMessage } from './boardLogic'
 import type { ToastTone } from './Toast'
 
@@ -44,7 +44,7 @@ export interface ClockState {
 
 export function useClock(): ClockState {
   const [linked, setLinked] = useState<boolean | null>(null)
-  const [unavailable, setUnavailable] = useState(false)
+  const [failed, setFailed] = useState(false)
   const [status, setStatus] = useState<ClockStatus>(INACTIVE)
   const [fetchedAt, setFetchedAt] = useState(() => Date.now())
   const [busy, setBusy] = useState(false)
@@ -66,10 +66,10 @@ export function useClock(): ClockState {
       setLinked(Boolean(r && r.linked))
       setStatus(r && r.linked && r.status ? r.status : INACTIVE)
       setFetchedAt(Date.now())
-      setUnavailable(false)
+      setFailed(false)
     } catch {
       if (!alive.current || mine !== seq.current) return
-      setUnavailable(true)
+      setFailed(true)
     }
   }, [])
 
@@ -84,7 +84,10 @@ export function useClock(): ClockState {
     try {
       const result = await clockIn(taskId)
       show(clockOutcomeText(result), 'info')
-      await refresh()
+      // The response already carries the fresh status: apply it at once so a
+      // failing follow-up refresh cannot hide a successful action.
+      if (alive.current) { seq.current++; setLinked(true); setStatus(result.status ?? INACTIVE); setFetchedAt(Date.now()); setFailed(false) }
+      void refresh()
       return true
     } catch (e) {
       show(plainRuleMessage(e instanceof Error ? e.message : '') || 'Could not clock in.', 'error')
@@ -97,7 +100,8 @@ export function useClock(): ClockState {
     try {
       const result = await clockOut(note.slice(0, NOTE_MAX))
       show(clockOutText(result), 'info')
-      await refresh()
+      if (alive.current) { seq.current++; setLinked(true); setStatus(INACTIVE); setFetchedAt(Date.now()); setFailed(false) }
+      void refresh()
       return true
     } catch (e) {
       show(plainRuleMessage(e instanceof Error ? e.message : '') || 'Could not clock out.', 'error')
@@ -105,6 +109,7 @@ export function useClock(): ClockState {
     } finally { if (alive.current) setBusy(false) }
   }, [refresh, show])
 
+  const unavailable = isClockUnavailable(linked, failed)
   return { linked, unavailable, status, fetchedAt, busy, refresh, clockInOn, clockOutNow, toast, dismissToast }
 }
 
@@ -137,6 +142,12 @@ export default function ClockControl({ clock, projects }: { clock: ClockState; p
     const id = setInterval(() => setNow(Date.now()), REFRESH_MS)
     return () => clearInterval(id)
   }, [])
+
+  // A dialog or picker left open while the clock changes underneath it (clocked
+  // out elsewhere, or in) must not reopen on the next change.
+  useEffect(() => {
+    if (status.active) setPickerOpen(false); else setOutOpen(false)
+  }, [status.active])
 
   const closePicker = useCallback(() => setPickerOpen(false), [])
   const closeDialog = useCallback(() => setOutOpen(false), [])

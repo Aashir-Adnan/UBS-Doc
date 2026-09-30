@@ -1,7 +1,7 @@
 // Pure helpers for the site's clock control: elapsed-time math, the task
 // picker's choices, which action a task page offers, and the toast sentences.
 // No React, no fetch, no DOM.
-import type { ClockInResult, ClockOutResult, ClockStatus } from '../../components/discordTasks/api'
+import type { ClockInResult, ClockOutResult, ClockStatus, ClockedInPerson } from '../../components/discordTasks/api'
 import { isTerminal, type ProjectGroup } from '../tasksLogic'
 import { formatDuration } from './timeLogic'
 
@@ -39,6 +39,19 @@ export function clockTaskChoices(projects: ProjectGroup[], query: string): Clock
     }
   }
   return out
+}
+
+// The control reads "unavailable" only when no fetch has ever succeeded
+// (`linked` is still null). After that a failed refresh keeps the last good
+// status, so a running clock never loses its Clock out button to a blip.
+export const isClockUnavailable = (linked: boolean | null, lastFetchFailed: boolean): boolean =>
+  lastFetchFailed && linked === null
+
+// A task the viewer cannot see arrives as taskTitle 'a task' (taskId null); a
+// missing title on a real task id is never shown as General work.
+export function clockedInTaskLabel(p: Pick<ClockedInPerson, 'taskId' | 'taskTitle'>): string {
+  if (p.taskTitle) return p.taskTitle
+  return p.taskId ? 'a task' : GENERAL_WORK
 }
 
 export type TaskClockAction = 'clock-in' | 'switch' | 'clock-out'
