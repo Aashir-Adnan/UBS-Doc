@@ -187,9 +187,11 @@ export interface CreateTaskInput {
   scope: string | null
   modules: string[]
   holder_ids: string[]
-  repository_ids: string[]
+  repository_ids?: string[]
   create_issue: boolean
-  tracks: { api_tests: boolean; qa_tests: boolean; acceptance_criteria: boolean }
+  tracks?: { api_tests: boolean; qa_tests: boolean; acceptance_criteria: boolean }
+  // Absent means the server's default (open); sent only when provided.
+  status?: string
 }
 export interface CreateTaskResult {
   task: { id: string; type: string; status: string; projectId: string }
@@ -208,11 +210,56 @@ export async function createTask(input: CreateTaskInput): Promise<CreateTaskResu
 
 export interface AddSubtaskResult { task: { id: string; status: string; parentId: string } }
 
-export async function addSubtask(parentId: string, title: string, holderIds: string[]): Promise<AddSubtaskResult> {
+// `extra` keys are sent only when provided, so a plain call's body is unchanged.
+export async function addSubtask(
+  parentId: string, title: string, holderIds: string[],
+  extra?: { description?: string | null; scope?: string | null; status?: string },
+): Promise<AddSubtaskResult> {
+  const body: Record<string, unknown> = { parent_id: parentId, title, holder_ids: holderIds }
+  if (extra?.description !== undefined) body.description = extra.description
+  if (extra?.scope !== undefined) body.scope = extra.scope
+  if (extra?.status !== undefined) body.status = extra.status
   return apiCall<AddSubtaskResult>('/discord/tasks/subtask', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ parent_id: parentId, title, holder_ids: holderIds }),
+    body: JSON.stringify(body),
+  })
+}
+
+// Import from a JSON file: the backend's verdict per task, nothing is created.
+// `index` is the 0-based position in the file; `fields` is null for an invalid task.
+export interface ImportSubtaskFields {
+  title: string
+  description: string | null
+  scope: string | null
+  status: 'open' | 'in_progress' | 'done'
+  holderIds: string[]
+}
+export interface ImportFields {
+  type: 'feature' | 'bug'
+  title: string
+  description: string | null
+  scope: string | null
+  status: 'open' | 'in_progress' | 'done'
+  modules: string[]
+  holderIds: string[]
+  repositoryIds: string[]
+  tracks: { apiTests: boolean; qaTests: boolean; acceptanceCriteria: boolean }
+  subtasks: ImportSubtaskFields[]
+}
+export interface ImportVerdict {
+  index: number
+  ok: boolean
+  errors: string[]
+  warnings: string[]
+  fields: ImportFields | null
+}
+
+export async function checkImport(projectId: string, tasks: unknown[], createIssues: boolean): Promise<{ tasks: ImportVerdict[] }> {
+  return apiCall<{ tasks: ImportVerdict[] }>('/discord/tasks/import-check', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ project_id: projectId, tasks, create_issues: createIssues }),
   })
 }
 

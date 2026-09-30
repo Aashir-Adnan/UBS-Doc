@@ -21,6 +21,7 @@ import TasksList from '../screens/team/TasksList'
 import People from '../screens/team/People'
 import TaskDetail from '../screens/team/TaskDetail'
 import TaskCreate from '../screens/team/TaskCreate'
+import TaskImport from '../screens/team/TaskImport'
 import Board from '../screens/team/Board'
 import TimeTab from '../screens/team/TimeTab'
 import Stats from '../screens/team/Stats'
@@ -83,6 +84,7 @@ export default function AppRoutes() {
           <Route index element={<People />} />
           <Route path="tasks" element={<TasksList />} />
           <Route path="tasks/new" element={<TaskCreate />} />
+          <Route path="tasks/import" element={<TaskImport />} />
           <Route path="tasks/:taskId" element={<TaskDetail />} />
           <Route path="board" element={<Board />} />
           <Route path="time" element={<TimeTab />} />

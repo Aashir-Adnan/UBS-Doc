@@ -11,7 +11,7 @@ import MemberPicker from './MemberPicker'
 import { bugRepoChoices, issueTargetText, projectRepoList, resolveTaskRepo } from './repoLogic'
 import {
   NO_REPO_AT_ALL_MESSAGE, SCOPE_OPTIONS, bugIssueRepo, bugRepoHint, createErrorText, createPayload, emptyCreateForm,
-  validateCreateForm, type CreateForm,
+  projectChoices, validateCreateForm, type CreateForm,
 } from './taskFormLogic'
 
 // A new Feature or Bug, made by the Discord bot exactly as /create-task makes
@@ -29,7 +29,7 @@ export default function TaskCreate() {
   const [error, setError] = useState<string | null>(null)
   const set = <K extends keyof CreateForm>(key: K, value: CreateForm[K]) => setForm((f) => ({ ...f, [key]: value }))
 
-  const projects = (payload?.projects ?? []).filter((p): p is typeof p & { id: string } => p.id !== null)
+  const projects = projectChoices(payload?.projects ?? [])
 
   // Which repository this task's GitHub issue would go to, by the same rule
   // the bot applies (repoLogic.ts / bot's taskRepo.js) — recomputed whenever
