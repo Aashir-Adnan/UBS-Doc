@@ -6,7 +6,8 @@ import { c, card, txt, muted, chipGray, chipIndigo } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import { useActingPermissions } from '../../components/portal/tenantProjects/useActingPermissions'
 import type { Theme } from '../../types'
-import { findTask, statusTone, STATUS_LABEL, type TaskRef } from '../tasksLogic'
+import { findTask, isTerminal, statusTone, STATUS_LABEL, type TaskRef } from '../tasksLogic'
+import { taskClockAction } from './clockLogic'
 import { fmtDate, refLabel, refTone, taskUrl, testCount } from './detailLogic'
 import { toneChip } from './chips'
 import { useTeam } from './TeamLayout'
@@ -31,7 +32,7 @@ export default function TaskDetail() {
   const { theme } = useTheme()
   const d = theme === 'dark'
   const { taskId } = useParams()
-  const { payload, loading, refresh } = useTeam()
+  const { payload, loading, refresh, clock } = useTeam()
   // Back goes to the list the visitor came from, filters and all.
   const location = useLocation()
   const navigate = useNavigate()
@@ -107,6 +108,19 @@ export default function TaskDetail() {
           {/* mt-1 lines it up with the status chip, which the row's
               items-start leaves sitting slightly below the title's cap. */}
           <div className="mt-1 shrink-0 flex items-center gap-2">
+            {/* Hidden for an unlinked viewer, while the clock is unavailable,
+                and on a finished task (nothing left to work on). */}
+            {clock.linked === true && !clock.unavailable && !isTerminal(task.status) && !editing && (() => {
+              const action = taskClockAction(clock.status, task.id)
+              const label = action === 'clock-out' ? 'Clock out' : action === 'switch' ? 'Switch to this task' : 'Clock in on this task'
+              return (
+                <button type="button" disabled={clock.busy}
+                  onClick={() => { void (action === 'clock-out' ? clock.clockOutNow('') : clock.clockInOn(task.id)) }}
+                  className={c('btn-outline-indigo inline-flex items-center gap-1.5 px-3 py-1.5 text-xs', d ? 'dark-variant' : '')}>
+                  {label}
+                </button>
+              )
+            })()}
             {canEdit && !editing && (
               <button type="button" onClick={() => setEditing(true)}
                 className={c('btn-outline-indigo inline-flex items-center gap-1.5 px-3 py-1.5 text-xs', d ? 'dark-variant' : '')}>

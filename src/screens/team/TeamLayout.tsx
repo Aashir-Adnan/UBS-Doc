@@ -12,6 +12,8 @@ import { activeTab, TEAM_TABS } from './teamNav'
 import LinkCard from './LinkCard'
 import { showsLinkCard, viewerLine } from './identityLogic'
 import { normalizePayload } from './payloadLogic'
+import ClockControl, { useClock, type ClockState } from './ClockControl'
+import Toast from './Toast'
 
 // The Team section shell: one fetch of GET /api/discord/tasks shared by every
 // tab (People, Tasks, Board and task detail), the tab bar, the filter bar and
@@ -32,6 +34,9 @@ export interface TeamContext {
   // would 403.
   timeSelfScoped: boolean
   setTimeSelfScoped: (v: boolean) => void
+  // The shared clock (header control, task-page button). `status` is the
+  // server's; `refresh` refetches it.
+  clock: ClockState
 }
 
 // Typed accessor for the children below <Outlet context={…}>. Every tab reads
@@ -50,6 +55,7 @@ export default function TeamLayout() {
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<Filters>({ ...DEFAULT_FILTERS, projectSlug: params.get('project'), scope: parseScopeFilter(params.get('scope')) })
   const [timeSelfScoped, setTimeSelfScoped] = useState(false)
+  const clock = useClock()
 
   const refresh = useCallback(async () => {
     setLoading(true); setError(null)
@@ -95,7 +101,7 @@ export default function TeamLayout() {
   const total = visible.reduce((n, p) => n + p.tasks.length, 0)
   const blocked = visible.reduce((n, p) => n + p.tasks.filter((t) => t.isBlocked).length, 0)
 
-  const context: TeamContext = { payload, loading, error, refresh, filters, setFilter, people, timeSelfScoped, setTimeSelfScoped }
+  const context: TeamContext = { payload, loading, error, refresh, filters, setFilter, people, timeSelfScoped, setTimeSelfScoped, clock }
   // Only on People, Tasks and Board: Time and Stats follow view_discord_time,
   // not the link, so an unlinked caller still reaches them.
   const showLinkCard = showsLinkCard(payload, tab)
@@ -121,14 +127,15 @@ export default function TeamLayout() {
             </p>
             {viewerText && <p className={c('text-xs font-semibold mt-1 mb-0', muted(theme))}>{viewerText}</p>}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <ClockControl clock={clock} projects={projects} />
             {/* The search box filters the shared tasks payload — meaningless
                 on the Time and Stats tabs' separately-fetched reports, and on
                 the link card, which has no tasks payload to filter. */}
             {taskControls && !showLinkCard && (
               <SearchInput value={filters.query} onChange={(v) => setFilter({ query: v })} placeholder="Search tasks…" width={240} theme={theme} />
             )}
-            <button type="button" onClick={() => void refresh()} disabled={loading} title="Refresh"
+            <button type="button" onClick={() => { void refresh(); void clock.refresh() }} disabled={loading} title="Refresh"
               className={c('h-11 w-11 inline-flex items-center justify-center rounded-xl tr', d ? 'text-white/50 hover:bg-white/6' : 'text-slate-400 hover:bg-slate-100', loading ? 'opacity-50' : '')}>
               <RefreshCw size={16} className={loading ? 'spin' : ''} />
             </button>
@@ -197,8 +204,9 @@ export default function TeamLayout() {
           </div>
         )}
 
-        {showLinkCard ? <LinkCard theme={theme} onLinked={refresh} /> : <Outlet context={context} />}
+        {showLinkCard ? <LinkCard theme={theme} onLinked={async () => { await refresh(); void clock.refresh() }} /> : <Outlet context={context} />}
       </div>
+      {clock.toast && <Toast key={clock.toast.seq} message={clock.toast.message} tone={clock.toast.tone} onClose={clock.dismissToast} />}
     </div>
   )
 }
