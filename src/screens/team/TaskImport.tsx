@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { c, card, txt, muted } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
@@ -48,6 +49,8 @@ export default function TaskImport() {
   const mounted = useRef(true)
   const runningRef = useRef(false)
   const checkSeq = useRef(0)
+  const pickSeq = useRef(0)
+  const dialogRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     mounted.current = true
     return () => { mounted.current = false }
@@ -63,6 +66,9 @@ export default function TaskImport() {
     const match = slug ? payload.projects.find((p) => p.docsSlug === slug && p.id) : null
     if (match?.id) setProjectId(match.id)
   }, [payload, params, projectId])
+
+  // The overlay is a modal: move focus into it when the import starts.
+  useEffect(() => { if (running) dialogRef.current?.focus() }, [running])
 
   // Leaving the page mid-import abandons the rest of the queue.
   useEffect(() => {
@@ -92,14 +98,15 @@ export default function TaskImport() {
     if (!file) return
     if (file.size > MAX_IMPORT_BYTES) { setChecked(null); setCheckError(FILE_TOO_LARGE_TEXT); return }
     const seq = checkSeq.current
+    const pick = ++pickSeq.current
     let content: string
     try {
       content = await file.text()
     } catch {
-      if (mounted.current && seq === checkSeq.current) { setChecked(null); setCheckError(FILE_UNREADABLE_TEXT) }
+      if (mounted.current && seq === checkSeq.current && pick === pickSeq.current) { setChecked(null); setCheckError(FILE_UNREADABLE_TEXT) }
       return
     }
-    if (!mounted.current || seq !== checkSeq.current) return
+    if (!mounted.current || seq !== checkSeq.current || pick !== pickSeq.current) return
     setText(content)
     clearCheck()
   }
@@ -147,17 +154,20 @@ export default function TaskImport() {
     setRunning(true)
     let r = initialRun(steps)
     setRun(r)
-    let step: ImportStep | null
-    while ((step = nextStep(r, steps))) {
-      r = { ...r, [step.key]: { state: 'running' } }
-      if (mounted.current) setRun(r)
-      const result = await runStep(step, r, verdicts, pid, issues)
-      r = applyStepResult(r, steps, step.key, result)
-      if (mounted.current) setRun(r)
+    try {
+      let step: ImportStep | null
+      while ((step = nextStep(r, steps))) {
+        r = { ...r, [step.key]: { state: 'running' } }
+        if (mounted.current) setRun(r)
+        const result = await runStep(step, r, verdicts, pid, issues)
+        r = applyStepResult(r, steps, step.key, result)
+        if (mounted.current) setRun(r)
+      }
+    } finally {
+      runningRef.current = false
+      void refresh()
+      if (mounted.current) { setRunning(false); setFinished(true) }
     }
-    runningRef.current = false
-    void refresh()
-    if (mounted.current) { setRunning(false); setFinished(true) }
   }
 
   function reset() {
@@ -193,15 +203,18 @@ export default function TaskImport() {
 
   return (
     <>
-      {running && checked && (
-        <div role="dialog" aria-modal="true" aria-label="Import in progress"
-          className={c('fixed inset-0 z-[1000] overflow-auto px-4 py-8', d ? 'bg-slate-950' : 'bg-white')}>
+      {/* In a portal on document.body: inside the layout's `relative z-10` content
+          column the overlay would rank as z-10 and the fixed sidebar (z-40) would stay clickable. */}
+      {running && checked && createPortal(
+        <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Import in progress"
+          className={c('fixed inset-0 z-[2000] overflow-auto px-4 py-8 outline-none', d ? 'bg-slate-950' : 'bg-white')}>
           <div className="mx-auto max-w-[900px] flex flex-col gap-4">
             <h2 className={c('font-extrabold text-xl m-0', txt(theme))}>Import tasks</h2>
             <p role="status" className="text-sm font-semibold text-amber-500 m-0">{RUNNING_NOTICE}</p>
             {list}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
       <Link to={`/tools/team/tasks${search}`} className={c('inline-block text-sm font-semibold no-underline mb-4 tr',
         d ? 'text-white/40 hover:text-white/70' : 'text-slate-400 hover:text-indigo-600')}>&larr; Back to tasks</Link>
