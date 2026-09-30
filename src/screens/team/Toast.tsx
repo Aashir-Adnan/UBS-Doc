@@ -37,7 +37,7 @@ export default function Toast({ message, tone, onClose }: { message: string; ton
           : d ? 'bg-indigo-500/12 border-indigo-500/30 text-indigo-100' : 'bg-indigo-50 border-indigo-200 text-indigo-700',
       )}
     >
-      <span className="flex-1">{message}</span>
+      <span className="flex-1 whitespace-pre-line">{message}</span>
       <button
         type="button"
         onClick={onClose}

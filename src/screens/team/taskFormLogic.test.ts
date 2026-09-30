@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import type { TaskRow, TasksPayload } from '../tasksLogic'
+import type { RepoRef, TaskRow, TasksPayload } from '../tasksLogic'
 import {
   formFromTask, diffChanges, validateForm, emptyCreateForm, validateCreateForm, createPayload,
-  blockerCandidates, saveErrorText, createErrorText, scopeOptionsFor,
+  blockerCandidates, saveErrorText, createErrorText, scopeOptionsFor, bugIssueRepo, bugRepoHint,
 } from './taskFormLogic'
+
+const R1: RepoRef = { id: 'r1', name: 'Framework_Node', url: 'https://github.com/ubs-dev-org/Framework_Node' }
 
 function task(over: Partial<TaskRow> = {}): TaskRow {
   return {
@@ -66,20 +68,82 @@ describe('validateForm', () => {
 })
 
 describe('create form', () => {
-  it('validates title, project and the bug repository limit', () => {
-    expect(validateCreateForm({ ...emptyCreateForm('P1'), title: '' })).toBe('A task needs a title.')
-    expect(validateCreateForm({ ...emptyCreateForm(''), title: 'x' })).toBe('Pick a project for the task.')
-    expect(validateCreateForm({ ...emptyCreateForm('P1'), title: 'x', type: 'bug', repositoryIds: ['R1', 'R2'] })).toBe('A bug can name one repository.')
-    expect(validateCreateForm({ ...emptyCreateForm('P1'), title: 'x' })).toBeNull()
+  const NO_REPO_MESSAGE = 'This project has no repository — add one in Discord with /repos add.'
+  const R2: RepoRef = { id: 'r2', name: 'Framework_React', url: 'https://github.com/ubs-dev-org/Framework_React' }
+
+  it('validates title and project', () => {
+    expect(validateCreateForm({ ...emptyCreateForm('P1'), title: '' }, null)).toBe('A task needs a title.')
+    expect(validateCreateForm({ ...emptyCreateForm(''), title: 'x' }, null)).toBe('Pick a project for the task.')
+    expect(validateCreateForm({ ...emptyCreateForm('P1'), title: 'x' }, null)).toBeNull()
   })
-  it('builds the payload: modules split and deduped for a feature, dropped for a bug', () => {
+  it('refuses a bug only when there is no repository at all to pick, with the exact sentence', () => {
+    expect(validateCreateForm({ ...emptyCreateForm('P1'), title: 'x', type: 'bug' }, null)).toBe(NO_REPO_MESSAGE)
+    expect(validateCreateForm({ ...emptyCreateForm('P1'), title: 'x', type: 'bug' }, null, [])).toBe(NO_REPO_MESSAGE)
+    expect(validateCreateForm({ ...emptyCreateForm('P1'), title: 'x', type: 'bug' }, R1)).toBeNull()
+  })
+
+  // F5 (final review, 2026-09-30; spec §5): the bug fallback picker.
+  it('a bug the rule gives no repository must pick one of the choices', () => {
+    const bug = { ...emptyCreateForm('P1'), title: 'x', type: 'bug' as const }
+    expect(validateCreateForm(bug, null, [R1, R2])).toBe('Pick a repository for the bug.')
+    expect(validateCreateForm({ ...bug, repoPick: 'gone' }, null, [R1, R2])).toBe('Pick a repository for the bug.')
+    expect(validateCreateForm({ ...bug, repoPick: 'r2' }, null, [R1, R2])).toBeNull()
+  })
+  it('the pick is ignored when the rule resolves a repository', () => {
+    const bug = { ...emptyCreateForm('P1'), title: 'x', type: 'bug' as const, repoPick: 'r2' }
+    expect(validateCreateForm(bug, R1, [R1, R2])).toBeNull()
+    expect(createPayload(bug, R1, [R1, R2])).toMatchObject({ repository_ids: [], create_issue: true })
+    expect(bugIssueRepo(bug, R1, [R1, R2])).toEqual(R1)
+  })
+  it('the payload carries the pick as repository_ids for a bug the rule gives none', () => {
+    const bug = { ...emptyCreateForm('P1'), title: 'x', type: 'bug' as const, repoPick: 'r2' }
+    expect(createPayload(bug, null, [R1, R2])).toMatchObject({ type: 'bug', repository_ids: ['r2'], create_issue: true })
+    expect(createPayload({ ...bug, createIssue: false }, null, [R1, R2])).toMatchObject({ repository_ids: ['r2'], create_issue: false })
+    expect(bugIssueRepo(bug, null, [R1, R2])).toEqual(R2)
+  })
+  it('a pick that is not among the choices is never sent', () => {
+    const bug = { ...emptyCreateForm('P1'), title: 'x', type: 'bug' as const, repoPick: 'gone' }
+    expect(createPayload(bug, null, [R1, R2])).toMatchObject({ repository_ids: [], create_issue: false })
+    expect(bugIssueRepo(bug, null, [R1, R2])).toBeNull()
+  })
+  it('a feature never sends a pick', () => {
+    const feature = { ...emptyCreateForm('P1'), title: 'x', repoPick: 'r2' }
+    expect(createPayload(feature, null, [R1, R2])).toMatchObject({ repository_ids: [], create_issue: false })
+    expect(bugIssueRepo(feature, null, [R1, R2])).toBeNull()
+  })
+  it('defaults the pick to empty', () => {
+    expect(emptyCreateForm('P1').repoPick).toBe('')
+  })
+  it('hints at the scope only for a scope-less bug in a project with several links', () => {
+    const HINT = 'Pick a scope to choose the repository automatically, or pick one below.'
+    const bug = { ...emptyCreateForm('P1'), title: 'x', type: 'bug' as const }
+    expect(bugRepoHint(bug, null, 2)).toBe(HINT)
+    expect(bugRepoHint(bug, null, 1)).toBeNull()
+    expect(bugRepoHint(bug, null, 0)).toBeNull()
+    expect(bugRepoHint({ ...bug, scope: 'design' }, null, 2)).toBeNull()
+    expect(bugRepoHint(bug, R1, 2)).toBeNull()
+    expect(bugRepoHint({ ...bug, type: 'feature' }, null, 2)).toBeNull()
+  })
+  it('allows a feature with no resolvable repository', () => {
+    expect(validateCreateForm({ ...emptyCreateForm('P1'), title: 'x', type: 'feature' }, null)).toBeNull()
+  })
+  it('defaults createIssue to on', () => {
+    expect(emptyCreateForm('P1').createIssue).toBe(true)
+  })
+  it('builds the payload: modules split and deduped for a feature, dropped for a bug; empty repository_ids always', () => {
     const f = { ...emptyCreateForm('P1'), title: ' Sync ', description: '  ', scope: 'qa', modules: 'auth, billing , auth,, ',
-      holderIds: ['u1'], repositoryIds: ['R1', 'R2'], tracksApi: true }
-    expect(createPayload(f)).toEqual({
+      holderIds: ['u1'], tracksApi: true }
+    expect(createPayload(f, R1)).toEqual({
       type: 'feature', title: 'Sync', description: null, project_id: 'P1', scope: 'qa', modules: ['auth', 'billing'],
-      holder_ids: ['u1'], repository_ids: ['R1', 'R2'], tracks: { api_tests: true, qa_tests: false, acceptance_criteria: false },
+      holder_ids: ['u1'], repository_ids: [], create_issue: true, tracks: { api_tests: true, qa_tests: false, acceptance_criteria: false },
     })
-    expect(createPayload({ ...f, type: 'bug' })).toMatchObject({ type: 'bug', modules: [], repository_ids: ['R1'] })
+    expect(createPayload({ ...f, type: 'bug' }, R1)).toMatchObject({ type: 'bug', modules: [], repository_ids: [], create_issue: true })
+  })
+  it('a feature with no repository is sent with create_issue false, even if the checkbox was left on', () => {
+    expect(createPayload({ ...emptyCreateForm('P1'), title: 'x' }, null)).toMatchObject({ repository_ids: [], create_issue: false })
+  })
+  it('create_issue off is honoured when a repository is resolved', () => {
+    expect(createPayload({ ...emptyCreateForm('P1'), title: 'x', createIssue: false }, R1)).toMatchObject({ create_issue: false })
   })
 })
 
@@ -142,7 +206,7 @@ describe('createErrorText', () => {
 
 describe('scopeOptionsFor', () => {
   it('keeps a legacy free-text scope selectable so an untouched save does not erase it', () => {
-    expect(scopeOptionsFor('backend').map((o) => o.value)).toEqual(['', 'backend', 'frontend', 'qa', 'design'])
-    expect(scopeOptionsFor('GitSync').map((o) => o.value)).toEqual(['', 'backend', 'frontend', 'qa', 'design', 'GitSync'])
+    expect(scopeOptionsFor('backend').map((o) => o.value)).toEqual(['', 'backend', 'frontend', 'mobile', 'qa', 'design'])
+    expect(scopeOptionsFor('GitSync').map((o) => o.value)).toEqual(['', 'backend', 'frontend', 'mobile', 'qa', 'design', 'GitSync'])
   })
 })

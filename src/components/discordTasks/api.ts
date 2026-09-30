@@ -188,6 +188,7 @@ export interface CreateTaskInput {
   modules: string[]
   holder_ids: string[]
   repository_ids: string[]
+  create_issue: boolean
   tracks: { api_tests: boolean; qa_tests: boolean; acceptance_criteria: boolean }
 }
 export interface CreateTaskResult {

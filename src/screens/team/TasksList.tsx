@@ -5,8 +5,8 @@ import { c, card, txt, muted, chipRed, chipGray, chipIndigo } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
 import {
-  applyFilters, statusTone, roleLabel, unknownProjectSlug, STATUS_LABEL,
-  type ProjectGroup, type TaskRow,
+  applyFilters, statusTone, roleLabel, unknownProjectSlug, scopeLabel, STATUS_LABEL,
+  type ProjectGroup, type ProjectRepoLink, type RepoRef, type TaskRow,
 } from '../tasksLogic'
 import { toneChip } from './chips'
 import DependencyGraph from './DependencyGraph'
@@ -16,6 +16,7 @@ import Avatar, { AvatarStack } from './Avatar'
 import ScopeBadge from './ScopeBadge'
 import { whoLine } from './activityLogic'
 import { groupHierarchy, progressText } from './hierarchyLogic'
+import { projectRepoList } from './repoLogic'
 import { timeChip } from './timeLogic'
 
 // The Tasks tab of the Team section: project cards with their task rows, all
@@ -58,17 +59,23 @@ export default function TasksList() {
       )}
 
       <div className="flex flex-col gap-5">
-        {visible.map((p) => <ProjectCard key={p.id ?? 'none'} p={p} theme={theme} search={search} />)}
+        {visible.map((p) => (
+          <ProjectCard key={p.id ?? 'none'} p={p} theme={theme} search={search}
+            projectRepos={payload?.projectRepos} repositories={payload?.repositories} />
+        ))}
       </div>
     </>
   )
 }
 
-function ProjectCard({ p, theme, search }: { p: ProjectGroup; theme: Theme; search: string }) {
+function ProjectCard({ p, theme, search, projectRepos, repositories }: {
+  p: ProjectGroup; theme: Theme; search: string; projectRepos?: ProjectRepoLink[]; repositories?: RepoRef[]
+}) {
   const d = theme === 'dark'
   const [showGraph, setShowGraph] = useState(false)
   const hasEdges = p.tasks.some((t) => t.blockedBy.length > 0 || t.blocks.length > 0)
   const canCreate = useActingPermissions().hasOnAnyRole('update_discord_tasks')
+  const repos = projectRepoList(p.id, projectRepos, repositories)
   return (
     <section className={c(card(theme), 'rounded-2xl p-5 sm:p-6')}>
       <div className="flex flex-wrap items-baseline justify-between gap-3 mb-3">
@@ -97,6 +104,11 @@ function ProjectCard({ p, theme, search }: { p: ProjectGroup; theme: Theme; sear
           )}
         </div>
       </div>
+      {repos.length > 0 && (
+        <p className={c('text-xs font-semibold mb-3', muted(theme))}>
+          Repositories: {repos.map((r) => (r.scope ? `${r.name} · ${scopeLabel(r.scope)}` : r.name)).join(', ')}
+        </p>
+      )}
       {showGraph && <DependencyGraph tasks={p.tasks} theme={theme} />}
       {p.members.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-4">

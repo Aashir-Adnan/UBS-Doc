@@ -113,9 +113,10 @@ describe('roleLabel', () => {
 })
 
 describe('scopeLabel / scopeTone', () => {
-  it('labels the four fixed scopes', () => {
+  it('labels the five fixed scopes', () => {
     expect(scopeLabel('backend')).toBe('Backend')
     expect(scopeLabel('frontend')).toBe('Frontend')
+    expect(scopeLabel('mobile')).toBe('Mobile')
     expect(scopeLabel('qa')).toBe('QA')
     expect(scopeLabel('design')).toBe('Design')
   })
@@ -139,30 +140,32 @@ describe('scope filter', () => {
   const withScope = (id: string, scope: string | null) => ({ ...t(id, 'open', []), scope })
   const scoped: ProjectGroup[] = [
     { id: 'p1', name: 'Framework', docsSlug: 'framework', members: [], counts: { open: 5, in_progress: 0, pending: 0, done: 0, blocked: 0 },
-      tasks: [withScope('BE', 'backend'), withScope('FE', 'Frontend'), withScope('LEG', 'GitSync'), withScope('NUL', null), withScope('BL', '  ')] },
+      tasks: [withScope('BE', 'backend'), withScope('FE', 'Frontend'), withScope('MO', 'mobile'), withScope('LEG', 'GitSync'), withScope('NUL', null), withScope('BL', '  ')] },
   ]
   const ids = (f: Partial<typeof DEFAULT_FILTERS>) => applyFilters(scoped, { ...DEFAULT_FILTERS, ...f }).flatMap((p) => p.tasks.map((x) => x.id))
 
   it('all keeps everything', () => {
     expect(DEFAULT_FILTERS.scope).toBe('all')
-    expect(ids({})).toEqual(['BE', 'FE', 'LEG', 'NUL', 'BL'])
+    expect(ids({})).toEqual(['BE', 'FE', 'MO', 'LEG', 'NUL', 'BL'])
   })
   it('a named scope matches case-insensitively', () => {
     expect(ids({ scope: 'backend' })).toEqual(['BE'])
     expect(ids({ scope: 'frontend' })).toEqual(['FE'])
+    expect(ids({ scope: 'mobile' })).toEqual(['MO'])
     expect(ids({ scope: 'qa' })).toEqual([])
   })
   it('"none" catches unset, blank and pre-2026-09-29 free text', () => {
     expect(ids({ scope: 'none' })).toEqual(['LEG', 'NUL', 'BL'])
   })
-  it('fixedScope reads only the four', () => {
+  it('fixedScope reads only the five', () => {
     expect(fixedScope(' QA ')).toBe('qa')
+    expect(fixedScope('Mobile')).toBe('mobile')
     expect(fixedScope('GitSync')).toBeNull()
     expect(fixedScope(null)).toBeNull()
   })
   it('parseScopeFilter reads ?scope= and treats anything unknown as all', () => {
-    expect(SCOPE_FILTERS.map((o) => o.value)).toEqual(['all', 'backend', 'frontend', 'qa', 'design', 'none'])
-    expect(SCOPE_FILTERS.map((o) => o.label)).toEqual(['All scopes', 'Backend', 'Frontend', 'QA', 'Design', 'No scope'])
+    expect(SCOPE_FILTERS.map((o) => o.value)).toEqual(['all', 'backend', 'frontend', 'mobile', 'qa', 'design', 'none'])
+    expect(SCOPE_FILTERS.map((o) => o.label)).toEqual(['All scopes', 'Backend', 'Frontend', 'Mobile', 'QA', 'Design', 'No scope'])
     expect(parseScopeFilter('design')).toBe('design')
     expect(parseScopeFilter('none')).toBe('none')
     expect(parseScopeFilter('Design')).toBe('all')
