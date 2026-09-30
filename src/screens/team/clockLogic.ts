@@ -87,3 +87,34 @@ export function clockOutcomeText(result: ClockInResult): string {
 export function clockOutText(result: ClockOutResult): string {
   return `Clocked out — ${formatDuration(result.minutes) ?? '0m'}.`
 }
+
+// The board's "clocked in" tag. `mine` comes from the viewer's own status (every
+// linked viewer has it); `others` from the who-is-clocked-in list, which only
+// holders of view_discord_time receive — without it the list is empty and the
+// tag shows the viewer's own clock alone. A redacted entry carries no task id,
+// so it can never be pinned to a card.
+export interface ClockTag { mine: boolean; others: string[] }
+
+// `taskIds` is the card's task plus its subtasks: a clock running on a subtask
+// shows on the parent's card, the only place the board draws it.
+export function clockTagFor(
+  taskIds: string[], status: ClockStatus,
+  people: Pick<ClockedInPerson, 'discordId' | 'name' | 'taskId'>[], myDiscordIds: string[],
+): ClockTag | null {
+  const ids = new Set(taskIds)
+  const me = new Set(myDiscordIds)
+  const mine = status.active && status.taskId != null && ids.has(status.taskId)
+  const others = people
+    .filter((p) => p.taskId != null && ids.has(p.taskId) && !me.has(p.discordId))
+    .map((p) => p.name || p.discordId)
+  return mine || others.length ? { mine, others } : null
+}
+
+export function clockTagText(tag: ClockTag): string {
+  if (tag.mine) return tag.others.length ? `You + ${tag.others.length} clocked in` : 'You are clocked in'
+  return tag.others.length === 1 ? `${tag.others[0]} clocked in` : `${tag.others.length} clocked in`
+}
+
+export function clockTagTitle(tag: ClockTag): string {
+  return `Clocked in now: ${[...(tag.mine ? ['you'] : []), ...tag.others].join(', ')}`
+}
