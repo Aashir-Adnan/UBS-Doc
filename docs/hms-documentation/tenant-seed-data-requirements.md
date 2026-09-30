@@ -163,7 +163,7 @@ These tables are populated by user actions at runtime:
 | `guest_favorites` | GuestFavorites APIs |
 | `guest_profiles` | Auto-created on first booking |
 | `guest_booking_history` | System on booking completion |
-| `guest_support_tickets` | GuestSupportContact |
+| `guest_support_tickets` | GuestSupportContact, GuestSupportTickets |
 | `guest_notifications` | System notifications engine |
 | `guest_notification_settings` | Auto-created on first access |
 | `guest_assistant_threads` | GuestAssistantMessages |

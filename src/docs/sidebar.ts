@@ -437,6 +437,18 @@ export const SIDEBAR: SidebarNode[] = [
             ],
           },
           {
+            label: 'Guest Support FAQs',
+            items: [
+              'hms-documentation/guest-apis/guest-support-faqs/guest-support-faqs',
+            ],
+          },
+          {
+            label: 'Guest Support Contact',
+            items: [
+              'hms-documentation/guest-apis/guest-support-contact/guest-support-contact',
+            ],
+          },
+          {
             label: 'Guest Auth Refresh Tokens',
             items: [
               'api/guest-auth-refresh-tokens',
@@ -550,6 +562,8 @@ export const SIDEBAR: SidebarNode[] = [
               'hms-documentation/admin-apis/config-possible-values-crud',
               'hms-documentation/admin-apis/frontpage-data',
               'hms-documentation/admin-apis/client-runtime-config',
+              'hms-documentation/admin-apis/support-faqs-crud',
+              'hms-documentation/admin-apis/dev-console-translations',
             ],
           },
           {

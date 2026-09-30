@@ -53,6 +53,74 @@ These permissions are seeded on the framework tier (`PG-FRAMEWORK`) — see migr
 
 ---
 
+## The `data` document
+
+`data` is one JSON object whose top-level keys are the page's sections, in render order.
+The column is `TEXT`, and the API `JSON.parse`s it on read, so **key order is preserved
+end to end** — insert a new section where it belongs rather than appending it.
+
+```
+hero · facilities · about_us · about_banner · service_banner · contact_banner ·
+contact_us · terms_conditions · privacy_policy · gallery · footer
+```
+
+Bilingual fields are always `{ "en": "...", "ar": "..." }`.
+
+### `terms_conditions` and `privacy_policy`
+
+Added 2026-09-30. Both are **bare arrays** of numbered clauses — there is no section
+wrapper and no section heading, so the page title is the frontend's to supply:
+
+```json
+{
+  "terms_conditions": [
+    {
+      "id": 1,
+      "title": { "en": "Acceptance of Terms", "ar": "قبول الشروط" },
+      "description": {
+        "en": "<p>By downloading, accessing, or using the AlMuttahed mobile application…</p>",
+        "ar": "<p>بتنزيلك أو وصولك أو استخدامك تطبيق المتحد الجوال…</p>"
+      },
+      "media": []
+    }
+  ]
+}
+```
+
+Every clause carries exactly four keys, in this order: `id`, `title`, `description`,
+`media`.
+
+- **`id`** is positional and 1-based — `terms_conditions` ships ids 1 to 8,
+  `privacy_policy` ids 1 to 6. It is stable copy numbering, not a database key, so
+  renumber deliberately rather than as a side effect of reordering.
+- **`description.en` / `description.ar` are HTML fragments**, each wrapped in a single
+  `<p>` tag, and must be rendered as HTML rather than escaped as plain text. Ampersands
+  and angle brackets inside the copy arrive as entities (`&amp;`, `&gt;`).
+- **`media`** is an empty array on every seeded clause. It exists so a clause can carry
+  an image later, and is enriched by List exactly like any other `media` array.
+- Render in array order. The numbering in the legal copy is positional, so sorting or
+  filtering the array changes what the document says.
+
+Both are edited like any other section: send the whole `data` object back through
+Update. There is no per-section endpoint.
+
+:::warning Renamed on 2026-09-30
+These sections were briefly specified as `terms` / `privacy`, each an object with
+`title` and `items`. The shipped shape is the one above — `terms_conditions` and
+`privacy_policy`, both bare arrays whose clauses carry `id` and `media`. Any frontend
+still reading `data.terms.items` must move to `data.terms_conditions`.
+:::
+
+:::warning Editing this copy through SQL
+The clause text contains 35 semicolons, some inside the HTML entities, and the migration
+runner splits files on every semicolon without parsing string literals. A migration that
+writes this copy has to tokenise them first, and double every backslash, since the copy
+carries escaped quotes — see `20260930_1_frontpage_terms_privacy.sql` for the pattern.
+Editing through the API has no such constraint.
+:::
+
+---
+
 ## Response
 
 ### List (enriched with media)
