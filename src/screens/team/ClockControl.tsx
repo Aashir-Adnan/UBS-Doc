@@ -10,6 +10,7 @@ import type { ProjectGroup } from '../tasksLogic'
 import { CLOCK_UNAVAILABLE, clockUnavailableText, clockOutText, clockOutcomeText, clockTaskChoices, elapsedNow, formatElapsed, isClockUnavailable } from './clockLogic'
 import { plainRuleMessage } from './boardLogic'
 import type { ToastTone } from './Toast'
+import LinkCard from './LinkCard'
 
 // The shared clock state for the Team section. TeamLayout calls useClock()
 // once and hands the result to the header's ClockControl and, through the Team
@@ -136,7 +137,12 @@ function useDismiss(open: boolean, onClose: () => void, ref: React.RefObject<HTM
   }, [open, onClose, ref])
 }
 
-export default function ClockControl({ clock, projects }: { clock: ClockState; projects: ProjectGroup[] }) {
+// Anyone can be unlinked here, including someone who sees every project and so
+// never meets the Team section's own link card — the clock is the one thing
+// that needs a Discord member whatever else the account may see.
+const CLOCK_LINK_REASON = 'Clocking in needs a Discord member to clock. Your UBS-Doc account is not linked to one yet.'
+
+export default function ClockControl({ clock, projects, onLinked }: { clock: ClockState; projects: ProjectGroup[]; onLinked: () => Promise<void> }) {
   const { theme } = useTheme()
   const d = theme === 'dark'
   const { linked, unavailable, unavailableText, status, fetchedAt, busy } = clock
@@ -145,8 +151,10 @@ export default function ClockControl({ clock, projects }: { clock: ClockState; p
   const [query, setQuery] = useState('')
   const [outOpen, setOutOpen] = useState(false)
   const [note, setNote] = useState('')
+  const [linkOpen, setLinkOpen] = useState(false)
   const pickerRef = useRef<HTMLDivElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
+  const linkRef = useRef<HTMLDivElement>(null)
 
   // The elapsed text only needs minute resolution.
   useEffect(() => {
@@ -164,12 +172,32 @@ export default function ClockControl({ clock, projects }: { clock: ClockState; p
   const closeDialog = useCallback(() => setOutOpen(false), [])
   useDismiss(pickerOpen, closePicker, pickerRef)
   useDismiss(outOpen, closeDialog, dialogRef)
+  const closeLink = useCallback(() => setLinkOpen(false), [])
+  useDismiss(linkOpen, closeLink, linkRef)
+  // Linked (here, by email, or in another tab): the dialog has nothing left to do.
+  useEffect(() => { if (linked) setLinkOpen(false) }, [linked])
 
   const pill = c('inline-flex items-center gap-2 h-11 px-3 rounded-xl text-xs font-semibold', muted(theme))
 
   if (unavailable) return <span className={pill}><Clock size={14} /> {unavailableText}</span>
   if (linked === null) return null
-  if (!linked) return <span className={pill}><Clock size={14} /> Link your Discord account to clock in</span>
+  if (!linked) {
+    return (
+      <>
+        <button type="button" onClick={() => setLinkOpen(true)} aria-haspopup="dialog"
+          className={c('btn-outline-indigo inline-flex items-center gap-2 px-3 py-1.5 text-xs', d ? 'dark-variant' : '')}>
+          <Clock size={14} /> Link your Discord account to clock in
+        </button>
+        {linkOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div ref={linkRef} role="dialog" aria-modal="true" aria-label="Link your Discord account">
+              <LinkCard theme={theme} reason={CLOCK_LINK_REASON} onLinked={async () => { await onLinked(); setLinkOpen(false) }} />
+            </div>
+          </div>
+        )}
+      </>
+    )
+  }
 
   if (status.active) {
     const elapsed = formatElapsed(elapsedNow(status, fetchedAt, now))

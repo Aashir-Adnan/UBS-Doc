@@ -128,7 +128,7 @@ export default function TeamLayout() {
             {viewerText && <p className={c('text-xs font-semibold mt-1 mb-0', muted(theme))}>{viewerText}</p>}
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            <ClockControl clock={clock} projects={projects} />
+            <ClockControl clock={clock} projects={projects} onLinked={async () => { await Promise.all([refresh(), clock.refresh()]) }} />
             {/* The search box filters the shared tasks payload — meaningless
                 on the Time and Stats tabs' separately-fetched reports, and on
                 the link card, which has no tasks payload to filter. */}

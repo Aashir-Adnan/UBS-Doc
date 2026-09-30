@@ -8,7 +8,10 @@ import { LINK_HELP, codeProblem, linkErrorText, normalizeCode } from './identity
 // Shown instead of the Team tabs while the signed-in account has no Discord link:
 // with no link there is nothing the backend will show, so the only useful thing on
 // the page is the way to make one.
-export default function LinkCard({ theme, onLinked }: { theme: Theme; onLinked: () => Promise<void> }) {
+// `reason` replaces the first sentence where the card is shown for something
+// other than an empty Team section (the header's clock, for someone who already
+// sees every project).
+export default function LinkCard({ theme, onLinked, reason }: { theme: Theme; onLinked: () => Promise<void>; reason?: string }) {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -35,7 +38,7 @@ export default function LinkCard({ theme, onLinked }: { theme: Theme; onLinked: 
         <h2 className={c('font-extrabold text-lg m-0', txt(theme))}>Link your Discord account</h2>
       </div>
       <p className={c('text-sm mb-2', muted(theme))}>
-        Your UBS-Doc account is not linked to a Discord member yet, so there are no projects to show you.
+        {reason ?? 'Your UBS-Doc account is not linked to a Discord member yet, so there are no projects to show you.'}
       </p>
       <p className={c('text-sm mb-5', muted(theme))}>{LINK_HELP}</p>
       <form onSubmit={(e) => { e.preventDefault(); void submit() }} className="flex flex-wrap gap-3 items-center">
