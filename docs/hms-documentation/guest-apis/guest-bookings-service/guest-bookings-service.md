@@ -462,8 +462,10 @@ Only services where `standaloneBookable: true` in the service catalog (`GET /gue
 
 | Status | Message | Condition |
 |---|---|---|
+| 403 | `The partner guest role is view only` (`meta.scc = partner_guest_read_only`) | `actionPerformerURDD` is a partner guest URDD (`partnerTenantUrddMap`); visit legs booked through a partner platform are view only |
 | 400 | `serviceId is required` | No service ID provided. |
 | 400 | `Maximum N booking(s) allowed per reservation for this service` | Quantity exceeds `max_quantity_per_booking` config. |
+| 409 | `Only N unit(s) of "..." available, M requested` | Quantity (main service or an add-on) exceeds the service's free delivery units right now, the `availableUnitsCount` from `GET /api/guest/hotel-services`. |
 | 400 | `Minimum N person(s) required` | Party size below minimum. |
 | 400 | `Maximum N person(s) allowed` | Party size above maximum. |
 | 400 | `Booking requires at least N day(s) advance notice` | Date before advance booking minimum. |

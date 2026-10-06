@@ -104,6 +104,21 @@ The probe now runs the same booking rule checks as the actual booking creation A
 | `min_persons_per_booking` | Party size from stay service config. |
 | `max_persons_per_booking` | Party size from stay service config. |
 
+### Delivery unit capacity (rooms and package stays)
+
+The probe checks that enough free delivery units (rooms) exist for the whole party (adults + children), the same way booking does. Each delivery unit has a `capacity` (guests per room).
+
+1. **Rooms needed.** With `entries`, the largest entry `quantity`. Otherwise the probe takes the largest of 1, `ceil(guests / max_persons_per_booking)` and `ceil(guests / smallest unit capacity)`, and returns it as `roomsNeeded` when it's more than 1.
+2. **Enough free units.** Fewer free units than rooms needed for the dates adds `insufficient_units`, and `nextAvailable` is filled in.
+3. **Enough capacity.** The rooms booking would assign (the first free units, in the same order booking uses) must hold every guest. If their combined `capacity` is lower, `insufficient_capacity` is added. Booking rejects the same request. A unit with no capacity set counts as unlimited.
+
+With `entries`, rule 2 is checked for each entry, and rule 3 for the entry with the largest quantity, as booking does. Either violation sets `available` to `false`.
+
+| Rule | Extra fields | When |
+|---|---|---|
+| `insufficient_units` | `unitsNeeded`, `unitsAvailable` | Fewer free rooms than the party needs for those dates |
+| `insufficient_capacity` | `unitsNeeded`, `capacity`, `guests` | The rooms that would be assigned can't hold every guest |
+
 ---
 
 ## Entries Mode (Packages)
@@ -126,7 +141,8 @@ Alternative key names are accepted: `checkIn`/`check_in` and `checkOut`/`check_o
 ### Unit availability check
 
 1. **Full-span attempt** — Try to find `max(quantity)` units available for the entire span (first check-in to last check-out) so the guest keeps the same room(s) across entries.
-2. **Per-entry fallback** — If full-span fails, check each entry independently via `pickMultipleAvailableUnits(serviceId, checkIn, checkOut, quantity)`.
+2. **Per-entry fallback** — If full-span fails, check each entry independently for `quantity` free units. An entry without enough adds an `insufficient_units` violation naming the entry.
+3. **Capacity** — The entry with the largest quantity must hold the whole party (`insufficient_capacity` otherwise). See [Delivery unit capacity](#delivery-unit-capacity-rooms-and-package-stays).
 
 The response includes per-entry availability details when entries are used.
 
@@ -198,6 +214,41 @@ When booking rules are violated, `available` is `false` and `violations` lists e
     }
   ]
 }
+```
+
+### Unavailable — not enough rooms for the party (200)
+
+Three guests asked for a room type with one free unit of capacity 2:
+
+```json
+{
+  "checkIn": "2026-10-08",
+  "checkOut": "2026-10-10",
+  "nights": 2,
+  "rooms": {
+    "serviceId": 489,
+    "hotelId": 88,
+    "available": false,
+    "nightlyPrice": 400,
+    "currency": "SAR",
+    "violations": [
+      {
+        "rule": "insufficient_units",
+        "message": "Only 1 room(s) available from 2026-10-08 to 2026-10-10, 2 needed for 3 guest(s)",
+        "unitsNeeded": 2,
+        "unitsAvailable": 1
+      }
+    ],
+    "nextAvailable": null,
+    "roomsNeeded": 2
+  }
+}
+```
+
+With `entries` asking for 1 room for the same 3 guests, the room is free but too small:
+
+```json
+{ "rule": "insufficient_capacity", "message": "Entry 1: 1 room(s) can accommodate 2 guest(s) but 3 were requested", "unitsNeeded": 1, "capacity": 2, "guests": 3 }
 ```
 
 ### Unavailable with Next Available Dates (200)
@@ -330,7 +381,7 @@ When `packageId` is provided, `packages` is a single object (not an array) and `
 | `available` | `boolean` | `true` only if a unit is free **and** no booking rule violations exist. |
 | `nightlyPrice` | `number\|null` | Price per night. |
 | `currency` | `string` | Currency code. |
-| `violations` | `array` | Booking rule violations (empty if none). Each: `{ rule, message }`. |
+| `violations` | `array` | Booking rule violations (empty if none). Each: `{ rule, message }`, plus extra fields for the unit rules (see [Delivery unit capacity](#delivery-unit-capacity-rooms-and-package-stays)). |
 | `nextAvailable` | `object\|null` | Next available date range if no units are free. `null` if available or no alternative found within 30 days. |
 
 ### Package Entry
@@ -342,7 +393,7 @@ When `packageId` is provided, `packages` is a single object (not an array) and `
 | `available` | `boolean` | `true` only if units are free **and** no booking rule violations exist. |
 | `totalPrice` | `number` | Total package price (multiplied by total instances when entries are used). |
 | `currency` | `string` | Currency code. |
-| `violations` | `array` | Booking rule violations (empty if none). Each: `{ rule, message }`. |
+| `violations` | `array` | Booking rule violations (empty if none). Each: `{ rule, message }`, plus extra fields for the unit rules (see [Delivery unit capacity](#delivery-unit-capacity-rooms-and-package-stays)). |
 | `nextAvailable` | `object\|null` | Next available date range (single-entry mode only). |
 | `entries` | `array` | *(Only present when entries are provided)* Per-entry availability details. |
 
@@ -350,7 +401,7 @@ When `packageId` is provided, `packages` is a single object (not an array) and `
 
 | Field | Type | Description |
 |---|---|---|
-| `rule` | `string` | Config key or validation rule that was violated (e.g. `min_stay_nights`, `blackout_dates`, `entries_duration`). |
+| `rule` | `string` | Config key or validation rule that was violated (e.g. `min_stay_nights`, `blackout_dates`, `entries_duration`, `insufficient_units`, `insufficient_capacity`). |
 | `message` | `string` | Human-readable description of the violation. |
 
 ### Entry Result Object

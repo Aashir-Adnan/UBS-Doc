@@ -315,6 +315,7 @@ After all changes are applied:
 | Stay service cannot be removed | Hardcoded | 422 |
 | Addon must belong to same hotel | `tenant_id` match | 422 |
 | Addon within quantity limit | `max_quantity_per_booking` | 400 |
+| Addon within free delivery units | Quantity ≤ the service's `availableUnitsCount` (free units right now). Staging reports it in `errors`, commit returns 409 | 409 |
 | Booking must be editable status | Not cancelled/checked_out/completed/no_show | 422 |
 | Must be booking owner | `urdd_id` match | 403 |
 
@@ -324,6 +325,7 @@ After all changes are applied:
 
 | Status | Code | Message |
 |---|---|---|
+| 403 | `partner_guest_read_only` | `The partner guest role is view only`: `actionPerformerURDD` is a partner guest URDD (`partnerTenantUrddMap`); visit legs booked through a partner platform are view only |
 | 400 | Validation | `bookingId is required` |
 | 400 | Validation | `Check-out must be after check-in` |
 | 400 | Validation | `Check-in date cannot be in the past` |

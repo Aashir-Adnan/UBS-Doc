@@ -18,6 +18,8 @@ This document describes the complete guest room booking flow from hotel discover
 
 Steps 1-4 are public (no authentication required, platform encryption only). Steps 5-7 require a valid guest JWT access token.
 
+Booking (steps 5 and 5b) needs a normal guest URDD from `tenantUrddMap`. A partner guest URDD from `partnerTenantUrddMap` is refused with `403 partner_guest_read_only`: that role only views visit legs booked through a partner platform.
+
 ---
 
 ## Step 1: Fetch Hotels
@@ -81,7 +83,9 @@ Same endpoint as step 2 but with `include=packages`. Returns bundled packages th
 
 Returns all bookable add-on services for the hotel (excludes rooms/stay services and amenities). These can be attached to the booking as addons.
 
-Each service object is a minimal landing-card shape with `id`, `name`, `category`, `price`, `images`, etc. The `category.slug` determines which scheduling shape the frontend should collect for each addon:
+Each service object is a minimal landing-card shape with `id`, `name`, `category`, `price`, `images`, etc. Each also has `availableUnitsCount`: how many of the service's delivery units can take a booking right now so while booking the product of availableUnitsCount*maxOccupancy should be < sum of selced childs+adults , at the hotel's local time. A unit counts when it's active with `current_status` `available` (units under maintenance, cleaning, occupied or reserved don't count), it's open now, and its bookings running at that moment are below its `max_concurrent`. "Open now" means its opening hours (unit availability) cover the current time on today's date or weekday. A unit with no opening hours set is always open and takes one booking at a time. The value is 0 when the service has no free unit.
+
+The `category.slug` determines which scheduling shape the frontend should collect for each addon:
 
 | Category slug | What to collect | Scheduling field |
 |---------------|----------------|------------------|
