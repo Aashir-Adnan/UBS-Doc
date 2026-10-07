@@ -71,6 +71,24 @@ export function chipGray(theme: Theme) {
     : 'chip bg-slate-100 text-slate-500 border border-slate-200'
 }
 
+export function chipTeal(theme: Theme) {
+  return theme === 'dark'
+    ? 'chip bg-teal-500/15 text-teal-300 border border-teal-500/20'
+    : 'chip bg-teal-50 text-teal-600 border border-teal-100'
+}
+
+export function chipOrange(theme: Theme) {
+  return theme === 'dark'
+    ? 'chip bg-orange-500/12 text-orange-300 border border-orange-500/20'
+    : 'chip bg-orange-50 text-orange-600 border border-orange-100'
+}
+
+export function chipStone(theme: Theme) {
+  return theme === 'dark'
+    ? 'chip bg-stone-500/15 text-stone-300 border border-stone-500/20'
+    : 'chip bg-stone-100 text-stone-600 border border-stone-200'
+}
+
 export function Breadcrumb({ items, theme }: { items: string[]; theme: Theme }) {
   const t = theme === 'dark'
   return (

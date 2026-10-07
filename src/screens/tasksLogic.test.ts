@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   applyFilters, assigneeOptions, statusTone, unknownProjectSlug, roleLabel, DEFAULT_FILTERS,
   findTask, allTasks, scopeLabel, scopeTone, fixedScope, parseScopeFilter, scopeAppliesOn,
-  peopleCorpusFilters, SCOPE_FILTERS, type ProjectGroup, type TeamMember,
+  peopleCorpusFilters, SCOPE_FILTERS, SCOPE_LABEL, type ProjectGroup, type TeamMember,
 } from './tasksLogic'
 
 const t = (id: string, status: string, assignees: string[], isBlocked = false, title = id) => ({
@@ -164,8 +164,8 @@ describe('scope filter', () => {
     expect(fixedScope(null)).toBeNull()
   })
   it('parseScopeFilter reads ?scope= and treats anything unknown as all', () => {
-    expect(SCOPE_FILTERS.map((o) => o.value)).toEqual(['all', 'backend', 'frontend', 'mobile', 'qa', 'design', 'none'])
-    expect(SCOPE_FILTERS.map((o) => o.label)).toEqual(['All scopes', 'Backend', 'Frontend', 'Mobile', 'QA', 'Design', 'No scope'])
+    expect(SCOPE_FILTERS.map((o) => o.value)).toEqual(['all', 'backend', 'frontend', 'fullstack', 'mobile', 'admin', 'qa', 'design', 'legacy', 'none'])
+    expect(SCOPE_FILTERS.map((o) => o.label)).toEqual(['All scopes', 'Backend', 'Frontend', 'Full stack', 'Mobile', 'Admin', 'QA', 'Design', 'Legacy', 'No scope'])
     expect(parseScopeFilter('design')).toBe('design')
     expect(parseScopeFilter('none')).toBe('none')
     expect(parseScopeFilter('Design')).toBe('all')
@@ -180,5 +180,25 @@ describe('scope filter', () => {
   it('the People corpus ignores scope with the other member-side filters', () => {
     const f = peopleCorpusFilters({ ...DEFAULT_FILTERS, scope: 'qa', status: 'done', assigneeId: 'u1', blockedOnly: true, query: 'x', projectSlug: 'framework' })
     expect(f).toEqual({ ...DEFAULT_FILTERS, projectSlug: 'framework' })
+  })
+})
+
+describe('the new scopes', () => {
+  it('are labelled, filterable, toned, and fixed', () => {
+    expect(Object.entries(SCOPE_LABEL)).toEqual([
+      ['backend', 'Backend'], ['frontend', 'Frontend'], ['fullstack', 'Full stack'], ['mobile', 'Mobile'],
+      ['admin', 'Admin'], ['qa', 'QA'], ['design', 'Design'], ['legacy', 'Legacy'],
+    ])
+    expect(SCOPE_FILTERS.find((o) => o.value === 'fullstack')?.label).toBe('Full stack')
+    expect(parseScopeFilter('fullstack')).toBe('fullstack')
+    expect(parseScopeFilter('legacy')).toBe('legacy')
+    expect(scopeTone('admin')).toBe('admin')
+    expect(fixedScope(' Legacy ')).toBe('legacy')
+    expect(scopeLabel('fullstack')).toBe('Full stack')
+  })
+  it('a free-text scope is still shown as itself, grey, and not fixed', () => {
+    expect(scopeLabel('GitSync')).toBe('GitSync')
+    expect(scopeTone('GitSync')).toBe('other')
+    expect(fixedScope('Full stack')).toBeNull()
   })
 })

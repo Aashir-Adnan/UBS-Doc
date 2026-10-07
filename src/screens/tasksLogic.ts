@@ -91,14 +91,19 @@ export function findTask(payload: TasksPayload, id: string): { task: TaskRow; pr
 export type StatusFilter = 'all' | 'active' | 'done'
 // A task's discipline, as a filter. 'none' is a task with no fixed scope:
 // unset, blank, or free text from before 2026-09-29.
-export type ScopeFilter = 'all' | 'backend' | 'frontend' | 'mobile' | 'qa' | 'design' | 'none'
+// The fixed scopes, in display order (2026-10-07: fullstack, admin, legacy added).
+export type FixedScope = 'backend' | 'frontend' | 'fullstack' | 'mobile' | 'admin' | 'qa' | 'design' | 'legacy'
+export type ScopeFilter = 'all' | FixedScope | 'none'
 export const SCOPE_FILTERS: { value: ScopeFilter; label: string }[] = [
   { value: 'all', label: 'All scopes' },
   { value: 'backend', label: 'Backend' },
   { value: 'frontend', label: 'Frontend' },
+  { value: 'fullstack', label: 'Full stack' },
   { value: 'mobile', label: 'Mobile' },
+  { value: 'admin', label: 'Admin' },
   { value: 'qa', label: 'QA' },
   { value: 'design', label: 'Design' },
+  { value: 'legacy', label: 'Legacy' },
   { value: 'none', label: 'No scope' },
 ]
 export interface Filters { status: StatusFilter; projectSlug: string | null; assigneeId: string | null; blockedOnly: boolean; query: string; scope: ScopeFilter }
@@ -172,26 +177,29 @@ export const ROLE_LABEL: Record<string, string> = {
 }
 export const roleLabel = (role: string) => ROLE_LABEL[role] ?? role
 
-// A task's discipline. The bot stores lowercase keys (backend/frontend/mobile/
-// qa/design); a task from before that change may still carry free text, which
+// A task's discipline. The bot stores lowercase keys (backend/frontend/
+// fullstack/mobile/admin/qa/design/legacy); a task from before that change may still carry free text, which
 // is shown as-is. Order here is the display order used everywhere a list of
 // the fixed scopes is built (project cards' repository summary, etc).
-export const SCOPE_LABEL: Record<string, string> = { backend: 'Backend', frontend: 'Frontend', mobile: 'Mobile', qa: 'QA', design: 'Design' }
+export const SCOPE_LABEL: Record<string, string> = {
+  backend: 'Backend', frontend: 'Frontend', fullstack: 'Full stack', mobile: 'Mobile',
+  admin: 'Admin', qa: 'QA', design: 'Design', legacy: 'Legacy',
+}
 const isFixedScope = (s: string) => Object.prototype.hasOwnProperty.call(SCOPE_LABEL, s)
 export const scopeLabel = (scope: string | null | undefined): string | null => {
   const s = (scope ?? '').trim()
   if (!s) return null
   return isFixedScope(s) ? SCOPE_LABEL[s] : s
 }
-// Which chip colour a scope takes; anything that is not one of the five is 'other'.
-export type ScopeTone = 'backend' | 'frontend' | 'mobile' | 'qa' | 'design' | 'other'
+// Which chip colour a scope takes; anything that is not one of the fixed scopes is 'other'.
+export type ScopeTone = FixedScope | 'other'
 export const scopeTone = (scope: string | null | undefined): ScopeTone => {
   const s = (scope ?? '').trim()
   return isFixedScope(s) ? (s as ScopeTone) : 'other'
 }
 
 // The fixed scope a task carries, or null (unset, blank, or legacy free text).
-export const fixedScope = (scope: string | null | undefined): 'backend' | 'frontend' | 'mobile' | 'qa' | 'design' | null => {
+export const fixedScope = (scope: string | null | undefined): FixedScope | null => {
   const s = (scope ?? '').trim().toLowerCase()
-  return isFixedScope(s) ? (s as 'backend' | 'frontend' | 'mobile' | 'qa' | 'design') : null
+  return isFixedScope(s) ? (s as FixedScope) : null
 }

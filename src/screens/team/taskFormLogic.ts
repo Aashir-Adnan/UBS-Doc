@@ -16,9 +16,12 @@ export const STATUS_OPTIONS = ['open', 'pending', 'in_progress', 'resolved', 'cl
 export const SCOPE_OPTIONS = [
   { value: 'backend', label: 'Backend' },
   { value: 'frontend', label: 'Frontend' },
+  { value: 'fullstack', label: 'Full stack' },
   { value: 'mobile', label: 'Mobile' },
+  { value: 'admin', label: 'Admin' },
   { value: 'qa', label: 'QA' },
   { value: 'design', label: 'Design' },
+  { value: 'legacy', label: 'Legacy' },
 ]
 export const IMPLEMENTATION_OPTIONS = [
   { value: 'not_started', label: 'Not started' },
@@ -104,7 +107,7 @@ export function validateForm(task: TaskRow, form: EditForm): string | null {
   return null
 }
 
-/** The scope select's options: "none", the four, and a legacy free-text value when the task still holds one. */
+/** The scope select's options: "none", the fixed scopes, and an old free-text value when the task still holds one. */
 export function scopeOptionsFor(current: string): { value: string; label: string }[] {
   const opts = [{ value: '', label: 'None' }, ...SCOPE_OPTIONS]
   if (current && !SCOPE_OPTIONS.some((o) => o.value === current)) opts.push({ value: current, label: `${current} (old)` })

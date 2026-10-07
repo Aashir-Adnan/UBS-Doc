@@ -220,8 +220,8 @@ describe('createErrorText', () => {
 
 describe('scopeOptionsFor', () => {
   it('keeps a legacy free-text scope selectable so an untouched save does not erase it', () => {
-    expect(scopeOptionsFor('backend').map((o) => o.value)).toEqual(['', 'backend', 'frontend', 'mobile', 'qa', 'design'])
-    expect(scopeOptionsFor('GitSync').map((o) => o.value)).toEqual(['', 'backend', 'frontend', 'mobile', 'qa', 'design', 'GitSync'])
+    expect(scopeOptionsFor('backend').map((o) => o.value)).toEqual(['', 'backend', 'frontend', 'fullstack', 'mobile', 'admin', 'qa', 'design', 'legacy'])
+    expect(scopeOptionsFor('GitSync').map((o) => o.value)).toEqual(['', 'backend', 'frontend', 'fullstack', 'mobile', 'admin', 'qa', 'design', 'legacy', 'GitSync'])
   })
 })
 
