@@ -385,6 +385,13 @@ const sidebars = {
             },
             {
               type: 'category',
+              label: 'Guest Hotel Services',
+              items: [
+                'hms-documentation/guest-apis/guest-hotel-services/guest-hotel-services',
+              ],
+            },
+            {
+              type: 'category',
               label: 'Guest Packages',
               items: [
                 'hms-documentation/guest-apis/guest-packages/guest-packages',

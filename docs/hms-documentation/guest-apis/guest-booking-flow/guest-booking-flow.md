@@ -83,7 +83,13 @@ Same endpoint as step 2 but with `include=packages`. Returns bundled packages th
 
 Returns all bookable add-on services for the hotel (excludes rooms/stay services and amenities). These can be attached to the booking as addons.
 
-Each service object is a minimal landing-card shape with `id`, `name`, `category`, `price`, `images`, etc. Each also has `availableUnitsCount`: how many of the service's delivery units can take a booking right now so while booking the product of availableUnitsCount*maxOccupancy should be < sum of selced childs+adults , at the hotel's local time. A unit counts when it's active with `current_status` `available` (units under maintenance, cleaning, occupied or reserved don't count), it's open now, and its bookings running at that moment are below its `max_concurrent`. "Open now" means its opening hours (unit availability) cover the current time on today's date or weekday. A unit with no opening hours set is always open and takes one booking at a time. The value is 0 when the service has no free unit.
+Each service object is a minimal landing-card shape with `id`, `name`, `category`, `price`, `images`, etc. Pass the booking's dates as `startDate` and `endDate` (for example `?hotelId=86&startDate=2026-10-10&endDate=2026-10-14`); without them the counts are for today in the hotel's time zone. Each card has `availableUnitsCount`, the number of the service's delivery units free for that period, plus `maxQuantityPerBooking`, `maxOccupancy`, `maxAdults` and `maxChildren`. Use them to limit the guest's selection:
+
+- the quantity is at most `min(availableUnitsCount, maxQuantityPerBooking)`, and `0` free units disables the service;
+- for quantity `q`, adults + children ≤ `q × maxOccupancy`, adults ≤ `q × maxAdults` and children ≤ `q × maxChildren` (skip a rule whose field is `null`);
+- when only one unit is possible, the adults and children steppers stop at `maxAdults` and `maxChildren`.
+
+[Guest Hotel Services](../guest-hotel-services/guest-hotel-services.md) has the counting rules and a worked example.
 
 The `category.slug` determines which scheduling shape the frontend should collect for each addon:
 

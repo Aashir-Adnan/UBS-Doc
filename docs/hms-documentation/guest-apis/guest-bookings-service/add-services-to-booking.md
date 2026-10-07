@@ -254,7 +254,7 @@ The booking confirmation email is sent **after the first successful down payment
 | Service must belong to the same hotel as the booking | `422 Addon belongs to a different hotel` |
 | Stay-category services cannot be added as addons | `422 Stay services cannot be added as addons` |
 | Quantity must not exceed `max_quantity_per_booking` | `400 Maximum N booking(s) allowed for service "..."` |
-| Quantity must not exceed the service's free delivery units right now (the `availableUnitsCount` from `GET /api/guest/hotel-services`). Quantities for the same service in one request are added together | `409 Only N unit(s) of "..." available, M requested` |
+| Quantity must not exceed the service's delivery units free right now, in the hotel's time zone. `GET /api/guest/hotel-services` called without dates gives today's count. Quantities for the same service in one request are added together | `409 Only N unit(s) of "..." available, M requested` |
 | `addons` must be a non-empty array | `400 addons must be a non-empty array` |
 | `booking_id` is required | `400 booking id is required` |
 | `tenant_id` is required | `400 tenant_id is required` |

@@ -323,6 +323,12 @@ export const SIDEBAR: SidebarNode[] = [
             ],
           },
           {
+            label: 'Guest Hotel Services',
+            items: [
+              'hms-documentation/guest-apis/guest-hotel-services/guest-hotel-services',
+            ],
+          },
+          {
             label: 'Guest Packages',
             items: [
               'hms-documentation/guest-apis/guest-packages/guest-packages',

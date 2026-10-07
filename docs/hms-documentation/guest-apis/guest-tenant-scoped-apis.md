@@ -168,7 +168,7 @@ These endpoints use **PUBLIC_ENCRYPTED_PLATFORM** (no JWT, no URDD) or handle au
 | `/api/guest/hotels` | GET | PUBLIC_ENCRYPTED | List hotels |
 | `/api/guest/availability` | GET | PUBLIC_ENCRYPTED | Check room/package availability |
 | `/api/guest/search/filter` | GET | PUBLIC_ENCRYPTED | Search rooms/packages/services |
-| `/api/guest/hotel-services` | GET | PUBLIC_ENCRYPTED | Fetch hotel service catalog |
+| `/api/guest/hotel-services` | GET | PUBLIC_ENCRYPTED | Fetch hotel service catalog with free unit counts (`startDate` / `endDate` optional) |
 | `/api/admin/create/guest/user` | POST | PUBLIC_ENCRYPTED | Admin creates guest account |
 | `/api/admin/create/guest/booking` | POST | PUBLIC_ENCRYPTED | Admin creates guest booking |
 

@@ -54,7 +54,7 @@ sequenceDiagram
   participant A as SaaS admin
   participant P as Partner backend
   participant H as HMS
-  A->>H: POST /api/crud/partner-platforms (platform, key, system user)
+  A->>H: POST /api/crud/partner-platforms ?step=1 platform, ?step=2 version and key, ?step=3 system user
   A-->>P: platform name + version, platform key, outer key, email + password (out of band)
   P->>H: POST /api/partner/auth/login (enrol TOTP, then login)
   P->>H: GET /api/partner/visits, GET /api/partner/visits/detail (priced, fingerprint)

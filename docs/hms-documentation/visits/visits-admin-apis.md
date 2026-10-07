@@ -10,9 +10,9 @@ Admin dashboard endpoints. The visits CRUD and the component picker are used by 
 | `PUT /api/crud/visits?id=` | `update_visits` | Change header, components, price, configs, visibility, status |
 | `DELETE /api/crud/visits?id=` | `delete_visits` | Delete (deferred while legs are open) |
 | `GET /api/crud/visits/components` | `list_visits` | Cross-hotel component picker |
-| `GET /api/crud/partner-platforms` | `list_partner_platforms` (group `PG-PARTNER-PLATFORMS`) | Partner platforms and their system users |
-| `POST /api/crud/partner-platforms` | `add_partner_platforms` | Onboard a partner |
-| `PUT /api/crud/partner-platforms?id=` | `update_partner_platforms` | Settings, webhook, TOTP reset/revoke, password reset, new version |
+| `GET /api/crud/partner-platforms?step=1\|2\|3` | `list_partner_platforms` (group `PG-PARTNER-PLATFORMS`) | Partner platforms (step 1), their versions (step 2), their system users (step 3) |
+| `POST /api/crud/partner-platforms?step=1\|2\|3` | `add_partner_platforms` | Create a platform, add a version (new key), add a system user |
+| `PUT /api/crud/partner-platforms?step=1\|2\|3&id=` | `update_partner_platforms` | Platform settings and webhook; retire or reactivate a version; reset a password or TOTP |
 | `GET /api/crud/platform-events` | `list_platform_events` | Partner event outbox |
 | `PUT /api/crud/platform-events/retry` | `update_platform_events` | Re-queue a dead or delivered event |
 
@@ -282,131 +282,359 @@ Query: `type` (`package` | `service`), `hotelId`, `q`, `consentOnly` (default `t
 
 ## Partner platforms
 
-### Onboard — `POST /api/crud/partner-platforms`
+A **grouped CRUD** in three steps on one URL. `?step=` picks the entity; leaving it out means step 1.
+
+| Step | Entity | Add | Update (`id` =) | List / View |
+|---|---|---|---|---|
+| `?step=1` | Platform | Create the platform | platform id | Partner platforms |
+| `?step=2` | Platform versions | Add a version and its key | platform version id | A platform's versions |
+| `?step=3` | Platform system users | Add a system user | user id | A platform's system users |
+
+Every key is `<table>_<camelColumn>` (`platforms_*`, `platformVersions_*`, `versions_*`, `users_*`). Lists are flat rows with `table_count` and support the standard `page_no`, `page_size`, `sort_by`, `sort_order` and `filter_*` query parameters. View (`&id=`) returns one row. The framework requires `id` in the body on every `PUT` as well.
+
+**Onboarding a partner** is three calls, in order:
+1. `POST ?step=1` with the platform. Keep `id`.
+2. `POST ?step=2` with `platformVersions_platformId = id` and `versions_version`. Keep `platformVersions_encryptionKey`.
+3. `POST ?step=3` with `users_platformId = id` and the email. Keep the password if one was generated.
+
+Then hand the partner, out of band: the platform name and version, the platform key, the shared outer key, the system user email and password, and the webhook secret.
+
+A platform does nothing until it has an active version and a system user: no envelope can be decrypted and nobody can log in. If the admin stops halfway, the later steps can be run at any time.
+
+### Step 1 — Platform
+
+**Add — `POST /api/crud/partner-platforms?step=1`**
 
 ```json
 {
   "actionPerformerURDD": 1,
-  "platformName": "TravelCo",
-  "version": "1.0.0",
-  "domains": ["travelco.example.com"],
-  "egressIps": ["198.51.100.10/32"],
-  "rateLimit": 600,
-  "contact": ["integrations@travelco.example.com"],
-  "webhook": { "url": "https://travelco.example.com/webhooks/hms" },
-  "systemUser": { "email": "hms@travelco.example.com", "firstName": "TravelCo", "lastName": "System", "password": "Travel-Co-2026!x" }
+  "platforms_platformName": "TravelCo",
+  "platforms_domains": ["travelco.example.com"],
+  "platforms_egressIps": ["198.51.100.10/32"],
+  "platforms_rateLimit": 600,
+  "platforms_contact": ["integrations@travelco.example.com"],
+  "platforms_webhook": { "url": "https://travelco.example.com/webhooks/hms" }
 }
 ```
 
-Creates the platform (`is_partner = 1`), its version with a generated **platform key**, the system user, its `PARTNER · System` URDD and permissions, and a webhook signing secret.
-
-`systemUser.password` is optional. When the partner chooses its own password, send it here: it must be 12 to 128 characters with a lowercase letter, an uppercase letter, a digit and a special character, and no leading or trailing spaces, otherwise `422 weak_password` and nothing is created. It is stored hashed and **not echoed back** (`password: null`, `passwordSource: "provided"`). Without it a random password is generated and returned once (`passwordSource: "generated"`).
-
-The response is the **only time** the secrets are shown; hand them to the partner out of band together with the shared outer key:
-
-```json
-{ "platformId": 8, "platformName": "TravelCo", "platformVersion": "1.0.0", "platformKey": "…",
-  "systemUser": { "userId": 912, "systemUrdd": 4410, "email": "hms@travelco.example.com", "password": null, "passwordSource": "provided" },
-  "webhookSecret": "whsec_…" }
-```
-
-Validation: `domains` bare hostnames (at most 20); `egressIps` IPv4/IPv6 addresses or CIDRs no broader than `/24` (IPv4) or `/48` (IPv6), at most 20; empty or absent means no IP check. `rateLimit` requests per minute (default 600).
-
-### Update — `PUT /api/crud/partner-platforms?id=8`
-
-| Field | Effect |
-|---|---|
-| `domains`, `egressIps`, `contact`, `rateLimit`, `status` | Replace the value (`null` clears) |
-| `webhook: { url, rotateSecret }` | Change the URL; `rotateSecret: true` returns a new `webhookSecret`. `webhook: null` removes it |
-| `totpReset: { userId }` | Removes the user's TOTP entry; their next password login re-enrols |
-| `totpRevoke: { userId }` | Login returns `403 totp_revoked` until reset |
-| `resetPassword: { userId, password? }` | With `password` (same rules as onboarding), sets the partner's own password: `systemUserPassword: null`, `systemUserPasswordSource: "provided"`. Without it, generates one and returns it once in `systemUserPassword` (`"generated"`) |
-| `newVersion: "1.1.0"` | Adds a platform version with a new `platformKey` (key rotation) |
-
-The response holds `platformId` plus only the fields the call changed:
-
-```json
-{ "platformId": 8, "webhookSecret": "whsec_…", "totpReset": "reset", "totpRevoke": "revoked",
-  "systemUserPassword": null, "systemUserPasswordSource": "provided", "platformKey": "…", "platformVersion": "1.1.0" }
-```
-
-| Path | Present when | Values and notes |
-|---|---|---|
-| `platformId` | always | |
-| `webhookSecret` | `webhook.rotateSecret: true`, or a URL set when there was no secret yet | the new signing secret, shown once |
-| `totpReset` | `totpReset` sent | `reset`, or `no_totp_entry` when the user had none |
-| `totpRevoke` | `totpRevoke` sent | `revoked`, or `no_totp_entry` |
-| `systemUserPassword` | `resetPassword` sent | the generated password, shown once; `null` when the partner chose it |
-| `systemUserPasswordSource` | `resetPassword` sent | `generated` or `provided` |
-| `platformKey`, `platformVersion` | `newVersion` sent | the new version's key, shown once, and its version |
-
-Errors: `422 invalid_status` (status other than `active` / `inactive`), `422 weak_password`, `409 version_exists` (the platform already has that version), plus the onboarding validation errors for `domains`, `egressIps`, `contact`, `rateLimit` and `webhook.url`.
-
-### List — `GET /api/crud/partner-platforms`
-
-Request: the admin envelope with `actionPerformerURDD` (the SaaS admin seat); no other fields. It needs `list_partner_platforms`.
-
-```json
-{ "actionPerformerURDD": 1 }
-```
-
-The list is not paged and returns every partner platform, active or inactive, oldest first:
-
-```json
-{ "items": [
-  { "id": 8, "platformName": "TravelCo", "status": "active",
-    "domains": ["travelco.example.com"], "egressIps": ["198.51.100.10/32"], "rateLimit": 600,
-    "contact": ["integrations@travelco.example.com"],
-    "webhookUrl": "https://travelco.example.com/webhooks/hms",
-    "versions": [ { "version": "1.0.0", "status": "active" }, { "version": "1.1.0", "status": "active" } ],
-    "systemUsers": [
-      { "userId": 912, "email": "hms@travelco.example.com", "status": "active",
-        "totp": { "status": "active", "enrolledAt": "2026-10-06T10:00:00.000Z", "rotatedAt": null,
-                  "lockedUntil": null, "rotationPending": false } } ],
-    "createdAt": "2026-10-06T09:58:12.000Z", "updatedAt": "2026-10-06T10:00:01.000Z" } ] }
-```
-
-### View — `GET /api/crud/partner-platforms?id=8`
-
-Same permission and envelope; the platform id goes in the `id` query parameter. Returns one platform object, in the same shape as an `items[]` entry, or `null` when the id is not a partner platform.
-
-```json
-{ "actionPerformerURDD": 1 }
-```
-
-**Response fields** (List `items[]`, and View)
-
-| Path | Type | Nullable | Values and notes |
+| Key | Type | Required | Notes |
 |---|---|---|---|
-| `id` | number | no | the `platformId` for update and the outbox filter |
-| `platformName` | string | no | the name partners send as `PlatformName` in the envelope |
-| `status` | string | no | `active` or `inactive`; an inactive platform is refused by every partner endpoint |
-| `domains` | string[] | yes | bare hostnames; `null` when not set |
-| `egressIps` | string[] | yes | addresses or CIDRs; `null` or empty means no IP check |
-| `rateLimit` | number | yes | requests per minute; `null` uses the default (600, or `PARTNER_RATE_LIMIT_PER_MINUTE`) |
-| `contact` | string[] | yes | |
-| `webhookUrl` | string | yes | `null` when no webhook is set. The secret is never returned |
-| `versions[]` | array | no | every version of the platform, oldest first; the platform keys are never returned |
-| `versions[].version` | string | no | e.g. `1.0.0`, the `PlatformVersion` partners send |
-| `versions[].status` | string | no | `active` or `inactive` |
-| `systemUsers[]` | array | no | the platform's system users |
-| `systemUsers[].userId` | number | no | send it as `userId` in `totpReset`, `totpRevoke` and `resetPassword` |
-| `systemUsers[].email` | string | no | the login email |
-| `systemUsers[].status` | string | no | the user's status, e.g. `active` |
-| `systemUsers[].totp` | object | yes | `null` until the user first logs in (no TOTP entry yet, or after a reset) |
-| `systemUsers[].totp.status` | string | no | `pending` (enrolment started, not confirmed), `active` or `revoked` |
-| `systemUsers[].totp.enrolledAt` | ISO 8601 datetime | yes | when enrolment was confirmed |
-| `systemUsers[].totp.rotatedAt` | ISO 8601 datetime | yes | the last completed rotation |
-| `systemUsers[].totp.lockedUntil` | ISO 8601 datetime | yes | set after five failed logins; login is refused until then |
-| `systemUsers[].totp.rotationPending` | boolean | no | `true` while a rotation was started and not yet confirmed |
-| `createdAt`, `updatedAt` | ISO 8601 datetime | no | |
+| `platforms_platformName` | string | yes | 3 to 64 letters, digits, `-` or `_`, starting with a letter; unique (`409 platform_exists`). Partners send it as `PlatformName` |
+| `platforms_domains` | string[] | no | bare hostnames, at most 20 |
+| `platforms_egressIps` | string[] | no | IPv4/IPv6 addresses or CIDRs no broader than `/24` (IPv4) or `/48` (IPv6), at most 20; empty or absent means no IP check |
+| `platforms_rateLimit` | number | no | requests per minute; absent uses the default (600) |
+| `platforms_contact` | string[] | no | |
+| `platforms_webhook` | object | no | `url`. A signing secret is generated when a URL is set |
 
-No secret is ever returned by List or View: not the platform keys, the webhook secret, the TOTP secrets or the password.
+```json
+{ "id": 8, "platforms_platformId": 8, "platforms_platformName": "TravelCo", "platforms_status": "active", "platforms_webhookSecret": "whsec_…" }
+```
+
+`platforms_webhookSecret` is shown **once**. It is `null` without a webhook.
+
+**Update — `PUT /api/crud/partner-platforms?step=1&id=8`**
+
+| Key | Effect |
+|---|---|
+| `platforms_domains`, `platforms_egressIps`, `platforms_contact`, `platforms_rateLimit` | Replace the value (`null` clears) |
+| `platforms_status` | `active` or `inactive`. Every partner endpoint refuses an inactive platform |
+| `platforms_webhook: { url, rotateSecret }` | Change the URL. `rotateSecret: true`, or a first URL, returns a new `platforms_webhookSecret` once. `platforms_webhook: null` removes the webhook |
+
+```json
+{ "id": 8, "actionPerformerURDD": 1, "platforms_rateLimit": 1200, "platforms_webhook": { "url": "https://travelco.example.com/webhooks/hms", "rotateSecret": true } }
+```
+
+Response: `{ "id": 8, "platforms_platformId": 8, "platforms_webhookSecret": "whsec_…" }`. The secret is present only when a new one was made.
+
+**List — `GET ?step=1` and View — `GET ?step=1&id=8`.** Every partner platform, active or inactive:
+
+```json
+[
+  {
+    "table_count": 1,
+    "id": 8,
+    "platforms_platformId": 8,
+    "platforms_platformName": "TravelCo",
+    "platforms_status": "active",
+    "platforms_domains": ["travelco.example.com"],
+    "platforms_egressIps": ["198.51.100.10/32"],
+    "platforms_rateLimit": 600,
+    "platforms_contact": ["integrations@travelco.example.com"],
+    "platforms_webhookUrl": "https://travelco.example.com/webhooks/hms",
+    "platforms_activeVersionCount": 1,
+    "platforms_systemUserCount": 1,
+    "platforms_createdBy": 1,
+    "platforms_updatedBy": 1,
+    "platforms_createdAt": "2026-10-06T09:58:12.000Z",
+    "platforms_updatedAt": "2026-10-06T10:00:01.000Z"
+  }
+]
+```
+
+| Key | Type | Nullable | Notes |
+|---|---|---|---|
+| `table_count` | number | no | List only |
+| `id`, `platforms_platformId` | number | no | |
+| `platforms_platformName` | string | no | |
+| `platforms_status` | string | no | `active` or `inactive` |
+| `platforms_domains`, `platforms_egressIps`, `platforms_contact` | string[] | yes | |
+| `platforms_rateLimit` | number | yes | `null` uses the default (600, or `PARTNER_RATE_LIMIT_PER_MINUTE`) |
+| `platforms_webhookUrl` | string | yes | the secret is never returned |
+| `platforms_activeVersionCount` | number | no | `0` means partners cannot connect |
+| `platforms_systemUserCount` | number | no | `0` means nobody can log in |
+| `platforms_createdBy`, `platforms_updatedBy` | number | yes | URDD ids |
+| `platforms_createdAt`, `platforms_updatedAt` | ISO 8601 datetime | no | |
+
+View returns one row in this shape, without `table_count`. An unknown id is `404 platform_not_found`.
+
+### Step 2 — Platform versions
+
+**Add — `POST /api/crud/partner-platforms?step=2`**
+
+```json
+{ "actionPerformerURDD": 1, "platformVersions_platformId": 8, "versions_version": "1.0.0" }
+```
+
+```json
+{
+  "id": 31,
+  "platformVersions_platformVersionId": 31,
+  "platformVersions_platformId": 8,
+  "versions_version": "1.0.0",
+  "platformVersions_status": "active",
+  "platformVersions_encryptionKey": "3f9a…"
+}
+```
+
+`platformVersions_encryptionKey` is the platform key the partner uses for this version. It is shown **once**; List and View never return it. Adding a second version (for example `1.1.0`) is how keys are rotated, and the old version keeps working until it is retired.
+
+Errors:
+- `400 platform_id_required`, `404 platform_not_found`
+- `422 invalid_version`: a version is required, such as `1.0.0`
+- `409 version_exists`
+
+**Update — `PUT /api/crud/partner-platforms?step=2&id=31`**
+
+```json
+{ "id": 31, "actionPerformerURDD": 1, "platformVersions_status": "inactive" }
+```
+
+- `platformVersions_status` is `active` or `inactive`.
+- A partner calling with an inactive version gets `400` from the envelope ("Invalid Platform Name or Version"). Use this to retire an old key after rotation.
+- Retiring the last active version is `409 last_active_version`.
+- Unknown id: `404 version_not_found`.
+- The response is the row: `id`, `platformVersions_platformVersionId`, `platformVersions_platformId`, `versions_version`, `platformVersions_status`.
+
+**List — `GET ?step=2` and View — `GET ?step=2&id=31`.** Optional `platformVersions_platformId` (body or query) limits the list to one platform:
+
+```json
+[
+  {
+    "table_count": 2,
+    "id": 31,
+    "platformVersions_platformVersionId": 31,
+    "platformVersions_platformId": 8,
+    "platforms_platformName": "TravelCo",
+    "platformVersions_versionId": 4,
+    "versions_version": "1.0.0",
+    "platformVersions_status": "active",
+    "platformVersions_createdBy": 1,
+    "platformVersions_updatedBy": 1,
+    "platformVersions_createdAt": "2026-10-06T09:58:12.000Z",
+    "platformVersions_updatedAt": "2026-10-06T09:58:12.000Z"
+  }
+]
+```
+
+### Step 3 — Platform system users
+
+**Add — `POST /api/crud/partner-platforms?step=3`**
+
+```json
+{
+  "actionPerformerURDD": 1,
+  "users_platformId": 8,
+  "users_email": "hms@travelco.example.com",
+  "users_firstName": "TravelCo",
+  "users_lastName": "System",
+  "users_password": "Travel-Co-2026!x"
+}
+```
+
+This creates the user, with its `PARTNER · System` URDD and permissions.
+
+`users_password` is optional:
+- **If sent:** it must be 12 to 128 characters with a lowercase letter, an uppercase letter, a digit and a special character, and no leading or trailing spaces. Otherwise `422 weak_password`, and nothing is created. It is stored hashed and not echoed back.
+- **If left out:** a password is generated and returned **once**.
+
+```json
+{
+  "id": 912,
+  "users_userId": 912,
+  "users_platformId": 8,
+  "users_systemUrdd": 4410,
+  "users_email": "hms@travelco.example.com",
+  "users_password": null,
+  "users_passwordSource": "provided"
+}
+```
+
+Errors:
+- `400 platform_id_required`, `404 platform_not_found`
+- `422 invalid_email`, `422 weak_password`
+- `409 email_in_use`
+
+**Update — `PUT /api/crud/partner-platforms?step=3&id=912`**
+
+| Key | Effect |
+|---|---|
+| `users_resetPassword: true` (optionally with `users_password`) | With `users_password`, sets the partner's own password (`users_password: null`, `users_passwordSource: "provided"`). Without it, generates one and returns it once (`"generated"`) |
+| `users_totpReset: true` | Removes the user's TOTP entry. Their next password login enrols again. Result `reset` or `no_totp_entry` |
+| `users_totpRevoke: true` | Login returns `403 totp_revoked` until a reset. Result `revoked` or `no_totp_entry` |
+
+```json
+{ "id": 912, "actionPerformerURDD": 1, "users_resetPassword": true }
+```
+
+```json
+{ "id": 912, "users_userId": 912, "users_platformId": 8, "users_password": "…", "users_passwordSource": "generated" }
+```
+
+`users_totpReset` and `users_totpRevoke` appear in the response when sent.
+
+Errors:
+- `404 user_not_found`: not a partner system user.
+- `422 nothing_to_update`: none of the keys were sent.
+- `422 weak_password`.
+
+**List — `GET ?step=3` and View — `GET ?step=3&id=912`.** Optional `users_platformId` limits the list to one platform:
+
+```json
+[
+  {
+    "table_count": 1,
+    "id": 912,
+    "users_userId": 912,
+    "users_platformId": 8,
+    "platforms_platformName": "TravelCo",
+    "users_email": "hms@travelco.example.com",
+    "users_firstName": "TravelCo",
+    "users_lastName": "System",
+    "users_status": "active",
+    "users_createdAt": "2026-10-06T09:58:12.000Z",
+    "users_updatedAt": "2026-10-06T09:58:12.000Z",
+    "users_totpStatus": "active",
+    "users_totpEnrolledAt": "2026-10-06T10:00:00.000Z",
+    "users_totpRotatedAt": null,
+    "users_totpLockedUntil": null,
+    "users_totpRotationPending": false
+  }
+]
+```
+
+| Key | Type | Nullable | Notes |
+|---|---|---|---|
+| `users_totpStatus` | string | yes | `null` until the first login (or after a reset); then `pending` (enrolment not confirmed), `active` or `revoked` |
+| `users_totpEnrolledAt`, `users_totpRotatedAt` | ISO 8601 datetime | yes | |
+| `users_totpLockedUntil` | ISO 8601 datetime | yes | set after five failed logins; login is refused until then |
+| `users_totpRotationPending` | boolean | no | `true` while a rotation has started and is not confirmed |
+
+Only system users are listed. Travellers created by the partner are not. No step ever returns a TOTP secret or a password hash.
+
+### Changes on 2026-10-07
+
+| Before | Now |
+|---|---|
+| One `POST` onboarded the platform, its version and the system user | `?step=1` platform, `?step=2` version, `?step=3` system user |
+| `PUT` on the platform carried `platformVersions_newVersion`, `users_resetPassword: { userId }`, `platforms_totpReset/Revoke: { userId }` | New version: `POST ?step=2`. Password and TOTP: `PUT ?step=3&id=<userId>` with booleans |
+| List rows nested `platformVersions[]` and `users[]` | Separate lists: `GET ?step=2` and `GET ?step=3` filtered by platform |
+| A version could not be retired | `PUT ?step=2` with `platformVersions_status: "inactive"`; the envelope refuses an inactive partner version |
 
 ---
 
 ## Event outbox
 
-`GET /api/crud/platform-events` — query `status` (`pending` | `delivered` | `dead`), `platformId`, `bookingId`, `page_no`, `page_size`. Each item: `eventId`, `platformName`, `bookingId`, `visitId`, `eventType`, `oldStatus`, `newStatus`, `status`, `attempts`, `nextAttemptAt`, `lastError`, `createdAt`, `deliveredAt`.
+Both endpoints follow the admin CRUD key convention (`platformEventOutbox_*`, `platforms_*`).
 
-`PUT /api/crud/platform-events/retry` with `{ "id": "<eventId>", "eventId": "<eventId>" }` (the framework requires `id` on every `PUT`). Resets the event to `pending`, `attempts = 0`, due now. The event id and body never change.
+### List — `GET /api/crud/platform-events`
+
+Needs `list_platform_events`. Send `actionPerformerURDD` (the SaaS admin seat). Every key below is optional.
+
+| Key | Where | Notes |
+|---|---|---|
+| `platformEventOutbox_status` | body or query | `pending`, `delivered` or `dead`; anything else is `422 invalid_status` |
+| `platformEventOutbox_platformId` | body or query | events of one partner platform |
+| `platformEventOutbox_bookingId` | body or query | events of one leg |
+| `page_no`, `page_size` | query | without `page_size`, every row is returned |
+| `sort_by`, `sort_order` | query | e.g. `sort_by=platformEventOutbox_createdAt&sort_order=DESC` for newest first. Rows are unordered without `sort_by` |
+| `filter_columns_and`, `filter_values_and`, … | query | the standard admin filters, on the row keys |
+
+```
+GET /api/crud/platform-events?page_no=1&page_size=20&sort_by=platformEventOutbox_createdAt&sort_order=DESC
+{ "actionPerformerURDD": 1, "platformEventOutbox_platformId": 8, "platformEventOutbox_status": "dead" }
+```
+
+The response is flat rows:
+
+```json
+[
+  {
+    "table_count": 42,
+    "id": "3f6c1a2e-5b7d-4c1e-9a8f-0d2b4e6f8a10",
+    "platformEventOutbox_eventId": "3f6c1a2e-5b7d-4c1e-9a8f-0d2b4e6f8a10",
+    "platformEventOutbox_platformId": 8,
+    "platforms_platformName": "TravelCo",
+    "platformEventOutbox_bookingId": 9301,
+    "platformEventOutbox_visitId": 80,
+    "platformEventOutbox_eventType": "booking.cancelled_by_hotel",
+    "platformEventOutbox_oldStatus": "confirmed",
+    "platformEventOutbox_newStatus": "cancelled",
+    "platformEventOutbox_initiator": "hotel",
+    "platformEventOutbox_status": "dead",
+    "platformEventOutbox_attempts": 7,
+    "platformEventOutbox_nextAttemptAt": "2026-10-07T03:00:00.000Z",
+    "platformEventOutbox_lastError": "HTTP 500",
+    "platformEventOutbox_createdAt": "2026-10-06T12:00:00.000Z",
+    "platformEventOutbox_deliveredAt": null
+  }
+]
+```
+
+| Key | Type | Nullable | Values and notes |
+|---|---|---|---|
+| `table_count` | number | no | total matching rows, for paging |
+| `id`, `platformEventOutbox_eventId` | string (UUID) | no | the event id; also the `id` partners see on the webhook |
+| `platformEventOutbox_platformId` | number | no | |
+| `platforms_platformName` | string | yes | |
+| `platformEventOutbox_bookingId` | number | yes | `null` for visit events |
+| `platformEventOutbox_visitId` | number | yes | |
+| `platformEventOutbox_eventType` | string | no | e.g. `leg.approved`, `leg.rejected`, `leg.scheduled`, `booking.cancelled`, `booking.cancelled_by_hotel`, `booking.cancelled_by_system`, `booking.checked_in`, `booking.checked_out`, `booking.no_show`, `booking.modified`, `visit.invalidated`, `visit.restored`, `visit.updated` |
+| `platformEventOutbox_oldStatus`, `platformEventOutbox_newStatus` | string | yes | the leg's booking status before and after |
+| `platformEventOutbox_initiator` | string | yes | `hotel`, `partner`, `system` or `guest` |
+| `platformEventOutbox_status` | string | no | `pending`, `delivered` or `dead` |
+| `platformEventOutbox_attempts` | number | no | delivery attempts so far |
+| `platformEventOutbox_nextAttemptAt` | ISO 8601 datetime | yes | when the next attempt is due |
+| `platformEventOutbox_lastError` | string | yes | the last delivery error |
+| `platformEventOutbox_createdAt`, `platformEventOutbox_deliveredAt` | ISO 8601 datetime | `deliveredAt` yes | |
+
+### Retry — `PUT /api/crud/platform-events/retry`
+
+Needs `update_platform_events`. The framework requires `id` on every `PUT`, so send the event id twice:
+
+```json
+{ "actionPerformerURDD": 1, "id": "3f6c1a2e-5b7d-4c1e-9a8f-0d2b4e6f8a10", "platformEventOutbox_eventId": "3f6c1a2e-5b7d-4c1e-9a8f-0d2b4e6f8a10" }
+```
+
+Resets the event to `pending`, with `attempts = 0`, due now. The event id and body never change.
+
+```json
+{ "id": "3f6c1a2e-…", "platformEventOutbox_eventId": "3f6c1a2e-…", "platformEventOutbox_status": "pending", "platformEventOutbox_attempts": 0, "alreadyQueued": false }
+```
+
+- `alreadyQueued: true`: the event was already pending and nothing changed. `platformEventOutbox_attempts` then holds the current count.
+- Errors: `400 event_id_required` (not a UUID), `404 event_not_found`.
+
+**Changes on 2026-10-07:**
+- The query parameters `status`, `platformId` and `bookingId` became `platformEventOutbox_status`, `platformEventOutbox_platformId` and `platformEventOutbox_bookingId`.
+- List returned `{ items, pagination }` with camelCase keys. It now returns flat rows with `table_count` and the standard paging, sorting and filters.
+- Retry took `eventId` and returned `{ eventId, status }`. It now takes `platformEventOutbox_eventId` and returns the keys above.

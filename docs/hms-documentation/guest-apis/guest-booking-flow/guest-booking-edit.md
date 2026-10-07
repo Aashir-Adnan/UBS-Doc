@@ -315,7 +315,7 @@ After all changes are applied:
 | Stay service cannot be removed | Hardcoded | 422 |
 | Addon must belong to same hotel | `tenant_id` match | 422 |
 | Addon within quantity limit | `max_quantity_per_booking` | 400 |
-| Addon within free delivery units | Quantity ≤ the service's `availableUnitsCount` (free units right now). Staging reports it in `errors`, commit returns 409 | 409 |
+| Addon within free delivery units | Quantity ≤ the service's delivery units free right now. Staging reports it in `errors`, commit returns 409 | 409 |
 | Booking must be editable status | Not cancelled/checked_out/completed/no_show | 422 |
 | Must be booking owner | `urdd_id` match | 403 |
 
