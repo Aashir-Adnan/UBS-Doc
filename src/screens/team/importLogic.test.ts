@@ -207,6 +207,7 @@ describe('screen texts', () => {
     expect(rule('modules')).toContain('100')
     expect(rule('assignees')).toContain('50')
     expect(rule('subtasks')).toContain('25')
+    expect(rule('scope')).toBe('backend, frontend, fullstack, mobile, admin, qa, design or legacy.')
     expect(FORMAT_RULES[0]).toContain('50 tasks')
     expect(FORMAT_RULES[0]).toContain('90 KB')
     expect(FORMAT_RULES.join(' ')).not.toMatch(/bug needs a repository/i)

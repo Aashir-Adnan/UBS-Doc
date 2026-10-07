@@ -3,7 +3,7 @@
 // No React, no fetch, no DOM.
 import type { CreateTaskInput, ImportFields, ImportVerdict } from '../../components/discordTasks/api'
 import { plainRuleMessage } from './boardLogic'
-import { CREATE_MAYBE_CREATED_TEXT, createMayHaveSucceeded } from './taskFormLogic'
+import { CREATE_MAYBE_CREATED_TEXT, createMayHaveSucceeded, SCOPE_OPTIONS } from './taskFormLogic'
 
 export const MAX_IMPORT_TASKS = 50
 export const MAX_IMPORT_BYTES = 90 * 1024
@@ -217,7 +217,8 @@ export const FORMAT_TASK_FIELDS: { name: string; rule: string }[] = [
   { name: 'type', rule: 'Required. feature or bug.' },
   { name: 'title', rule: 'Required. Up to 200 characters.' },
   { name: 'description', rule: 'Up to 2000 characters.' },
-  { name: 'scope', rule: 'backend, frontend, mobile, qa or design.' },
+  // Built from the form's list, so the help can never drift from the scopes on offer.
+  { name: 'scope', rule: `${SCOPE_OPTIONS.slice(0, -1).map((o) => o.value).join(', ')} or ${SCOPE_OPTIONS[SCOPE_OPTIONS.length - 1].value}.` },
   { name: 'status', rule: 'open (the default), in_progress or done.' },
   { name: 'modules', rule: 'Up to 20 names of up to 100 characters each. Features only.' },
   { name: 'assignees', rule: 'Up to 50 people, each the email they verified in Discord or their Discord name.' },
