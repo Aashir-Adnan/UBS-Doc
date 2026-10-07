@@ -12,6 +12,8 @@ Uses **AUTH_PLATFORM** — requires a valid guest JWT (`accessToken`). The guest
 
 The frontend must send a **tenant-specific URDD** (`tenantUrddMap[tenantId]`) for this endpoint.
 
+**Role scoping (visits).** Results follow the persona of the URDD sent. With a normal guest URDD (`tenantUrddMap[tenantId]`) visit legs booked through a partner platform are never returned. With a partner guest URDD (`partnerTenantUrddMap[tenantId]`) only that hotel's visit legs are returned. See [Partner guest role](../guest-tenant-scoped-apis.md#partner-guest-role-visits).
+
 ---
 
 ## Request Payload

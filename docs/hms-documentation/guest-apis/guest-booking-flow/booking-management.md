@@ -69,6 +69,10 @@ confirmed/pending ---> cancelled ---> refund processed
 | `/guest/payments/initiate` | POST | Initiate a payment (including addon down payment) |
 | `/guest/payments/confirm` | POST | Confirm a payment after 3DS |
 
+### Visit legs (partner bookings)
+
+A booking made through a partner platform (a visit leg, `bookings.visit_id` set) belongs to a partner guest URDD and cannot be managed here. Under the partner guest role (`partnerTenantUrddMap`) the guest can view it and schedule or reschedule the services inside it with `PUT /guest/booking/reschedule` or `PUT /guest/bookings/services`, while the leg is `pending`, `confirmed` or `checked_in` (`409 leg_not_schedulable` otherwise). Slots stay inside the leg's dates, dates, party and price never change, and the partner receives `leg.scheduled`; see [Guest booking reschedule](../guest-booking-reschedule/guest-booking-reschedule.md#visit-legs-partner-guest-role). Every other API in the table above (edit, add services, cancel, check-in, check-out, payments) returns `403 partner_guest_read_only`. The role can also favourite, review after a checked-out stay, raise support tickets and edit the profile except the email. Under the normal guest role it is not listed at all. Hotel staff can only move its status, and only the partner platform can cancel it, as a whole visit. See the [visits overview](../../visits/visits-overview.md#after-booking).
+
 ---
 
 ## Adding Addon Services to Any Booking
@@ -685,5 +689,6 @@ Previously, `slot_duration_minutes` appeared in the form schema as a dropdown wi
 
 | Date | Change |
 |---|---|
+| 2026-10-07 | Visit legs: the partner guest role may now schedule and reschedule services inside its own legs (`PUT /guest/booking/reschedule`, `PUT /guest/bookings/services`); the other management APIs still return `403 partner_guest_read_only`. |
 | 2026-07-17 | Added `PUT /guest/booking/edit` — full booking edit flow (dates, party size, add/remove services, down payment delta). Removed "cancel and rebook" guidance for date/party changes. Added scheduler form schema duration field documentation. Updated summary table, frontend guide, and UI states. |
 | 2026-07-13 | Initial version. Comprehensive booking management reference covering addon services, down payments, date handling, party size, rescheduling, removal, cancellation, and frontend guide. |

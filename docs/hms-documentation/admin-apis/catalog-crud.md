@@ -37,14 +37,14 @@ All fields resolve from the parameter schema. `actionPerformerURDD` identifies t
 | `catalog_id` | number | No | Catalog primary key. Supplied as `?id=` (query) for View / Update / Delete. |
 | `actionPerformerURDD` | number | No | Acting user's URDD. Stored as `created_by` (Add) and `updated_by` (Add/Update/Delete). |
 | `language_code` | string | No | Language code (query) — reserved for translation resolution. |
-| `catalog_catalogKey` | string | No | The catalog key value written to `catalog.catalog_key`. |
+| `catalog_catalogKey` | string | No | A JSON string `{"key": …, "label": {"en": …, "ar": …}}`. The key is stored in `catalog.catalog_key`, `label.en` in `catalog.catalog_name`, and `label.ar` as the Arabic of both columns in `translated_entries`. A plain string is accepted and used as both key and name. On Update, omitting it leaves the row unchanged. |
 
 ### Example — Add (POST)
 
 ```json
 {
   "actionPerformerURDD": 42,
-  "catalog_catalogKey": "SPA_SERVICES"
+  "catalog_catalogKey": "{\"key\": \"service\", \"label\": {\"en\": \"service\", \"ar\": \"خدمة\"}}"
 }
 ```
 
@@ -56,9 +56,9 @@ CRUD operations return the affected/queried rows via the standard CRUD template.
 
 ```json
 {
-  "id": 7,
-  "catalog_catalogId": 7,
-  "catalog_catalogKey": "SPA_SERVICES",
+  "id": 1,
+  "catalog_catalogId": 1,
+  "catalog_catalogKey": "{\"key\": \"service\", \"label\": {\"en\": \"service\", \"ar\": \"خدمة\"}}",
   "catalog_status": "active",
   "catalog_createdBy": 42,
   "catalog_updatedBy": 42,
@@ -73,7 +73,8 @@ CRUD operations return the affected/queried rows via the standard CRUD template.
 
 - **Soft delete.** Delete does not remove the row — it sets `status = 'inactive'` and updates `updated_by`. List and View still query by id; List explicitly filters out `status = 'inactive'` rows.
 - **List filtering.** List returns only rows where `catalog.status != 'inactive'`.
-- **No pre/post processing.** `preProcessFunctions` is empty and `postProcessFunction` is `null` — the query result is returned as-is.
+- **Storage.** Since migration `20261004_6_catalog_name_column`, `catalog.catalog_key` holds the plain English key, the new `catalog.catalog_name` (after `catalog_id`) the English name, and `translated_entries` (`table_name = 'catalog'`, columns `catalog_key` and `catalog_name`, language `ar`) the Arabic. List and View rebuild `catalog_catalogKey` as the JSON string above, so the response is unchanged; the Arabic falls back to the English name when no translation exists.
+- **Filtering and sorting.** `catalog_catalogKey` filters on the plain key and `catalog_catalogName` on the English name.
 - **Actor audit.** `created_by` and `updated_by` are populated from `actionPerformerURDD`.
 
 ---
@@ -84,3 +85,4 @@ CRUD operations return the affected/queried rows via the standard CRUD template.
 |---|---|
 | `Src/Apis/ProjectSpecificApis/CatalogCrud/CatalogCrud.js` | API object definition (`global.Catalogs_object`) — CRUD SQL for the `catalog` table |
 | `Src/Apis/ProjectSpecificApis/CatalogCrud/CRUD_parameters.js` | Request parameter schema + `colMapper` |
+| `Src/HelperFunctions/PreProcessingFunctions/Catalog/catalogCrud.js` | Splits the incoming JSON on write, stores the Arabic, rebuilds the JSON string on read |

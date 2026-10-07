@@ -122,6 +122,23 @@ Supports two formats — use **either** `{start, end}` or `{date, slot}`:
 | 401 | `Authenticated user required` | No `userId` in the session. |
 | 403 | `Invalid or expired URDD` | URDD validation failed. |
 | 404 | `Service slot rows not found for this booking` | No slots exist for this booking/service combination, or the booking doesn't belong to the caller. Previously, this also occurred when the caller's URDD had a `NULL` tenant_id (global URDD) — now handled. |
+| 409 | `leg_not_schedulable` (`meta.scc`) | Visit leg only: the leg is not `pending`, `confirmed` or `checked_in`. |
+| 422 | `transport_direction_required`, `invalid_transport_location`, `transport_hotel_stop_required`, `transport_same_stop` (`meta.scc`) | Visit leg only: the transfer's direction or stops break the hotel-stop rule. See [Visit legs](#visit-legs-partner-guest-role). |
+
+---
+
+## Visit legs (partner guest role)
+
+A visit leg is a booking with `visit_id` set, made through a partner platform. With a partner guest URDD (`partnerTenantUrddMap`) that owns the leg, this endpoint schedules or reschedules the leg's service slots:
+
+- The leg must be `pending`, `confirmed` or `checked_in`, otherwise `409` with `meta.scc = leg_not_schedulable`.
+- Slots move only inside the leg's own dates. Dates, party and price never change.
+- Transport follows the hotel-stop rule of the partner API. With `tripType` (or `destination_type`) `pickup`, the drop-off is the hotel stop (the location option with `is_default` 1); with `dropoff`, the pickup is the hotel stop. A wrong combination returns `422` with `transport_direction_required`, `invalid_transport_location`, `transport_hotel_stop_required` or `transport_same_stop`. See [Transfers](../../visits/partner-integration-guide.md#64-booking-forms-formschema).
+- `pickupLocation` and `dropoffLocation` may be the option value, the `hms_config_id`, or an unambiguous English location name.
+- The change is appended to the leg's history as `{ "action": "schedule", "by": "guest", "serviceId", "updated" }`.
+- The partner receives a `leg.scheduled` webhook event with the usual leg fields plus `serviceId`, `updated` and `initiatedBy: "guest"`. See [Events](../../visits/partner-integration-guide.md#9-events).
+
+A normal guest URDD (`tenantUrddMap`) cannot reach a visit leg: it gets `404` as before. Ordinary bookings (no `visit_id`) behave exactly as described above.
 
 ---
 
@@ -202,5 +219,6 @@ Both require credentials.json (run `guestOtpFlow.js` first) and a running server
 
 | Date | Change |
 |---|---|
+| 2026-10-07 | Partner guest URDDs may reschedule services inside their own visit legs (previously `403 partner_guest_read_only`): leg must be `pending`, `confirmed` or `checked_in` (`409 leg_not_schedulable`), transport follows the hotel-stop rule, the change is added to the leg history and the partner receives `leg.scheduled`. |
 | 2026-06-10 | Added mobile format support for sessions (`{date, slot}`) and transport (`pickupDateTime`). Made `slotId` optional for sessions and transport (auto-assigned from pool). Aligns reschedule with the same format used by booking creation and addon scheduling. |
 | 2026-06-09 | Fixed 404 when the caller's URDD has `tenant_id = NULL` (global URDD). The ownership query now skips the tenant check when tenant_id is null, relying on `urdd_id` ownership alone (fixes [#246](https://github.com/UBS-Dev-Org/hms/issues/246)). |

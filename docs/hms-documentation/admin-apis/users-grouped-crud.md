@@ -136,7 +136,7 @@ Each step-2 helper wraps its work in a single `START TRANSACTION` / `COMMIT` (ro
 }
 ```
 
-**List** returns the rows array, each augmented with `tenantUrddMap` (`{ "global": urddId, "<tenant_id>": urddId, … }` — the same structure returned after guest login); `table_count` per row is preserved so pagination is unaffected. **View** returns the raw user row including `userRolesDesignationsDepartment_roleDesignationDepartmentId` (a JSON array of the user's active RDD ids that drives the FE multi-select pre-selection).
+**List** returns the rows array, each augmented with `tenantUrddMap` (`{ "global": urddId, "<tenant_id>": urddId, … }` — the same structure returned after guest login, so partner guest URDDs of visit travellers are not in it); `table_count` per row is preserved so pagination is unaffected. **View** returns the raw user row including `userRolesDesignationsDepartment_roleDesignationDepartmentId` (a JSON array of the user's active RDD ids that drives the FE multi-select pre-selection).
 
 > **List/View no longer carry the persona-of-tenants read state.** `persona_of_tenants` / `tenants` / `includes_global` / `persona_of_tenants_detail` used to be attached to each read row; that moved to the **[Tenant Manager Candidates](./tenant-manager-candidates.md)** API (POST `entity_type: "users"`), which is the source of truth for a user's Tenant-Manager membership. This CRUD's List/View emit only the plain user/URDD data.
 

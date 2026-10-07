@@ -142,7 +142,7 @@ Returns all active hotel/tenant brands.
 {
   "param": "hotelId",
   "options": [
-    { "id": 1, "key": "makkah-royal-suites", "label": { "en": "Makkah Royal Suites", "ar": "Makkah Royal Suites" } },
+    { "id": 1, "key": "my-destination", "label": { "en": "My-Destination", "ar": "ماي ديستينيشن" } },
     { "id": 56, "key": "dar-al-taqwa-hotel", "label": { "en": "Dar Al-Taqwa Hotel", "ar": "Dar Al-Taqwa Hotel" } }
   ]
 }

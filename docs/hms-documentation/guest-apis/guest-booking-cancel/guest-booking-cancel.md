@@ -44,6 +44,7 @@ Requires the **AUTH_PLATFORM** (guest JWT). The `actionPerformerURDD` is validat
    - `cancelled_at` → `NOW()`
    - `updated_by` → `actionPerformerURDD`
 6. The `status` column (soft-delete flag) remains `'active'` — only `booking_status` changes.
+7. **Only when that update cancelled the caller's own booking** are its items and slots released and its payments refunded. If no row was updated (the booking is not the caller's, or not active), the API returns `404 Booking not found` and touches nothing.
 
 ### Cancellation Fee Policy
 
@@ -114,6 +115,8 @@ The `cancellation` metadata block on the booking object also updates:
 |---|---|---|
 | 401 | `Authenticated user is required` | No `userId` in the session. |
 | 403 | `Invalid or expired URDD` | `actionPerformerURDD` does not match the user. |
+| 404 | `Booking not found` | The booking is not the caller's or is not active; nothing is released or refunded. |
+| 403 | `The partner guest role is view only` (`meta.scc = partner_guest_read_only`) | `actionPerformerURDD` is a partner guest URDD; visit legs are cancelled only by the partner platform. |
 | 409 | `Cancellation not permitted within Xh of scheduled pickup` | Transport booking within the cutoff window. |
 
 ---
@@ -153,4 +156,5 @@ The cancel operation modifies `booking_status` and cascades `item_status = 'canc
 
 | Date | Change |
 |---|---|
+| 2026-10-05 | Fix: item release and refund ran for any `booking_id` sent, even when the ownership-scoped update matched nothing, so a caller could refund and free another guest's booking. They now run only after the caller's own booking was cancelled, and a non-matching id returns 404. Partner guest URDDs are refused (`partner_guest_read_only`). |
 | 2026-06-09 | Cancel now cascades `item_status = 'cancelled'` to `booking_items`, freeing delivery units for rebooking. Previously, cancelled booking items kept `item_status = 'reserved'`, permanently blocking room availability (fixes [#255](https://github.com/UBS-Dev-Org/hms/issues/255)). |

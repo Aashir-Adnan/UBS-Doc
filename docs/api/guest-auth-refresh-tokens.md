@@ -86,7 +86,7 @@ When any authenticated API is called with a valid access token that has **5 minu
 
 ### Client Responsibility
 
-On every API response, the client should check for the `x-new-accesstoken` header (or `accessToken` in the decrypted body). If present, the client must persist this new token and use it for all subsequent requests.
+On every API response, the client should check for the `x-new-accesstoken` header (or `accessToken` in the decrypted body). If present, the client must persist this new token and use it for all subsequent requests. This includes **error responses**: the header is sent on them too, because the token is renewed before the request fails.
 
 ### Example
 
@@ -136,6 +136,7 @@ Content-Type: application/json
     "refreshToken": "rfh_<jwt>",
     "expiresIn": 900,
     "tenantUrddMap": { "3": 16, "global": 14 },
+    "partnerTenantUrddMap": {},
     "user": { "..." },
     "device_name": "Chrome / Windows",
     "user_roles_designations_departments": ["..."],
@@ -302,4 +303,4 @@ Guest tokens are issued by two endpoints, both producing the same token pair:
 | `POST /api/guest/auth/verify-otp` | OTP | Email-based OTP login (send-otp → verify-otp) |
 | `POST /api/guest/auth/social-signup` | OAuth | Social provider login/signup (Google, Apple, Firebase) — signup-or-login in one call |
 
-Both return the same response shape: `{ access_token, refreshToken, expiresIn, tenantUrddMap, user, ... }`. The token lifecycle (auto-renewal, refresh, expiry) works identically regardless of login method.
+Both return the same response shape: `{ access_token, refreshToken, expiresIn, tenantUrddMap, partnerTenantUrddMap, user, ... }`. The token lifecycle (auto-renewal, refresh, expiry) works identically regardless of login method.

@@ -462,7 +462,7 @@ Only services where `standaloneBookable: true` in the service catalog (`GET /gue
 
 | Status | Message | Condition |
 |---|---|---|
-| 403 | `The partner guest role is view only` (`meta.scc = partner_guest_read_only`) | `actionPerformerURDD` is a partner guest URDD (`partnerTenantUrddMap`); visit legs booked through a partner platform are view only |
+| 403 | `The partner guest role is view only` (`meta.scc = partner_guest_read_only`) | `actionPerformerURDD` is a partner guest URDD (`partnerTenantUrddMap`). That role cannot book; it can only schedule services inside an existing visit leg, through `PUT /guest/booking/reschedule` or `PUT /guest/bookings/services` |
 | 400 | `serviceId is required` | No service ID provided. |
 | 400 | `Maximum N booking(s) allowed per reservation for this service` | Quantity exceeds `max_quantity_per_booking` config. |
 | 409 | `Only N unit(s) of "..." available, M requested` | Quantity (main service or an add-on) exceeds the service's free delivery units right now, the `availableUnitsCount` from `GET /api/guest/hotel-services`. |
@@ -685,6 +685,7 @@ as `addon.transport.guest_pickup_location`, `addon.transport.pickupLocation`, or
 
 | Date | Change |
 |---|---|
+| 2026-10-07 | The `403 partner_guest_read_only` row now points to the scheduling the partner guest role may do (reschedule inside a visit leg); booking a service is still refused. |
 | 2026-08-27 | Transport pickup/drop-off moved to the per-service dropdowns `guest_pickup_location` / `guest_dropoff_location` in `formData`. The option value is the `hms_config.id` of the row holding that location, addressing the source row the way a possible-value id does. Submitted values are resolved against the service's configured locations and stored as the full location form entry — stamped with `hms_config_id` — at both booking and slot level. The legacy `transport.pickupLocation` / `dropoffLocation` fields and the scalar `pickup_location` / `dropoff_location` slot form values are both retained; a bare location name resolves only when unambiguous. |
 | 2026-07-13 | Response now includes `downPayment` object (20% of total). Booking confirmation email moved to after first successful payment. See [Add Services to Booking](./add-services-to-booking.md) for full addon + payment flow. |
 | 2026-08-13 | Added top-level `slots` object to standalone service booking responses. Contains `type` (`"meals"`, `"sessions"`, or `"transport"`) and `items` (the scheduled slot entries). Previously, primary service slots were only stored in the DB but not returned in the response. Also: dining/room-service `meals[]` now accepts optional `slot` field (`"HH:MM-HH:MM"`) — when provided, `booking_service_slots.scheduled_start` and `scheduled_end` are stored as full datetimes. `children` field now accepted and stored. |

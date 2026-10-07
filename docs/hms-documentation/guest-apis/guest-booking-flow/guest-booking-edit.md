@@ -325,7 +325,7 @@ After all changes are applied:
 
 | Status | Code | Message |
 |---|---|---|
-| 403 | `partner_guest_read_only` | `The partner guest role is view only`: `actionPerformerURDD` is a partner guest URDD (`partnerTenantUrddMap`); visit legs booked through a partner platform are view only |
+| 403 | `partner_guest_read_only` | `The partner guest role is view only`: `actionPerformerURDD` is a partner guest URDD (`partnerTenantUrddMap`); that role cannot change a visit leg booked through a partner platform (see [Partner guest role](../guest-tenant-scoped-apis.md#partner-guest-role-visits)) |
 | 400 | Validation | `bookingId is required` |
 | 400 | Validation | `Check-out must be after check-in` |
 | 400 | Validation | `Check-in date cannot be in the past` |

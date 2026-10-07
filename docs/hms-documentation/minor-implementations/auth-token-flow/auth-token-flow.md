@@ -54,6 +54,7 @@ POST /api/guest/auth/verify-otp
     "refreshToken": "rfh_<jwt>",
     "expiresIn": 300,
     "tenantUrddMap": { "global": 14, "3": 16 },
+    "partnerTenantUrddMap": {},
     "user_id": 5,
     "user": { "..." }
   }
@@ -66,6 +67,7 @@ POST /api/guest/auth/verify-otp
 | `refreshToken` | string | Store securely. Use when the access token expires. Always starts with `rfh_`. |
 | `expiresIn` | number | Seconds until the access token expires. Use to track expiry on the client. |
 | `tenantUrddMap` | object | Maps tenant IDs to URDD IDs. Use for tenant-scoped guest API calls. |
+| `partnerTenantUrddMap` | object | Partner guest URDDs per tenant ID (visit legs booked by a partner platform), `{}` when none. Switch to these for the partner guest role: it views visit legs and can schedule services inside them, favourite, review after a checked-out stay, raise support tickets and edit the profile (not email), but cannot book, edit, cancel or pay. |
 
 ### 1b. Guest Social Login
 
@@ -77,7 +79,7 @@ POST /api/guest/auth/social-signup
 { "signUp_flag": "Google", "idToken": "<provider_token>" }
 ```
 
-Returns the same token keys as guest OTP login: `accesstoken`, `refreshToken`, `expiresIn`, `tenantUrddMap`.
+Returns the same token keys as guest OTP login: `accesstoken`, `refreshToken`, `expiresIn`, `tenantUrddMap`, `partnerTenantUrddMap`.
 
 ### 1c. Admin Password Login
 
@@ -210,6 +212,8 @@ If the token is within the renewal window:
    - **Response header:** `x-new-accesstoken`
    - **Response body:** `accessToken` field (inside the encrypted payload for encrypted platforms)
 
+The header is also sent on **error responses** (since 2026-10-06). The token is renewed before the request can fail, so a client must read `x-new-accesstoken` on every response, success or error, or its next request fails with 401 "Token has been revoked".
+
 ### Client implementation
 
 ```
@@ -275,7 +279,8 @@ Content-Type: application/json
     "accesstoken": "<new_jwt>",
     "refreshToken": "rfh_<new_jwt>",
     "expiresIn": 300,
-    "tenantUrddMap": { "global": 14, "3": 16 }
+    "tenantUrddMap": { "global": 14, "3": 16 },
+    "partnerTenantUrddMap": {}
   }
 }
 ```
@@ -286,6 +291,7 @@ Content-Type: application/json
 | `refreshToken` | string | Replace your stored refresh token (the old one is now invalid) |
 | `expiresIn` | number | Seconds until the new access token expires |
 | `tenantUrddMap` | object | Updated tenant URDD map (may include newly added tenants) |
+| `partnerTenantUrddMap` | object | Updated partner guest URDD map (guest sessions only; a partner traveller session returns its partner map as `tenantUrddMap` instead) |
 
 ### Important: Token Rotation
 
@@ -400,17 +406,17 @@ The response shape validator does **not** interfere with any auth endpoint:
 | `POST /api/guest/auth/social-signup` | `shape: "any"` | No validation — all keys pass through |
 | Auto-renewed `x-new-accesstoken` header | Set directly on `res` | Not subject to shape validation (response headers bypass the shape validator) |
 
-All token-related keys (`accesstoken`, `refreshToken`, `expiresIn`, `tenantUrddMap`) are guaranteed to reach the client without being stripped.
+All token-related keys (`accesstoken`, `refreshToken`, `expiresIn`, `tenantUrddMap`, `partnerTenantUrddMap`) are guaranteed to reach the client without being stripped.
 
 ---
 
 ## 9. Summary of Response Keys by Endpoint
 
-| Endpoint | `accesstoken` | `access_token` | `refreshToken` | `expiresIn` | `tenantUrddMap` |
-|---|---|---|---|---|---|
-| Guest OTP verify | Yes | Yes | Yes | Yes | Yes |
-| Guest social signup | Yes | Yes | Yes | Yes | Yes |
-| Admin password login | Yes | Yes | Yes | Yes | No |
-| Admin OTP login | Yes | Yes | Yes | Yes | No |
-| Auth refresh | Yes | No | Yes | Yes | Yes |
-| Auto-renewal (header) | `x-new-accesstoken` header | No | No | No | No |
+| Endpoint | `accesstoken` | `access_token` | `refreshToken` | `expiresIn` | `tenantUrddMap` | `partnerTenantUrddMap` |
+|---|---|---|---|---|---|---|
+| Guest OTP verify | Yes | Yes | Yes | Yes | Yes | Yes |
+| Guest social signup | Yes | Yes | Yes | Yes | Yes | Yes |
+| Admin password login | Yes | Yes | Yes | Yes | No | No |
+| Admin OTP login | Yes | Yes | Yes | Yes | No | No |
+| Auth refresh | Yes | No | Yes | Yes | Yes | Guest sessions |
+| Auto-renewal (header) | `x-new-accesstoken` header | No | No | No | No | No |

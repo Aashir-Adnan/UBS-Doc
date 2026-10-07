@@ -35,7 +35,7 @@ Send only the fields being changed — a **dynamic SET** builder writes just the
 | `actionPerformerURDD` | `number` | Yes | Acting URDD — resolves the self user id. |
 | `users_firstName` | `string` | No | First name. |
 | `users_lastName` | `string` | No | Last name. |
-| `users_email` | `string` | No | Login email. Self-editable, but guarded for uniqueness (see Behavior). |
+| `users_email` | `string` | No | Login email. **Not editable** (`disabled: true` in the schema): the current value or no value is ignored, a different value returns `422 email_not_editable` (see Behavior). |
 | `users_phoneNo` | `string` | No | Phone number. |
 | `users_cnic` | `string` | No | CNIC. |
 | `users_passportNumber` | `string` | No | Passport number. |
@@ -49,7 +49,7 @@ Send only the fields being changed — a **dynamic SET** builder writes just the
 | `users_postalCode` | `string` | No | Postal code. |
 | `users_preferences` | `string` | No | Preferences. |
 
-Not self-editable (rejected/ignored by design): `username`, `password`, `status`, `is_primary_tenant`, `created_by`.
+Not self-editable (rejected/ignored by design): `username`, `email`, `password`, `status`, `is_primary_tenant`, `created_by`.
 
 ```json
 {
@@ -110,7 +110,7 @@ Returns `null` if no profile row is found. Fields map directly to the `users` ta
 
 - **Self resolution.** `resolveSelfUserId` reads `actionPerformerURDD`, looks up the active URDD, and stashes the real `user_id` as `profileUserId`. All queries scope on that integer id (injected directly, coercion-safe) — never a client parameter.
 - **Partial-safe update.** The Update query is built dynamically from only the fields present in the payload, plus `updated_by` and `updated_at`. Omitted fields are left untouched (a full-row template would null them out).
-- **Email uniqueness guard.** When `users_email` is being changed, `assertProfileEmailUnique` checks all other users (matching the DB unique index `uk_users_email`) and returns a clean **409** if the address is already taken, instead of a raw duplicate-key error. No-op when email is absent/blank.
+- **Email locked.** `users_email` is never written. Omitting it, or sending the current email (compared ignoring case and surrounding whitespace), is accepted and ignored. A different email returns **422** with `meta.scc = email_not_editable` and the message "Email cannot be changed from the profile". Other fields update as before. The earlier duplicate-email `409` check no longer applies and has been removed.
 
 ---
 
@@ -118,5 +118,5 @@ Returns `null` if no profile row is found. Fields map directly to the `users` ta
 
 | File | Purpose |
 |---|---|
-| `Src/Apis/ProjectSpecificApis/Profile/Profile.js` | API object — self-resolution, email guard, dynamic-SET update, List/Update queries and response shapers. |
+| `Src/Apis/ProjectSpecificApis/Profile/Profile.js` | API object — self-resolution, email lock, dynamic-SET update, List/Update queries and response shapers. |
 | `Src/Apis/ProjectSpecificApis/Profile/CRUD_parameters.js` | Request field schema (editable profile fields). |

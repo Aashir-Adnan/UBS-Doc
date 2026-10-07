@@ -305,6 +305,7 @@ Same structure as `POST /api/guest/auth/verify-otp` — returns the full guest l
       "3": 16,
       "5": 18
     },
+    "partnerTenantUrddMap": { "5": 31 },
     "user_roles_designations_departments": [
       {
         "user_id": 5,
@@ -332,7 +333,8 @@ Same structure as `POST /api/guest/auth/verify-otp` — returns the full guest l
 | `access_token` | string | Short-lived guest JWT (~15 min) |
 | `refreshToken` | string | Long-lived JWT (prefixed `rfh_`, 24 hr) for token refresh |
 | `expiresIn` | number | Seconds until the access token expires |
-| `tenantUrddMap` | object | Maps `"global"` and each `tenant_id` (as string) to the guest's URDD id for that context |
+| `tenantUrddMap` | object | Maps `"global"` and each `tenant_id` (as string) to the guest's URDD id for that context. Partner guest URDDs are never included |
+| `partnerTenantUrddMap` | object | The user's **partner guest** URDDs, one per hotel (`tenant_id` as string), holding visit legs booked through a partner platform. `{}` when there are none. Never overlaps `tenantUrddMap`. Use it as a second role that views visit legs and can schedule services inside them, but cannot book, edit, cancel or pay: see [Partner guest role](../hms-documentation/guest-apis/guest-tenant-scoped-apis.md#partner-guest-role-visits) |
 
 ### Error Responses
 

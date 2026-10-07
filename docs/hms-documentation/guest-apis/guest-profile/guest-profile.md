@@ -137,7 +137,6 @@ Returns `null` data when the user row is missing or not `active`.
   "users_firstName": "Ada",
   "users_lastName": "Lovelace",
   "users_phoneNo": "+966500000000",
-  "users_email": "ada@example.com",
   "users_country": "Saudi Arabia",
   "users_nationality": "Saudi Arabia",
   "users_dateOfBirth": "1990-04-01",
@@ -155,7 +154,6 @@ Returns `null` data when the user row is missing or not `active`.
 | `users_firstName` | `first_name` |
 | `users_lastName` | `last_name` |
 | `users_phoneNo` | `phone_no` |
-| `users_email` | `email` |
 | `users_country` | `country` |
 | `users_nationality` | `nationality` |
 | `users_dateOfBirth` | `date_of_birth` |
@@ -165,6 +163,12 @@ Returns `null` data when the user row is missing or not `active`.
 
 Anything not on this list is ignored. `password`, `status` and `created_by` are **not**
 self-editable through this endpoint.
+
+**Email is not editable.** `users_email` is never written; the field is `disabled: true` in the
+parameter schema. Omitting it, or sending the current email (compared ignoring case and surrounding
+whitespace), is accepted and ignored. A different email returns `422` with
+`meta.scc = email_not_editable` and the message "Email cannot be changed from the profile". This
+applies to both guest roles, normal and partner (`partnerTenantUrddMap`).
 
 :::tip Partial updates are safe — send only what changed
 The update writes **only the keys present in the request**. Omitting a field leaves that column
@@ -209,3 +213,4 @@ To **clear** a field, send it explicitly as `null` — omitting it is "don't tou
 | 401 | — | the URDD resolves to no user |
 | 403 | — | the URDD does not belong to the authenticated token's user |
 | 403 | — | the URDD's hotel is deactivated |
+| 422 | `email_not_editable` | `users_email` differs from the current email: `Email cannot be changed from the profile` |

@@ -73,6 +73,7 @@ Returns the **same payload as guest login** — including access/refresh tokens,
     "3": 81,
     "5": 82
   },
+  "partnerTenantUrddMap": {},
   "user": {
     "user_id": 25,
     "first_name": "John",
@@ -99,7 +100,8 @@ Returns the **same payload as guest login** — including access/refresh tokens,
 | `accesstoken` | `string` | Alias of `access_token` (for header compatibility). |
 | `refreshToken` | `string` | 24-hour refresh token (prefixed `rfh_`). |
 | `expiresIn` | `number` | Access token TTL in seconds. |
-| `tenantUrddMap` | `object` | Map of all tenant URDDs: `"global"` key for the null-tenant URDD, string tenant IDs for per-hotel URDDs. |
+| `tenantUrddMap` | `object` | Map of all tenant URDDs: `"global"` key for the null-tenant URDD, string tenant IDs for per-hotel URDDs. Partner guest URDDs are not included. |
+| `partnerTenantUrddMap` | `object` | Partner guest URDDs per hotel (visit legs booked by a partner platform), `{}` when none. |
 | `user` | `object` | Full user profile row (name, email, phone, image, etc.). |
 | `user_roles` | `array` | Guest's role records. |
 | `user_permissions` | `object` | Permissions grouped by URDD ID. |

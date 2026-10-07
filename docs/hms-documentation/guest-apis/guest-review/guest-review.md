@@ -156,6 +156,7 @@ Submit a new review for a service or package. One review per guest per entity.
 - `baseTable` must be `"services"` or `"packages"`.
 - `recordId` must reference an active record.
 - A guest can only submit one review per `baseTable` + `recordId` combination. Attempting a duplicate returns a 409 error.
+- With a partner guest URDD (`partnerTenantUrddMap`), the user must have a checked-out stay that included the item: a booking owned by any of the user's URDDs, `booking_status` `checked_out`, status `active`, whose `package_id` equals `recordId` (`baseTable` `packages`) or which has an active `booking_services` row with that `service_id` (`baseTable` `services`). Otherwise `403` with `meta.scc = review_requires_stay`. A normal guest URDD has no stay check.
 
 ---
 
@@ -218,6 +219,19 @@ Soft-delete the authenticated guest's own review (sets `status = 'inactive'`).
 ---
 
 ## Error Responses
+
+### No checked-out stay (403)
+
+Partner guest URDD only, on Add. Returned when the user has no checked-out stay that included the reviewed package or service. `meta.scc = review_requires_stay`.
+
+```json
+{
+  "statusCode": 403,
+  "message": "You can review this package after a checked-out stay that included it"
+}
+```
+
+For `baseTable` `services` the message reads "service" instead of "package". Update and Delete have no stay check, and reading reviews is unaffected.
 
 ### Missing required fields (422)
 
@@ -309,4 +323,5 @@ Soft-delete the authenticated guest's own review (sets `status = 'inactive'`).
 
 | Date | Change |
 |---|---|
+| 2026-10-07 | Partner guest URDDs may now add, update and delete reviews (previously `403 partner_guest_read_only`). Add needs a checked-out stay that included the item, otherwise `403 review_requires_stay`. Normal guest reviews unchanged. |
 | 2026-07-06 | Initial creation — CRUD spec for guest reviews |

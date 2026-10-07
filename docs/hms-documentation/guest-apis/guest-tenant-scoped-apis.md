@@ -23,6 +23,24 @@ The `tenant_id` can be **NULL** if the guest sends their global URDD. Whether th
 
 The mobile/web client stores the `tenantUrddMap` locally and sends the correct URDD per hotel on every request.
 
+### Partner guest role (visits)
+
+Signup, OTP verify, social signup, refresh and ensure-urdd also return `partnerTenantUrddMap`: the user's partner guest URDDs, one per hotel holding the visit legs a partner platform booked for them, plus a `global` one (tenant NULL) that sees the legs of every hotel, like `tenantUrddMap.global` (`{}` when there are none). `tenantUrddMap` never contains a partner guest URDD.
+
+The app offers it as a second role. Front-end steps, payloads and UI rules for it are in [Partner Guest Role — Front-end Guide](./partner-guest-role.md). With a partner guest URDD as `actionPerformerURDD`:
+
+- the booking reads (`/guest/bookings`, `/guest/bookings/upcoming`, `/guest/bookings/current`, folio) return only that hotel's visit legs, and with a normal URDD they never include visit legs;
+- these writes are allowed:
+  - favourites: `GET`, `POST`, `DELETE` on `/api/guest/favorites`, `/api/guest/favorites/rooms`, `/api/guest/favorites/packages`;
+  - reviews: `/api/guest/review` Add, Update, Delete. Add needs a checked-out stay that included the reviewed package or service, otherwise `403` with `meta.scc = review_requires_stay` (see [Guest review](./guest-review/guest-review.md));
+  - support tickets: `GET` and `POST` on `/api/guest/support/tickets` and reply;
+  - scheduling inside a visit leg: `PUT /api/guest/booking/reschedule` and `PUT /api/guest/bookings/services` (reschedule). The leg must be `pending`, `confirmed` or `checked_in`, otherwise `409 leg_not_schedulable`; slots move only inside the leg's own dates, and the partner gets a `leg.scheduled` webhook (see [Guest booking reschedule](./guest-booking-reschedule/guest-booking-reschedule.md));
+  - `POST /api/guest/scheduler` (slot hold), which is a read;
+  - profile updates, except email, which no profile CRUD changes (`422 email_not_editable`, see [Guest profile](./guest-profile/guest-profile.md));
+- every other write is refused with `403` and `meta.scc = partner_guest_read_only`: bookings (room, package, service), add and remove booking services (`POST`/`DELETE /api/guest/bookings/services`), edit, extend, stage, cancel, check-in, check-out, payments initiate and confirm, QR issue and loyalty redeem. Check-in eligibility is blocked entirely. `GET` reads stay available.
+
+When a request sends the global partner URDD (`partnerTenantUrddMap.global`) together with a `hotelId`, the backend resolves, or creates, that hotel's partner guest URDD. The global normal URDD (`tenantUrddMap.global`) still resolves to the normal hotel URDD.
+
 ---
 
 ## Tenant-Specific URDD Required

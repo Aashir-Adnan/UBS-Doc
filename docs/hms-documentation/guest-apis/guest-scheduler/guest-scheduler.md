@@ -12,6 +12,8 @@ This is the primary endpoint powering the **Schedule now / Reschedule** flow for
 
 Uses **AUTH_PLATFORM** — requires a valid guest JWT (`accessToken`). The guest's identity is resolved via `ensureGuestUrdd`.
 
+The scheduler is a read (`POST` only carries the query), so a partner guest URDD (`partnerTenantUrddMap`) is accepted the same as a normal guest URDD.
+
 ---
 
 ## Request Payload

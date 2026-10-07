@@ -113,6 +113,7 @@ Window-gated responses include the check-in time window:
 
 | Status | `error.details` | Condition |
 |---|---|---|
+| 403 | `The partner guest role is view only` (`meta.scc = partner_guest_read_only`) | `actionPerformerURDD` is a partner guest URDD (`partnerTenantUrddMap`); that role cannot change a visit leg booked through a partner platform (see [Partner guest role](../guest-tenant-scoped-apis.md#partner-guest-role-visits)) |
 | 400 | `booking_id is required` | Missing `booking_id` in the payload. |
 | 401 | `Authenticated user required` | No `userId` in the session. |
 | 403 | `Invalid or expired URDD` | URDD validation failed. |

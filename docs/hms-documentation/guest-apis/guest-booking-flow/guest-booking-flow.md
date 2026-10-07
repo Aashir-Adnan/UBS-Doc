@@ -18,7 +18,7 @@ This document describes the complete guest room booking flow from hotel discover
 
 Steps 1-4 are public (no authentication required, platform encryption only). Steps 5-7 require a valid guest JWT access token.
 
-Booking (steps 5 and 5b) needs a normal guest URDD from `tenantUrddMap`. A partner guest URDD from `partnerTenantUrddMap` is refused with `403 partner_guest_read_only`: that role only views visit legs booked through a partner platform.
+Booking (steps 5 and 5b) needs a normal guest URDD from `tenantUrddMap`. A partner guest URDD from `partnerTenantUrddMap` is refused with `403 partner_guest_read_only`: that role holds visit legs booked through a partner platform. It can view them, schedule services inside a leg, favourite, review after a checked-out stay, raise support tickets and edit the profile except the email, but cannot book, edit, cancel or pay. See [Partner guest role](../guest-tenant-scoped-apis.md#partner-guest-role-visits).
 
 ---
 
@@ -406,3 +406,4 @@ The test exercises all 7 steps above plus direct DB verification, and automatica
 | 2026-06-09 | Initial documentation of the end-to-end guest booking flow ([#252](https://github.com/UBS-Dev-Org/hms/issues/252)). |
 | 2026-06-12 | Default `booking_status` changed from `pending` to `confirmed` for new bookings. |
 | 2026-07-16 | Added serial/parallel booking support via `entries` array — multiple rooms and consecutive stays in a single booking. |
+| 2026-10-07 | Partner guest role wording updated: besides viewing visit legs it can schedule services inside a leg, favourite, review after a checked-out stay, raise tickets and edit the profile (not email). Booking is still refused with `403 partner_guest_read_only`. |

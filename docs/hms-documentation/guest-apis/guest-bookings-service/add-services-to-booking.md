@@ -258,7 +258,7 @@ The booking confirmation email is sent **after the first successful down payment
 | `addons` must be a non-empty array | `400 addons must be a non-empty array` |
 | `booking_id` is required | `400 booking id is required` |
 | `tenant_id` is required | `400 tenant_id is required` |
-| `actionPerformerURDD` must not be a partner guest URDD (visit legs are view only) | `403 partner_guest_read_only` |
+| `actionPerformerURDD` must not be a partner guest URDD (`partnerTenantUrddMap`): the partner guest role cannot add or remove services, on `POST` and `DELETE` | `403 partner_guest_read_only` |
 
 ---
 
@@ -328,6 +328,10 @@ Reschedules the time slots of a previously added service.
   ]
 }
 ```
+
+### Visit legs (partner guest role)
+
+`PUT` is the one verb here open to a partner guest URDD (`partnerTenantUrddMap`). On a visit leg it owns, the same rules as [Guest booking reschedule](../guest-booking-reschedule/guest-booking-reschedule.md#visit-legs-partner-guest-role) apply: the leg must be `pending`, `confirmed` or `checked_in` (`409 leg_not_schedulable`), transport follows the hotel-stop rule (`422` transfer errors), slots move only inside the leg's dates, the change is added to the leg history, and the partner receives `leg.scheduled`. `POST` and `DELETE` still return `403 partner_guest_read_only`. Ordinary bookings behave as before.
 
 ---
 
@@ -403,6 +407,7 @@ Full behaviour is documented in
 
 | Date | Change |
 |---|---|
+| 2026-10-07 | `PUT` (reschedule) now accepts a partner guest URDD on its own visit legs, with the visit-leg rules (`409 leg_not_schedulable`, hotel-stop transfer rule, `leg.scheduled` to the partner). `POST` and `DELETE` still return `403 partner_guest_read_only`. |
 | 2026-08-27 | Transport addons take pickup/drop-off from the per-service dropdowns `guest_pickup_location` / `guest_dropoff_location` instead of free text. The option value is the `hms_config.id` of the row holding that location, addressing the source row. The submitted value is resolved against the service's configured locations and stored as the full location form entry — with `hms_config_id` provenance — in the slot's `form_values`, alongside the retained scalar `pickup_location` / `dropoff_location` keys. Legacy `transport.pickupLocation` / `dropoffLocation` still accepted. |
 | 2026-08-13 | Dining/room-service `meals[]` now accepts optional `slot` field (`"HH:MM-HH:MM"`) for precise time scheduling in `booking_service_slots`. |
 | 2026-07-20 | Added `slot_id` parameter to DELETE endpoint for targeted slot removal. A guest can now remove a specific scheduled session (e.g., the 10:00 barber slot) without affecting other slots of the same service. |

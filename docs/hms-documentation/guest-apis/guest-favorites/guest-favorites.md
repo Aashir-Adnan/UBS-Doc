@@ -20,6 +20,8 @@ Manage a guest's favorite stay rooms and packages. Three dedicated endpoints han
 
 All endpoints require the **AUTH_PLATFORM** (guest JWT). The `userId` is resolved from the authenticated session and `actionPerformerURDD` is validated via the `ensureGuestUrdd` pre-process step.
 
+A partner guest URDD (`partnerTenantUrddMap`) is accepted on every endpoint here, the same as a normal guest URDD.
+
 ---
 
 ## List Favorites

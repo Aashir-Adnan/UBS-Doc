@@ -92,6 +92,10 @@ This is the mechanism for cross-tenant access on public endpoints. The frontend 
 |---|---|---|
 | Public catalog (`/guest/services`, `/guest/packages`, `/guest/service-categories`) | `tenantUrddMap.global` | Cross-tenant -- sees all active tenants |
 | Authenticated scoped (`/guest/bookings/current`, `/guest/booking/checkin`) | `tenantUrddMap[tenantId]` | Scoped to that tenant |
+| Partner guest role (visit legs) | `partnerTenantUrddMap[tenantId]` | That tenant's visit legs only. Reads, plus favourites, reviews (after a checked-out stay), support tickets, profile (not email) and scheduling services inside a leg. Booking, edit, cancel, check-in/out, payments and the other guest writes return `403 partner_guest_read_only` |
+| Partner guest role, global (visit legs) | `partnerTenantUrddMap.global` | Visit legs at every hotel, with the same allowed and refused writes. Sent with a `hotelId`, it resolves (or creates) that hotel's partner guest URDD; `tenantUrddMap.global` with a `hotelId` still resolves the normal hotel URDD |
+
+Login also returns `partnerTenantUrddMap`, the user's partner guest URDDs (designation `PARTNER`, role Guest), kept apart from `tenantUrddMap`. Guest booking reads match the persona of the URDD sent: a normal URDD never sees visit legs and a partner guest URDD sees only them. See [Partner guest role](../hms-documentation/guest-apis/guest-tenant-scoped-apis.md#partner-guest-role-visits).
 
 ---
 

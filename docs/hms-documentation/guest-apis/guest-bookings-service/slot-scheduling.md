@@ -212,4 +212,6 @@ Each slot is independently assigned a delivery unit (table, chair, room, etc.) v
 | **Reschedule a slot** | `PUT /guest/booking/reschedule` | `booking_id`, `booking_service_id`, new scheduling fields |
 | **Remove all slots** | `DELETE /guest/bookings/services` | `booking_id`, `serviceId` (no `slot_id`) |
 
+With a partner guest URDD (`partnerTenantUrddMap`), only rescheduling is allowed, and only on its own visit legs while the leg is `pending`, `confirmed` or `checked_in` (`409 leg_not_schedulable` otherwise). Transport follows the hotel-stop rule and the partner receives `leg.scheduled`; see [Guest booking reschedule](../guest-booking-reschedule/guest-booking-reschedule.md#visit-legs-partner-guest-role). Removing slots (`DELETE /guest/bookings/services`) returns `403 partner_guest_read_only`.
+
 When a single slot is removed, the `booking_services` quantity and total are decremented. If it was the last active slot, the entire service is removed from the booking.

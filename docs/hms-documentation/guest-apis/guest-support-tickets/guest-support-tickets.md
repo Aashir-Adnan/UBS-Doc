@@ -22,6 +22,8 @@ Uses **AUTH_PLATFORM** — AES-ECB with the guest access token plus the platform
 | Step 1 `GET` — list tickets | `list_guest_support_tickets` |
 | Step 2 `POST` — staff reply | `update_guest_support_tickets` |
 
+A partner guest URDD (`partnerTenantUrddMap`) is no longer refused on any step here: it may list and raise tickets the same as a normal guest URDD, and step 2 applies its usual permission check.
+
 The ten standard verbs for the entity (`list`, `view`, `export`, `filter`, `search`, `sort`, `add`, `update`, `delete`, `import` + `_guest_support_tickets`) are seeded by `20260930_2_guest_support_tickets_permissions.sql` and granted to **`PG-TENANT-MGMT`** only. `PG-TENANT-MGMT` is never cloned per tenant, so a newly cloned or newly assigned Tenant-Manager RDD inherits them automatically — `syncUserRddSet` reads the group's active grants live at assignment time.
 
 ---
@@ -75,9 +77,11 @@ Idempotency-Key: 8f3c1b90-7c2e-4d55-9c41-2b0a6d9f1e77
 ```json
 {
   "ticketId": 42,
+  "ticketNumber": "TKT301292809593",
   "bookingId": 1,
   "languageCode": "ar",
-  "emailSent": true
+  "emailSent": true,
+  "confirmationSent": true
 }
 ```
 
@@ -86,7 +90,8 @@ Idempotency-Key: 8f3c1b90-7c2e-4d55-9c41-2b0a6d9f1e77
 | `ticketId` | `number` | The new ticket. |
 | `bookingId` | `number \| null` | The linked booking, or `null` when none was supplied or the number did not match. |
 | `languageCode` | `string` | The language actually applied. |
-| `emailSent` | `boolean` | Whether the support email went out. **The ticket is saved either way** — see [Support email](#support-email). |
+| `emailSent` | `boolean` | Whether the **property** request email went out. **The ticket is saved either way** — see [Support email](#support-email). |
+| `confirmationSent` | `boolean` | Whether the **guest** confirmation email went out. `false` when the guest has no email on file or the send failed; the ticket is saved either way. |
 | `duplicate` | `boolean` | Present and `true` only when an `Idempotency-Key` matched an existing ticket. No new row was created and no second email was sent. |
 
 ---
@@ -108,15 +113,16 @@ The columns are `NOT NULL` and are the fallback every other language reads throu
 
 ## Booking linking
 
-Send `bookingNumber` (the human-readable reference the guest can see), not an internal id. It is resolved against `bookings.booking_number`:
+Send `bookingNumber` (the human-readable reference the guest can see), not an internal id. It is resolved against `bookings.booking_number`, and only a booking owned by the caller (its URDD belongs to the same user) is linked:
 
 | Case | `booking_id` stored | Request outcome |
 |---|---|---|
-| Number matches a booking | that booking's id | `201` |
+| Number matches one of the caller's bookings | that booking's id | `201` |
+| Number matches another user's booking | `null`, treated like an unknown number | `201` |
 | Number matches nothing | `null` | `201` — **not** an error |
 | `bookingNumber` omitted or empty | `null` | `201` |
 
-A wrong or stale booking number never blocks a guest from reaching support. The support email flags it as `not found` so the agent can see the guest believed they had a booking.
+A wrong, stale or foreign booking number never blocks a guest from reaching support. The support email flags it as `not found` so the agent can see the guest believed they had a booking.
 
 `booking_id` is a foreign key to `bookings` with **`ON DELETE SET NULL`**, so if the booking is later deleted the ticket survives with `bookingId: null` rather than the delete being blocked — the same end state as a booking number that never matched.
 
@@ -129,9 +135,21 @@ Every accepted ticket is emailed to the property's support address, resolved in 
 1. `contact_us.email` inside the active `frontpage_data` row.
 2. If that is empty, missing, or the row's JSON will not parse — the platform fallback **`info@my-destination.com`**.
 
-The message carries the ticket id, category, the guest's name and **email address so the agent can reply directly**, the booking number (flagged when unmatched), the language, the subject, and the message body.
+The message carries the ticket number, category, the guest's name and **email address so the agent can reply directly**, the booking number (flagged when unmatched), the language, the subject, and the message body.
 
-**Delivery never fails the request.** If the mail transport errors the ticket is still saved and the response returns `emailSent: false`, so a mail outage cannot cost a guest their support request. A `duplicate` response sends no email, and a rate-limited request sends none either.
+### Guest confirmation
+
+**Two emails go out per accepted ticket.** Alongside the request to the property, the guest receives a confirmation that their report was received, carrying the **ticket number**, category, booking number (when matched), subject and their own message, and telling them a reply is coming by email. It is sent **as the platform, not as the hotel** — branded `Destination / Stay with Comfort` via the shared `DESTINATION_BRAND`, the same constant the guest OTP and account-created emails use. The guest's tenant name never appears as the sender, because a support request is handled by the platform rather than by the property.
+
+Reported separately as `confirmationSent`. It is `false` — without affecting the ticket or the property email — when the guest has no address on file, or when the send fails.
+
+Guest-supplied text is HTML-escaped in **both** emails, so a subject or message containing markup cannot inject into the agent's or the guest's mail client.
+
+**Delivery never fails the request.** If the mail transport errors the ticket is still saved and the response returns `emailSent: false` / `confirmationSent: false`, so a mail outage cannot cost a guest their support request. A `duplicate` response sends neither email, and a rate-limited request sends none either.
+
+:::note Language
+Both emails are in English today, matching every other transactional email in the system, even when the ticket itself was submitted in Arabic and stored that way. Localising them is a separate piece of work that would apply to all confirmation emails.
+:::
 
 ---
 
@@ -332,3 +350,4 @@ A guest may open **5 tickets per hour**. The sixth is rejected with `429` and no
 | 2026-09-29 | Added `POST` — multilingual subject/message by `language_code`, `bookingNumber` resolution, and the support email with the `frontpage_data` recipient and `info@my-destination.com` fallback |
 | 2026-09-30 | `status` became an ENUM (`active`/`inactive`/`closed`/`probation`, default `active`); added `created_by`/`updated_by`; List now returns the user's id, full name and email plus the booking number and message; added **step 2**, a staff reply that emails the guest and closes the ticket only on a confirmed send |
 | 2026-09-30 | `booking_id` narrowed to `int` and given a foreign key to `bookings` with `ON DELETE SET NULL` |
+| 2026-10-07 | `bookingNumber` now links only a booking owned by the caller; another user's booking number is treated as unknown (`booking_id` null, email shows "(not found)"). Partner guest URDDs are no longer refused on list, create or reply (previously `403 partner_guest_read_only`) |

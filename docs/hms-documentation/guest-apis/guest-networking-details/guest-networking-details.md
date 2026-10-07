@@ -127,11 +127,11 @@ WiFi details are stored as config values attached to a service or package entity
 
 ## Seed Data
 
-Migration `20260611_2_seed_networking_details_for_all_services.sql` seeds `wifi_name` and `wifi_password` for **all** active services and packages. WiFi credentials are assigned per tenant:
+Migration `20260611_2_seed_networking_details_for_all_services.sql` seeds `wifi_name` and `wifi_password` for **all** active services and packages. WiFi credentials are assigned per tenant. The SSIDs below are the seeded literals and did **not** change when tenant 1 was renamed to My-Destination on 2026-10-01, so `MRS-Guest` still reflects its former name:
 
 | Tenant | SSID | Password |
 |---|---|---|
-| Makkah Royal Suites (1) | `MRS-Guest` | `MRSWelcome2026!` |
+| My-Destination (1) | `MRS-Guest` | `MRSWelcome2026!` |
 | Makkah Blue Suites (3) | `MBS-Guest` | `MBSWelcome2026!` |
 | Royal Palm (5) | `RP-Guest` | `RPWelcome2026!` |
 | Pearl Continental (6) | `PC-Guest` | `PCWelcome2026!` |

@@ -245,6 +245,7 @@ export const SIDEBAR: SidebarNode[] = [
         label: 'Guest APIs',
         items: [
           'hms-documentation/guest-apis/guest-tenant-scoped-apis',
+          'hms-documentation/guest-apis/partner-guest-role',
           {
             label: 'Guest Search & Filter',
             items: [
@@ -526,6 +527,14 @@ export const SIDEBAR: SidebarNode[] = [
         ],
       },
       {
+        label: 'Visits & Partner APIs',
+        items: [
+          'hms-documentation/visits/visits-overview',
+          'hms-documentation/visits/visits-admin-apis',
+          'hms-documentation/visits/partner-integration-guide',
+        ],
+      },
+      {
         label: 'Admin APIs',
         items: [
           'api/admin-code',
@@ -537,6 +546,7 @@ export const SIDEBAR: SidebarNode[] = [
             items: [
               'hms-documentation/admin-apis/admin-create-guest-user',
               'hms-documentation/admin-apis/admin-create-guest-booking',
+              'hms-documentation/admin-apis/bookings-visit-legs',
             ],
           },
           {
@@ -565,6 +575,7 @@ export const SIDEBAR: SidebarNode[] = [
               'hms-documentation/admin-apis/client-runtime-config',
               'hms-documentation/admin-apis/support-faqs-crud',
               'hms-documentation/admin-apis/dev-console-translations',
+              'hms-documentation/admin-apis/server-logs',
             ],
           },
           {

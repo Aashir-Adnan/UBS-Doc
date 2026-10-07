@@ -96,7 +96,7 @@ Paginated, 10 per page by default. Ordered by `category`, then `sort_order`, the
     "guestSupportFaqs_updatedBy": 1,
     "guestSupportFaqs_createdAt": "2026-09-29T10:31:33.000Z",
     "guestSupportFaqs_updatedAt": "2026-09-29T10:31:33.000Z",
-    "tenants_tenantName": "Makkah Royal Suites"
+    "tenants_tenantName": "My-Destination"
   }
 ]
 ```
@@ -131,7 +131,7 @@ Returns a **one-element array** in the List row shape, minus `table_count` — s
     "guestSupportFaqs_updatedBy": 1,
     "guestSupportFaqs_createdAt": "2026-09-29T10:31:33.000Z",
     "guestSupportFaqs_updatedAt": "2026-09-29T10:31:33.000Z",
-    "tenants_tenantName": "Makkah Royal Suites"
+    "tenants_tenantName": "My-Destination"
   }
 ]
 ```

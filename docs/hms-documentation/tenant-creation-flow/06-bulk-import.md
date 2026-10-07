@@ -366,7 +366,7 @@ Every gap-fill is recorded in `defaultsApplied[]`. The important ones:
 | service | `is_consumable` | `true` for `DINE` / `TRANS` / `RMSVC`, else `false` |
 | service | `max_adults` / `max_children` | `2` / `0` (also for the literal `"NON"`) |
 | service | `max_quantity_per_booking` | `10` |
-| service | `serviceCode` | `SVC-<SLUG-OF-NAME>` |
+| service | `serviceCode` | `SVC-<SLUG-OF-NAME>` in the preview; the services API replaces it with a generated `SVC-XXXXXX` code on create |
 | service | translations | missing `_ar` mirrors the `en` value |
 | unit | `label` | the `identifier` |
 | unit | `avail_days` | `all` |

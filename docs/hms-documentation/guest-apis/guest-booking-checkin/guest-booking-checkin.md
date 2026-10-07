@@ -97,6 +97,7 @@ When `main_guest_flag` is omitted, no main-guest details are recorded.
 
 | Status | Message | Condition |
 |---|---|---|
+| 403 | `The partner guest role is view only` (`meta.scc = partner_guest_read_only`) | `actionPerformerURDD` is a partner guest URDD (`partnerTenantUrddMap`); that role cannot change a visit leg booked through a partner platform (see [Partner guest role](../guest-tenant-scoped-apis.md#partner-guest-role-visits)) |
 | 400 | `booking_id is required` | Missing `booking_id`. |
 | 401 | `Authenticated user is required` | No `userId` in the session. |
 | 403 | `Invalid or expired URDD` | `actionPerformerURDD` does not match the user. |

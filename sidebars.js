@@ -278,6 +278,7 @@ const sidebars = {
           label: 'Guest APIs',
           items: [
             'hms-documentation/guest-apis/guest-tenant-scoped-apis',
+            'hms-documentation/guest-apis/partner-guest-role',
             {
               type: 'category',
               label: 'Guest Support',
@@ -586,6 +587,15 @@ const sidebars = {
           ],
         },
         'hms-documentation/tenant-seed-data-requirements',
+        {
+          type: 'category',
+          label: 'Visits & Partner APIs',
+          items: [
+            'hms-documentation/visits/visits-overview',
+            'hms-documentation/visits/visits-admin-apis',
+            'hms-documentation/visits/partner-integration-guide',
+          ],
+        },
         {
           type: 'category',
           label: 'Admin APIs',
