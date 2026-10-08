@@ -369,6 +369,8 @@ Per-service configs from `hms_config` control availability:
 | `cutoff_time` | If current time exceeds the daily cutoff, all same-day slots are unavailable. |
 | `gender_restricted_windows` | Slots in restricted windows show a `genderConstraint` flag. |
 
+"Today" and "now" in these rules are the **hotel's local date and time**, from `tenants.tenant_timezone` (an IANA name such as `Asia/Riyadh`), or UTC when the hotel has none. Slot times, opening hours and booking dates are hotel-local wall-clock values and are returned as stored.
+
 ---
 
 ## Seeded Test Data

@@ -331,7 +331,7 @@ Reschedules the time slots of a previously added service.
 
 ### Visit legs (partner guest role)
 
-`PUT` is the one verb here open to a partner guest URDD (`partnerTenantUrddMap`). On a visit leg it owns, the same rules as [Guest booking reschedule](../guest-booking-reschedule/guest-booking-reschedule.md#visit-legs-partner-guest-role) apply: the leg must be `pending`, `confirmed` or `checked_in` (`409 leg_not_schedulable`), transport follows the hotel-stop rule (`422` transfer errors), slots move only inside the leg's dates, the change is added to the leg history, and the partner receives `leg.scheduled`. `POST` and `DELETE` still return `403 partner_guest_read_only`. Ordinary bookings behave as before.
+Every verb here (`POST`, `PUT`, `DELETE`) returns `403 partner_guest_read_only` with a partner guest URDD (`partnerTenantUrddMap`). The partner platform schedules visit legs. Ordinary bookings behave as before.
 
 ---
 
@@ -407,6 +407,7 @@ Full behaviour is documented in
 
 | Date | Change |
 |---|---|
+| 2026-10-08 | Reverted: `PUT` (reschedule) returns `403 partner_guest_read_only` for a partner guest URDD again, like `POST` and `DELETE`. |
 | 2026-10-07 | `PUT` (reschedule) now accepts a partner guest URDD on its own visit legs, with the visit-leg rules (`409 leg_not_schedulable`, hotel-stop transfer rule, `leg.scheduled` to the partner). `POST` and `DELETE` still return `403 partner_guest_read_only`. |
 | 2026-08-27 | Transport addons take pickup/drop-off from the per-service dropdowns `guest_pickup_location` / `guest_dropoff_location` instead of free text. The option value is the `hms_config.id` of the row holding that location, addressing the source row. The submitted value is resolved against the service's configured locations and stored as the full location form entry — with `hms_config_id` provenance — in the slot's `form_values`, alongside the retained scalar `pickup_location` / `dropoff_location` keys. Legacy `transport.pickupLocation` / `dropoffLocation` still accepted. |
 | 2026-08-13 | Dining/room-service `meals[]` now accepts optional `slot` field (`"HH:MM-HH:MM"`) for precise time scheduling in `booking_service_slots`. |

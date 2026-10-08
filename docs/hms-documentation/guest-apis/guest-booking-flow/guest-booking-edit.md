@@ -249,7 +249,7 @@ A `booking_modified` push notification and email are sent on every successful ed
 1. All existing `booking_items` (unit assignments) are cancelled (`item_status = 'cancelled'`, `status = 'inactive'`).
 2. Stay duration configs are re-validated (min/max stay, advance booking window, blackout dates).
 3. Room count is derived from the party size vs the **delivery unit capacity** (`delivery_units.capacity`): `roomCount = ceil(totalPersons / unitCapacity)`.
-4. New units are picked via `pickAvailableUnitForService` / `pickMultipleAvailableUnits`.
+4. Units are taken from the stage's holds, or picked via `pickMultipleAvailableUnits`. The booking's own rooms are tried first, so the guest keeps the same rooms whenever they're free on the new dates. The booking's own assignments never count as occupied when checking the new dates.
 5. New `booking_items` rows are inserted with the updated dates.
 6. The stay `booking_services` row is repriced: `nightlyPrice * nights * roomCount`.
 
@@ -258,9 +258,9 @@ A `booking_modified` push notification and email are sent on every successful ed
 1. The delivery unit capacity for the stay service is fetched (`MIN(delivery_units.capacity)` across active units).
 2. The needed room count is computed: `neededRooms = ceil(totalPersons / unitCapacity)`.
 3. If `neededRooms > currentRooms`:
-   - Existing `booking_items` are cancelled.
-   - New units are picked for the original date range with the new room count.
-   - `booking_services` stay quantity and pricing are updated to reflect the additional rooms.
+   - The existing units are **kept**. Only the extra `neededRooms − currentRooms` units are added, from the stage's holds, or picked from units the booking doesn't already hold.
+   - `guests` is spread evenly over all units: `ceil(totalPersons / neededRooms)` each.
+   - Pricing is recomputed from the new unit count.
 4. If the party fits within current rooms, only `booking_items.guests` is updated.
 5. If unit capacity is `NULL` (unlimited), room count is never scaled — stays at 1.
 
@@ -330,7 +330,7 @@ After all changes are applied:
 | 400 | Validation | `Check-out must be after check-in` |
 | 400 | Validation | `Check-in date cannot be in the past` |
 | 400 | Booking rule | `Minimum stay is N nights` |
-| 409 | Capacity | `Not enough rooms available: need N, found M` (party exceeds capacity but insufficient units) |
+| 409 | Capacity | `Not enough rooms available: need N, found M` (party exceeds capacity but insufficient units). `M` counts the rooms the booking already holds plus the free ones, so a 2-room booking needing 3 rooms only fails when no third room is free |
 | 403 | Auth | `You can only edit your own bookings` |
 | 404 | Not found | `Booking not found` |
 | 409 | Availability | `No rooms available for the selected dates` |

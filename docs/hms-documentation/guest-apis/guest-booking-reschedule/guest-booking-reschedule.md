@@ -4,6 +4,26 @@
 
 Reschedules service slots (sessions, meals, or transport) within a booking. All IDs are sent in the encrypted payload — no URL path parameters.
 
+:::danger `id` is required — send it on every call
+This is a `PUT`, and the framework adds a required `id` parameter to every `PUT` and `DELETE`, on top of the fields below. A request without `id` fails in parameter validation, before the reschedule runs:
+
+```json
+{
+  "status": 400,
+  "statusCode": "E10",
+  "message": "Failed to reschedule service",
+  "payload": {
+    "message": "Id is required",
+    "detail": "Failed to reschedule service",
+    "code": "E10",
+    "source": "Parameter Validation"
+  }
+}
+```
+
+Send `id` in the body with the same value as `booking_id` (`"id": 347, "booking_id": 347`). The reschedule reads `booking_id`, not `id`, so the value only has to be present. `?id=347` in the query string works too.
+:::
+
 ---
 
 ## Authentication
@@ -16,6 +36,7 @@ Requires the **AUTH_PLATFORM** (guest JWT). The `actionPerformerURDD` is validat
 
 | Field | Type | Required | Description |
 |---|---|---|---|
+| **`id`** | `number` | **Yes** | **Framework-required on every `PUT`. Send the booking ID again. Missing → `400 Id is required` (`E10`, source `Parameter Validation`).** |
 | `actionPerformerURDD` | `number` | Yes | The guest's URDD ID. |
 | `booking_id` | `number` | Yes | The booking containing the service to reschedule. |
 | `service_id` | `number` | Yes | The service whose slots are being rescheduled. |
@@ -59,6 +80,7 @@ Supports two formats — use **either** `{start, end}` or `{date, slot}`:
 
 ```json
 {
+  "id": 9024,
   "actionPerformerURDD": 16,
   "booking_id": 9024,
   "service_id": 96,
@@ -68,10 +90,28 @@ Supports two formats — use **either** `{start, end}` or `{date, slot}`:
 }
 ```
 
+### Example (meals)
+
+The request from the bug report, corrected. Without the first line it fails with `Id is required`:
+
+```json
+{
+  "id": 347,
+  "booking_id": 347,
+  "service_id": 374,
+  "meals": [
+    { "slotId": 817, "date": "2026-10-10", "mealType": "breakfast", "slot": "11:00-13:00" }
+  ],
+  "formData": { "allergies": "no", "preferences": "no" },
+  "actionPerformerURDD": 2275
+}
+```
+
 ### Example (legacy format)
 
 ```json
 {
+  "id": 9024,
   "actionPerformerURDD": 16,
   "booking_id": 9024,
   "service_id": 96,
@@ -85,7 +125,7 @@ Supports two formats — use **either** `{start, end}` or `{date, slot}`:
 
 ## Behavior
 
-1. **Validates** `booking_id` and `service_id` are both provided.
+1. **Validates** `id` is present (framework parameter validation, runs first), then that `booking_id` and `service_id` are both provided.
 2. **Loads allowed slot IDs** — queries `booking_service_slots` joined through `booking_services` and `bookings` to verify ownership (matching `booking_id`, `tenant_id`, `urdd_id`, `service_id`, all active).
 3. **Rejects** with 404 if no slot rows are found for the booking/service combination.
 4. **Updates each slot** provided in `sessions`, `meals`, or `transport`:
@@ -118,32 +158,29 @@ Supports two formats — use **either** `{start, end}` or `{date, slot}`:
 
 | Status | `error.details` | Condition |
 |---|---|---|
+| 400 | **`Id is required`** (`statusCode: E10`, `source: Parameter Validation`, `message: Failed to reschedule service`) | **No `id` in the body or query. The most common integration mistake: send `id` = `booking_id`.** |
 | 400 | `booking_id and service_id are required` | Missing either ID. |
 | 401 | `Authenticated user required` | No `userId` in the session. |
 | 403 | `Invalid or expired URDD` | URDD validation failed. |
 | 404 | `Service slot rows not found for this booking` | No slots exist for this booking/service combination, or the booking doesn't belong to the caller. Previously, this also occurred when the caller's URDD had a `NULL` tenant_id (global URDD) — now handled. |
-| 409 | `leg_not_schedulable` (`meta.scc`) | Visit leg only: the leg is not `pending`, `confirmed` or `checked_in`. |
-| 422 | `transport_direction_required`, `invalid_transport_location`, `transport_hotel_stop_required`, `transport_same_stop` (`meta.scc`) | Visit leg only: the transfer's direction or stops break the hotel-stop rule. See [Visit legs](#visit-legs-partner-guest-role). |
+| 403 | `partner_guest_read_only` (`meta.scc`) | Sent with a partner guest URDD. Visit legs are scheduled by the partner platform. See [Visit legs](#visit-legs-partner-guest-role). |
 
 ---
 
 ## Visit legs (partner guest role)
 
-A visit leg is a booking with `visit_id` set, made through a partner platform. With a partner guest URDD (`partnerTenantUrddMap`) that owns the leg, this endpoint schedules or reschedules the leg's service slots:
+A visit leg is a booking with `visit_id` set, made through a partner platform. The partner platform schedules and reschedules a leg's services, at booking or later through its own API. This endpoint does not, for either role:
 
-- The leg must be `pending`, `confirmed` or `checked_in`, otherwise `409` with `meta.scc = leg_not_schedulable`.
-- Slots move only inside the leg's own dates. Dates, party and price never change.
-- Transport follows the hotel-stop rule of the partner API. With `tripType` (or `destination_type`) `pickup`, the drop-off is the hotel stop (the location option with `is_default` 1); with `dropoff`, the pickup is the hotel stop. A wrong combination returns `422` with `transport_direction_required`, `invalid_transport_location`, `transport_hotel_stop_required` or `transport_same_stop`. See [Transfers](../../visits/partner-integration-guide.md#64-booking-forms-formschema).
-- `pickupLocation` and `dropoffLocation` may be the option value, the `hms_config_id`, or an unambiguous English location name.
-- The change is appended to the leg's history as `{ "action": "schedule", "by": "guest", "serviceId", "updated" }`.
-- The partner receives a `leg.scheduled` webhook event with the usual leg fields plus `serviceId`, `updated` and `initiatedBy: "guest"`. See [Events](../../visits/partner-integration-guide.md#9-events).
+- With a partner guest URDD (`partnerTenantUrddMap`) it returns `403`, `meta.scc = partner_guest_read_only`, and nothing changes. Hide Reschedule under that role and show the leg's times read only.
+- A normal guest URDD (`tenantUrddMap`) cannot reach a visit leg: it gets `404`.
 
-A normal guest URDD (`tenantUrddMap`) cannot reach a visit leg: it gets `404` as before. Ordinary bookings (no `visit_id`) behave exactly as described above.
+Ordinary bookings (no `visit_id`) behave exactly as described above.
 
 ---
 
 ## Important
 
+- **Always send `id`** (= `booking_id`). Every `PUT` needs it, and without it the call fails with `400 Id is required` before anything else is checked.
 - The Flutter app should call `PUT /api/guest/booking/reschedule` with IDs in the payload. Do **not** use the path-parameter pattern (`/guest/bookings/{id}/services/{serviceId}`) — the framework does not reliably inject multiple path parameters.
 - The scheduling shape (`sessions`, `meals`, or `transport`) is determined by the service's category slug — the same shape used at booking creation time. See [Addon Scheduling](../guest-booking-flow/guest-booking-flow.md#addon-scheduling) for the full category → shape mapping.
 - To get `slotId` values, read the booking via `GET /guest/bookings` — each addon's slots appear as `services[].sessions[].id`, `services[].meals[].id`, or `services[].transport.id`. These are the `booking_service_slots.slot_id` values the reschedule expects.
@@ -219,6 +256,8 @@ Both require credentials.json (run `guestOtpFlow.js` first) and a running server
 
 | Date | Change |
 |---|---|
+| 2026-10-08 | Documented the framework-required `id` (send `booking_id` again). Requests without it fail with `400 Id is required` (`E10`, `Parameter Validation`). |
+| 2026-10-08 | Reverted the 2026-10-07 change: partner guest URDDs get `403 partner_guest_read_only` again. The partner platform schedules visit legs. |
 | 2026-10-07 | Partner guest URDDs may reschedule services inside their own visit legs (previously `403 partner_guest_read_only`): leg must be `pending`, `confirmed` or `checked_in` (`409 leg_not_schedulable`), transport follows the hotel-stop rule, the change is added to the leg history and the partner receives `leg.scheduled`. |
 | 2026-06-10 | Added mobile format support for sessions (`{date, slot}`) and transport (`pickupDateTime`). Made `slotId` optional for sessions and transport (auto-assigned from pool). Aligns reschedule with the same format used by booking creation and addon scheduling. |
 | 2026-06-09 | Fixed 404 when the caller's URDD has `tenant_id = NULL` (global URDD). The ownership query now skips the tenant check when tenant_id is null, relying on `urdd_id` ownership alone (fixes [#246](https://github.com/UBS-Dev-Org/hms/issues/246)). |

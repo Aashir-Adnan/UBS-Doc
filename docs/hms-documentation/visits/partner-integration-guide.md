@@ -8,10 +8,10 @@ A **visit** is a bundle of hotel packages and services from several hotels, sold
 |---|---|
 | 1. What you receive at onboarding | credentials and settings |
 | 2. Transport: the encrypted envelope | how every request and response is encoded |
-| 3. Responses and errors | envelope shapes, SCCs, retry guidance |
+| 3. Responses and errors | envelope shapes, SCCs, retry guidance, language |
 | 4. End-to-end flows | sequence diagrams |
 | 5. Authentication APIs | login, TOTP enrolment and rotation |
-| 6. Catalogue APIs | visit list and priced detail |
+| 6. Catalogue APIs | visit list and priced detail, booking forms, hotel and location objects |
 | 7. Traveller API | traveller token |
 | 8. Booking APIs | book, cancel, purchases, leg changes, settle |
 | 9. Events | webhooks and replay |
@@ -191,6 +191,55 @@ Errors are **not encrypted**:
 | 403 | `wrong_token` | a system token was used where a traveller token is needed, or the reverse, or the token belongs to another platform |
 | 403 | `persona_mismatch` | `actionPerformerURDD` does not belong to the token's user, or is not the right kind of seat |
 | 409 | `concurrent_request` | another request for the same purchase is in progress; retry shortly |
+
+### Language
+
+Every partner visit API returns its text in **one language**: the one you ask for with `language_code`, or English when you send none.
+
+```
+GET /api/partner/visits/detail?language_code=ar
+```
+
+You can also send `language_code` in the encrypted body. The query string wins when both are sent. The same parameter sets the language of `meta.message`.
+
+| Rule | Behaviour |
+|---|---|
+| Default | `en` |
+| Supported codes | the languages HMS has active, currently `en`, `ar`, `ur` and `fr` |
+| Unsupported or unknown code | treated as `en`; no error |
+| A text with no translation in that language | that one field comes back in English; the rest of the response stays in the requested language |
+| Shape | every text field is a **single string**. No response contains `{ "en": …, "ar": … }` pairs |
+
+**Translated:**
+- the visit's `name`, `description` and text `configs` (for example `display_name`);
+- leg and component names (`legs[].name`, `pricing.legs[].name`);
+- hotel names (`hotelName`, `hotel.name`) and the hotel location chain (country, state, city, address);
+- the names in each in-hotel `locations[]` path;
+- service names and labels;
+- `formSchema` options and location names. The form field labels themselves (`formSchema[].label`) are English for now; render your own label from `formSchema[].key` when you need it in another language;
+- the booking labels inside `legs[].booking`;
+- the category and service labels in the slots call.
+
+**Never translated:** ids, codes, slugs and enum values, for example:
+- `status`, `type`, `category`, `rule`, the `formSchema[].key` and option `value`;
+- currency codes, dates, emails and coordinates.
+
+Branch your code only on these, never on a display text. `violations[].message` is an English developer sentence; show `meta.message` to users.
+
+**When to call again.** HMS doesn't push a language change to you: webhooks carry ids and statuses, no display text. Whenever your user's language changes, fetch again whatever you show:
+
+| Your user… | Call again, with the new `language_code` |
+|---|---|
+| switches language on a catalogue screen | `GET /api/partner/visits` and, for an open visit, `GET /api/partner/visits/detail` |
+| switches language on a booking or trip screen | `GET /api/partner/visits/bookings` (or filter by `externalRef`) |
+| switches language while scheduling a service | `GET /api/partner/visits/legs/slots` |
+| books, cancels, settles or schedules | send their current `language_code` on the call itself: the response's purchase or leg comes back in that language |
+| gets a webhook (any event type) | fetch the purchase with `GET /api/partner/visits/bookings` in the user's language, then render it |
+
+**Caching:**
+- Key cached catalogue and purchase data by language as well as by id: (`visitId`, `language_code`), (`externalRef`, `language_code`).
+- The visit `etag` already depends on the language, so an `ifNoneMatch` from another language always gets the full detail back, never `notModified`.
+- What is stored (ids, dates, prices, the fingerprint and the booking itself) is the same in every language. A language switch never needs a new booking or a new price check. Re-pricing is only needed when dates or the party change.
 
 ---
 
@@ -508,7 +557,7 @@ Fields: `page` (default 1, alias `page_no`), `pageSize` (default 20, max 100, al
           "hotelName": "Le Meridien Makkah", "category": null, "dayOffset": 0, "nights": 3, "quantity": 1 },
         { "legNo": 2, "type": "package", "recordId": 422, "name": "Romance Escape", "hotelId": 106,
           "hotelName": "Sample Grand Hotel II", "category": null, "dayOffset": 3, "nights": 2, "quantity": 1 } ],
-      "configs": { "display_name": { "en": "Makkah and Madinah", "ar": "مكة والمدينة" }, "is_featured": "true",
+      "configs": { "display_name": "Makkah and Madinah", "is_featured": "true",
                    "base_currency": "SAR", "media": ["201", "202"] }, "updatedAt": "2026-10-04T10:07:00Z", "etag": "W/\"7b0c19f2a1\"" } ],
   "pagination": { "page": 1, "pageSize": 20, "totalItems": 1, "totalPages": 1 } }
 ```
@@ -536,15 +585,16 @@ Fields: `page` (default 1, alias `page_no`), `pageSize` (default 20, max 100, al
 | `items[].price.currency` | string | no | ISO currency code, e.g. `SAR` |
 | `items[].legs[]` | array | no | the itinerary in order, at least one leg |
 | `items[].legs[].legNo` | number | no | 1, 2, 3, … in itinerary order |
-| `items[].legs[].type` | string | no | `package` or `service` |
+| `items[].legs[].type` | string | no | `package` or `stay` (a room type). Visits created before 2026-10-08 may still have `service` legs until they are next edited |
 | `items[].legs[].recordId` | number | no | the package id or service id at the hotel |
 | `items[].legs[].name` | string | no | the package or service name |
 | `items[].legs[].hotelId` | number | no | |
 | `items[].legs[].hotelName` | string | no | |
-| `items[].legs[].category` | string | yes | service legs only: the service category slug, e.g. `dining`, `transport`, `spa`. Always `null` on package legs |
-| `items[].legs[].dayOffset` | number | no | day of the trip the leg starts on, `0` = `startDate` |
-| `items[].legs[].nights` | number | no | package legs: the package's nights plus any extra nights. Service legs: `0` |
-| `items[].legs[].quantity` | number | no | package legs: packages booked per purchase (parallel rooms). Service legs: units booked |
+| `items[].legs[].hotel` | object | yes | the leg's hotel and its location hierarchy, see [6.5](#65-hotel-and-location-objects) |
+| `items[].legs[].category` | string | yes | stay legs: `stay` (older `service` legs: their category slug). Always `null` on package legs |
+| `items[].legs[].dayOffset` | number | no | day of the trip the leg starts on, `0` = `startDate`. Legs are back to back: each starts the day the previous one ends |
+| `items[].legs[].nights` | number | no | package legs: the package's nights plus any extra nights. Stay legs: the stay length |
+| `items[].legs[].quantity` | number | no | the least units booked per purchase: packages for a package leg, rooms for a stay leg. A larger party books more (see `pricing.legs[].units`) |
 | `items[].configs` | object | no | the visit's display settings by config key; `{}` when none (see below) |
 | `items[].updatedAt` | ISO 8601 datetime | no | last change to the visit |
 | `items[].etag` | string | no | e.g. `W/"edfe4b465a207d255849"`; changes when the visit, its legs, price or configs change |
@@ -557,7 +607,7 @@ Fields: `page` (default 1, alias `page_no`), `pageSize` (default 20, max 100, al
 
 | Config | Value |
 |---|---|
-| a text value with an Arabic translation | `{ "en": "…", "ar": "…" }` |
+| a translatable text value | a string in the requested language ([Language](#language)), e.g. `display_name` = `"Makkah and Madinah"`, or `"مكة والمدينة"` with `language_code=ar` |
 | a text or number value without a translation | a string, e.g. `"3"`, `"2026-10-31 00:00:00"`; JSON text is returned parsed |
 | an option (chosen from a list) | the option's value, e.g. `duration_unit` = `{ "value": "Nights", "key": "nights" }` |
 | `base_currency` | a currency code string, e.g. `"SAR"` |
@@ -660,7 +710,11 @@ Fields only the detail call returns (6.1 does not, to keep the list light):
 | `legs[].services[].serviceId` | number | no | use it in `legs[].scheduling.services[]` (8.1), 8.5 and 8.6 |
 | `legs[].services[].name` | string | no | |
 | `legs[].services[].category` | string | yes | category slug, e.g. `stay`, `dining`, `spa`, `transport`; tells you which scheduling block applies |
+| `legs[].services[].isConsumable` | boolean | no | `true`: each guest gets their own timed slot (spa session, table, transfer), so the service can be scheduled. `false`: shared access for the whole stay (pool, gym access), with no times to pick. For a service inside a package leg, the package's own setting for that service decides; otherwise the service's setting does |
+| `legs[].services[].schedulable` | boolean | no | same as `isConsumable`; show Schedule only when `true` |
 | `legs[].services[].formSchema[]` | array | no | the form to collect for this service, see 6.4; `[]` when the hotel asks for nothing |
+| `legs[].services[].locations[]` | array | no | where the service takes place inside the hotel, one path per location, see [6.5](#65-hotel-and-location-objects); `[]` when none is configured |
+| `legs[].hotel` | object | yes | the leg's hotel and its location hierarchy, see [6.5](#65-hotel-and-location-objects) (also on 6.1 legs) |
 
 | Path | Type | Nullable | Values and notes |
 |---|---|---|---|
@@ -689,13 +743,15 @@ Fields only the detail call returns (6.1 does not, to keep the list light):
 | `pricing.pricingFingerprint` | string | no | `sha256:` and 64 hex characters; send it to 8.1 |
 | `pricing.legs[]` | array | no | one entry per leg, in `legNo` order |
 | `pricing.legs[].legNo` | number | no | |
-| `pricing.legs[].type` | string | no | `package` or `service` |
+| `pricing.legs[].type` | string | no | `package` or `stay` (`service` on older visits) |
+| `pricing.legs[].nights` | number | no | the leg's nights |
+| `pricing.legs[].units` | number | yes | packages or rooms this party books on the leg (`null` on older `service` legs) |
 | `pricing.legs[].recordId` | number | no | |
 | `pricing.legs[].hotelId` | number | no | |
 | `pricing.legs[].name` | string | no | |
 | `pricing.legs[].checkIn` | `YYYY-MM-DD` | no | `startDate` + `dayOffset` |
-| `pricing.legs[].checkOut` | `YYYY-MM-DD` | no | package legs: `checkIn` + `nights`. Service legs: same as `checkIn` |
-| `pricing.legs[].componentPrice` | number | no | the leg's own price with the hotel's rules for that date; for a package leg it covers every package booked |
+| `pricing.legs[].checkOut` | `YYYY-MM-DD` | no | `checkIn` + `nights`; the next leg's `checkIn` |
+| `pricing.legs[].componentPrice` | number | no | the leg's own price with the hotel's rules for that date; it covers every unit booked (for a stay: price per night or block × nights × rooms) |
 | `pricing.legs[].allocatedDiscount` | number | no | this leg's share of `bundleDiscount` |
 | `pricing.legs[].legNet` | number | no | `componentPrice` − `allocatedDiscount`; what the hotel is paid. The legs' `legNet` add up to `sellAmount` exactly |
 
@@ -717,6 +773,8 @@ Rule codes in `violations[].rule`:
 | `entries`, `entries_duration`, `entries_continuity`, `entries_factor`, `entries_quantity` | package | the multi-room request for a quantity above 1 is invalid for this package |
 | `probe_failed` | package | availability could not be checked; retry |
 | `is_amenity` | service | the service is an amenity and cannot be booked on its own |
+
+The notice rules count days from **today at the leg's hotel**: its own time zone (for example `Asia/Riyadh`), or UTC when the hotel has none. Each leg of a multi-hotel visit uses its own hotel's date. Dates and slot times you send and receive are the hotel's local calendar and clock; no time zone conversion is applied.
 
 Keep `pricingFingerprint` for the book call. It never expires: it stays valid exactly as long as every price it covers is unchanged.
 
@@ -769,14 +827,14 @@ Hotels ask for different details per kind of service: a guest name and phone for
 
 ```json
 [ { "key": "destination_type", "label": "Destination Type", "type": "dropdown", "isRequired": true, "autoDerivable": false,
-    "options": [ { "value": "pickup", "label": { "en": "pickup", "ar": "" } }, { "value": "dropoff", "label": { "en": "dropoff", "ar": "" } } ] },
+    "options": [ { "value": "pickup", "label": "pickup" }, { "value": "dropoff", "label": "dropoff" } ] },
   { "key": "guest_pickup_location", "label": "Guest Pickup Location", "type": "dropdown", "isRequired": true, "autoDerivable": false,
     "options": [
-      { "value": "59961", "label": { "en": "Granjur Technologies", "ar": "غرانجور تكنولوجيز" }, "is_default": 0,
-        "form": { "hms_config_id": 59961, "is_default": 0, "order": 1, "location_name": { "en": "Granjur Technologies", "ar": "غرانجور تكنولوجيز" },
+      { "value": "59961", "label": "Granjur Technologies", "is_default": 0,
+        "form": { "hms_config_id": 59961, "is_default": 0, "order": 1, "location_name": "Granjur Technologies",
                   "location_latitude": "31.472244", "location_longitude": "74.336978" } },
-      { "value": "59962", "label": { "en": "Le Meridien Makkah", "ar": "فندق مريديان مكة" }, "is_default": 1,
-        "form": { "hms_config_id": 59962, "is_default": 1, "order": null, "location_name": { "en": "Le Meridien Makkah", "ar": "فندق مريديان مكة" },
+      { "value": "59962", "label": "Le Meridien Makkah", "is_default": 1,
+        "form": { "hms_config_id": 59962, "is_default": 1, "order": null, "location_name": "Le Meridien Makkah",
                   "location_latitude": "21.42025", "location_longitude": "39.82918" } } ] },
   { "key": "guest_dropoff_location", "label": "Guest Drop-off Location", "type": "dropdown", "isRequired": true, "autoDerivable": false, "options": [ "…the same stops…" ] },
   { "key": "pickup_time", "label": "Pickup Time", "type": "time", "isRequired": true, "autoDerivable": false } ]
@@ -834,6 +892,65 @@ So show only the non-hotel stops for the free end, and fill the hotel end yourse
 When a transfer service has no hotel stop configured, only `destination_type` is checked; the stops are passed on as sent.
 
 ---
+
+### 6.5 Hotel and location objects
+
+Each leg names its hotel twice: `hotelId` and `hotelName` as before, plus a `hotel` object with everything needed to show the hotel and where it is. Services inside a leg carry `locations[]`, which says where in the hotel the service takes place. Both use the same nested hierarchy shape, from the widest level to the narrowest.
+
+**Hierarchy node:** `{ id, name, type, code?, child? }`. Each node holds the next level in `child`; the last node has no `child`. Levels with no data are left out, so walk `child` instead of assuming a fixed depth.
+
+```json
+"hotel": {
+  "id": 86,
+  "name": "Le Meridien Makkah",
+  "slug": "le-meridien-makkah",
+  "logo": null,
+  "timezone": "Asia/Riyadh",
+  "contact": { "email": "reservations@lemeridien-makkah.example", "phone": null },
+  "location": {
+    "id": null, "name": "Saudi Arabia", "type": "country",
+    "child": {
+      "id": null, "name": "Makkah", "type": "city",
+      "child": { "id": null, "name": "King Abdulaziz Road, Ajyad District, Makkah 24231", "type": "address" }
+    }
+  },
+  "postalCode": null,
+  "coordinates": { "lat": 21.42025, "lng": 39.82918 }
+}
+```
+
+```json
+"locations": [
+  {
+    "id": 3193, "name": "Tower 8", "type": "building",
+    "child": {
+      "id": 3220, "name": "Floor 21", "type": "floor",
+      "child": { "id": 3860, "name": "Dinner Buffet Area", "type": "zone" }
+    }
+  }
+]
+```
+
+| Path (under `hotel`) | Type | Nullable | Values and notes |
+|---|---|---|---|
+| `id` | number | no | same as the leg's `hotelId` |
+| `name` | string | no | |
+| `slug` | string | yes | |
+| `logo` | string | yes | |
+| `timezone` | string | no | IANA name, e.g. `Asia/Riyadh`; `UTC` when the hotel has none. Notice rules count days in this zone (6.2) |
+| `contact.email`, `contact.phone` | string | yes | |
+| `location` | node | yes | geography, levels in this order when present: `region` › `country` › `state` › `city` › `address`. A level that comes from HMS reference data has an `id` (and `code` for region and country); one taken from the hotel's address text has `id: null` |
+| `postalCode` | string | yes | |
+| `coordinates` | object | yes | `{ lat, lng }` |
+
+| Path (each `locations[]` entry) | Type | Nullable | Values and notes |
+|---|---|---|---|
+| node `id` | number | no | the HMS location id |
+| node `name` | string | no | |
+| node `type` | string | yes | the hotel's own level names, typically `building` › `floor` › `zone`; read `type` rather than assuming the depth |
+| node `child` | node | missing on the last level | |
+
+A service can have several locations (a gym in two towers): each is its own path. For a package leg, every service in the package carries its own `locations[]`.
 
 ## 7. Traveller API
 
@@ -944,7 +1061,7 @@ Header **`Idempotency-Key`**: 8 to 180 characters of letters, digits, `.`, `_`, 
 | `externalRef` | string | yes | your order id, unique on your platform, at most 128 characters |
 | `externalUserRef` | string | no | echoed back |
 | `paymentMeta` | object | no | your payment reference, e.g. `{ "reference": "PAY-77", "capturedAt": "…" }` |
-| `legs` | array | no | scheduling choices per leg, e.g. `[ { "legNo": 3, "scheduling": { "meals": [ { "day": 0, "slot": "20:00-22:00" } ] } } ]`; `day` counts from the leg's first day |
+| `legs` | array | no | scheduling choices for the services included in a package leg, e.g. `[ { "legNo": 1, "scheduling": { "services": [ { "serviceId": 374, "meals": [ { "day": 1, "slot": "20:00-22:00" } ] } ] } } ]`. `day` counts from the leg's first day and must stay within the leg (0 to its `nights`); a date outside it is `422 outside_leg_dates` |
 | `formData` | object | no | answers to the hotels' forms, keyed by `formSchema[].key` (6.4). Required fields are checked per leg |
 | `specialRequests` | string | no | |
 
@@ -996,6 +1113,10 @@ Every leg is paid in full through your partner account at booking time; HMS does
 | `legs[].status` | string | no | `pending` (awaiting hotel approval), `confirmed`, `checked_in`, `checked_out`, `cancelled`, `no_show` |
 | `legs[].legNet` | number | no | the amount paid for this leg |
 | `legs[].booking` | object | yes | the full hotel booking, in the same shape as the HMS guest booking reads. Every field is listed in the [guest booking field reference](../guest-apis/guest-bookings-upcoming/guest-bookings-upcoming.md#response-field-reference): `id`, `bookingId`, `hotelId`, `bookingType`, `status`, `paymentStatus`, `amount`, `paidAmount`, `currency`, `checkIn`, `checkOut`, `adults`, `children`, `package`, `services[]` (each with its `sessions`, `meals` or `transport` slots), `schedulingStatus`, `formValues`, `pricing`, `cancellation`, `checkInFlag`, and more |
+| `legs[].hotel` | object | yes | the leg's hotel and its location hierarchy, see [6.5](#65-hotel-and-location-objects) |
+| `legs[].services[]` | array | no | every service booked in the leg: the service itself, or the package's services and extras |
+| `legs[].services[].serviceId`, `.name`, `.category` | number, string, string | `name` and `category` yes | as in `legs[].booking.services[]` |
+| `legs[].services[].locations[]` | array | no | in-hotel location paths, see [6.5](#65-hotel-and-location-objects) |
 
 `purchaseStatus` is derived from the legs: `confirmed`, `awaiting_approval` (a hotel must approve a leg; you will get `leg.approved` or `leg.rejected`), `partially_cancelled`, `cancelled`.
 
@@ -1013,6 +1134,7 @@ Every leg is paid in full through your partner account at booking time; HMS does
 | 409 | `visit_unavailable`, `visit_not_priced`, `visit_empty`, `currency_mismatch` | as for the detail read | |
 | 404 | `visit_not_found` | | |
 | 422 | `invalid_start_date`, `outside_sellable_window`, `invalid_party`, `external_ref_required`, `fingerprint_required` | | |
+| 422 | `outside_leg_dates` | a `legs[].scheduling` date falls outside its leg's dates; `error.details.legs` lists `legNo`, `serviceId`, `date`, `checkIn`, `checkOut` | nothing created; move the service inside the leg |
 | 422 | `transport_direction_required`, `invalid_transport_location`, `transport_hotel_stop_required`, `transport_same_stop` | a transfer's direction or stops are wrong (6.4) | fix the transfer; nothing was created |
 
 ### 8.2 Cancel — `POST /api/partner/visits/cancel`
@@ -1150,7 +1272,7 @@ Settle and service scheduling (8.5, 8.6) are the only calls that act on a single
 
 ### 8.5 Service slots — `GET /api/partner/visits/legs/slots`
 
-The services inside a leg, such as a spa or gym session, a dining reservation or a transfer, can be booked with or without a time. Use this call to see the times you can choose, then 8.6 to set them. At booking you can already pass times in `legs[].scheduling` (8.1); anything left without a time stays `unscheduled` until you schedule it here.
+The services inside a leg, such as a spa or gym session, a dining reservation or a transfer, can be booked with or without a time. Only **consumable** services can be scheduled (`legs[].services[].schedulable: true` in 6.2). A non-consumable service, used freely during the stay, returns `422 service_not_schedulable` here and in 8.6. Use this call to see the times you can choose, then 8.6 to set them. At booking you can already pass times in `legs[].scheduling` (8.1); anything left without a time stays `unscheduled` until you schedule it here.
 
 **Request**
 
@@ -1179,9 +1301,9 @@ Payload (the JSON inside `reqData`, before encryption):
   "from": "2026-11-02", "to": "2026-11-05",
   "formSchema": [ { "key": "full_name", "label": "Full Name", "type": "text", "isRequired": true, "autoDerivable": true } ],
   "slots": [ { "slotId": 189, "status": "unscheduled", "scheduledStart": null, "scheduledEnd": null } ],
-  "categories": [ { "categoryId": 120, "label": { "en": "Spa", "ar": "سبا" }, "icon": "spa",
+  "categories": [ { "categoryId": 120, "label": "Spa", "icon": "spa",
     "locations": [ { "locationId": 31, "name": "Spa Level 2", "code": "SPA-2",
-      "services": [ { "serviceId": 192, "label": { "en": "Full Body Massage", "ar": "مساج كامل الجسم" }, "shortDescription": null,
+      "services": [ { "serviceId": 192, "label": "Full Body Massage", "shortDescription": null,
         "images": [], "unitPrice": 350, "currency": "SAR",
         "availability": [ { "date": "2026-11-03", "unavailableReason": null,
           "slots": [ { "start": "14:15", "end": "15:00", "unitId": 77, "locationId": 31, "available": true,
@@ -1232,10 +1354,11 @@ A service with no availability set up returns its days with empty `slots`.
 | 422 | `invalid_date` | `from` or `to` is not `YYYY-MM-DD` |
 | 422 | `outside_leg_dates` | the window leaves the leg; `error.details` has `checkIn` and `checkOut` |
 | 422 | `range_too_long` | more than 14 days |
+| 422 | `service_not_schedulable` | the service is not consumable: it has no individual time slots; `error.details.serviceId`, and `error.details.packageId` when the leg is a package |
 
 ### 8.6 Schedule or reschedule — `POST /api/partner/visits/legs/schedule`
 
-Sets the time of one or more slots of a service in a leg. The same call moves a slot that is already scheduled to a new time. Scheduling does not change the price.
+Sets the time of one or more slots of a service in a leg. The same call moves a slot that is already scheduled to a new time. Scheduling does not change the price. The service must be consumable (`schedulable: true`).
 
 **Request**
 
@@ -1282,24 +1405,24 @@ At least one of `sessions`, `meals` or `transport` is required. Every `slotId` m
 | HTTP | SCC | When |
 |---|---|---|
 | 400 | `booking_id_required`, `service_id_required` | |
-| 400 | | the time is outside the leg's dates |
 | 404 | `booking_not_found`, `service_not_in_leg` | as in 8.5 |
 | 409 | `leg_not_schedulable` | the leg is `cancelled`, `checked_out` or `no_show`; `error.details.status` |
 | 409 | | the chosen time is no longer free; read 8.5 again |
 | 422 | `nothing_to_schedule` | no `sessions`, `meals` or `transport` |
+| 422 | `outside_leg_dates` | a date is outside the leg (check-in to check-out); `error.details` has `checkIn`, `checkOut` and the offending `dates` |
 | 422 | `unknown_slot` | a `slotId` is not a slot of this service in the leg; `error.details.slotIds` |
+| 422 | `service_not_schedulable` | the service is not consumable (see 8.5) |
 | 422 | `transport_direction_required`, `invalid_transport_location`, `transport_hotel_stop_required`, `transport_same_stop` | a transfer's direction or stops are wrong (6.4) |
 
-Hotel staff see the new times at once. No event is sent, since the change came from you. When the traveller schedules from the HMS guest app instead (8.7), you receive `leg.scheduled`.
+Hotel staff see the new times at once. No event is sent, since the change came from you.
 
 ### 8.7 Travellers in the HMS guest app
 
 A traveller can also sign in to the HMS guest app with the same email. Their visit legs belong to a separate **partner guest** role, one URDD per hotel plus a global one, returned at login as `partnerTenantUrddMap` (with a `global` key, like `tenantUrddMap`) beside the normal `tenantUrddMap`. Under that role the traveller sees the legs hotel by hotel, and can:
 
-- schedule or reschedule the services inside a leg from the app (`PUT /api/guest/booking/reschedule`, `PUT /api/guest/bookings/services`), while the leg is `pending`, `confirmed` or `checked_in` (otherwise `409 leg_not_schedulable`). The same transfer rule as 8.6 applies (6.4, with the same `422` errors), and a stop may be sent as its option value, its `hms_config_id` or an unambiguous English stop name. Slots move only inside the leg's own dates; dates, party and price never change. The change is added to the leg's history and you receive a `leg.scheduled` event with `initiatedBy: "guest"` (9.1);
 - favourite rooms and packages, review a package or service after a checked-out stay that included it, raise support tickets, and edit their profile (not the email).
 
-Booking, adding or removing services, edits, extensions, staging, cancellation, check-in, check-out, payments, room QR and loyalty redeem are refused with `403 partner_guest_read_only`, and check-in eligibility is blocked. Under their normal guest role the visit legs are not shown at all. Cancellations and every other change to a leg go through you.
+Booking, scheduling or rescheduling the services inside a leg, adding or removing services, edits, extensions, staging, cancellation, check-in, check-out, payments, room QR and loyalty redeem are refused with `403 partner_guest_read_only`, and check-in eligibility is blocked. Under their normal guest role the visit legs are not shown at all. Scheduling (at booking in 8.1, or later in 8.5 and 8.6), cancellations and every other change to a leg go through you; the app shows the times you set, read only.
 
 ---
 
@@ -1307,19 +1430,249 @@ Booking, adding or removing services, edits, extensions, staging, cancellation, 
 
 ### 9.1 Event types
 
-| Event | When |
-|---|---|
-| `leg.approved` | the hotel approved a leg that was awaiting approval |
-| `leg.rejected` | the hotel rejected it; HMS then cancels the purchase's other legs |
-| `leg.scheduled` | the traveller scheduled or rescheduled a service inside a leg from the HMS guest app; `data` adds `serviceId`, `updated` (slots set) and `initiatedBy: "guest"` |
-| `booking.cancelled` | cancelled by you |
-| `booking.cancelled_by_hotel` | cancelled by the hotel |
-| `booking.cancelled_by_system` | cancelled by HMS, e.g. the other legs after a rejection |
-| `booking.checked_in`, `booking.checked_out`, `booking.no_show` | stay events |
-| `booking.modified` | dates changed, or another status change |
-| `visit.invalidated` | a visit stopped being on sale |
-| `visit.restored` | it is on sale again |
-| `visit.updated` | a visit's components or price changed (re-read and re-price) |
+Every event has the same envelope: `id`, `event`, `createdAt` and `data` (fields in 9.2). There are two shapes of `data`: **leg events** (`leg.*`, `booking.*`) describe one leg, and **visit events** (`visit.*`) describe a visit in the catalogue.
+
+| Event | Sent when | `oldStatus` → `newStatus` | `initiatedBy` | What to do |
+|---|---|---|---|---|
+| `leg.approved` | the hotel approves a leg that was waiting for approval | `pending` → `confirmed` | `hotel` | mark the leg confirmed |
+| `leg.rejected` | the hotel rejects a leg that was waiting for approval | `pending` → `cancelled` | `hotel` | the purchase fails: HMS cancels its other legs (each sends `booking.cancelled_by_system`) and credits you |
+| `booking.cancelled` | you cancelled the purchase (8.2); one event per leg | `pending` or `confirmed` → `cancelled` | `partner` | confirmation of your own call |
+| `booking.cancelled_by_hotel` | the hotel cancelled a leg that was already confirmed or later | any → `cancelled` | `hotel` | tell the traveller; contact the hotel with `externalRef` |
+| `booking.cancelled_by_system` | HMS cancelled a leg, for example the other legs of a purchase after `leg.rejected` | `pending` or `confirmed` → `cancelled` | `system` | mark the leg cancelled |
+| `booking.checked_in` | the hotel checked the traveller in | usually `confirmed` → `checked_in` | `hotel` | stay started |
+| `booking.checked_out` | the hotel checked the traveller out | `checked_in` → `checked_out` | `hotel` | stay finished |
+| `booking.no_show` | the traveller did not arrive | `confirmed` → `no_show` | `hotel` | stay did not happen |
+| `booking.modified` | anything else that changes a leg's status, its `checkIn` or `checkOut`, or makes the leg active or inactive | as stored (can be equal) | `hotel`, `system` or `partner` | re-read the purchase (8.3) |
+| `visit.invalidated` | a published visit stopped being on sale: a component was withdrawn, or the visit was unpublished | — | — | stop selling it |
+| `visit.restored` | it is on sale again | — | — | you may sell it again; re-read it (6.2) |
+| `visit.updated` | a published visit's components or price changed | — | — | re-read (6.2) and re-price before selling |
+
+**Not sent:** creating a purchase (8.1), settling (8.4) and scheduling or moving a leg's services (8.6), since you made those changes yourself and get the result in the response. Room changes at the desk and hotel-side notes are not sent either.
+
+**Rules that apply to every event:**
+- `checkIn` and `checkOut` are the hotel's calendar dates, sent as midnight UTC (`2026-11-02T00:00:00Z` means the stay starts on 2 November at the hotel). Use the date part only, and don't convert it to a local time zone.
+- Visit events go to every active partner platform, whether or not you have sold that visit. Ignore visits you don't use.
+- Treat an `event` you don't recognise as "re-read the purchase": new types may be added.
+- HMS checks for due events every 10 seconds, so a webhook normally arrives within a few seconds of the change.
+- A platform with no webhook URL or secret still gets every event through replay (9.3). Its deliveries fail and end as `dead`.
+
+### 9.1.1 Complete payloads
+
+The exact bodies HMS sends. All leg events share one `data` shape, and all visit events share another.
+
+**`leg.approved`**
+
+```json
+{
+  "id": "9f3c2e1a-5d7b-4c1e-9a0f-2b6d8e4c7a11",
+  "event": "leg.approved",
+  "createdAt": "2026-11-01T09:14:02Z",
+  "data": {
+    "visitId": 42,
+    "bookingId": 5012,
+    "bookingNumber": "BK08571620",
+    "externalRef": "TRAVELCO-ORD-8812",
+    "legNo": 1,
+    "oldStatus": "pending",
+    "newStatus": "confirmed",
+    "checkIn": "2026-11-02T00:00:00Z",
+    "checkOut": "2026-11-05T00:00:00Z",
+    "initiatedBy": "hotel"
+  }
+}
+```
+
+**`leg.rejected`**
+
+```json
+{
+  "id": "9f3c2e1a-5d7b-4c1e-9a0f-2b6d8e4c7a11",
+  "event": "leg.rejected",
+  "createdAt": "2026-11-01T09:14:02Z",
+  "data": {
+    "visitId": 42,
+    "bookingId": 5012,
+    "bookingNumber": "BK08571620",
+    "externalRef": "TRAVELCO-ORD-8812",
+    "legNo": 1,
+    "oldStatus": "pending",
+    "newStatus": "cancelled",
+    "checkIn": "2026-11-02T00:00:00Z",
+    "checkOut": "2026-11-05T00:00:00Z",
+    "initiatedBy": "hotel"
+  }
+}
+```
+
+**`booking.cancelled`** (you cancelled; one per leg)
+
+```json
+{
+  "id": "9f3c2e1a-5d7b-4c1e-9a0f-2b6d8e4c7a11",
+  "event": "booking.cancelled",
+  "createdAt": "2026-11-01T09:14:02Z",
+  "data": {
+    "visitId": 42,
+    "bookingId": 5012,
+    "bookingNumber": "BK08571620",
+    "externalRef": "TRAVELCO-ORD-8812",
+    "legNo": 1,
+    "oldStatus": "confirmed",
+    "newStatus": "cancelled",
+    "checkIn": "2026-11-02T00:00:00Z",
+    "checkOut": "2026-11-05T00:00:00Z",
+    "initiatedBy": "partner"
+  }
+}
+```
+
+**`booking.cancelled_by_hotel`**
+
+```json
+{
+  "id": "9f3c2e1a-5d7b-4c1e-9a0f-2b6d8e4c7a11",
+  "event": "booking.cancelled_by_hotel",
+  "createdAt": "2026-11-01T09:14:02Z",
+  "data": {
+    "visitId": 42,
+    "bookingId": 5012,
+    "bookingNumber": "BK08571620",
+    "externalRef": "TRAVELCO-ORD-8812",
+    "legNo": 1,
+    "oldStatus": "confirmed",
+    "newStatus": "cancelled",
+    "checkIn": "2026-11-02T00:00:00Z",
+    "checkOut": "2026-11-05T00:00:00Z",
+    "initiatedBy": "hotel"
+  }
+}
+```
+
+**`booking.cancelled_by_system`** (here leg 2 of the purchase, after leg 1 was rejected)
+
+```json
+{
+  "id": "9f3c2e1a-5d7b-4c1e-9a0f-2b6d8e4c7a11",
+  "event": "booking.cancelled_by_system",
+  "createdAt": "2026-11-01T09:14:02Z",
+  "data": {
+    "visitId": 42,
+    "bookingId": 5013,
+    "bookingNumber": "BK08571621",
+    "externalRef": "TRAVELCO-ORD-8812",
+    "legNo": 2,
+    "oldStatus": "confirmed",
+    "newStatus": "cancelled",
+    "checkIn": "2026-11-05T00:00:00Z",
+    "checkOut": "2026-11-07T00:00:00Z",
+    "initiatedBy": "system"
+  }
+}
+```
+
+**`booking.checked_in`**
+
+```json
+{
+  "id": "9f3c2e1a-5d7b-4c1e-9a0f-2b6d8e4c7a11",
+  "event": "booking.checked_in",
+  "createdAt": "2026-11-01T09:14:02Z",
+  "data": {
+    "visitId": 42,
+    "bookingId": 5012,
+    "bookingNumber": "BK08571620",
+    "externalRef": "TRAVELCO-ORD-8812",
+    "legNo": 1,
+    "oldStatus": "confirmed",
+    "newStatus": "checked_in",
+    "checkIn": "2026-11-02T00:00:00Z",
+    "checkOut": "2026-11-05T00:00:00Z",
+    "initiatedBy": "hotel"
+  }
+}
+```
+
+**`booking.checked_out`**
+
+```json
+{
+  "id": "9f3c2e1a-5d7b-4c1e-9a0f-2b6d8e4c7a11",
+  "event": "booking.checked_out",
+  "createdAt": "2026-11-01T09:14:02Z",
+  "data": {
+    "visitId": 42,
+    "bookingId": 5012,
+    "bookingNumber": "BK08571620",
+    "externalRef": "TRAVELCO-ORD-8812",
+    "legNo": 1,
+    "oldStatus": "checked_in",
+    "newStatus": "checked_out",
+    "checkIn": "2026-11-02T00:00:00Z",
+    "checkOut": "2026-11-05T00:00:00Z",
+    "initiatedBy": "hotel"
+  }
+}
+```
+
+**`booking.no_show`**
+
+```json
+{
+  "id": "9f3c2e1a-5d7b-4c1e-9a0f-2b6d8e4c7a11",
+  "event": "booking.no_show",
+  "createdAt": "2026-11-01T09:14:02Z",
+  "data": {
+    "visitId": 42,
+    "bookingId": 5012,
+    "bookingNumber": "BK08571620",
+    "externalRef": "TRAVELCO-ORD-8812",
+    "legNo": 1,
+    "oldStatus": "confirmed",
+    "newStatus": "no_show",
+    "checkIn": "2026-11-02T00:00:00Z",
+    "checkOut": "2026-11-05T00:00:00Z",
+    "initiatedBy": "hotel"
+  }
+}
+```
+
+**`booking.modified`** (here the dates changed and the status did not)
+
+```json
+{
+  "id": "9f3c2e1a-5d7b-4c1e-9a0f-2b6d8e4c7a11",
+  "event": "booking.modified",
+  "createdAt": "2026-11-01T09:14:02Z",
+  "data": {
+    "visitId": 42,
+    "bookingId": 5012,
+    "bookingNumber": "BK08571620",
+    "externalRef": "TRAVELCO-ORD-8812",
+    "legNo": 1,
+    "oldStatus": "confirmed",
+    "newStatus": "confirmed",
+    "checkIn": "2026-11-03T00:00:00Z",
+    "checkOut": "2026-11-06T00:00:00Z",
+    "initiatedBy": "system"
+  }
+}
+```
+
+**`visit.invalidated`**, **`visit.restored`**, **`visit.updated`** (the same `data` for all three)
+
+```json
+{
+  "id": "9f3c2e1a-5d7b-4c1e-9a0f-2b6d8e4c7a11",
+  "event": "visit.updated",
+  "createdAt": "2026-11-01T09:14:02Z",
+  "data": {
+    "visitId": 42,
+    "visitCode": "MKK-MDN-5N"
+  }
+}
+```
+
+Visit events carry only `visitId` and `visitCode`. They have no `bookingId` and no `initiatedBy`.
 
 ### 9.2 Webhooks
 
@@ -1331,14 +1684,7 @@ X-Timestamp: 1790327642
 X-Signature: sha256=<hex HMAC-SHA256(webhookSecret, X-Timestamp + raw body)>
 ```
 
-```json
-{ "id": "9f3c2e1a-5d7b-4c1e-9a0f-2b6d8e4c7a11", "event": "booking.cancelled_by_hotel", "createdAt": "2026-11-01T09:14:02Z",
-  "data": { "bookingId": 5012, "bookingNumber": "BK08571620", "visitId": 42, "externalRef": "TRAVELCO-ORD-8812", "legNo": 1,
-            "oldStatus": "confirmed", "newStatus": "cancelled", "checkIn": "2026-11-01T21:00:00Z", "checkOut": "2026-11-04T21:00:00Z",
-            "initiatedBy": "hotel" } }
-```
-
-Visit events carry `data: { "visitId": 42, "visitCode": "MKK-MDN-5N" }`. `initiatedBy` is `partner`, `hotel`, `system` or `guest` (the traveller, in the HMS guest app).
+The body is one of the payloads in 9.1.1.
 
 **Event fields** (the webhook body; replay items carry the same fields plus two more, see 9.3)
 
@@ -1355,11 +1701,9 @@ Visit events carry `data: { "visitId": 42, "visitCode": "MKK-MDN-5N" }`. `initia
 | `data.legNo` | number | yes | |
 | `data.oldStatus` | string | yes | a leg status, as `legs[].status` in 8.1 |
 | `data.newStatus` | string | yes | a leg status |
-| `data.checkIn` | ISO 8601 datetime | yes | the leg's current check-in |
-| `data.checkOut` | ISO 8601 datetime | yes | the leg's current check-out |
-| `data.serviceId` | number | | `leg.scheduled` only: the service scheduled |
-| `data.updated` | number | | `leg.scheduled` only: slots set by the change |
-| `data.initiatedBy` | string | no | `partner` (you), `hotel`, `system` or `guest` (the traveller in the HMS guest app) |
+| `data.checkIn` | ISO 8601 datetime | yes | the leg's current check-in date at the hotel, as midnight UTC; use the date part |
+| `data.checkOut` | ISO 8601 datetime | yes | the leg's current check-out date at the hotel, as midnight UTC; use the date part |
+| `data.initiatedBy` | string | no | leg events only: `partner` (you), `hotel` or `system` |
 
 Your endpoint must:
 
@@ -1408,7 +1752,10 @@ Webhooks are a hint; replay is the source of truth.
 
 ```json
 { "items": [
-    { "id": "9f3c2e1a-…", "event": "booking.cancelled", "createdAt": "2026-11-01T09:14:02Z", "data": { "bookingId": 5012 },
+    { "id": "9f3c2e1a-5d7b-4c1e-9a0f-2b6d8e4c7a11", "event": "booking.cancelled", "createdAt": "2026-11-01T09:14:02Z",
+      "data": { "visitId": 42, "bookingId": 5012, "bookingNumber": "BK08571620", "externalRef": "TRAVELCO-ORD-8812", "legNo": 1,
+                "oldStatus": "confirmed", "newStatus": "cancelled", "checkIn": "2026-11-02T00:00:00Z", "checkOut": "2026-11-05T00:00:00Z",
+                "initiatedBy": "partner" },
       "deliveryStatus": "delivered", "attempts": 1 } ],
   "nextCursor": "WyIyMDI2LTExLTAxVDA5OjE0OjAyWiIsIjlmM2MyZTFhLi4uIl0" }
 ```

@@ -7,6 +7,7 @@ When a partner books a visit, HMS creates one ordinary booking per component (a 
 | Page | Audience | Contents |
 |---|---|---|
 | [Visits admin APIs](./visits-admin-apis.md) | General Tenant Manager or visits curator (visits); SaaS admin (partners, outbox) | Visits CRUD, component picker, partner onboarding, event outbox |
+| [Visit Components API](./visits-components-api.md) | Visit builder (frontend) | The component picker in full: rules, party matching, full payload, and how results become legs |
 | [Partner integration guide](./partner-integration-guide.md) | Partner engineering teams (hand this over) | Credentials, transport, auth, every endpoint with requests, responses and errors, events, sequence diagrams |
 
 ---
@@ -16,6 +17,7 @@ When a partner books a visit, HMS creates one ordinary booking per component (a 
 | Term | Meaning |
 |---|---|
 | Visit | A `visits` row (code, name, visibility) plus its ordered components in `visit_items`. Its availability window and length are configs (`publish_start_datetime`, `publish_end_datetime`, server-computed `duration`) |
+| Component | What a leg is built from: a hotel's **package** or **stay service** (room type), chosen with the [Visit Components API](./visits-components-api.md). Legs run back to back with no gaps; the server derives each leg's start day from the leg order |
 | Leg | One booking created for one component. It carries `visit_id`, the partner's `externalRef` in `booking_metadata`, and `channel_platform_id` |
 | Purchase | All legs of one partner order: the same `visit_id` and `externalRef` on the same platform |
 | Sell price | The visit's own `catalog_pricing` row (`base_table = 'visits'`) |
@@ -42,7 +44,7 @@ A traveller created by a partner also gets the standard global guest URDD. **On 
 | Who | What they can do with a visit leg |
 |---|---|
 | Partner platform | View the purchase, settle a balance, and cancel the **whole visit** (`externalRef`). Every leg still pending or confirmed is cancelled; legs already checked in, checked out or cancelled are reported and left. Schedule or reschedule the services inside a leg (spa, gym, dining, transport) through `GET /api/partner/visits/legs/slots` and `POST /api/partner/visits/legs/schedule`. No change to a leg's dates, party or price, no extension, add-on or single-leg cancel |
-| Traveller in our guest app | Two roles. The normal guest role (`tenantUrddMap`) never shows visit legs. The partner guest role (`partnerTenantUrddMap`, one URDD per hotel plus `global`) shows that hotel's legs, or every hotel's with `global`: list, view and folio. It can also schedule or reschedule services inside a leg that is pending, confirmed or checked in (same transfer rule as the partner; the partner gets `leg.scheduled`), favourite, review after a checked-out stay, raise support tickets and edit the profile except the email. Booking, add or remove services, edit, extend, stage, cancel, check-in, check-out, payments, QR and loyalty redeem return `403 partner_guest_read_only`; check-in eligibility is blocked |
+| Traveller in our guest app | Two roles. The normal guest role (`tenantUrddMap`) never shows visit legs. The partner guest role (`partnerTenantUrddMap`, one URDD per hotel plus `global`) shows that hotel's legs, or every hotel's with `global`: list, view and folio. It can also favourite, review after a checked-out stay, raise support tickets and edit the profile except the email. Scheduling and rescheduling the services inside a leg are done by the partner platform only. Booking, scheduling or rescheduling, add or remove services, edit, extend, stage, cancel, check-in, check-out, payments, QR and loyalty redeem return `403 partner_guest_read_only`; check-in eligibility is blocked |
 | Hotel staff (bookings CRUD, grouped bookings, booking-rooms edit) | Status only: pending → confirmed or cancelled (a rejection, which cancels the other legs of the purchase), confirmed → checked_in or no_show, checked_in → checked_out. Dates, party, amounts, package, guest and currency are locked (`409 visit_leg_locked`), other status moves return `409 visit_leg_status`, and a delete returns `409 visit_leg_locked` |
 | Curator or general Tenant Manager | The visit itself (catalogue); a booked purchase is not changed |
 

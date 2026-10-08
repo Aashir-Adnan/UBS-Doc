@@ -371,6 +371,8 @@ A unit is considered **available** when no active `booking_items` row overlaps t
 
 If no unit is free, the booking API returns **409** `"No available rooms for the selected dates"`. For serial/parallel bookings with insufficient units for a specific entry, the error includes the date range and the shortfall (e.g. `"need 2, found 1"`).
 
+**Concurrent bookings** (updated 2026-10-08): room, package and service bookings, add-on services, reschedules and edit holds at one hotel are placed one at a time. Each request holds a per-hotel lock from choosing the room or slot until its booking rows are written, so two guests can never be given the same unit. A request that waits more than 15 seconds for the lock returns **409** with `meta.scc = unit_lock_busy` ("The hotel is busy with another booking right now"); nothing is written, so retry the same request with the same `idempotencyKey`.
+
 **Pinned bookings** (where the guest starts from a specific room/package detail page, bypassing `/guest/search/filter`) rely on the same availability check at submit time. No separate pre-check endpoint is needed — the `roomId` sent by the frontend is a `service_id` (the same `id` returned by search results).
 
 > When a booking is cancelled or checked out, the corresponding `booking_items.item_status` is cascaded to `'cancelled'` or `'checked_out'` respectively, freeing the delivery unit for rebooking.

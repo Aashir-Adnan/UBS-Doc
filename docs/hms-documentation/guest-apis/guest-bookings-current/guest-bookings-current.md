@@ -273,7 +273,7 @@ This endpoint takes no request parameters. Send an empty encrypted body.
 | `services[].totalPrice` | `number` | Total price for this addon. |
 | `services[].amenities` | `array` | Per-service amenities. Each: `{ key, icon, label: { en, ar }, group }`. |
 | `services[].tags` | `array` | Per-service keyword tags. Each: `{ en, ar }`. |
-| `services[].isConsumable` | `boolean` | Whether the service is consumable (from `is_consumable` config). |
+| `services[].isConsumable` | `boolean` | Whether the service is consumable. In a package booking, the package's `package_services.is_consumable` for that service wins; otherwise the service's `is_consumable` config. Updated 2026-10-07. |
 | `services[].deliveryUnits` | `array` | Delivery units assigned to this addon. See **Delivery Units** section below. |
 | `services[].operatingHours` | `array` | Operating hours for the service. |
 | `services[].status` | `string` | Addon status (e.g. `"confirmed"`, `"cancelled"`). |

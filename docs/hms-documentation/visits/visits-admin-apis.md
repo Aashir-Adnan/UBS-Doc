@@ -9,10 +9,10 @@ Admin dashboard endpoints. The visits CRUD and the component picker are used by 
 | `POST /api/crud/visits` | `add_visits` | Create a visit |
 | `PUT /api/crud/visits?id=` | `update_visits` | Change header, components, price, configs, visibility, status |
 | `DELETE /api/crud/visits?id=` | `delete_visits` | Delete (deferred while legs are open) |
-| `GET /api/crud/visits/components` | `list_visits` | Cross-hotel component picker |
+| `GET /api/crud/visits/components` | `list_visits` | Cross-hotel component picker (packages and stays, party-aware); see [Visit Components API](./visits-components-api.md) |
 | `GET /api/crud/partner-platforms?step=1\|2\|3` | `list_partner_platforms` (group `PG-PARTNER-PLATFORMS`) | Partner platforms (step 1), their versions (step 2), their system users (step 3) |
-| `POST /api/crud/partner-platforms?step=1\|2\|3` | `add_partner_platforms` | Create a platform, add a version (new key), add a system user |
-| `PUT /api/crud/partner-platforms?step=1\|2\|3&id=` | `update_partner_platforms` | Platform settings and webhook; retire or reactivate a version; reset a password or TOTP |
+| `POST /api/crud/partner-platforms?step=1\|2\|3` | `add_partner_platforms` | Create a platform, create or link versions (new keys), add a system user |
+| `PUT /api/crud/partner-platforms?step=1\|2\|3&id=` | `update_partner_platforms` | Platform settings and webhook; sync the platform's version set (new version, link, retire, reactivate); reset a password or TOTP |
 | `GET /api/crud/platform-events` | `list_platform_events` | Partner event outbox |
 | `PUT /api/crud/platform-events/retry` | `update_platform_events` | Re-queue a dead or delivered event |
 
@@ -59,10 +59,9 @@ The visits CRUD uses the **same payload and response conventions as the packages
   ],
 
   "visitItems": [
-    { "baseTable": "packages", "recordId": 367, "dayOffset": 0, "extraNights": 0, "displayOrder": 1 },
-    { "baseTable": "packages", "recordId": 422, "dayOffset": 3, "displayOrder": 2 },
-    { "baseTable": "services", "recordId": 377, "dayOffset": 3, "quantity": 1, "displayOrder": 3,
-      "scheduling": { "meals": [ { "day": 0, "slot": "19:00-21:00", "mealType": "dinner" } ] } }
+    { "baseTable": "packages", "recordId": 367, "extraNights": 0, "displayOrder": 1 },
+    { "baseTable": "services", "recordId": 381, "nights": 2, "quantity": 1, "displayOrder": 2 },
+    { "baseTable": "packages", "recordId": 422, "displayOrder": 3 }
   ],
 
   "configs": [
@@ -84,15 +83,36 @@ The visits CRUD uses the **same payload and response conventions as the packages
 | `visitVisibility` | The only visibility control. `draft` (default), `published`, `archived`. A `visibility` entry in `configs` is ignored. Publishing requires at least one component, every component and hotel active, every hotel consenting, and an active price |
 | `visitStatus` | `active` (default) or `inactive` |
 | `visitPricing[]` | Same row shape as `packagePricing[]`. `price` and `currencyId` required. An adjustment (`delta` `+`/`-`, `value`, `type` `flat`/`percentage`) is applied at write time and the result is stored in `price`; the row keeps `delta`/`value`/`type` as the record of how it was reached. The sell price is the active in-window adjusted row if there is one, otherwise the plain row |
-| `visitItems[]` | On create a flat array. On update either a flat array (replaces the list) or `{ added, updated, deleted }` (`updated` entries carry `visitItemId`, `deleted` lists ids). `baseTable` `packages` or `services` and `recordId` (or the shorthand `packageId` / `serviceId`). `dayOffset`: day of the visit the leg starts. `extraNights`: package legs only, within the package's allowance. `quantity`: for a service leg, the units booked. For a package leg, how many packages each purchase books (parallel rooms, at most the package's `max_quantity_per_booking`). If the party needs more packages than that, by the package's `max_adults` + `max_children`, the larger number is booked and priced. `displayOrder`: leg order. Stay services cannot be a leg on their own; use a package |
-| `visitItems[].scheduling` | Optional hints in the guest booking shapes with **days relative to the leg**: `sessions[]` / `meals[]` with `day` and `slot`, `transport` with `day` and `time`, `formData`, and for package legs `services[]` hints for included services (each day must fall inside the package stay) |
+| `visitItems[]` | On create a flat array. On update either a flat array (replaces the list) or `{ added, updated, deleted }` (`updated` entries carry `visitItemId`, `deleted` lists ids). See **Legs** below |
+| `visitItems[].scheduling` | Optional hints in the guest booking shapes with **days relative to the leg**: `formData`, and for package legs `services[]` hints for included services. Every day must fall inside the leg's stay (day 0 to its nights) |
 | `configs[]` | Same entry shape as packages: `config_key_id`, `config_key`, `is_input`, `config_value`, optional `operator`. Only keys whose `target_table` includes `visits` are accepted (`display_name`, `short_description`, `long_description`, `media`, `keyword_tags`, `category_tags`, `is_featured`, `publish_start_datetime`, `publish_end_datetime`, `terms_and_conditions`, `base_currency`, `max_adults`, `max_children`, `min_persons_per_booking`, `max_persons_per_booking`, `advance_booking_min_days`, `advance_booking_max_days`, `allowed_regions`). `config_key_id` may be omitted when `config_key` is sent. Values are stored one row per entity, as for packages |
 | Availability window | Set with the `publish_start_datetime` / `publish_end_datetime` configs, as for packages and services. The whole trip (start date to start date + `duration` nights) must fall inside it, and partners stop seeing the visit once `publish_end_datetime` has passed. Both are optional |
-| `duration`, `duration_unit` | **Server-owned.** Recomputed from the components on every create and update: the latest component end (its `dayOffset` plus its nights; a service leg adds no nights), with `duration_unit` = nights. Values sent in `configs` are ignored. They come back in `configs` on View and List |
+| `duration`, `duration_unit` | **Server-owned.** Recomputed from the components on every create and update: the sum of the legs' nights (legs are back to back), with `duration_unit` = nights. Values sent in `configs` are ignored. They come back in `configs` on View and List |
 | `visitAttachmentIds` | Images. Treated as the `media` config when `configs` does not carry `media`; either way the ids are mirrored into `dynamic_attachments` |
 | `tenant_id` | Accepted and ignored; visits belong to the platform, not a hotel |
 
 The whole create runs in one transaction: a failure leaves no visit behind.
+
+#### Legs
+
+A visit is a chain of stays with **no gaps**: each leg starts the day the previous one ends. A leg is either a **package** or a **stay service** (a room type). Other services (dining, transport, spa…) are not legs; they come with a package.
+
+| Key | Package leg | Stay leg |
+|---|---|---|
+| `baseTable` / `recordId` | `packages` + package id | `services` + a service whose category is `stay` |
+| Length | the package's `duration` + `extraNights` | `nights` (≥ 1) |
+| `extraNights` | extra nights on top of the package, within its allowance | the whole stay length. `nights` is accepted as an alias and stored here |
+| `quantity` | packages per purchase, at most `max_quantity_per_booking` | rooms per purchase |
+| `displayOrder` | leg order | leg order |
+| `dayOffset` | **server-derived**, see below | **server-derived** |
+
+**`extraNights` on a stay leg.** Stay services have no fixed duration, so a stay leg's base length is 0 and its whole stay is held in `extra_nights`: a 3-night stay is stored as `extra_nights = 3`. On a package leg the column keeps its meaning (nights beyond the package). View returns `extra_nights` for both, plus `nights` on stay legs. A stay leg must also respect the room's `min_stay_nights` / `max_stay_nights`.
+
+**`dayOffset` is derived from the order.** Legs are sorted by `displayOrder`. Leg 1 starts on day 0, and every later leg starts where the previous one ends (its `dayOffset` + nights). The server writes these values, so leave `dayOffset` out. If you send it, it must equal the derived value: a later day is `leg_gap`, an earlier one `leg_overlap`, and the edit is rolled back. Changing a leg's nights shifts every later leg.
+
+Example: package 367 (2 nights) → Family Suite 381, `nights: 2` → package 422 (2 nights) gives day offsets 0, 2 and 4, and a 6-night visit.
+
+**Party size.** At purchase every leg is sized for the party with the rule below (also used by the component picker): the number of units `u` is the smallest for which adults ≤ `u × max_adults`, children ≤ `u × max_children` + the adult places left free, and adults + children ≤ `u × max occupancy` (room capacity and `max_persons_per_booking` for stays). A child may take a free adult place; an adult never takes a child's. A leg books at least its `quantity`. Visits created before 2026-10-08 keep their legs as they are until their items are next edited; the rules above apply to every write.
 
 Response:
 
@@ -178,8 +198,8 @@ Send only what changes; omitted fields and lists are left as they are. Multiling
   ],
 
   "visitItems": {
-    "added":   [ { "baseTable": "services", "recordId": 380, "dayOffset": 4, "quantity": 1 } ],
-    "updated": [ { "visitItemId": 77, "baseTable": "packages", "recordId": 367, "dayOffset": 0, "displayOrder": 1 } ],
+    "added":   [ { "baseTable": "services", "recordId": 380, "nights": 1, "quantity": 1, "displayOrder": 4 } ],
+    "updated": [ { "visitItemId": 77, "baseTable": "packages", "recordId": 367, "displayOrder": 1 } ],
     "deleted": [ 78 ]
   },
 
@@ -242,18 +262,18 @@ A well-formed entry that is not valid as a leg is reported after the write, and 
 ```json
 { "code": "invalid_items", "legs": [
   { "legNo": 3, "visitItemId": 918, "recordId": 377,
-    "problems": ["extra_nights applies to package legs only"],
-    "issues": [ { "code": "extra_nights_on_service", "field": "extraNights", "message": "extra_nights applies to package legs only" } ] } ] }
+    "problems": ["a service leg must be a stay (room) service; other services belong inside a package"],
+    "issues": [ { "code": "service_not_stay", "field": "recordId", "message": "a service leg must be a stay (room) service; other services belong inside a package" } ] } ] }
 ```
 
 | `issues[].code` | `field` |
 |---|---|
 | `invalid_item`, `invalid_base_table`, `invalid_record_id`, `invalid_scheduling`, `missing_visit_item_id`, `unknown_visit_item` | the field named, or `null` (malformed input) |
-| `component_not_found`, `stay_service_leg` | `recordId` |
-| `invalid_day_offset` | `dayOffset` |
+| `component_not_found`, `service_not_stay` | `recordId` |
+| `invalid_day_offset`, `leg_gap`, `leg_overlap` | `dayOffset` |
 | `invalid_quantity`, `package_quantity_over_max` | `quantity` |
-| `extra_nights_not_allowed`, `extra_nights_over_max`, `extra_nights_on_service` | `extraNights` |
-| `scheduling_outside_stay`, `scheduling_day_negative` | `scheduling` |
+| `extra_nights_not_allowed`, `extra_nights_over_max`, `invalid_nights` | `extraNights` (packages) or `nights` (stays) |
+| `scheduling_outside_stay` | `scheduling` |
 
 ### Automatic unpublishing
 
@@ -263,20 +283,9 @@ This happens at once when a component's service or package is deleted, when its 
 
 ### Component picker — `GET /api/crud/visits/components`
 
-Query: `type` (`package` | `service`), `hotelId`, `q`, `consentOnly` (default `true`: only hotels that consent; `false` also returns the others with `hotelConsents: false`), `page_no` (default 1), `page_size` (default 50, at most 200). Filtering and paging run in SQL, so every page is full until the last one and `total` counts all matches.
+Lists the packages and stay services a leg can be, across participating hotels. With an optional party (`adults`, `children`) it returns only the components that can take that party in one purchase, each with `party.unitsRequired`, `party.fitsNatively` and `party.adjustedPrice`.
 
-```json
-{ "total": 37, "pageNo": 1, "pageSize": 50, "items": [
-  { "baseTable": "packages", "recordId": 367, "name": "Generosity Umrah Package", "hotelId": 86, "hotelName": "Le Meridien Makkah",
-    "category": null, "price": { "base": 475, "current": 475, "currency": "SAR" },
-    "durationNights": 2, "extraNightsAllowed": false, "maxExtraNights": null, "maxQuantityPerBooking": null, "hotelConsents": true,
-    "configs": [
-      { "config_key_id": 67, "config_key": "base_price", "operator": "=", "config_value": [ { "en": "475.00", "ar": "" } ], "is_input": 1 },
-      { "config_key_id": 119, "config_key": "base_currency", "operator": "=",
-        "config_value": [ { "currency_id": 4, "key": "SAR", "en": "SAR", "ar": "SAR", "currency_name": "Saudi Riyal", "currency_symbol": "SR" } ], "is_input": 0 } ] } ] }
-```
-
-`maxQuantityPerBooking` is the package's cap on the leg `quantity` (`null`: no cap, always `null` for services). Each item's `configs` has the same shape as `configs` on the visit View: one entry per config key, with `config_value` as a list of `en`/`ar` pairs for typed values (`is_input: 1`), a list of selected option ids for option keys (`is_input: 0`), and currency objects for `base_currency`. These are the component's own configs. An item with none returns an empty list.
+The full contract (query parameters, every response field, the party-matching rule, worked examples, and how the visit builder turns results into `visitItems`) is on its own page: **[Visit Components API](./visits-components-api.md)**.
 
 ---
 
@@ -287,15 +296,15 @@ A **grouped CRUD** in three steps on one URL. `?step=` picks the entity; leaving
 | Step | Entity | Add | Update (`id` =) | List / View |
 |---|---|---|---|---|
 | `?step=1` | Platform | Create the platform | platform id | Partner platforms |
-| `?step=2` | Platform versions | Add a version and its key | platform version id | A platform's versions |
-| `?step=3` | Platform system users | Add a system user | user id | A platform's system users |
+| `?step=2` | Platform versions | Create a new version and/or link selected versions | platform id (version set), or platform version id (status only) | A platform's versions |
+| `?step=3` | Platform system users | Create a new system user and/or sync the selected users and their data | platform id (user set), or user id (single-user password/TOTP) | A platform's system users |
 
 Every key is `<table>_<camelColumn>` (`platforms_*`, `platformVersions_*`, `versions_*`, `users_*`). Lists are flat rows with `table_count` and support the standard `page_no`, `page_size`, `sort_by`, `sort_order` and `filter_*` query parameters. View (`&id=`) returns one row. The framework requires `id` in the body on every `PUT` as well.
 
 **Onboarding a partner** is three calls, in order:
 1. `POST ?step=1` with the platform. Keep `id`.
-2. `POST ?step=2` with `platformVersions_platformId = id` and `versions_version`. Keep `platformVersions_encryptionKey`.
-3. `POST ?step=3` with `users_platformId = id` and the email. Keep the password if one was generated.
+2. `POST ?step=2` with `platformVersions_platformId = id`, and either `platformVersions_isNewEntry: true` with `versions_version`, or `platformVersions_versionIds`. Keep every key in `platformVersions_newKeys`.
+3. `POST ?step=3` with `users_platformId = id`, `users_isNewEntry: true` and the email. Keep the password if one was generated.
 
 Then hand the partner, out of band: the platform name and version, the platform key, the shared outer key, the system user email and password, and the webhook secret.
 
@@ -363,6 +372,19 @@ Response: `{ "id": 8, "platforms_platformId": 8, "platforms_webhookSecret": "whs
     "platforms_webhookUrl": "https://travelco.example.com/webhooks/hms",
     "platforms_activeVersionCount": 1,
     "platforms_systemUserCount": 1,
+    "platformVersions_versionIds": [4],
+    "platformVersions_platformVersionIds": [31],
+    "platformVersions_versions": [
+      { "platformVersionId": 31, "versionId": 4, "version": "1.0.0", "status": "active" },
+      { "platformVersionId": 29, "versionId": 2, "version": "0.9.0", "status": "inactive" }
+    ],
+    "users_userIds": [912],
+    "users_usersData": {
+      "912": { "email": "hms@travelco.example.com", "firstName": "TravelCo", "lastName": "System", "status": "active",
+               "totpStatus": "active", "totpEnrolled": true, "totpEnrolledAt": "2026-10-06T10:00:00Z", "totpRotatedAt": null, "totpRotationPending": false, "totpFailedAttempts": 0, "totpLockedUntil": null, "totpLocked": false },
+      "915": { "email": "old@travelco.example.com", "firstName": "Old", "lastName": "System", "status": "inactive",
+               "totpStatus": null, "totpEnrolled": false, "totpEnrolledAt": null, "totpRotatedAt": null, "totpRotationPending": false, "totpFailedAttempts": 0, "totpLockedUntil": null, "totpLocked": false }
+    },
     "platforms_createdBy": 1,
     "platforms_updatedBy": 1,
     "platforms_createdAt": "2026-10-06T09:58:12.000Z",
@@ -381,7 +403,24 @@ Response: `{ "id": 8, "platforms_platformId": 8, "platforms_webhookSecret": "whs
 | `platforms_rateLimit` | number | yes | `null` uses the default (600, or `PARTNER_RATE_LIMIT_PER_MINUTE`) |
 | `platforms_webhookUrl` | string | yes | the secret is never returned |
 | `platforms_activeVersionCount` | number | no | `0` means partners cannot connect |
-| `platforms_systemUserCount` | number | no | `0` means nobody can log in |
+| `platforms_systemUserCount` | number | no | active system users. `0` means nobody can log in |
+| `platformVersions_versionIds` | number[] | no | `versions.version_id` of every **active** version linked to the platform. Prefill the step 2 multiselect with it |
+| `platformVersions_platformVersionIds` | number[] | no | `platform_versions.platform_version_id` of the same active links |
+| `platformVersions_versions` | object[] | no | every link, active or inactive: `platformVersionId`, `versionId`, `version`, `status` |
+| `users_userIds` | number[] | no | ids of the platform's **active** system users. Prefill the step 3 multiselect with it |
+| `users_usersData` | object | no | every system user, active or inactive, keyed by user id: `email`, `firstName`, `lastName`, `status`, and the MFA fields below. Edit it and send it back in step 3 |
+
+**MFA (TOTP) fields per system user.** Returned in `users_usersData` here and in the step 3 response, and as `users_<field>` on step 3 List/View rows. Read-only: change them with the step 3 actions (`totpUnlock`, `totpReset`, `totpRevoke`). Secrets are never returned.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `totpStatus` | string \| null | `null`: never logged in, or reset. `pending`: enrolment started, not confirmed. `active`. `revoked`: login refused until a reset |
+| `totpEnrolled` | boolean | `true` once enrolment was confirmed (`active` or `revoked`) |
+| `totpEnrolledAt`, `totpRotatedAt` | ISO 8601 datetime \| null | |
+| `totpRotationPending` | boolean | a rotation was started and isn't confirmed yet |
+| `totpFailedAttempts` | number | failed logins since the last success or lock. Five in a row lock the user |
+| `totpLockedUntil` | ISO 8601 datetime \| null | end of the current or last lock (15 minutes) |
+| `totpLocked` | boolean | `true` while `totpLockedUntil` is in the future |
 | `platforms_createdBy`, `platforms_updatedBy` | number | yes | URDD ids |
 | `platforms_createdAt`, `platforms_updatedAt` | ISO 8601 datetime | no | |
 
@@ -389,40 +428,95 @@ View returns one row in this shape, without `table_count`. An unknown id is `404
 
 ### Step 2 — Platform versions
 
+A platform can have several versions, each with its own key. Step 2 works like the other grouped CRUDs (users, RDDs): the admin either creates a new version (`platformVersions_isNewEntry: true`) or selects existing ones (`platformVersions_versionIds`), and the selection is applied as a delta.
+
+| Key | Type | Notes |
+|---|---|---|
+| `platformVersions_platformId` | number | the platform. Required on Add. On Update it falls back to `id` |
+| `platformVersions_isNewEntry` | boolean | `true`: create `versions_version` and link it to the platform |
+| `versions_version` | string | the new version, such as `1.2.0`. Required when `platformVersions_isNewEntry` is `true` |
+| `platformVersions_versionIds` | number[] or `{ value, label }`[] | ids from the `versions` table that the platform should have **active** after the call |
+
+**How the selection is applied.** Let *selected* be `platformVersions_versionIds`, plus the new version when `platformVersions_isNewEntry` is `true`. Compared with the platform's current links:
+
+| Version | Current link | Result | Key |
+|---|---|---|---|
+| selected | none | linked (`platformVersions_added`) | new key, returned once |
+| selected | inactive | reactivated (`platformVersions_reactivated`) | the old key works again |
+| selected | active | unchanged (`platformVersions_kept`) | unchanged |
+| not selected | active | retired, status `inactive` (`platformVersions_removed`) | stops working |
+
+- Omitting `platformVersions_versionIds` changes no existing link. Use this to add a new version and keep the others.
+- An empty array retires every link. This, and any change that would leave the platform with no active version, is `409 last_active_version`, and nothing is changed: the whole call runs in one transaction.
+- Retiring is a status change, never a delete. Selecting the version again reactivates it with its old key.
+
+**Flows**
+
+| Goal | Request |
+|---|---|
+| First version at onboarding | `POST`, `isNewEntry: true`, `versions_version: "1.0.0"` |
+| Link existing versions | `POST` or `PUT`, `isNewEntry: false`, `versionIds: [1, 2]` |
+| Rotate keys: add `1.1.0`, keep `1.0.0` for now | `PUT`, `isNewEntry: true`, `versions_version: "1.1.0"` (no `versionIds`) |
+| Rotate keys: add `1.1.0` and retire the rest | `PUT`, `isNewEntry: true`, `versions_version: "1.1.0"`, `versionIds: []` |
+| Retire `1.0.0` later | `PUT`, `versionIds` = the current set without `1.0.0` |
+| Reactivate `1.0.0` | `PUT`, `versionIds` = the current set plus `1.0.0` |
+
 **Add — `POST /api/crud/partner-platforms?step=2`**
 
 ```json
-{ "actionPerformerURDD": 1, "platformVersions_platformId": 8, "versions_version": "1.0.0" }
+{ "actionPerformerURDD": 1, "platformVersions_platformId": 8, "platformVersions_isNewEntry": true, "versions_version": "1.0.0" }
 ```
+
+**Update — `PUT /api/crud/partner-platforms?step=2&id=8`** (`id` = platform id)
+
+```json
+{ "id": 8, "actionPerformerURDD": 1, "platformVersions_platformId": 8,
+  "platformVersions_isNewEntry": true, "versions_version": "1.2.0", "platformVersions_versionIds": [4] }
+```
+
+Response (Add and Update):
 
 ```json
 {
-  "id": 31,
-  "platformVersions_platformVersionId": 31,
+  "id": 8,
   "platformVersions_platformId": 8,
-  "versions_version": "1.0.0",
+  "platformVersions_versionIds": [4, 5],
+  "platformVersions_platformVersionIds": [31, 40],
+  "platformVersions_added": [5],
+  "platformVersions_reactivated": [],
+  "platformVersions_kept": [4],
+  "platformVersions_removed": [2],
+  "platformVersions_newKeys": [
+    { "platformVersionId": 40, "versionId": 5, "version": "1.2.0", "encryptionKey": "3f9a…" }
+  ],
+  "platformVersions_platformVersionId": 40,
+  "versions_version": "1.2.0",
   "platformVersions_status": "active",
   "platformVersions_encryptionKey": "3f9a…"
 }
 ```
 
-`platformVersions_encryptionKey` is the platform key the partner uses for this version. It is shown **once**; List and View never return it. Adding a second version (for example `1.1.0`) is how keys are rotated, and the old version keeps working until it is retired.
+- `platformVersions_versionIds` / `platformVersions_platformVersionIds` are the platform's active links after the call.
+- `platformVersions_newKeys` has one entry per newly linked version. Each `encryptionKey` is the platform key the partner uses with that version. It is shown **once**; List and View never return it.
+- When exactly one version was newly linked, its fields are also returned flat (`platformVersions_platformVersionId`, `versions_version`, `platformVersions_status`, `platformVersions_encryptionKey`).
+- A `POST` sending only `versions_version` (no `platformVersions_isNewEntry` and no `platformVersions_versionIds`) is treated as `isNewEntry: true`. In that case `id` is the new platform version id, as before this change.
 
 Errors:
 - `400 platform_id_required`, `404 platform_not_found`
-- `422 invalid_version`: a version is required, such as `1.0.0`
-- `409 version_exists`
+- `422 invalid_version`: `platformVersions_isNewEntry` is `true` but `versions_version` is missing or malformed
+- `422 nothing_to_update`: `platformVersions_isNewEntry` is `false` and no `platformVersions_versionIds`
+- `404 version_not_found`: a selected id isn't in `versions`; `error.details.missing` lists them
+- `409 version_exists`: the new version is already linked to this platform; select it instead
+- `409 last_active_version`
 
-**Update — `PUT /api/crud/partner-platforms?step=2&id=31`**
+**Single-version status — `PUT /api/crud/partner-platforms?step=2&id=31`** (`id` = platform version id). When the body has neither `platformVersions_isNewEntry` nor `platformVersions_versionIds`, the call only sets one link's status:
 
 ```json
 { "id": 31, "actionPerformerURDD": 1, "platformVersions_status": "inactive" }
 ```
 
-- `platformVersions_status` is `active` or `inactive`.
-- A partner calling with an inactive version gets `400` from the envelope ("Invalid Platform Name or Version"). Use this to retire an old key after rotation.
-- Retiring the last active version is `409 last_active_version`.
-- Unknown id: `404 version_not_found`.
+- `platformVersions_status` is `active` or `inactive`. A partner calling with an inactive version gets `400` from the envelope ("Invalid Platform Name or Version").
+- Retiring the last active version is `409 last_active_version`. Unknown id: `404 version_not_found`.
 - The response is the row: `id`, `platformVersions_platformVersionId`, `platformVersions_platformId`, `versions_version`, `platformVersions_status`.
 
 **List — `GET ?step=2` and View — `GET ?step=2&id=31`.** Optional `platformVersions_platformId` (body or query) limits the list to one platform:
@@ -448,64 +542,121 @@ Errors:
 
 ### Step 3 — Platform system users
 
+Step 3 works like step 2. The admin can create a new system user (`users_isNewEntry: true`), select which existing users stay active (`users_userIds`, applied as a delta), and edit the selected users' details (`users_usersData`, keyed by user id).
+
+| Key | Type | Notes |
+|---|---|---|
+| `users_platformId` | number | the platform. Required on Add. On Update it falls back to `id` |
+| `users_isNewEntry` | boolean | `true`: create a system user from `users_email`, `users_firstName`, `users_lastName`, `users_password` |
+| `users_email` | string | required when `users_isNewEntry` is `true` |
+| `users_firstName`, `users_lastName` | string | new user only. Default `Partner` / `System` |
+| `users_password` | string | new user only, optional. Left out: a password is generated and returned **once** |
+| `users_userIds` | number[] or `{ value, label }`[] | system users that should be **active** after the call |
+| `users_usersData` | object, or the same object as a JSON string | per-user changes keyed by user id, for example `{ "912": { "firstName": "Ops" } }` |
+
+**`users_usersData` entries.** Each sent field replaces the stored value after validation. Fields left out are kept.
+
+| Field | Effect | Validation |
+|---|---|---|
+| `email` | replaces the login email | valid email (`422 invalid_email`), not used by another user (`409 email_in_use`) |
+| `firstName` | replaces the first name | not empty (`422 invalid_users_data`) |
+| `lastName` | replaces the last name | an empty string clears it |
+| `password` | sets this password | strength rules (`422 weak_password`) |
+| `resetPassword: true` | generates a password, returned once in `users_outcomes` | |
+| `totpReset: true` | removes the user's TOTP entry, so the next login enrols again | |
+| `totpRevoke: true` | login returns `403 totp_revoked` until a reset | |
+| `totpUnlock: true` | ends a lockout now and clears `totpFailedAttempts`. Status and secret are unchanged | |
+
+Any other field, a key that isn't a user id, or (when `users_userIds` is sent) a user not in `users_userIds` is `422 invalid_users_data`. Every id in `users_userIds` and `users_usersData` must be a system user of this platform, or the call is `404 user_not_found`.
+
+**How the selection is applied.** Compared with the platform's system users:
+
+| User | Current status | Result |
+|---|---|---|
+| in `users_userIds` | active | unchanged (`users_kept`) |
+| in `users_userIds` | inactive | reactivated, can log in again with the same password (`users_reactivated`) |
+| not in `users_userIds` | active | deactivated: login and every system call are refused (`users_removed`) |
+
+- Users are deactivated, never deleted. Selecting them again reactivates them.
+- Omitting `users_userIds` changes nobody's status. Use this to add a user, or edit details, without touching the others.
+- Any change that would leave no active system user is `409 last_system_user`, and nothing is changed: the whole call runs in one transaction.
+
+**Flows**
+
+| Goal | Request |
+|---|---|
+| First system user at onboarding | `POST`, `isNewEntry: true`, `users_email` |
+| Add a second user, keep the first | `PUT`, `isNewEntry: true`, `users_email` (no `users_userIds`) |
+| Edit names or emails | `PUT`, `users_usersData` with the changed users (`users_userIds` optional) |
+| Reset a password or TOTP | `PUT`, `users_usersData: { "<id>": { "resetPassword": true } }` |
+| Unlock a locked user | `PUT`, `users_usersData: { "<id>": { "totpUnlock": true } }` |
+| Deactivate a user | `PUT`, `users_userIds` = the current set without that user |
+| Reactivate a user | `PUT`, `users_userIds` = the current set plus that user |
+| Replace the only user | `PUT`, `isNewEntry: true` with the new email, `users_userIds: []` |
+
 **Add — `POST /api/crud/partner-platforms?step=3`**
 
 ```json
 {
   "actionPerformerURDD": 1,
   "users_platformId": 8,
+  "users_isNewEntry": true,
   "users_email": "hms@travelco.example.com",
   "users_firstName": "TravelCo",
-  "users_lastName": "System",
   "users_password": "Travel-Co-2026!x"
 }
 ```
 
-This creates the user, with its `PARTNER · System` URDD and permissions.
+The new user gets its `PARTNER · System` URDD and permissions.
 
-`users_password` is optional:
-- **If sent:** it must be 12 to 128 characters with a lowercase letter, an uppercase letter, a digit and a special character, and no leading or trailing spaces. Otherwise `422 weak_password`, and nothing is created. It is stored hashed and not echoed back.
-- **If left out:** a password is generated and returned **once**.
+**Update — `PUT /api/crud/partner-platforms?step=3&id=8`** (`id` = platform id)
 
 ```json
 {
-  "id": 912,
-  "users_userId": 912,
+  "id": 8,
+  "actionPerformerURDD": 1,
   "users_platformId": 8,
-  "users_systemUrdd": 4410,
-  "users_email": "hms@travelco.example.com",
-  "users_password": null,
-  "users_passwordSource": "provided"
+  "users_userIds": [912, 915],
+  "users_usersData": {
+    "912": { "email": "ops@travelco.example.com", "firstName": "Ops" },
+    "915": { "resetPassword": true }
+  }
 }
 ```
 
-Errors:
-- `400 platform_id_required`, `404 platform_not_found`
-- `422 invalid_email`, `422 weak_password`
-- `409 email_in_use`
-
-**Update — `PUT /api/crud/partner-platforms?step=3&id=912`**
-
-| Key | Effect |
-|---|---|
-| `users_resetPassword: true` (optionally with `users_password`) | With `users_password`, sets the partner's own password (`users_password: null`, `users_passwordSource: "provided"`). Without it, generates one and returns it once (`"generated"`) |
-| `users_totpReset: true` | Removes the user's TOTP entry. Their next password login enrols again. Result `reset` or `no_totp_entry` |
-| `users_totpRevoke: true` | Login returns `403 totp_revoked` until a reset. Result `revoked` or `no_totp_entry` |
+Response (Add and Update):
 
 ```json
-{ "id": 912, "actionPerformerURDD": 1, "users_resetPassword": true }
+{
+  "id": 8,
+  "users_platformId": 8,
+  "users_userIds": [912, 915],
+  "users_usersData": {
+    "912": { "email": "ops@travelco.example.com", "firstName": "Ops", "lastName": "System", "status": "active" },
+    "915": { "email": "old@travelco.example.com", "firstName": "Old", "lastName": "System", "status": "active" }
+  },
+  "users_added": [],
+  "users_reactivated": [915],
+  "users_kept": [912],
+  "users_removed": [],
+  "users_updated": [912, 915],
+  "users_outcomes": { "912": {}, "915": { "password": "…", "passwordSource": "generated" } }
+}
 ```
 
-```json
-{ "id": 912, "users_userId": 912, "users_platformId": 8, "users_password": "…", "users_passwordSource": "generated" }
-```
-
-`users_totpReset` and `users_totpRevoke` appear in the response when sent.
+- `users_userIds` and `users_usersData` are the platform's state after the call.
+- `users_outcomes` has, for each edited user: the generated `password` (once) with `passwordSource`, and `totpUnlock` / `totpReset` / `totpRevoke` as `unlocked`, `reset`, `revoked` or `no_totp_entry`.
+- When a user was created, its fields are also returned flat: `users_userId`, `users_systemUrdd`, `users_email`, `users_password` (generated only, else `null`), `users_passwordSource`.
 
 Errors:
-- `404 user_not_found`: not a partner system user.
-- `422 nothing_to_update`: none of the keys were sent.
-- `422 weak_password`.
+- `400 platform_id_required`, `404 platform_not_found`, `404 user_not_found`
+- `422 invalid_email`, `422 weak_password`, `422 invalid_users_data`
+- `422 nothing_to_update`: no new user, no `users_userIds` and no `users_usersData`
+- `409 email_in_use`, `409 last_system_user`
+
+**Earlier request shapes still work:**
+- A `POST` with only `users_email` (and names/password), without `users_isNewEntry`, `users_userIds` or `users_usersData`, creates one user and returns `id` = the user id.
+- `PUT ?step=3&id=<userId>` with `users_resetPassword`, `users_password`, `users_totpReset`, `users_totpRevoke` or `users_totpUnlock` (and none of the set keys) changes that one user and returns `{ id, users_userId, users_platformId, users_password, users_passwordSource, users_totpReset, users_totpRevoke, users_totpUnlock }`.
 
 **List — `GET ?step=3` and View — `GET ?step=3&id=912`.** Optional `users_platformId` limits the list to one platform:
 
@@ -524,20 +675,20 @@ Errors:
     "users_createdAt": "2026-10-06T09:58:12.000Z",
     "users_updatedAt": "2026-10-06T09:58:12.000Z",
     "users_totpStatus": "active",
+    "users_totpEnrolled": true,
     "users_totpEnrolledAt": "2026-10-06T10:00:00.000Z",
     "users_totpRotatedAt": null,
+    "users_totpRotationPending": false,
+    "users_totpFailedAttempts": 0,
     "users_totpLockedUntil": null,
-    "users_totpRotationPending": false
+    "users_totpLocked": false
   }
 ]
 ```
 
 | Key | Type | Nullable | Notes |
 |---|---|---|---|
-| `users_totpStatus` | string | yes | `null` until the first login (or after a reset); then `pending` (enrolment not confirmed), `active` or `revoked` |
-| `users_totpEnrolledAt`, `users_totpRotatedAt` | ISO 8601 datetime | yes | |
-| `users_totpLockedUntil` | ISO 8601 datetime | yes | set after five failed logins; login is refused until then |
-| `users_totpRotationPending` | boolean | no | `true` while a rotation has started and is not confirmed |
+| `users_totp*` | | | the MFA fields above, prefixed `users_` (`users_totpStatus`, `users_totpEnrolled`, `users_totpEnrolledAt`, `users_totpRotatedAt`, `users_totpRotationPending`, `users_totpFailedAttempts`, `users_totpLockedUntil`, `users_totpLocked`) |
 
 Only system users are listed. Travellers created by the partner are not. No step ever returns a TOTP secret or a password hash.
 
@@ -608,7 +759,7 @@ The response is flat rows:
 | `platforms_platformName` | string | yes | |
 | `platformEventOutbox_bookingId` | number | yes | `null` for visit events |
 | `platformEventOutbox_visitId` | number | yes | |
-| `platformEventOutbox_eventType` | string | no | e.g. `leg.approved`, `leg.rejected`, `leg.scheduled`, `booking.cancelled`, `booking.cancelled_by_hotel`, `booking.cancelled_by_system`, `booking.checked_in`, `booking.checked_out`, `booking.no_show`, `booking.modified`, `visit.invalidated`, `visit.restored`, `visit.updated` |
+| `platformEventOutbox_eventType` | string | no | e.g. `leg.approved`, `leg.rejected`, `booking.cancelled`, `booking.cancelled_by_hotel`, `booking.cancelled_by_system`, `booking.checked_in`, `booking.checked_out`, `booking.no_show`, `booking.modified`, `visit.invalidated`, `visit.restored`, `visit.updated` |
 | `platformEventOutbox_oldStatus`, `platformEventOutbox_newStatus` | string | yes | the leg's booking status before and after |
 | `platformEventOutbox_initiator` | string | yes | `hotel`, `partner`, `system` or `guest` |
 | `platformEventOutbox_status` | string | no | `pending`, `delivered` or `dead` |

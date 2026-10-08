@@ -537,6 +537,7 @@ export const SIDEBAR: SidebarNode[] = [
         items: [
           'hms-documentation/visits/visits-overview',
           'hms-documentation/visits/visits-admin-apis',
+          'hms-documentation/visits/visits-components-api',
           'hms-documentation/visits/partner-integration-guide',
         ],
       },

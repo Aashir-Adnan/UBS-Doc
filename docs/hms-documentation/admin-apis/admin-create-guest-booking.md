@@ -316,6 +316,7 @@ All existing booking validations apply — the admin does not bypass any busines
 | 404 | Hotel, service, package, or guest URDD not found |
 | 409 | No available rooms/units for the selected dates |
 | 422 | Cross-hotel addon, stay-as-addon, package has no services |
+| 422 | `meta.scc = guest_urdd_not_standard`: `guestUrddId` is not the guest's standard guest URDD (for example a partner guest URDD). Bookings made through a partner platform are created by the partner only, see [Partner Bookings in Hotel Tools](./bookings-visit-legs.md) |
 
 ---
 
