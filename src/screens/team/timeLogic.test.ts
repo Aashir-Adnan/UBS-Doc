@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   formatDuration, estimatePercent, isOverEstimate, weekRange, shiftWeek, topContributors, timeChip,
+  dayRange, shiftRange, switchView, parseTimeView,
 } from './timeLogic'
 
 describe('formatDuration', () => {
@@ -234,5 +235,70 @@ describe('csvRows', () => {
   it('renders a null projectName and note as empty columns end-to-end through toCsv', () => {
     const lines = toCsv(csvRows(payload)).split('\r\n')
     expect(lines[2]).toBe('2026-02-05 08:05,Ana,,General work,20,,discord')
+  })
+})
+
+// Local dates throughout, like weekRange: built with the local-time Date
+// constructor so the tests mean the same thing in any timezone.
+describe('dayRange', () => {
+  it('runs from local midnight to the next local midnight', () => {
+    const r = dayRange(new Date(2026, 9, 12, 15, 30))
+    expect(r.since).toEqual(new Date(2026, 9, 12, 0, 0, 0, 0))
+    expect(r.until).toEqual(new Date(2026, 9, 13, 0, 0, 0, 0))
+  })
+  it('crosses a month end', () => {
+    const r = dayRange(new Date(2026, 9, 31, 23, 59))
+    expect(r.until).toEqual(new Date(2026, 10, 1, 0, 0, 0, 0))
+  })
+})
+
+describe('shiftRange', () => {
+  it('moves a day by days', () => {
+    const r = dayRange(new Date(2026, 9, 12))
+    expect(shiftRange(r, 'day', -1)).toEqual(dayRange(new Date(2026, 9, 11)))
+    expect(shiftRange(r, 'day', 1)).toEqual(dayRange(new Date(2026, 9, 13)))
+  })
+  it('moves a week by weeks, exactly as shiftWeek does', () => {
+    const r = weekRange(new Date(2026, 9, 12))
+    expect(shiftRange(r, 'week', -1)).toEqual(shiftWeek(r, -1))
+    expect(shiftRange(r, 'week', 2)).toEqual(shiftWeek(r, 2))
+  })
+})
+
+describe('switchView', () => {
+  const today = new Date(2026, 9, 14, 10, 0) // a Wednesday
+  it('week to day opens today when the shown week holds today', () => {
+    expect(switchView(weekRange(today), 'day', today)).toEqual(dayRange(today))
+  })
+  it("week to day opens that week's Monday when the week does not hold today", () => {
+    const earlier = weekRange(new Date(2026, 8, 24)) // Mon 21 Sep .. Sun 27 Sep
+    expect(switchView(earlier, 'day', today)).toEqual(dayRange(new Date(2026, 8, 21)))
+  })
+  it('day to week opens the week holding that day', () => {
+    const sunday = dayRange(new Date(2026, 9, 18))
+    expect(switchView(sunday, 'week', today)).toEqual(weekRange(new Date(2026, 9, 18)))
+  })
+  it('the same view keeps the range', () => {
+    const r = dayRange(new Date(2026, 9, 2))
+    expect(switchView(r, 'day', today)).toEqual(r)
+  })
+})
+
+describe('parseTimeView', () => {
+  it('reads ?view=day and treats anything else as week', () => {
+    expect(parseTimeView('day')).toBe('day')
+    expect(parseTimeView('week')).toBe('week')
+    for (const v of [null, undefined, '', 'Day', 'month']) expect(parseTimeView(v)).toBe('week')
+  })
+})
+
+describe('csvFilename for one day', () => {
+  it('names the single day once', () => {
+    const r = dayRange(new Date(2026, 9, 12))
+    expect(csvFilename('Ali Khan', r.since, r.until)).toBe('time-ali-khan-2026-10-12.csv')
+  })
+  it('a week keeps its from-to name', () => {
+    const r = weekRange(new Date(2026, 9, 12))
+    expect(csvFilename('Ali Khan', r.since, r.until)).toBe('time-ali-khan-2026-10-12-to-2026-10-18.csv')
   })
 })

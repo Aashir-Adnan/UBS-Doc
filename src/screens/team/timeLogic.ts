@@ -40,9 +40,46 @@ export function weekRange(date: Date): { since: Date; until: Date } {
 
 // Both ends of `range` shifted by `n` weeks (n may be negative).
 export function shiftWeek(range: { since: Date; until: Date }, n: number): { since: Date; until: Date } {
-  const days = n * 7
+  return shiftDays(range, n * 7)
+}
+
+// Both ends of `range` shifted by `days` calendar days, in local time, so a
+// daylight-saving change never leaves a range an hour off midnight.
+function shiftDays(range: { since: Date; until: Date }, days: number): { since: Date; until: Date } {
   const shift = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + days, d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds())
   return { since: shift(range.since), until: shift(range.until) }
+}
+
+/** The Time tab's two views: a Monday-to-Monday week, or a single day. */
+export type TimeView = 'week' | 'day'
+
+/** `?view=` from the address bar; anything but `day` is the default week. */
+export const parseTimeView = (v: string | null | undefined): TimeView => (v === 'day' ? 'day' : 'week')
+
+// Local midnight on `date` through the next local midnight (exclusive) — the
+// day the Time tab's Day view covers, built the same way as weekRange.
+export function dayRange(date: Date): { since: Date; until: Date } {
+  const since = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0)
+  const until = new Date(since.getFullYear(), since.getMonth(), since.getDate() + 1, 0, 0, 0, 0)
+  return { since, until }
+}
+
+// The previous or next week or day: `n` steps of the current view.
+export function shiftRange(range: { since: Date; until: Date }, view: TimeView, n: number): { since: Date; until: Date } {
+  return view === 'day' ? shiftDays(range, n) : shiftWeek(range, n)
+}
+
+// Switching views keeps the visitor's place: a week opens as today when it
+// holds today, else as its Monday; a day opens as the week holding it. The
+// same view keeps the range as it is.
+export function switchView(range: { since: Date; until: Date }, to: TimeView, today: Date = new Date()): { since: Date; until: Date } {
+  const isDay = range.until.getTime() - range.since.getTime() <= 25 * 60 * 60 * 1000
+  if (to === 'day') {
+    if (isDay) return range
+    const holdsToday = today >= range.since && today < range.until
+    return dayRange(holdsToday ? today : range.since)
+  }
+  return isDay ? weekRange(range.since) : range
 }
 
 // The first `max` entries unchanged (same references), then — only when more
@@ -98,6 +135,8 @@ const isoDay = (d: Date): string =>
 export function csvFilename(name: string, since: Date, until: Date): string {
   const slug = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'person'
   const lastDay = new Date(until.getFullYear(), until.getMonth(), until.getDate() - 1)
+  // A single day (the Day view) is named once, not "from it to itself".
+  if (isoDay(lastDay) === isoDay(since)) return `time-${slug}-${isoDay(since)}.csv`
   return `time-${slug}-${isoDay(since)}-to-${isoDay(lastDay)}.csv`
 }
 

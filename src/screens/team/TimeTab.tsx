@@ -1,17 +1,19 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { c, card, txt, muted } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
 import { ApiError, fetchClockedIn, fetchTimeEntries, fetchTimeReport, type ClockedInPerson, type TimeEntriesPayload, type TimeReportPayload } from '../../components/discordTasks/api'
-import { csvFilename, csvRows, entriesByTask, formatDuration, shiftWeek, toCsv, weekRange } from './timeLogic'
+import { csvFilename, csvRows, dayRange, entriesByTask, formatDuration, parseTimeView, shiftRange, switchView, toCsv, weekRange, type TimeView } from './timeLogic'
 import Avatar from './Avatar'
 import { clockedInTaskLabel, formatElapsed } from './clockLogic'
 import { useTeam } from './TeamLayout'
 
 // The Time tab: its own fetch of GET /api/discord/time/report, entirely
 // separate from the shared TasksList/People/Board payload TeamLayout owns —
-// the report is keyed by the week range and the shared Project filter, not
+// the report is keyed by the shown range (a week, or one day in the Day view)
+// and the shared Project filter, not
 // by the rest of the task filters that apply to the other tabs, so it holds
 // its own range/data/loading/error state and refetches whenever the range or
 // the Project filter changes. It also refetches whenever the shared payload's
@@ -27,13 +29,20 @@ import { useTeam } from './TeamLayout'
 // caller, whatever the filter says, and the shell hides the select.
 
 const rangeFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
+const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
 
-function rangeLabel(range: { since: Date; until: Date }): string {
+function rangeLabel(range: { since: Date; until: Date }, view: TimeView): string {
+  if (view === 'day') return dayFmt.format(range.since)
   // `until` is exclusive (the following Monday), so the last day actually
   // covered is one day earlier.
   const lastDay = new Date(range.until.getFullYear(), range.until.getMonth(), range.until.getDate() - 1)
   return `${rangeFmt.format(range.since)} – ${rangeFmt.format(lastDay)}`
 }
+
+const VIEWS: { value: TimeView; label: string }[] = [
+  { value: 'week', label: 'Week' },
+  { value: 'day', label: 'Day' },
+]
 
 // Built in the browser from what is already on screen, so the file can never
 // disagree with what the user is looking at, and there is no export endpoint
@@ -60,7 +69,21 @@ export default function TimeTab() {
   const { theme } = useTheme()
   const d = theme === 'dark'
   const { payload, filters, setTimeSelfScoped } = useTeam()
-  const [range, setRange] = useState(() => weekRange(new Date()))
+  // Week or Day, mirrored into the address (`?view=day`) like the Project and
+  // Scope filters, so a refresh or a shared link keeps it. Week is the default
+  // and is left out of the address.
+  const [params, setParams] = useSearchParams()
+  const [view, setView] = useState<TimeView>(() => parseTimeView(params.get('view')))
+  const [range, setRange] = useState(() => (view === 'day' ? dayRange(new Date()) : weekRange(new Date())))
+  const changeView = (next: TimeView) => {
+    if (next === view) return
+    setView(next)
+    setRange((r) => switchView(r, next, new Date()))
+    const q = new URLSearchParams(params)
+    if (next === 'day') q.set('view', 'day'); else q.delete('view')
+    setParams(q, { replace: true })
+  }
+  const unit = view === 'day' ? 'day' : 'week'
   const [data, setData] = useState<TimeReportPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -177,12 +200,23 @@ export default function TimeTab() {
     <>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => setRange((r) => shiftWeek(r, -1))} title="Previous week"
+          <div role="radiogroup" aria-label="Time range" className={c('inline-flex rounded-xl p-0.5 mr-1', d ? 'bg-white/6' : 'bg-slate-100')}>
+            {VIEWS.map((o) => (
+              <button key={o.value} type="button" role="radio" aria-checked={view === o.value} onClick={() => changeView(o.value)}
+                className={c('px-3 h-8 text-xs font-semibold rounded-lg tr',
+                  view === o.value
+                    ? (d ? 'bg-white/12 text-white' : 'bg-white text-slate-800 shadow-sm')
+                    : (d ? 'text-white/50 hover:text-white/80' : 'text-slate-500 hover:text-slate-700'))}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={() => setRange((r) => shiftRange(r, view, -1))} title={`Previous ${unit}`}
             className={c('h-9 w-9 inline-flex items-center justify-center rounded-xl tr', d ? 'text-white/50 hover:bg-white/6' : 'text-slate-400 hover:bg-slate-100')}>
             <ChevronLeft size={16} />
           </button>
-          <p className={c('text-sm font-bold m-0 tabular-nums', txt(theme))}>{rangeLabel(range)}</p>
-          <button type="button" onClick={() => setRange((r) => shiftWeek(r, 1))} title="Next week"
+          <p className={c('text-sm font-bold m-0 tabular-nums', txt(theme))}>{rangeLabel(range, view)}</p>
+          <button type="button" onClick={() => setRange((r) => shiftRange(r, view, 1))} title={`Next ${unit}`}
             className={c('h-9 w-9 inline-flex items-center justify-center rounded-xl tr', d ? 'text-white/50 hover:bg-white/6' : 'text-slate-400 hover:bg-slate-100')}>
             <ChevronRight size={16} />
           </button>
@@ -223,7 +257,7 @@ export default function TimeTab() {
       <div className={c('tr', loading && data ? 'opacity-50' : '')}>
         {!loading && !error && people.length === 0 && projects.length === 0 ? (
           <div className={c(card(theme), 'rounded-2xl px-8 py-14 text-center')}>
-            <p className={c('text-sm font-medium m-0', muted(theme))}>No time logged this week.</p>
+            <p className={c('text-sm font-medium m-0', muted(theme))}>{view === 'day' ? 'No time logged on this day.' : 'No time logged this week.'}</p>
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2">
