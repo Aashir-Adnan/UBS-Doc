@@ -279,6 +279,7 @@ const sidebars = {
           items: [
             'hms-documentation/guest-apis/guest-tenant-scoped-apis',
             'hms-documentation/guest-apis/partner-guest-role',
+            'hms-documentation/guest-apis/partner-guest-role-backend-contract',
             {
               type: 'category',
               label: 'Guest Support',
