@@ -324,3 +324,11 @@ describe('the create note', () => {
     expect(run.t0).toEqual({ state: 'created', taskId: 'x1', note: 'No issue.' })
   })
 })
+
+describe('import help: the QA type (2026-10-11, part 2)', () => {
+  it('lists qa as a type, says where a scope-less qa task starts, and allows its modules', () => {
+    const rule = (name: string) => FORMAT_TASK_FIELDS.find((f) => f.name === name)?.rule ?? ''
+    expect(rule('type')).toBe('Required. feature, bug or qa. A qa task with no scope gets the qa scope.')
+    expect(rule('modules')).toBe('Up to 20 names of up to 100 characters each. Features and qa tasks only.')
+  })
+})

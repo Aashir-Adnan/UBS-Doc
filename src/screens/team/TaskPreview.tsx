@@ -2,9 +2,9 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { Ban, ExternalLink, Info } from 'lucide-react'
-import { c, txt, muted, chipRed } from '../../lib'
+import { c, txt, muted, chipRed, chipAmber } from '../../lib'
 import type { Theme } from '../../types'
-import { statusTone, STATUS_LABEL, type TaskRow } from '../tasksLogic'
+import { statusTone, STATUS_LABEL, typeMarker, type TaskRow } from '../tasksLogic'
 import { blockedLabel } from './boardLogic'
 import { popoverPosition } from './previewLogic'
 import { toneChip } from './chips'
@@ -110,7 +110,7 @@ export default function TaskPreview({ t, theme, search }: { t: TaskRow; theme: T
               {STATUS_LABEL[t.status] ?? t.status}
             </span>
             <ScopeBadge scope={t.scope} theme={theme} showEmpty />
-            {t.type === 'bug' && <span className={c('text-[11px] font-bold px-2 py-0.5 rounded-md', chipRed(theme))}>Bug</span>}
+            {typeMarker(t.type) && <span className={c('text-[11px] font-bold px-2 py-0.5 rounded-md', t.type === 'bug' ? chipRed(theme) : chipAmber(theme))}>{typeMarker(t.type)}</span>}
           </div>
 
           <p className={c('text-sm font-bold m-0 mb-1 leading-snug', txt(theme))}>{t.title}</p>

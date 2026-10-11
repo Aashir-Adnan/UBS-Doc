@@ -179,8 +179,11 @@ export async function updateTask(taskId: string, changes: TaskChanges): Promise<
   })
 }
 
+// The three task types the site creates (QA since 2026-10-11, part 2). The bot validates every create.
+export type TaskType = 'feature' | 'bug' | 'qa'
+
 export interface CreateTaskInput {
-  type: 'feature' | 'bug'
+  type: TaskType
   title: string
   description: string | null
   project_id: string
@@ -236,7 +239,7 @@ export interface ImportSubtaskFields {
   holderIds: string[]
 }
 export interface ImportFields {
-  type: 'feature' | 'bug'
+  type: TaskType
   title: string
   description: string | null
   scope: string | null

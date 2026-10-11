@@ -3,6 +3,7 @@ import type { RepoRef, TaskRow, TasksPayload } from '../tasksLogic'
 import {
   formFromTask, diffChanges, validateForm, emptyCreateForm, validateCreateForm, createPayload,
   blockerCandidates, saveErrorText, createErrorText, scopeOptionsFor, bugIssueRepo, bugRepoHint, showsBugRepoPicker, NO_REPO_OPTION, OPTIONAL_REPO_HELP,
+  TASK_TYPE_OPTIONS, withType,
 } from './taskFormLogic'
 
 const R1: RepoRef = { id: 'r1', name: 'Framework_Node', url: 'https://github.com/ubs-dev-org/Framework_Node' }
@@ -230,5 +231,32 @@ describe('projectChoices', () => {
     const { projectChoices } = await import('./taskFormLogic')
     const list = [{ id: 'p1', name: 'A' }, { id: null, name: 'General' }] as unknown as TasksPayload['projects']
     expect(projectChoices(list).map((p) => p.id)).toEqual(['p1'])
+  })
+})
+
+describe('the QA type (2026-10-11, part 2)', () => {
+  it('offers Feature, Bug and QA, in that order', () => {
+    expect(TASK_TYPE_OPTIONS).toEqual([{ value: 'feature', label: 'Feature' }, { value: 'bug', label: 'Bug' }, { value: 'qa', label: 'QA' }])
+  })
+  it('picking QA preselects the QA scope only when none is set; the creator can change it', () => {
+    const f = emptyCreateForm('P1')
+    expect(withType(f, 'qa')).toEqual({ ...f, type: 'qa', scope: 'qa' })
+    expect(withType({ ...f, scope: 'backend' }, 'qa').scope).toBe('backend')
+    expect(withType(f, 'bug')).toEqual({ ...f, type: 'bug' })
+    expect(withType({ ...f, type: 'qa', scope: 'qa' }, 'feature')).toEqual({ ...f, type: 'feature', scope: 'qa' })
+  })
+  it('a QA task validates like a feature and is sent as type qa with its modules and scope', () => {
+    const qa = withType({ ...emptyCreateForm('P1'), title: 'Regression pass', modules: 'search, search' }, 'qa')
+    expect(validateCreateForm(qa, null)).toBeNull()
+    expect(createPayload(qa, R1)).toEqual({
+      type: 'qa', title: 'Regression pass', description: null, project_id: 'P1', scope: 'qa', modules: ['search'],
+      holder_ids: [], repository_ids: [], create_issue: true, tracks: { api_tests: false, qa_tests: false, acceptance_criteria: false },
+    })
+  })
+  it('a QA task never shows the bug repository picker or sends a pick', () => {
+    const qa = { ...withType(emptyCreateForm('P1'), 'qa'), title: 'x', repoPick: 'r1' }
+    expect(showsBugRepoPicker(qa, null, [R1])).toBe(false)
+    expect(bugRepoHint(qa, null, 2)).toBeNull()
+    expect(createPayload(qa, null, [R1])).toMatchObject({ repository_ids: [], create_issue: false })
   })
 })

@@ -170,6 +170,15 @@ export const STATUS_LABEL: Record<string, string> = {
   open: 'Open', pending: 'Pending', in_progress: 'In progress', resolved: 'Resolved', closed: 'Closed', done: 'Done',
 }
 
+// The marker a task's type puts on a board card, a task row and the preview:
+// a bug and a QA task are marked, a feature (and a client's support task) is
+// not. "QA task", not "QA": the QA scope's badge already reads "QA".
+export function typeMarker(type: string | null | undefined): 'Bug' | 'QA task' | null {
+  if (type === 'bug') return 'Bug'
+  if (type === 'qa') return 'QA task'
+  return null
+}
+
 // Stored role keys come from the bot's PROJECT_MEMBER_ROLES; the site only labels them.
 export const ROLE_LABEL: Record<string, string> = {
   lead: 'Lead', developer: 'Developer', backend_developer: 'Backend Developer',

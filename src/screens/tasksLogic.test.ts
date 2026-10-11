@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   applyFilters, assigneeOptions, statusTone, unknownProjectSlug, roleLabel, DEFAULT_FILTERS,
   findTask, allTasks, scopeLabel, scopeTone, fixedScope, parseScopeFilter, scopeAppliesOn,
-  peopleCorpusFilters, SCOPE_FILTERS, SCOPE_LABEL, type ProjectGroup, type TeamMember,
+  peopleCorpusFilters, SCOPE_FILTERS, SCOPE_LABEL, typeMarker, type ProjectGroup, type TeamMember,
 } from './tasksLogic'
 
 const t = (id: string, status: string, assignees: string[], isBlocked = false, title = id) => ({
@@ -200,5 +200,16 @@ describe('the new scopes', () => {
     expect(scopeLabel('GitSync')).toBe('GitSync')
     expect(scopeTone('GitSync')).toBe('other')
     expect(fixedScope('Full stack')).toBeNull()
+  })
+})
+
+describe('typeMarker (2026-10-11, part 2)', () => {
+  it('marks a bug and a QA task, nothing else', () => {
+    expect(typeMarker('bug')).toBe('Bug')
+    expect(typeMarker('qa')).toBe('QA task')
+    expect(typeMarker('feature')).toBeNull()
+    expect(typeMarker('task')).toBeNull()
+    expect(typeMarker(null)).toBeNull()
+    expect(typeMarker(undefined)).toBeNull()
   })
 })

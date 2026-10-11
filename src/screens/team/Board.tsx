@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Ban, ListChecks, Clock, Timer } from 'lucide-react'
-import { c, card, txt, muted, chipGray, chipRed, chipMint } from '../../lib'
+import { c, card, txt, muted, chipGray, chipRed, chipMint, chipAmber } from '../../lib'
 import { useTheme } from '../../app/ThemeContext'
 import type { Theme } from '../../types'
-import { allTasks, applyFilters, statusTone, STATUS_LABEL, type TaskRow } from '../tasksLogic'
+import { allTasks, applyFilters, statusTone, STATUS_LABEL, typeMarker, type TaskRow } from '../tasksLogic'
 import { useActingPermissions } from '../../components/portal/tenantProjects/useActingPermissions'
 import { fetchClockedIn, setTaskStatus, type ClockedInPerson } from '../../components/discordTasks/api'
 import {
@@ -304,8 +304,8 @@ function Card({ t, col, theme, search, canMove, clockTag }: { t: TaskRow; col: B
             <Timer size={12} className="shrink-0" /> <span className="truncate">{clockTagText(clockTag)}</span>
           </span>
         )}
-        {t.type === 'bug' && (
-          <span className={c('text-[11px] font-bold px-2 py-0.5 rounded-md', chipRed(theme))}>Bug</span>
+        {typeMarker(t.type) && (
+          <span className={c('text-[11px] font-bold px-2 py-0.5 rounded-md', t.type === 'bug' ? chipRed(theme) : chipAmber(theme))}>{typeMarker(t.type)}</span>
         )}
         {progressText(t) && (
           <span title="Subtasks finished" className={c('text-[11px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1', chipGray(theme))}>

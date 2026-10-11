@@ -214,13 +214,13 @@ export const PARENT_MISSING_TEXT = 'The task was not created.'
 export const UNCONFIRMED_SKIP_TEXT = 'The task could not be confirmed, so its subtasks were not added.'
 
 export const FORMAT_TASK_FIELDS: { name: string; rule: string }[] = [
-  { name: 'type', rule: 'Required. feature or bug.' },
+  { name: 'type', rule: 'Required. feature, bug or qa. A qa task with no scope gets the qa scope.' },
   { name: 'title', rule: 'Required. Up to 200 characters.' },
   { name: 'description', rule: 'Up to 2000 characters.' },
   // Built from the form's list, so the help can never drift from the scopes on offer.
   { name: 'scope', rule: `${SCOPE_OPTIONS.slice(0, -1).map((o) => o.value).join(', ')} or ${SCOPE_OPTIONS[SCOPE_OPTIONS.length - 1].value}.` },
   { name: 'status', rule: 'open (the default), in_progress or done.' },
-  { name: 'modules', rule: 'Up to 20 names of up to 100 characters each. Features only.' },
+  { name: 'modules', rule: 'Up to 20 names of up to 100 characters each. Features and qa tasks only.' },
   { name: 'assignees', rule: 'Up to 50 people, each the email they verified in Discord or their Discord name.' },
   { name: 'subtasks', rule: 'Up to 25 subtasks.' },
 ]

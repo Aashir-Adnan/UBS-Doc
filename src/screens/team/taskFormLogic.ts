@@ -1,5 +1,5 @@
 import type { RepoRef, TaskRow, TasksPayload } from '../tasksLogic'
-import type { CreateTaskInput, TaskChanges } from '../../components/discordTasks/api'
+import type { CreateTaskInput, TaskChanges, TaskType } from '../../components/discordTasks/api'
 import { formatDuration } from './timeLogic'
 import { plainRuleMessage } from './boardLogic'
 
@@ -124,7 +124,7 @@ export const OPTIONAL_REPO_HELP = 'The repository is optional. Without one, no G
 export const PICK_SCOPE_HINT = 'Pick a scope to choose the repository automatically, or pick one below.'
 
 export interface CreateForm {
-  type: 'feature' | 'bug'
+  type: TaskType
   title: string
   description: string
   projectId: string
@@ -144,6 +144,23 @@ export interface CreateForm {
 
 export function emptyCreateForm(projectId = ''): CreateForm {
   return { type: 'feature', title: '', description: '', projectId, scope: '', modules: '', holderIds: [], createIssue: true, repoPick: '', tracksApi: false, tracksQa: false, tracksAc: false }
+}
+
+/** The New task form's type choices, in display order. */
+export const TASK_TYPE_OPTIONS: { value: TaskType; label: string }[] = [
+  { value: 'feature', label: 'Feature' },
+  { value: 'bug', label: 'Bug' },
+  { value: 'qa', label: 'QA' },
+]
+
+/**
+ * The form after the creator picks a type. Picking QA starts the scope on QA
+ * when none is set (the creator can still change it); a chosen scope is kept,
+ * and Feature and Bug leave the scope alone. The bot applies the same default
+ * to a QA task sent with no scope (`defaultScopeFor`, bot utils/taskScope.js).
+ */
+export function withType(f: CreateForm, type: TaskType): CreateForm {
+  return { ...f, type, scope: type === 'qa' && !f.scope ? 'qa' : f.scope }
 }
 
 /** The picked repository, when the form is a bug the rule gives none and the pick is one of `choices`. */

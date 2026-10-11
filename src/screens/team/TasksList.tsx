@@ -159,7 +159,7 @@ function TaskLine({ t, theme, search, nested = false }: { t: TaskRow; theme: The
           <AvatarStack people={t.assignees} size={22} theme={theme} />
           <p className={c('text-xs m-0', muted(theme))}>
             {t.assignees.length ? t.assignees.map((a) => a.name).join(', ') : 'Unassigned'}
-            {t.type === 'bug' ? ' · bug' : ''}
+            {t.type === 'bug' ? ' · bug' : t.type === 'qa' ? ' · QA task' : ''}
           </p>
           <ScopeBadge scope={t.scope} theme={theme} />
           {progressText(t) && (
