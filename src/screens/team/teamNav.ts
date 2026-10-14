@@ -1,7 +1,7 @@
 // Tab bar model for the Team section. The active tab is derived from the URL
 // rather than held in state, so a deep link (or the task-detail route, which
 // has no tab of its own) lights the right tab on first paint.
-export type TeamTabKey = 'people' | 'tasks' | 'board' | 'time' | 'stats'
+export type TeamTabKey = 'people' | 'tasks' | 'board' | 'time' | 'stats' | 'mcp'
 export interface TeamTab { key: TeamTabKey; label: string; path: string }
 
 export const TEAM_BASE = '/tools/team'
@@ -12,6 +12,7 @@ export const TEAM_TABS: TeamTab[] = [
   { key: 'board', label: 'Board', path: `${TEAM_BASE}/board` },
   { key: 'time', label: 'Time', path: `${TEAM_BASE}/time` },
   { key: 'stats', label: 'Stats', path: `${TEAM_BASE}/stats` },
+  { key: 'mcp', label: 'MCP', path: `${TEAM_BASE}/mcp` },
 ]
 
 // `/tools/team/tasks/:taskId` counts as the Tasks tab; anything else under the
@@ -23,5 +24,6 @@ export function activeTab(pathname: string): TeamTabKey {
   if (rest === '/tasks' || rest.startsWith('/tasks/')) return 'tasks'
   if (rest === '/time' || rest.startsWith('/time/')) return 'time'
   if (rest === '/stats' || rest.startsWith('/stats/')) return 'stats'
+  if (rest === '/mcp' || rest.startsWith('/mcp/')) return 'mcp'
   return 'people'
 }

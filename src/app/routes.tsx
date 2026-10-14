@@ -25,6 +25,7 @@ import TaskImport from '../screens/team/TaskImport'
 import Board from '../screens/team/Board'
 import TimeTab from '../screens/team/TimeTab'
 import Stats from '../screens/team/Stats'
+import McpTab from '../screens/team/McpTab'
 import { legacyTasksRedirect } from '../screens/team/redirect'
 import MeetingCreate from '../screens/MeetingCreate'
 import MeetingDetail from '../screens/MeetingDetail'
@@ -89,6 +90,7 @@ export default function AppRoutes() {
           <Route path="board" element={<Board />} />
           <Route path="time" element={<TimeTab />} />
           <Route path="stats" element={<Stats />} />
+          <Route path="mcp" element={<McpTab />} />
         </Route>
         <Route path="/tools/tasks" element={<LegacyTasksRedirect />} />
         <Route path="/tools/myProjects" element={T(<MyProjects view="grid" />)} />

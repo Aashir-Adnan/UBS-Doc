@@ -1,6 +1,7 @@
 import { mwGet } from '../meetingWorkflow/api'
 import { API_BASE_URL } from '../portal/config'
 import type { TaskRow, TasksPayload } from '../../screens/tasksLogic'
+import type { McpToken, CreatedMcpToken } from '../../screens/team/mcpLogic'
 
 // Same transport as the meeting workflow: ${API_BASE_URL}/api + path, response
 // unwrapped as payload.return ?? payload ?? data.
@@ -351,4 +352,27 @@ export async function fetchClockStatus(): Promise<{ linked: boolean; status?: Cl
 
 export async function fetchClockedIn(): Promise<{ people: ClockedInPerson[] }> {
   return apiCall<{ people: ClockedInPerson[] }>('/discord/time/active')
+}
+
+// Team → MCP. Personal access tokens for the task MCP; the token string is only
+// in the create response.
+export async function listMcpTokens(): Promise<McpToken[]> {
+  const out = await apiCall<{ tokens: McpToken[] }>('/portal/tokens')
+  return out.tokens || []
+}
+
+export function createMcpToken(input: { name: string; scope: 'read' | 'full'; days: number }): Promise<CreatedMcpToken> {
+  return apiCall<CreatedMcpToken>('/portal/tokens/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+}
+
+export async function revokeMcpToken(id: number): Promise<void> {
+  await apiCall('/portal/tokens/revoke', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  })
 }

@@ -35,6 +35,7 @@ describe('TEAM_TABS', () => {
       ['board', '/tools/team/board'],
       ['time', '/tools/team/time'],
       ['stats', '/tools/team/stats'],
+      ['mcp', '/tools/team/mcp'],
     ])
   })
 })

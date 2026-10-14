@@ -118,7 +118,8 @@ export default function TeamLayout() {
   // Which of the shared controls apply on this tab. Status is a tasks-list
   // concept; search and Blocked-only act on the tasks payload, which the
   // Time and Stats tabs do not render.
-  const taskControls = tab !== 'time' && tab !== 'stats'
+  // MCP is account-level (the caller's own tokens): no shared filter applies.
+  const taskControls = tab !== 'time' && tab !== 'stats' && tab !== 'mcp'
   const showAssignee = !(tab === 'time' && timeSelfScoped)
 
   return (
@@ -168,7 +169,7 @@ export default function TeamLayout() {
 
         {/* Filters are dead weight over the link card, which replaces the
             Outlet with nothing to filter; everywhere else they show. */}
-        {!showLinkCard && (
+        {!showLinkCard && tab !== 'mcp' && (
           <>
             {/* Project and Assignee apply everywhere; the rest only where the tasks payload is what is on screen. */}
             <div className="flex flex-wrap items-center gap-3 mb-6">
