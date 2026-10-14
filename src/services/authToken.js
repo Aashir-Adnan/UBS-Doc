@@ -18,6 +18,8 @@ const STORAGE_KEY = 'ubs-portal-access-token';
 let accessToken = null;
 let hydrated = false;
 const expiryListeners = new Set();
+let sessionRenewer = null;
+let renewing = null;
 
 function hydrate() {
   if (hydrated) return;
@@ -68,9 +70,43 @@ export function notifySessionExpired() {
   });
 }
 
+// The backend's token lives 60 minutes and is only rolled in its last five, so
+// a user who is idle at that moment comes back to a 401 although their Google
+// session is still good. AuthProvider registers a renewer that trades a fresh
+// Google ID token for a new portal token; the API layer calls renewSession()
+// on a 401 before treating it as an expired session.
+export function setSessionRenewer(renewer) {
+  sessionRenewer = typeof renewer === 'function' ? renewer : null;
+  return () => {
+    if (sessionRenewer === renewer) sessionRenewer = null;
+  };
+}
+
+// One renewal at a time: every request refused while a renewal is running
+// waits for that same renewal. True when it left a token behind.
+export function renewSession() {
+  if (!sessionRenewer) return Promise.resolve(false);
+  if (!renewing) {
+    const renewer = sessionRenewer;
+    renewing = (async () => {
+      try {
+        await renewer();
+        return Boolean(getAccessToken());
+      } catch {
+        return false;
+      } finally {
+        renewing = null;
+      }
+    })();
+  }
+  return renewing;
+}
+
 // Test seam.
 export function __resetAuthTokenForTests() {
   accessToken = null;
   hydrated = false;
   expiryListeners.clear();
+  sessionRenewer = null;
+  renewing = null;
 }

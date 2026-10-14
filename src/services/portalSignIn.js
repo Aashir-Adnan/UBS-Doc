@@ -41,3 +41,13 @@ export async function exchangeIdTokenForAccessToken(idToken) {
   setAccessToken(accessToken);
   return payload;
 }
+
+// A new portal token from the still-signed-in Google user, without a sign-in
+// screen: a forced-fresh ID token (Firebase refreshes it from its own long-lived
+// session) exchanged like a normal sign-in. AuthProvider registers this as the
+// session renewer.
+export async function renewPortalSession(currentUser) {
+  if (!currentUser) throw new Error('Not signed in to Google.');
+  const idToken = await currentUser.getIdToken(true);
+  return exchangeIdTokenForAccessToken(idToken);
+}

@@ -83,3 +83,35 @@ describe('exchangeIdTokenForAccessToken', () => {
     await expect(exchangeIdTokenForAccessToken('id')).rejects.toThrow(/502/);
   });
 });
+
+describe('renewPortalSession', () => {
+  let calls;
+
+  beforeEach(() => {
+    __resetAuthTokenForTests();
+    calls = [];
+    window.fetch = vi.fn(async (input, init) => {
+      calls.push({ input, init });
+      return jsonResponse({ payload: { return: { accessToken: 'renewed' } } });
+    });
+  });
+
+  afterEach(() => __resetAuthTokenForTests());
+
+  it('asks Google for a fresh ID token and exchanges it for a new portal token', async () => {
+    const { renewPortalSession } = await import('./portalSignIn');
+    const user = { getIdToken: vi.fn(async (force) => (force ? 'fresh-id' : 'cached-id')) };
+
+    await renewPortalSession(user);
+
+    expect(user.getIdToken).toHaveBeenCalledWith(true);
+    expect(JSON.parse(calls[0].init.body)).toEqual({ idToken: 'fresh-id' });
+    expect(getAccessToken()).toBe('renewed');
+  });
+
+  it('refuses when nobody is signed in to Google', async () => {
+    const { renewPortalSession } = await import('./portalSignIn');
+    await expect(renewPortalSession(null)).rejects.toThrow(/signed in/i);
+    expect(calls).toHaveLength(0);
+  });
+});

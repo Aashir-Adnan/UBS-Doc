@@ -1,5 +1,5 @@
 import { API_BASE_URL } from '@site/src/components/portal/config';
-import { getAccessToken, setAccessToken, notifySessionExpired } from './authToken';
+import { getAccessToken, setAccessToken, notifySessionExpired, renewSession } from './authToken';
 
 // Attaches the access token to every backend call, adopts rolled tokens, and
 // reports expiry — implemented as one wrapper around window.fetch rather than
@@ -51,40 +51,62 @@ export function installApiAuth(baseUrl = API_BASE_URL) {
   const original = window.fetch.bind(window);
   const base = absolute(String(baseUrl).replace(/\/$/, ''));
 
+  // The call as sent with `token`: the header added unless the call site set
+  // its own (a deliberate header always wins).
+  const withToken = (input, init, token) => {
+    const isRequest = typeof Request !== 'undefined' && input instanceof Request;
+    const headers = new Headers(init?.headers ?? (isRequest ? input.headers : undefined));
+    if (headers.has(AUTH_HEADER)) return { input, init, added: false };
+    headers.set(AUTH_HEADER, token);
+    if (isRequest && !init?.headers) return { input: new Request(input, { headers }), init, added: true };
+    return { input, init: { ...init, headers }, added: true };
+  };
+
+  // Rolled token. Requires the backend to send
+  // `Access-Control-Expose-Headers: x-new-accesstoken` — cross-origin JS
+  // cannot read the header otherwise, and we simply keep the current token.
+  const adoptRolled = (response) => {
+    const rolled = response.headers.get(NEW_TOKEN_HEADER);
+    if (rolled) setAccessToken(rolled);
+  };
+
   const patched = async (input, init) => {
     const url = absolute(requestUrl(input));
     if (!url.startsWith(base)) return original(input, init);
 
     const token = getAccessToken();
-    let nextInput = input;
-    let nextInit = init;
+    if (!token) return original(input, init);
 
-    if (token) {
-      const isRequest = typeof Request !== 'undefined' && input instanceof Request;
-      const headers = new Headers(init?.headers ?? (isRequest ? input.headers : undefined));
-      // An explicit header on the call site wins — never clobber a deliberate one.
-      if (!headers.has(AUTH_HEADER)) headers.set(AUTH_HEADER, token);
-      if (isRequest && !init?.headers) {
-        nextInput = new Request(input, { headers });
-      } else {
-        nextInit = { ...init, headers };
-      }
-    }
+    const isRequest = typeof Request !== 'undefined' && input instanceof Request;
+    // A Request's body can be read once; keep an unread copy for a repeat.
+    // A streamed body cannot be replayed at all, so that call is never repeated.
+    const spare = isRequest && !input.bodyUsed ? input.clone() : null;
+    const replayable = isRequest ? Boolean(spare) : !(typeof ReadableStream !== 'undefined' && init?.body instanceof ReadableStream);
 
-    const response = await original(nextInput, nextInit);
-
-    // Rolled token. Requires the backend to send
-    // `Access-Control-Expose-Headers: x-new-accesstoken` — cross-origin JS
-    // cannot read the header otherwise, and we simply keep the current token.
-    const rolled = response.headers.get(NEW_TOKEN_HEADER);
-    if (rolled) setAccessToken(rolled);
+    const first = withToken(input, init, token);
+    let response = await original(first.input, first.init);
+    adoptRolled(response);
 
     // Only an expiry if we actually presented a token. A 401 with no token is
     // an unauthenticated call (runtime keys before sign-in), not a dead session.
-    if (response.status === 401 && token && !url.includes(SIGNIN_PATH)) {
-      notifySessionExpired();
+    if (response.status !== 401 || url.includes(SIGNIN_PATH)) return response;
+
+    // The token this wrapper added has died: renew it from the Google session and
+    // repeat the call once. A token another call already replaced is used as
+    // it is. A token the call site set itself is the call site's business.
+    if (first.added && replayable) {
+      const current = getAccessToken();
+      const renewed = current && current !== token ? true : await renewSession();
+      const fresh = getAccessToken();
+      if (renewed && fresh && fresh !== token) {
+        const again = withToken(spare ?? input, init, fresh);
+        response = await original(again.input, again.init);
+        adoptRolled(response);
+        if (response.status !== 401) return response;
+      }
     }
 
+    notifySessionExpired();
     return response;
   };
 

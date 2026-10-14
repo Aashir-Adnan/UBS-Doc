@@ -12,6 +12,7 @@ window.sessionStorage = {
 const {
   getAccessToken, setAccessToken, clearAccessToken,
   onSessionExpired, notifySessionExpired, __resetAuthTokenForTests,
+  setSessionRenewer, renewSession,
 } = await import('./authToken');
 
 const KEY = 'ubs-portal-access-token';
@@ -99,5 +100,63 @@ describe('access token store', () => {
     expect(getAccessToken()).toBe('tok-1');
 
     window.sessionStorage = original;
+  });
+});
+
+// A dead token is renewed silently from the still-signed-in Google session
+// before anyone is told the session expired.
+describe('session renewal', () => {
+  beforeEach(() => {
+    store.clear();
+    __resetAuthTokenForTests();
+  });
+
+  it('answers false when no renewer is registered', async () => {
+    expect(await renewSession()).toBe(false);
+  });
+
+  it('runs one renewal for any number of callers waiting at once', async () => {
+    let calls = 0;
+    let release;
+    setSessionRenewer(() => {
+      calls += 1;
+      return new Promise((resolve) => {
+        release = () => { setAccessToken('fresh'); resolve(); };
+      });
+    });
+    const a = renewSession();
+    const b = renewSession();
+    release();
+    expect(await a).toBe(true);
+    expect(await b).toBe(true);
+    expect(calls).toBe(1);
+    expect(getAccessToken()).toBe('fresh');
+  });
+
+  it('starts a new renewal once the previous one has finished', async () => {
+    let calls = 0;
+    setSessionRenewer(async () => { calls += 1; setAccessToken(`tok-${calls}`); });
+    await renewSession();
+    await renewSession();
+    expect(calls).toBe(2);
+    expect(getAccessToken()).toBe('tok-2');
+  });
+
+  it('answers false when the renewer throws, and a later call may try again', async () => {
+    setSessionRenewer(async () => { throw new Error('signed out of Google'); });
+    expect(await renewSession()).toBe(false);
+    setSessionRenewer(async () => setAccessToken('ok'));
+    expect(await renewSession()).toBe(true);
+  });
+
+  it('answers false when the renewer leaves no token behind', async () => {
+    setSessionRenewer(async () => clearAccessToken());
+    expect(await renewSession()).toBe(false);
+  });
+
+  it('unregistering the renewer stops renewal', async () => {
+    const off = setSessionRenewer(async () => setAccessToken('x'));
+    off();
+    expect(await renewSession()).toBe(false);
   });
 });

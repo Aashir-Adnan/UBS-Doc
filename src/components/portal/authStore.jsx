@@ -3,9 +3,9 @@ import { getAuth, onAuthStateChanged, signOut as firebaseSignOut } from 'firebas
 import { initFirebase } from './firebase';
 import { store } from '@site/src/state/store';
 import {
-  getAccessToken, clearAccessToken, onSessionExpired,
+  getAccessToken, clearAccessToken, onSessionExpired, setSessionRenewer,
 } from '@site/src/services/authToken';
-import { exchangeIdTokenForAccessToken } from '@site/src/services/portalSignIn';
+import { exchangeIdTokenForAccessToken, renewPortalSession } from '@site/src/services/portalSignIn';
 
 const AuthContext = createContext(null);
 
@@ -94,9 +94,19 @@ export function AuthProvider({ children }) {
     };
   }, [trySubscribe]);
 
-  // A 401 on any portal call means the token the backend gave us is no longer
-  // good. Sign out of Firebase too, so the next attempt is a real re-auth
-  // producing a fresh ID token rather than a replay of the dead session.
+  // A portal token that died (60 minutes, rolled only in its last five) is
+  // renewed from the Google session before anything is called expired: the
+  // API layer calls this on a 401 and repeats the request with the new token.
+  useEffect(() => setSessionRenewer(async () => {
+    const app = initFirebase();
+    if (!app) throw new Error('Firebase is not initialised.');
+    await renewPortalSession(getAuth(app).currentUser);
+  }), []);
+
+  // Reached only when the renewal above failed (signed out of Google, access
+  // removed): the session is really over. Sign out of Firebase too, so the
+  // next attempt is a real re-auth producing a fresh ID token rather than a
+  // replay of the dead session.
   useEffect(() => onSessionExpired(() => {
     setAuthError('Your session expired. Please sign in again.');
     setUser(null);

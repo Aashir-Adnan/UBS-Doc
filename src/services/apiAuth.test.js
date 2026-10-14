@@ -11,6 +11,7 @@ if (!window.location) window.location = { href: 'http://app.test/' };
 const { installApiAuth } = await import('./apiAuth');
 const {
   setAccessToken, getAccessToken, onSessionExpired, __resetAuthTokenForTests,
+  setSessionRenewer,
 } = await import('./authToken');
 
 function jsonResponse(body, { status = 200, headers = {} } = {}) {
@@ -151,5 +152,185 @@ describe('installApiAuth', () => {
     uninstall();
     expect(window.fetch).not.toBe(patched);
     uninstall = () => {};
+  });
+});
+
+// The backend's token lives 60 minutes and is only rolled in its last 5, so a
+// user idle at that moment comes back to a 401. The Google session is still
+// good: the wrapper renews the portal token from it and repeats the request
+// once, and only a renewal that fails is a real expiry.
+describe('installApiAuth — silent renewal', () => {
+  let calls;
+  let uninstall;
+  let respondWith;
+
+  beforeEach(() => {
+    __resetAuthTokenForTests();
+    calls = [];
+    respondWith = () => jsonResponse({ ok: true });
+    window.fetch = vi.fn(async (input, init) => {
+      calls.push({ input, init });
+      return respondWith(input, init);
+    });
+    uninstall = installApiAuth(BASE);
+  });
+
+  afterEach(() => {
+    uninstall();
+    __resetAuthTokenForTests();
+  });
+
+  const sentToken = (input, init) => new Headers(init?.headers ?? input?.headers).get('accesstoken');
+  const tokenOf = (i) => sentToken(calls[i].input, calls[i].init);
+  // 401 for the dead token, 200 for any other.
+  const refuse = (dead) => (input, init) => (sentToken(input, init) === dead
+    ? jsonResponse({ message: 'Invalid Token' }, { status: 401 })
+    : jsonResponse({ ok: true }));
+
+  it('renews the token and repeats the request once with it; no expiry', async () => {
+    const expired = vi.fn();
+    onSessionExpired(expired);
+    setAccessToken('old');
+    const renewer = vi.fn(async () => setAccessToken('new'));
+    setSessionRenewer(renewer);
+    respondWith = refuse('old');
+
+    const res = await fetch(`${BASE}/api/portal/users/list`);
+
+    expect(res.status).toBe(200);
+    expect(renewer).toHaveBeenCalledTimes(1);
+    expect([tokenOf(0), tokenOf(1)]).toEqual(['old', 'new']);
+    expect(calls).toHaveLength(2);
+    expect(expired).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBe('new');
+  });
+
+  it('keeps the caller\'s method and body on the repeat', async () => {
+    setAccessToken('old');
+    setSessionRenewer(async () => setAccessToken('new'));
+    respondWith = refuse('old');
+
+    await fetch(`${BASE}/api/portal/org/update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"org_id":1}',
+    });
+
+    expect(calls[1].init.method).toBe('POST');
+    expect(calls[1].init.body).toBe('{"org_id":1}');
+    expect(new Headers(calls[1].init.headers).get('content-type')).toBe('application/json');
+  });
+
+  it('repeats a Request object with its body intact', async () => {
+    setAccessToken('old');
+    setSessionRenewer(async () => setAccessToken('new'));
+    respondWith = refuse('old');
+
+    await fetch(new Request(`${BASE}/api/portal/org/update`, { method: 'POST', body: '{"a":1}' }));
+
+    expect(calls).toHaveLength(2);
+    expect(tokenOf(1)).toBe('new');
+    await expect(calls[1].input.text()).resolves.toBe('{"a":1}');
+  });
+
+  it('requests refused together share one renewal and are each repeated', async () => {
+    setAccessToken('old');
+    const renewer = vi.fn(async () => {
+      await new Promise((r) => setTimeout(r, 5));
+      setAccessToken('new');
+    });
+    setSessionRenewer(renewer);
+    respondWith = refuse('old');
+
+    const [a, b, c] = await Promise.all([
+      fetch(`${BASE}/api/portal/users/list`),
+      fetch(`${BASE}/api/portal/users/me`),
+      fetch(`${BASE}/api/portal/org/list`),
+    ]);
+
+    expect([a.status, b.status, c.status]).toEqual([200, 200, 200]);
+    expect(renewer).toHaveBeenCalledTimes(1);
+    expect(calls).toHaveLength(6);
+  });
+
+  it('a request whose token was already replaced is repeated without another renewal', async () => {
+    setAccessToken('old');
+    const renewer = vi.fn(async () => setAccessToken('newer'));
+    setSessionRenewer(renewer);
+    // Another call renewed while this one was in flight.
+    respondWith = (input, init) => {
+      if (sentToken(input, init) === 'old') {
+        setAccessToken('new');
+        return jsonResponse({}, { status: 401 });
+      }
+      return jsonResponse({ ok: true });
+    };
+
+    const res = await fetch(`${BASE}/api/portal/users/list`);
+
+    expect(res.status).toBe(200);
+    expect(renewer).not.toHaveBeenCalled();
+    expect(tokenOf(1)).toBe('new');
+  });
+
+  it('reports expiry when the renewal fails', async () => {
+    const expired = vi.fn();
+    onSessionExpired(expired);
+    setAccessToken('old');
+    setSessionRenewer(async () => { throw new Error('signed out of Google'); });
+    respondWith = refuse('old');
+
+    const res = await fetch(`${BASE}/api/portal/users/list`);
+
+    expect(res.status).toBe(401);
+    expect(calls).toHaveLength(1);
+    expect(expired).toHaveBeenCalledTimes(1);
+    expect(getAccessToken()).toBeNull();
+  });
+
+  it('reports expiry when the repeated request is refused as well, without renewing again', async () => {
+    const expired = vi.fn();
+    onSessionExpired(expired);
+    setAccessToken('old');
+    const renewer = vi.fn(async () => setAccessToken('new'));
+    setSessionRenewer(renewer);
+    respondWith = () => jsonResponse({}, { status: 401 });
+
+    const res = await fetch(`${BASE}/api/portal/users/list`);
+
+    expect(res.status).toBe(401);
+    expect(renewer).toHaveBeenCalledTimes(1);
+    expect(calls).toHaveLength(2);
+    expect(expired).toHaveBeenCalledTimes(1);
+  });
+
+  it('never renews for a 401 from the sign-in call itself', async () => {
+    const expired = vi.fn();
+    onSessionExpired(expired);
+    setAccessToken('stale');
+    const renewer = vi.fn(async () => setAccessToken('new'));
+    setSessionRenewer(renewer);
+    respondWith = () => jsonResponse({ message: 'bad idToken' }, { status: 401 });
+
+    await fetch(`${BASE}/api/portal/users/signin`, { method: 'POST' });
+
+    expect(renewer).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(1);
+    expect(expired).not.toHaveBeenCalled();
+  });
+
+  it('does not renew a token the caller set explicitly', async () => {
+    const expired = vi.fn();
+    onSessionExpired(expired);
+    setAccessToken('old');
+    const renewer = vi.fn(async () => setAccessToken('new'));
+    setSessionRenewer(renewer);
+    respondWith = () => jsonResponse({}, { status: 401 });
+
+    await fetch(`${BASE}/api/portal/users/list`, { headers: { accesstoken: 'explicit' } });
+
+    expect(renewer).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(1);
+    expect(expired).toHaveBeenCalledTimes(1);
   });
 });
