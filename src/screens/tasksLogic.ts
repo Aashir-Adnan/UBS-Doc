@@ -10,7 +10,10 @@ export type ActivityChange =
   | { field: 'project'; from: string | null; to: string | null }
   | { field: 'blocked_by'; action: 'added' | 'removed'; title: string }
   | { field: 'subtask'; action: 'added'; title: string }
-export interface TaskActivityEntry { at: string | null; actor: TaskActor | null; viaSite: boolean; changes: ActivityChange[] }
+// Where a change came from: the site, the task MCP (`viaToken` = the token's
+// name) or Discord (null). `via` is optional: an older backend sends only viaSite.
+export type ActivityVia = 'site' | 'mcp' | null
+export interface TaskActivityEntry { at: string | null; actor: TaskActor | null; viaSite: boolean; via?: ActivityVia; viaToken?: string; changes: ActivityChange[] }
 // `hidden`: a task in a project the viewer cannot see — CSAAS sends only its id,
 // status and a fixed title ("A task in another project"); render it as plain text.
 export interface TaskRef { id: string; title: string; status?: string; hidden?: boolean }
@@ -27,7 +30,7 @@ export interface TaskRow {
   createdBy: TaskActor | null
   // Optional: an older backend does not send them, and a task nobody has edited
   // since activity logging began has none.
-  updatedBy?: (TaskActor & { at: string | null; viaSite: boolean }) | null
+  updatedBy?: (TaskActor & { at: string | null; viaSite: boolean; via?: ActivityVia; viaToken?: string }) | null
   activity?: TaskActivityEntry[]
   // Hierarchy (one level). Optional: an older backend sends none of it, and a task
   // with no subtasks has an empty list. `parent` is set on a subtask.

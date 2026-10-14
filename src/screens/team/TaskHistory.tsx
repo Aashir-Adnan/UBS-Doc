@@ -2,7 +2,7 @@ import { c, txt, muted } from '../../lib'
 import type { Theme } from '../../types'
 import type { TaskRow } from '../tasksLogic'
 import Avatar from './Avatar'
-import { actorName, describeChange, relativeTime } from './activityLogic'
+import { actorName, describeChange, relativeTime, viaLabel } from './activityLogic'
 import { fmtDate } from './detailLogic'
 
 // Who did what to this task, newest first, ending with who created it. Each row
@@ -18,10 +18,10 @@ export default function TaskHistory({ task, theme }: { task: TaskRow; theme: The
       text: e.changes.map(describeChange).join('; ') || 'updated this task',
       when: relativeTime(e.at),
       title: e.at ?? undefined,
-      viaSite: e.viaSite,
+      via: viaLabel(e),
     })),
     ...(task.createdBy || created
-      ? [{ key: 'created', actor: task.createdBy, text: 'created this task', when: created, title: task.createdAt, viaSite: false }]
+      ? [{ key: 'created', actor: task.createdBy, text: 'created this task', when: created, title: task.createdAt, via: null }]
       : []),
   ]
   if (!rows.length) return null
@@ -33,7 +33,7 @@ export default function TaskHistory({ task, theme }: { task: TaskRow; theme: The
           <p className={c('text-sm m-0 min-w-0', txt(theme))}>
             <span className="font-semibold">{actorName(r.actor)}</span>{' '}
             <span className={c(theme === 'dark' ? 'text-white/70' : 'text-slate-600')}>{r.text}</span>
-            {r.when && <span className={c('text-xs ml-2', muted(theme))} title={r.title}>{r.when}{r.viaSite ? ' · via the site' : ''}</span>}
+            {r.when && <span className={c('text-xs ml-2', muted(theme))} title={r.title}>{r.when}{r.via ? ` · ${r.via}` : ''}</span>}
           </p>
         </li>
       ))}

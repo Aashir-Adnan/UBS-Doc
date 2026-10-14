@@ -1,6 +1,6 @@
 // Pure wording for the task history: one sentence per change, and a relative
 // time. No React, no DOM.
-import { STATUS_LABEL, scopeLabel, type ActivityChange, type TaskActor } from '../tasksLogic'
+import { STATUS_LABEL, scopeLabel, type ActivityChange, type ActivityVia, type TaskActor } from '../tasksLogic'
 
 const label = (status: string | number | null) => (status === null || status === undefined ? 'none' : (STATUS_LABEL[String(status)] ?? String(status)))
 const names = (people: TaskActor[]) => people.map((p) => p.name).join(', ')
@@ -64,6 +64,14 @@ export function relativeTime(iso: string | null | undefined, now: number = Date.
   if (d === 1) return 'yesterday'
   if (d < 7) return `${d} days ago`
   return new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+// Where a change came from, for the caption after its time: "via MCP (laptop)"
+// for the task MCP, "via the site" for the site, null for a Discord edit.
+export function viaLabel(e: { viaSite?: boolean; via?: ActivityVia; viaToken?: string } | null | undefined): string | null {
+  if (!e) return null
+  if (e.via === 'mcp') return e.viaToken ? `via MCP (${e.viaToken})` : 'via MCP'
+  return e.viaSite || e.via === 'site' ? 'via the site' : null
 }
 
 // What a card prints in place of a name it cannot resolve.

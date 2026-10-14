@@ -18,7 +18,7 @@ import SubtasksSection from './SubtasksSection'
 import TaskHistory from './TaskHistory'
 import TimeSection from './TimeSection'
 import CopyLinkButton from './CopyLinkButton'
-import { relativeTime } from './activityLogic'
+import { relativeTime, viaLabel } from './activityLogic'
 import type { UpdateTaskResult } from '../../components/discordTasks/api'
 import TaskEditForm from './TaskEditForm'
 import AddSubtask from './AddSubtask'
@@ -233,7 +233,7 @@ export default function TaskDetail() {
               </Field>
               <Field label="Last updated by" theme={theme}>
                 {task.updatedBy
-                  ? <UserCard actor={task.updatedBy} caption={[relativeTime(task.updatedBy.at) ?? updated, task.updatedBy.viaSite ? 'via the site' : null].filter(Boolean).join(' · ') || null} theme={theme} />
+                  ? <UserCard actor={task.updatedBy} caption={[relativeTime(task.updatedBy.at) ?? updated, viaLabel(task.updatedBy)].filter(Boolean).join(' · ') || null} theme={theme} />
                   : <p className={c('text-sm m-0', muted(theme))}>{updated ? `No edits recorded yet · last change ${updated}` : 'No edits recorded yet'}</p>}
               </Field>
             </div>
