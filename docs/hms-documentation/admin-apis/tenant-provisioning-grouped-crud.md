@@ -16,6 +16,9 @@ Provisions a whole new tenant end-to-end in a single transaction — the tenant 
 
 Every verb is gated by the **`add_tenants`** permission (`requestMetaData.permission`). In the governance model `add_tenants` lives in the `tenant_mgmt` tier and is present only in **`PG-TENANT-MGMT`**, so only the **Tenant Manager** persona can call this endpoint. (SaaS Admin does *not* receive `add_tenants`.)
 
+> **Enforced since 2026-10-11.** This permission was declared but never checked before that date: the object's `requestMetaData` sat beside `data` instead of inside it, so the middleware skipped it. It is now checked, and a seat without it gets `403` (SCC `E41`).
+
+
 The **Add** flow additionally requires the actor to be in **system-tenant context**: the acting `actionPerformerURDD` must resolve to a URDD whose `tenant_id` equals the system tenant id (resolved via `getSystemTenantId()`). If the actor presents a per-tenant URDD instead, provisioning is rejected with **403 Forbidden**.
 
 The **Delete** flow additionally guards the system tenant: attempting to delete/suspend the system tenant returns **403 Forbidden**.

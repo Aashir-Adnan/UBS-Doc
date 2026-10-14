@@ -110,7 +110,8 @@ Returned when the `hotelId` does not match an active hotel tenant.
 ## Notes
 
 - Only returns tenants with `tenant_type` of `'hotel'` or `'branch'`, `status = 'active'`, and `is_active = 1`.
-- Bilingual fields attempt to parse JSON `{ en, ar }` from the database value. If the value is plain text, both `en` and `ar` will contain the same string.
+- Bilingual fields resolve `ar` from `translated_entries` (`table_name = 'tenants'`, newest active row per column); `city` prefers the translation of the linked `cities.name` row when `cityId` is set. `en` is always the base column value. When no translation exists, `ar` falls back to the English string, so the key is always present.
+- A column that already stores bilingual JSON `{ en, ar }` is used as-is and is not overridden by `translated_entries`.
 - Rating is computed as `AVG(feedback.star_rating)` across all active services **and** packages for the tenant, rounded to 1 decimal place.
 - `minStayCostPerNight` is `MIN(catalog_pricing.price / GREATEST(duration, 1))` across all active stay-category services. Duration is read from the service's `hms_config` (`config_key = 'duration'`), defaulting to 1 if unset.
 

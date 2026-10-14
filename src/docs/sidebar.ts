@@ -118,6 +118,12 @@ export const SIDEBAR: SidebarNode[] = [
             ],
           },
           {
+            label: 'Device Sessions & Alerts',
+            items: [
+              'hms-documentation/major-implementations/device-sessions/device-sessions',
+            ],
+          },
+          {
             label: 'Booking Changes Pipeline',
             items: [
               'hms-documentation/major-implementations/booking-changes-pipeline/booking-changes-pipeline',
@@ -195,6 +201,12 @@ export const SIDEBAR: SidebarNode[] = [
             label: 'Database Backups',
             items: [
               'hms-documentation/major-implementations/database-backups/database-backups',
+            ],
+          },
+          {
+            label: 'Background Jobs (Crons)',
+            items: [
+              'hms-documentation/major-implementations/background-jobs/background-jobs',
             ],
           },
         ],
@@ -538,7 +550,7 @@ export const SIDEBAR: SidebarNode[] = [
         items: [
           'hms-documentation/visits/visits-overview',
           'hms-documentation/visits/visits-admin-apis',
-          'hms-documentation/visits/visits-components-api',
+          'hms-documentation/visits/visit-price-calculation',
           'hms-documentation/visits/partner-integration-guide',
         ],
       },
@@ -555,6 +567,12 @@ export const SIDEBAR: SidebarNode[] = [
               'hms-documentation/admin-apis/admin-create-guest-user',
               'hms-documentation/admin-apis/admin-create-guest-booking',
               'hms-documentation/admin-apis/bookings-visit-legs',
+            ],
+          },
+          {
+            label: 'Visits',
+            items: [
+              'hms-documentation/admin-apis/visits-components-api',
             ],
           },
           {

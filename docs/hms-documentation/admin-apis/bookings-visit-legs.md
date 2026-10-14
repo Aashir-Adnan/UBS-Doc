@@ -89,7 +89,7 @@ The admin wizard books on behalf of a guest with the guest's own token and hotel
 - Arrival cards (`GET …?<identifier>`) and agenda rows (`GET …?agenda=1`) carry `booking.booked_via` (section 2).
 - Check-in, room swap and check-out work on a visit leg as on any booking.
 - **No payment at the desk.** `cash_amount > 0` on check-in or check-out of a partner leg returns `409`, `meta.scc = partner_settles_payment`. Nothing is recorded and the check-in or check-out does not run. Send no `cash_amount` and hide the payment input when `booked_via.payment_handled_by` is `"partner"`.
-- Check-out still needs a cleared balance. A partner leg is paid in full when it is booked, so its balance is normally `0`. If a balance shows, the partner settles it through its own API; don't take it at the desk.
+- Check-out still needs a cleared balance. A partner leg is paid in full when it is booked and its amounts are locked, so its balance is always `0`. Don't take payment for it at the desk.
 
 ## 5. Allowed status moves on a visit leg
 

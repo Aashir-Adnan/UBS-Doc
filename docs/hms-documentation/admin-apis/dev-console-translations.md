@@ -56,7 +56,7 @@ the endpoint caps it; the nightly cron is the unbounded path and stops at 06:00 
 
 A record is outdated when the source row's `updated_at` is later than the translation's
 `updated_at`. Use `missing` for the initial backfill, and `outdated` to keep translations in
-step with edits — the nightly cron runs `outdated` (override with `TRANSLATION_CRON_MODE`).
+step with edits. The nightly cron runs both, in order: `outdated` first, then `missing` once the `outdated` pass has finished, within the same window (override with `TRANSLATION_CRON_MODE`, for example `outdated` for the old single pass).
 
 :::caution Staleness is detected per row, not per column
 `updated_at` belongs to the whole row, so editing any column flags every translated column of

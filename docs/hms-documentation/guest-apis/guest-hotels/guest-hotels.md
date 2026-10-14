@@ -16,7 +16,7 @@ Uses **PUBLIC_ENCRYPTED_PLATFORM** — encrypted request/response using the plat
 
 | Parameter | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `q` | `string` | No | — | Free-text search. Matches against the hotel's denormalized `search_text` column (includes hotel name, city, address, translations). |
+| `q` | `string` | No | — | Free-text search. Matches the hotel's denormalized `search_text` column (English hotel name, city, address, country) **or** any Arabic translation of the hotel's `tenant_name`, `city`, `address` or `country`. Arabic queries work: `q=فندق مريديان مكة` returns the hotel whose English name is "Le Meridien Makkah". |
 | `cityId` | `number` | No | — | Filter hotels by city FK. Use the `cityId` returned from the landmarks CRUD endpoint. |
 
 ---
@@ -91,7 +91,8 @@ GET /api/guest/hotels?q=Makkah
 - Results are sorted by `rating DESC`, then `tenant_name ASC`.
 - Rating is computed as `AVG(feedback.star_rating)` across all active services **and** packages for the tenant, rounded to 1 decimal place.
 - `minStayCostPerNight` is `MIN(catalog_pricing.price / GREATEST(duration, 1))` across all active stay-category services. Duration is read from the service's `hms_config` (`config_key = 'duration'`), defaulting to 1 if unset.
-- Bilingual fields attempt to parse JSON `{ en, ar }` from the database value. If the value is plain text, both `en` and `ar` will contain the same string.
+- Bilingual fields resolve `ar` from `translated_entries` (`table_name = 'tenants'`, newest active row per column); `city` prefers the translation of the linked `cities.name` row when `cityId` is set. `en` is always the base column value. When no translation exists, `ar` falls back to the English string, so the key is always present.
+- A column that already stores bilingual JSON `{ en, ar }` is used as-is and is not overridden by `translated_entries`.
 
 ---
 

@@ -9,7 +9,7 @@ Admin dashboard endpoints. The visits CRUD and the component picker are used by 
 | `POST /api/crud/visits` | `add_visits` | Create a visit |
 | `PUT /api/crud/visits?id=` | `update_visits` | Change header, components, price, configs, visibility, status |
 | `DELETE /api/crud/visits?id=` | `delete_visits` | Delete (deferred while legs are open) |
-| `GET /api/crud/visits/components` | `list_visits` | Cross-hotel component picker (packages and stays, party-aware); see [Visit Components API](./visits-components-api.md) |
+| `GET /api/crud/visits/components` | `list_visits` | Cross-hotel component picker (packages and stays, party-aware); see [Visit Components API](../admin-apis/visits-components-api.md) |
 | `GET /api/crud/partner-platforms?step=1\|2\|3` | `list_partner_platforms` (group `PG-PARTNER-PLATFORMS`) | Partner platforms (step 1), their versions (step 2), their system users (step 3) |
 | `POST /api/crud/partner-platforms?step=1\|2\|3` | `add_partner_platforms` | Create a platform, create or link versions (new keys), add a system user |
 | `PUT /api/crud/partner-platforms?step=1\|2\|3&id=` | `update_partner_platforms` | Platform settings and webhook; sync the platform's version set (new version, link, retire, reactivate); reset a password or TOTP |
@@ -169,11 +169,27 @@ Response:
 }
 ```
 
-`visitPrice` is the first active price row, as `packagePrice` is. `visitSellPrice` is what partners are charged. `hms_config_keys_catalog` has the packages shape; each key's offered options (`hmsConfigKeys_possibleValues`) are listed under a single `visit` bucket and drawn from options scoped to `visits`, `packages` or `*`.
+`visitPricingEstimate` (View only) prices every leg with the backend's own rules for tomorrow, at each leg's `quantity` units, including package extra nights and room price blocks (formulas and examples: [Visit price calculation](./visit-price-calculation.md#7-the-admin-estimate-visitpricingestimate)):
+
+```json
+"visitPricingEstimate": {
+  "estimateDate": "2026-10-12", "currency": "SAR",
+  "componentsTotal": 6300, "sellAmount": 5400, "bundleDiscount": 900, "bundleDiscountPct": 14.29,
+  "legs": [ { "legNo": 1, "baseTable": "packages", "recordId": 369, "hotelId": 86, "name": "Family Umrah Package (Suite)",
+              "checkIn": "2026-10-12", "checkOut": "2026-10-15", "nights": 3, "extraNights": 1, "units": 1, "componentPrice": 891.75, "currency": "SAR" } ],
+  "unpricedLegs": []
+}
+```
+
+Use `componentsTotal` as the visit's real components total and warn when `bundleDiscountPct` is large, or negative (the visit sells above its parts). A saved visit price does not follow component price changes, so this is the place to see the drift. `unpricedLegs` lists legs that could not be priced, with a reason. The estimate is `null` if it cannot be computed.
+
+`visitPrice` is the first active price row, as `packagePrice` is. `visitSellPrice` is what partners are charged for a party that fits each leg's `quantity` units. Set it for that base party: a bigger party pays it scaled by the cost of its extra rooms or package units, so the bundle discount stays the same percentage (see the partner guide, 6.2). `hms_config_keys_catalog` has the packages shape; each key's offered options (`hmsConfigKeys_possibleValues`) are listed under a single `visit` bucket and drawn from options scoped to `visits`, `packages` or `*`.
 
 An unknown id returns `404 visit_not_found`.
 
 ### List — `GET /api/crud/visits?page_no=1&page_size=10`
+
+**No paging unless you ask for it.** Without `page_size`, every visit is returned in one response (`table_count` equals the number of rows). Send `page_size` (and `page_no`, default 1) to page.
 
 Returns an array of rows in the View shape, without `hms_config_keys_catalog`, each with `table_count`. Inactive visits are not listed. Paging, sorting and filtering are the standard CRUD query parameters (`page_no`, `page_size`, `sort_by`, `sort_order`, `filter_columns_and` / `filter_values_and`, `filter_columns_or=["all"]` for free-text search). Filter and sort keys:
 
@@ -271,21 +287,46 @@ A well-formed entry that is not valid as a leg is reported after the write, and 
 | `invalid_item`, `invalid_base_table`, `invalid_record_id`, `invalid_scheduling`, `missing_visit_item_id`, `unknown_visit_item` | the field named, or `null` (malformed input) |
 | `component_not_found`, `service_not_stay` | `recordId` |
 | `invalid_day_offset`, `leg_gap`, `leg_overlap` | `dayOffset` |
-| `invalid_quantity`, `package_quantity_over_max` | `quantity` |
+| `invalid_quantity`, `package_quantity_over_max`, `stay_quantity_over_max` (above the room's `max_quantity_per_booking`), `not_enough_units` (above the rooms the hotel has of that type) | `quantity` |
+| `component_unpriced` (the package or room has no active price), `currency_mismatch` (priced in another currency than the visit, or than the first component when the visit has no price yet) | `recordId` |
 | `extra_nights_not_allowed`, `extra_nights_over_max`, `invalid_nights` | `extraNights` (packages) or `nights` (stays) |
 | `scheduling_outside_stay` | `scheduling` |
 
 ### Automatic unpublishing
 
-A published visit is moved to `draft` automatically, with `visitAutoUnpublishedReason` `component_probation`, `component_archived`, `component_inactive`, `component_missing`, `tenant_inactive`, `consent_off` or `visit_empty`, when a component or its hotel stops being sellable, and re-published automatically when it is sellable again. A curator's own draft is never re-published.
+A published visit is moved to `draft` automatically, with `visitAutoUnpublishedReason`, when a component or its hotel stops being sellable, and re-published automatically when it is sellable again. Each change sends partners `visit.invalidated` or `visit.restored`.
 
-This happens at once when a component's service or package is deleted, when its hotel is deleted, and when a hotel turns its `allow_visit_bundling` consent off or on through the tenant configs API. Any other change is picked up by the daily lifecycle run.
+| Reason | Problem |
+|---|---|
+| `component_probation` | a leg's package or room is in probation (deleted or deactivated while it still has bookings) |
+| `component_archived` | a leg's package or room is inactive or archived |
+| `component_missing` | a leg's package or room no longer exists |
+| `tenant_inactive` | a leg's hotel is not active |
+| `consent_off` | a leg's hotel turned off `allow_visit_bundling` |
+| `visit_empty` | the visit has no legs |
+
+A visit is re-published only when the system unpublished it (`visitAutoUnpublishedAt` is set), it has no problem left, and it has an active price. A curator's own draft is never re-published.
+
+The check runs at once, for every visit that uses the changed package, room or hotel, when:
+
+| Change | API |
+|---|---|
+| a package's status changes (deactivated, put in probation, reactivated) | `PUT /api/custom/packages` with `packageStatus` |
+| a room service's status changes | `PUT /api/custom/services` with `serviceStatus` |
+| a package or service is deleted | `DELETE /api/custom/packages`, `DELETE /api/custom/services` |
+| a hotel's status changes, including a restore from `inactive` (after its cascade restore, so its packages and rooms count as back) | `PUT /api/crud/tenants` with `tenants_status`, or step 1 of `PUT /api/custom/tenants/grouped/crud` with `tenants_status` |
+| a hotel is deleted | the tenant delete cascade |
+| a hotel turns `allow_visit_bundling` on or off | `POST` / `DELETE /api/tenant/configs` |
+
+The daily lifecycle job (03:15 UTC) runs the same check over every visit, as a safety net for any change made outside these APIs.
+
+> **Changed 2026-10-12.** Before this date only deletes and consent changes triggered the check. Reactivating a package or room, restoring a hotel, or changing a status through an update waited for the 03:15 job.
 
 ### Component picker — `GET /api/crud/visits/components`
 
 Lists the packages and stay services a leg can be, across participating hotels. With an optional party (`adults`, `children`) it returns only the components that can take that party in one purchase, each with `party.unitsRequired`, `party.fitsNatively` and `party.adjustedPrice`.
 
-The full contract (query parameters, every response field, the party-matching rule, worked examples, and how the visit builder turns results into `visitItems`) is on its own page: **[Visit Components API](./visits-components-api.md)**.
+The full contract (query parameters, every response field, the party-matching rule, worked examples, and how the visit builder turns results into `visitItems`) is on its own page: **[Visit Components API](../admin-apis/visits-components-api.md)**.
 
 ---
 
@@ -329,8 +370,8 @@ A platform does nothing until it has an active version and a system user: no env
 | Key | Type | Required | Notes |
 |---|---|---|---|
 | `platforms_platformName` | string | yes | 3 to 64 letters, digits, `-` or `_`, starting with a letter; unique (`409 platform_exists`). Partners send it as `PlatformName` |
-| `platforms_domains` | string[] | no | bare hostnames, at most 20 |
-| `platforms_egressIps` | string[] | no | IPv4/IPv6 addresses or CIDRs no broader than `/24` (IPv4) or `/48` (IPv6), at most 20; empty or absent means no IP check |
+| `platforms_domains` | string[] | no | bare hostnames, at most 20. A browser `Origin` must match one (subdomains included), or the call is `403 origin_not_allowed`. `["*"]`, `*` anywhere in the list, empty or absent all mean any origin, stored as `["*"]` or `NULL` |
+| `platforms_egressIps` | string[] | no | IPv4/IPv6 addresses or CIDRs no broader than `/24` (IPv4) or `/48` (IPv6), at most 20. `["*"]`, `*` anywhere in the list, empty or absent all mean any address |
 | `platforms_rateLimit` | number | no | requests per minute; absent uses the default (600) |
 | `platforms_contact` | string[] | no | |
 | `platforms_webhook` | object | no | `url`. A signing secret is generated when a URL is set |
@@ -736,7 +777,9 @@ The response is flat rows:
     "platformEventOutbox_platformId": 8,
     "platforms_platformName": "TravelCo",
     "platformEventOutbox_bookingId": 9301,
+    "bookings_bookingNumber": "BK755336914935",
     "platformEventOutbox_visitId": 80,
+    "visits_visitCode": "VIS-441DPG",
     "platformEventOutbox_eventType": "booking.cancelled_by_hotel",
     "platformEventOutbox_oldStatus": "confirmed",
     "platformEventOutbox_newStatus": "cancelled",
@@ -758,7 +801,9 @@ The response is flat rows:
 | `platformEventOutbox_platformId` | number | no | |
 | `platforms_platformName` | string | yes | |
 | `platformEventOutbox_bookingId` | number | yes | `null` for visit events |
+| `bookings_bookingNumber` | string | yes | the leg's booking number (`BK…`), the one guests, hotels and partners see. `null` for visit events |
 | `platformEventOutbox_visitId` | number | yes | |
+| `visits_visitCode` | string | yes | the visit's code (`VIS-…`), the one partners use. `null` when the event has no visit |
 | `platformEventOutbox_eventType` | string | no | e.g. `leg.approved`, `leg.rejected`, `booking.cancelled`, `booking.cancelled_by_hotel`, `booking.cancelled_by_system`, `booking.checked_in`, `booking.checked_out`, `booking.no_show`, `booking.modified`, `visit.invalidated`, `visit.restored`, `visit.updated` |
 | `platformEventOutbox_oldStatus`, `platformEventOutbox_newStatus` | string | yes | the leg's booking status before and after |
 | `platformEventOutbox_initiator` | string | yes | `hotel`, `partner`, `system` or `guest` |

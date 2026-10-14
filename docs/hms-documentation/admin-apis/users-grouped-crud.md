@@ -4,14 +4,14 @@
 
 | Method | Step | Action | Permission | Returns |
 |---|---|---|---|---|
-| **POST** | 1 | Create a user | none (static) | `{ users_userId, … }` |
-| **PUT** | 1 | Update a user (`?id=<user_id>`) | none | user summary |
-| **GET** | 1 | List users / View one (`?id=`; `?guests=1` scope) | none | user rows + `tenantUrddMap` |
-| **DELETE** | 1 | Soft-delete a user (`?id=`) | none | standard delete result |
-| **POST** | 2 | Assign a user's role set (URDDs) + fan out URDPs | none | role-diff report |
-| **PUT** | 2 | Re-sync the role set (replace-all) | none | role-diff report |
-| **GET** | 2 | List / View a URDD (`?id=`) | none | URDD rows |
-| **DELETE** | 2 | Soft-delete one URDD (`?id=`, tenant-ownership gated) | none | standard delete result |
+| **POST** | 1 | Create a user | `add_users` | `{ users_userId, … }` |
+| **PUT** | 1 | Update a user (`?id=<user_id>`) | `update_users` | user summary |
+| **GET** | 1 | List users / View one (`?id=`; `?guests=1` scope) | `list_users` / `view_users` | user rows + `tenantUrddMap` |
+| **DELETE** | 1 | Soft-delete a user (`?id=`) | `delete_users` | standard delete result |
+| **POST** | 2 | Assign a user's role set (URDDs) + fan out URDPs | `add_user_roles_designations_department` | role-diff report |
+| **PUT** | 2 | Re-sync the role set (replace-all) | `update_user_roles_designations_department` | role-diff report |
+| **GET** | 2 | List / View a URDD (`?id=`) | `list_user_roles_designations_department` / `view_user_roles_designations_department` | URDD rows |
+| **DELETE** | 2 | Soft-delete one URDD (`?id=`, tenant-ownership gated) | `delete_user_roles_designations_department` | standard delete result |
 
 A multi-step grouped CRUD used by a **Tenant Admin** to manage a **user** and that user's **role assignments** in one API. Step 1 owns the `users` row; step 2 owns the user's `user_roles_designations_department` (URDD) set and fans out the `user_role_designation_permissions` (URDP) those assignments grant. A user may hold **multiple** RDDs, so step 2 treats the role field as a **set** with replace-all semantics. Business logic lives in preProcess helpers under `Src/HelperFunctions/PreProcessingFunctions/CustomUsersGroupedCrud/`; the Add/Update `queryPayload` is a `null` no-op.
 
@@ -21,7 +21,11 @@ A multi-step grouped CRUD used by a **Tenant Admin** to manage a **user** and th
 
 Runs on the encrypted **AUTH platform** (platform encryption + access token). `actionPerformerURDD` is the actor — it rides in the encrypted header on every request (including GETs) and may also be in the body. It is used to **derive the acting `tenant_id`** (payload tenant fields are ignored) and to stamp `created_by` / `updated_by`.
 
-Both steps declare `permission: null` — this CRUD does **not** gate on a static RBAC permission. Instead:
+Every verb is gated by the permission in the table above (`403`, SCC `E41`, when the actor's URDD lacks it). Holders today: the general and hotel Tenant Managers and the Tenant Admins hold all of them. Service Managers hold only `list_users` / `view_users`. The SaaS Admin and the Visits Curator hold none.
+
+> **Changed 2026-10-11.** These permissions were declared but never checked: the object's `requestMetaData` sat beside `data` instead of inside it, so the middleware never saw it, and any signed-in admin seat could list users, create users and assign roles. It now sits inside `data` and is enforced.
+
+On top of the permission gate:
 
 - **List / View** — tenant scoping is enforced by the query resolver (`created_by`-based tenancy filter on the top-level `users` rows).
 - **Add / Update (step 2)** — tenant scoping and a per-RDD "assignable to this tenant" guard are enforced **inside `syncUserRddSet`**. The `users` row has no per-tenant owner, so there is no tenant-ownership guard on step-1 Update; protection is per-URDD at the role layer.

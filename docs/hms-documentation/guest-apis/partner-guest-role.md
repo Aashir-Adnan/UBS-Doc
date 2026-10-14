@@ -2,6 +2,8 @@
 
 A traveller whose visit was booked by a partner platform (a travel company using the Visits API) can sign in to our guest app with the same email. Their visit legs belong to a separate **partner guest role**. This page is the front-end contract for that role: which URDD to send, what the app may show and do, the payloads, and the errors to handle.
 
+For the backend's side of this role (what the login response sends and means, how each endpoint treats a partner URDD, and every refused operation), see [Partner Guest Role — Backend Contract](./partner-guest-role-backend-contract.md).
+
 Updated 2026-10-08: scheduling and rescheduling are no longer allowed under this role; the partner platform does them. Changes are listed in [What changed](#what-changed).
 
 ---

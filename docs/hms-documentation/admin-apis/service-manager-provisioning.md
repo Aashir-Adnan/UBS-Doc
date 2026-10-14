@@ -16,6 +16,9 @@ Provisions a **Service Manager** — a staff user scoped to exactly one service 
 
 Requires the **`add_users`** permission. Per the governance strategy, both **PG-TENANT-MGMT** (Tenant Manager) and **PG-TENANT-ADMIN** (Tenant Admin) carry `add_users`, so both personas can provision Service Managers. (A dedicated `add_service_managers` permission may replace this later.)
 
+> **Enforced since 2026-10-11.** This permission was declared but never checked before that date: the object's `requestMetaData` sat beside `data` instead of inside it, so the middleware skipped it. It is now checked, and a seat without it gets `403` (SCC `E41`).
+
+
 The provisioning routine additionally enforces the acting context:
 
 - `actionPerformerURDD` must resolve to an **active** URDD.

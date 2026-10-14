@@ -366,8 +366,11 @@ A unit is considered **available** when no active `booking_items` row overlaps t
 
 - `bi.status = 'active'`
 - `bi.item_status NOT IN ('cancelled', 'checked_out')`
-- `b.booking_status NOT IN ('cancelled', 'checked_out')` (joined from `bookings`)
-- Date overlap: `DATE(bi.scheduled_start) < DATE(checkOut) AND DATE(bi.scheduled_end) > DATE(checkIn)`
+- `b.booking_status NOT IN ('cancelled', 'checked_out', 'no_show')`: a booking marked no-show releases its rooms (updated 2026-10-11)
+- Date overlap: `DATE(bi.scheduled_start) < DATE(checkOut) AND occupied-until > DATE(checkIn)`
+- Occupied-until is `DATE(bi.scheduled_end)`, except for a guest who is checked in (`item_status = 'occupied'`): their room counts as taken at least through tonight, until staff check them out. An overstaying guest's room is never offered while they are still in it, and future dates are not blocked.
+
+The same rule is used by booking, search, the availability probe, unavailable dates, extensions, in-range unit counts and the check-in desk's room allocation (`Src/HelperFunctions/Guest/v2/unitOccupancy.js`).
 
 If no unit is free, the booking API returns **409** `"No available rooms for the selected dates"`. For serial/parallel bookings with insufficient units for a specific entry, the error includes the date range and the shortfall (e.g. `"need 2, found 1"`).
 

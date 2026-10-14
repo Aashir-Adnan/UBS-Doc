@@ -229,6 +229,13 @@ const sidebars = {
                 'hms-documentation/major-implementations/additional-package-nights/backend-implementation',
               ],
             },
+            {
+              type: 'category',
+              label: 'Background Jobs (Crons)',
+              items: [
+                'hms-documentation/major-implementations/background-jobs/background-jobs',
+              ],
+            },
           ],
         },
         {
@@ -601,7 +608,7 @@ const sidebars = {
           items: [
             'hms-documentation/visits/visits-overview',
             'hms-documentation/visits/visits-admin-apis',
-            'hms-documentation/visits/visits-components-api',
+            'hms-documentation/visits/visit-price-calculation',
             'hms-documentation/visits/partner-integration-guide',
           ],
         },
@@ -619,6 +626,13 @@ const sidebars = {
               items: [
                 'hms-documentation/admin-apis/admin-create-guest-user',
                 'hms-documentation/admin-apis/admin-create-guest-booking',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Visits',
+              items: [
+                'hms-documentation/admin-apis/visits-components-api',
               ],
             },
             {

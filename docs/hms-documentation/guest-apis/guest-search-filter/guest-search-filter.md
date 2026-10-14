@@ -22,9 +22,9 @@ All parameters are passed as query string values.
 
 | Parameter | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `q` | `string` | No | — | Free-text search (LIKE match). Matches against service name, description, short description, and hotel `search_text`. Use for user-typed keywords (e.g. `"spa"`, `"deluxe"`). **Do not pass landmark display names** — use `cityId` instead for location-based filtering. |
+| `q` | `string` | No | — | Free-text search (LIKE match). Matches against service name, description, short description, hotel `search_text`, and — via `translated_entries` — any translation of the room/package name or description and of the hotel's `tenant_name`, `city`, `address` or `country`. Arabic user input therefore matches directly; no English title needs to be substituted. Use for user-typed keywords (e.g. `"spa"`, `"deluxe"`, `"بوفيه"`). **Do not pass landmark display names** — use `cityId` instead for location-based filtering. |
 | `hotelId` | `string` | No | all hotels | Comma-separated hotel/tenant IDs. Example: `"3,16"`. |
-| `cityId` | `number` | No | — | Filter results to hotels in a specific city. Use the `cityId` returned from the landmarks endpoint or hotels endpoint. This is the correct way to discover services/packages near a landmark. |
+| `cityId` | `number` | No | — | Filter results to hotels in a specific city. Use the `cityId` returned from the landmarks endpoint or hotels endpoint. This is the correct way to discover services/packages near a landmark. A hotel is in a city when its city is set in HMS, or, when none is set, when the city name in its address matches that reference city (preferring one in the hotel's country). Before 2026-10-11 only the set city counted, so hotels with only an address city never matched. |
 | `include` | `string` | No | `"rooms,services,packages"` | Comma-separated entity types to return. Valid values: `rooms`, `services`, `packages`. |
 | `tag` | `string` | No | — | Category slug filter (e.g. `"stay"`, `"dining"`, `"spa"`). When `include=rooms` only, defaults to `"stay"` internally. |
 

@@ -16,8 +16,9 @@ Four independent restrictions at the outer edge of the request pipeline. Three w
 | Platform name allowlist — guest APIs | L1 — `platformHandler.js` | `GUEST_PLATFORM_SUPPORTED` | `E51` / 400 |
 | Platform domain allowlist — admin / staff APIs | L1 — `platformHandler.js` | `PLATFORM_ALLOWED_DOMAINS` | `E51` / 400 |
 | Platform domain allowlist — guest APIs | L1 — `platformHandler.js` | `GUEST_PLATFORM_ALLOWED_DOMAINS` | `E51` / 400 |
+| Per-platform domains, egress IPs and rate limit | L1b — `platformAccessHandler` (`platformAccess.js`) | `platforms.domains`, `platforms.egress_ips`, `platforms.rate_limit` | `403 origin_not_allowed`, `403 ip_not_allowed`, `429 rate_limited` |
 
-**Every variable defaults to `*`.** An environment that sets none behaves exactly as before.
+**Every variable defaults to `*`.** An environment that sets none behaves exactly as before. The per-platform columns default to `*` the same way: `NULL` or an empty list means "allow all". See [Per-platform rules](#per-platform-rules-from-the-platforms-table).
 
 ---
 
@@ -388,6 +389,94 @@ It stops **other websites** from driving the API through a visitor's browser, an
 
 ---
 
+## Per-platform rules from the `platforms` table
+
+The partner platforms (visits) already had their own `domains`, `egress_ips` and `rate_limit` columns. The same three columns now apply to **every** platform, ours included: `Web_App`, `Ios_App`, `Android_App` and any partner. Each platform can have its own rules, with no redeploy needed.
+
+| Column | Meaning | `NULL` / `[]` | `*` |
+|---|---|---|---|
+| `domains` | JSON array of hosts or origins the browser `Origin` must match. An entry also matches its subdomains (`my-destination.com` allows `dev.my-destination.com`) | allow every origin | `["*"]`, or `*` anywhere in the list, allows every origin |
+| `egress_ips` | JSON array of IPs or CIDRs (`10.0.0.0/24`, `2001:db8::/48`). `::ffff:` IPv4-mapped addresses match their IPv4 entry | allow every address | `["*"]`, or `*` anywhere in the list, allows every address |
+| `rate_limit` | requests per minute, counted per server process. **Our platforms:** per signed-in user (per client IP for calls without a login). **Partner platforms:** for the whole platform | our platforms: no limit. Partner platforms: 600 (`PARTNER_RATE_LIMIT_PER_MINUTE`) | not applicable |
+
+### Where each rule is applied
+
+1. **CORS (L0).** An origin passes CORS when `CORS_ALLOWED_ORIGINS` allows it **or** any active platform's `domains` allows it. One active platform whose `domains` is `NULL`, empty or contains `*` opens CORS to every origin. CORS runs before the platform is known (a preflight carries no payload), so here the lists of all active platforms are combined.
+2. **Per platform (L1b).** After decryption, `platformAccessHandler` reads the request's `PlatformName` (the outer envelope's `encryptionDetails.PlatformName`, verified by the platform key) and checks that platform's row. The rate limit is counted later, by `platformRateLimitHandler`, right after the access token is verified, so it can count per user:
+
+| Check | Fails with |
+|---|---|
+| `Origin` header against `domains`. A request with no `Origin` (mobile, server-to-server, `curl`) skips this check | `403`, `meta.scc = origin_not_allowed` |
+| `req.ip` against `egress_ips` | `403`, `meta.scc = ip_not_allowed` |
+| calls this minute against `rate_limit`, counted as below | `429`, `meta.scc = rate_limited` |
+
+How the rate limit is counted:
+
+| Caller | Counted under | So |
+|---|---|---|
+| Partner platform | the platform | every user and server of that partner shares one allowance, as the partner guide promises |
+| Our platform, signed in (endpoint requires an access token) | the platform + the user id **from the verified token** | each user has their own allowance; users behind one office or carrier IP do not share it |
+| Our platform, token without a user id | the platform + the verified device id | |
+| Our platform, no login (OTP, signup, refresh, public reads) | the platform + the client IP (`req.ip`, see `TRUST_PROXY_HOPS`) | pre-login callers on one IP share an allowance |
+
+A `userId` sent in the body of a public endpoint is never used for counting; only the id from a verified token is. A request with an invalid or expired token is refused with `401` before it is counted. The global per-IP limiter in `securityConfig.js` (300 per minute) still applies to every request.
+
+Error body, for example (`meta.message` / `error.detail` hold the endpoint's own catalog sentence, in the request's language):
+
+```json
+{
+  "success": false,
+  "data": null,
+  "meta": {
+    "message": "<the endpoint's error sentence>",
+    "status": 403,
+    "detail": "The calling origin is not on this platform's domain list",
+    "source": "Platform Access",
+    "scc": "origin_not_allowed"
+  },
+  "error": {
+    "message": "The calling origin is not on this platform's domain list",
+    "detail": "<the endpoint's error sentence>",
+    "code": "origin_not_allowed",
+    "source": "Platform Access",
+    "details": { "code": "origin_not_allowed" }
+  }
+}
+```
+
+Branch on `meta.scc` (or `error.code`). The `ip_not_allowed` and `rate_limited` errors have the same shape.
+
+A request whose `PlatformName` is absent, unknown or belongs to an inactive platform is not checked here. The platform name allowlist (`supported`) and decryption decide those.
+
+### Relation to the env lists
+
+The env lists (`PLATFORM_ALLOWED_*`, `GUEST_PLATFORM_ALLOWED_*`) are per API template. The `platforms` columns are per client platform. A request must pass both. Keep the env lists at `*` and use the columns when the rule belongs to one app ("the web dashboard is only served from `my-destination.com`") rather than to a group of endpoints.
+
+### Setting the values
+
+- **Partner platforms:** `platforms_domains`, `platforms_egressIps` and `platforms_rateLimit` in step 1 of `/crud/partner-platforms` (see [Visits Admin APIs](../../visits/visits-admin-apis.md)). Both lists accept `"*"`. Saving clears the cache at once.
+- **Our platforms:** the generic Platforms CRUD does not expose these columns yet. Set them in the database, for example:
+
+```sql
+UPDATE platforms
+   SET domains = JSON_ARRAY('https://my-destination.com'),
+       egress_ips = NULL,
+       rate_limit = NULL
+ WHERE platform_name = 'Web_App';
+```
+
+The server reads the table at most once a minute, so a direct change takes effect within 60 seconds.
+
+:::caution Mobile platforms
+Leave `domains` and `egress_ips` as `NULL` on `Ios_App` and `Android_App`. Apps send no `Origin`, and phones change networks, so an IP list would lock real users out. A `rate_limit` there applies to each signed-in user on their own, and per IP before login.
+:::
+
+:::caution CORS opens while any platform is `NULL`
+Every row starts with `domains = NULL`, which means `*`. CORS therefore allows every origin until **every** active platform has a real `domains` list, whatever `CORS_ALLOWED_ORIGINS` says. To restrict browsers in production, set `domains` on every active platform, including partner rows (a server-only partner can use its own website, since server calls send no `Origin`).
+:::
+
+---
+
 ## Operational notes
 
 **`Crud_Template` is merged into every generated CRUD.** Narrowing `PLATFORM_ALLOWED_IPS` restricts far more than browsers: cron jobs, webhook callbacks, and any server-to-server integration are filtered by the same list. Enumerate those callers before setting it.
@@ -415,6 +504,12 @@ It stops **other websites** from driving the API through a visitor's browser, an
 | Server-to-server integration breaks, browsers fine | `PLATFORM_ALLOWED_IPS` — CORS would not affect a non-browser client. |
 | `E51` from one website only, mobile apps and Postman fine | That site's host is missing from `PLATFORM_ALLOWED_DOMAINS` / `GUEST_PLATFORM_ALLOWED_DOMAINS`. Requests without an `Origin` skip the domain check, which is why non-browser clients still work. |
 | `E51` on `/api/upload/serve` only, with `domains` and `platformIP` both `*` in the log | The query envelope wasn't read, so `supported` saw no `PlatformName`. Check the object still has `requestMetaData.envelopeInQuery: true` and the request is a `GET`. |
+| `403 origin_not_allowed` from one website only | That origin is missing from the calling platform's `platforms.domains`. Non-browser clients pass because they send no `Origin`. |
+| `403 ip_not_allowed` on one platform only | `req.ip` is outside that platform's `platforms.egress_ips`. Check `TRUST_PROXY_HOPS` before widening the list. |
+| `429 rate_limited` for one user of our app | that user went over `platforms.rate_limit` in the last minute. Raise it or set it to `NULL` |
+| `429 rate_limited` for every user of a partner at once | partner limits are per platform. Raise the partner's `rate_limit` |
+| `429 rate_limited` before login for many users at once | they share one IP (office, hotel Wi-Fi, carrier) and pre-login calls are counted per IP |
+| A row change has no effect yet | The `platforms` table is cached for 60 seconds. The partner CRUD clears it at once. A direct SQL change waits for the cache to expire. |
 | Guest site gets `E51` on one shared endpoint only | The endpoint omits `domains` and inherits the admin list from `Crud_Template`. Add `resolveSharedPlatformDomains()`. |
 
 `E51` is raised before the handler runs, so no application-level log will show the request reaching business logic.
@@ -428,6 +523,7 @@ It stops **other websites** from driving the API through a visitor's browser, an
 | `Src/Config/Security/securityConfig.js` | `originChecker`, `corsOptions`, the single `cors()` registration |
 | `Src/HelperFunctions/Platform/allowedPlatformIPs.js` | `resolveAllowedPlatformIPs(envVar)` and address-form expansion |
 | `Src/HelperFunctions/Platform/allowedPlatformDomains.js` | `resolveAllowedPlatformDomains(envVar)` / `resolveSharedPlatformDomains()` / `isOriginInDomains` |
+| `Src/HelperFunctions/Platform/platformAccess.js` | Per-platform `domains` / `egress_ips` / `rate_limit` from the `platforms` table: `enforcePlatformAccess`, `corsOriginAllowed`, 60-second cache |
 | `Src/HelperFunctions/Platform/supportedPlatforms.js` | `resolveSupportedPlatforms(envVar)` / `resolveSharedSupportedPlatforms()` |
 | `Services/Middlewares/PlatformCheck/platformEncryption.js` | `peekEncryptionDetails` — outer-envelope read that un-deadens `supported`; `extractEncryptedRequest` — header, body, then the `envelopeInQuery` query string |
 | `Services/Middlewares/DeviceHeaders/validateDeviceHeaders.js` | Exempts `envelopeInQuery` GETs from the `x-client-*` header requirement |
@@ -438,7 +534,7 @@ It stops **other websites** from driving the API through a visitor's browser, an
 | `Services/SysFunctions/deepObjectCopy.js` | `deepMerge` — why an omitted key inherits the template's value |
 | `Services/Middlewares/PlatformCheck/platformHandler.js` | `getPlatformConfig` — case-insensitive name match, IP match, domain match (`isPlatformDomainAllowed`), unencrypted exemption |
 | `Src/app.js` | `trust proxy` / `TRUST_PROXY_HOPS`, which determines `req.ip` |
-| `Services/Middlewares/config.js` | `platformConfigHandler` — calls the peek before matching, passes `req.get('origin')` |
+| `Services/Middlewares/config.js` | `platformConfigHandler` — calls the peek before matching, passes `req.get('origin')`. `platformAccessHandler` — per-platform rules, right after `encryptionHandler` |
 | `Src/Apis/GeneratedApis/Custom/Login/Custom_Objects/LoginWithOTP/login.js` | Both steps use the `platform` array shape so `supported` applies |
 | `data/migrations/20260910_1_normalize_platform_names_and_keys.sql` | Registry normalization — `Ios_App`, key rotation, retires other platforms |
 

@@ -1,8 +1,8 @@
 # Partner Integration Guide
 
-This guide is for engineering teams at **partner platforms** (travel apps and websites) that sell HMS **visits** to their own users. It covers everything a partner backend needs: credentials, the encrypted transport, authentication, every endpoint with its request and response, the errors it can return, and the events HMS sends back.
+This guide is for engineering teams at **partner platforms** (travel apps and websites) that sell my-destination **visits** to their own users. It covers everything a partner backend needs: credentials, the encrypted transport, authentication, every endpoint with its request and response, the errors it can return, and the events my-destination sends back.
 
-A **visit** is a bundle of hotel packages and services from several hotels, sold at one price. When you book a visit, HMS creates one booking per component (a **leg**) at that component's hotel, all at once: either every leg is created or none is.
+A **visit** is a bundle of hotel packages and services from several hotels, sold at one price. When you book a visit, my-destination creates one booking per component (a **leg**) at that component's hotel, all at once: either every leg is created or none is.
 
 | Section | |
 |---|---|
@@ -10,10 +10,10 @@ A **visit** is a bundle of hotel packages and services from several hotels, sold
 | 2. Transport: the encrypted envelope | how every request and response is encoded |
 | 3. Responses and errors | envelope shapes, SCCs, retry guidance, language |
 | 4. End-to-end flows | sequence diagrams |
-| 5. Authentication APIs | login, TOTP enrolment and rotation |
+| 5. Authentication APIs | login, TOTP enrolment and rotation, keeping tokens valid (5.4) |
 | 6. Catalogue APIs | visit list and priced detail, booking forms, hotel and location objects |
 | 7. Traveller API | traveller token |
-| 8. Booking APIs | book, cancel, purchases, leg changes, settle |
+| 8. Booking APIs | book, cancel, purchases, leg service scheduling |
 | 9. Events | webhooks and replay |
 | 10. Integration checklist | before going live |
 
@@ -21,7 +21,7 @@ A **visit** is a bundle of hotel packages and services from several hotels, sold
 
 ## 1. What you receive at onboarding
 
-HMS creates your platform and hands these over **once, out of band**. Store them in a secret manager.
+my-destination creates your platform and hands these over **once, out of band**. Store them in a secret manager.
 
 | Item | Example | Used for |
 |---|---|---|
@@ -30,10 +30,10 @@ HMS creates your platform and hands these over **once, out of band**. Store them
 | Platform version | `1.0.0` | `PlatformVersion` in every envelope |
 | Platform key | 32 hex characters | inner encryption layer |
 | Outer key | shared string | outer encryption layer |
-| System user email + password | `hms@travelco.example.com` / random | partner login |
+| System user email + password | `my-destination@travelco.example.com` / random | partner login |
 | Webhook secret | `whsec_…` | verifying webhooks (only if you gave a webhook URL) |
 
-Optional settings HMS records for you: the egress IPs of your servers (calls from other addresses are refused), a rate limit (requests per minute, default 600), your webhook URL, and contacts for incidents and key rotation. Key rotation is done by HMS adding a new platform version with a new key; you switch `PlatformVersion` and key together.
+Optional settings my-destination records for you: the egress IPs of your servers (calls from other addresses are refused), a rate limit (requests per minute, default 600), your webhook URL, and contacts for incidents and key rotation. Key rotation is done by my-destination adding a new platform version with a new key; you switch `PlatformVersion` and key together.
 
 ---
 
@@ -61,10 +61,11 @@ encryptedRequest = AES(JSON(outer), outerKey)
 | API | Method | Access token | `actionPerformerURDD` |
 |---|---|---|---|
 | 5.1 to 5.3 login, TOTP confirm, TOTP rotate | `POST` | none | not sent |
-| 6.1 list visits, 6.2 visit detail | `GET` | system | `systemUrdd` |
+| 5.4 traveller refresh (`/api/auth/refresh`) | `POST` | none (the expired token goes in the payload) | not sent |
+| 6.1 list visits, 6.1.1 search and filter, 6.2 visit detail | `GET` | system | `systemUrdd` |
 | 6.3 visit images | `GET` | none | not sent |
 | 7.1 traveller token | `POST` | system | `systemUrdd` |
-| 8.1 book, 8.2 cancel, 8.4 settle, 8.6 schedule | `POST` | traveller | the traveller's `tenantUrddMap.global` |
+| 8.1 book, 8.2 cancel, 8.6 schedule | `POST` | traveller | the traveller's `tenantUrddMap.global` |
 | 8.5 service slots | `GET` | traveller | the traveller's `tenantUrddMap.global` |
 | 8.3 purchases | `GET` | system or traveller | `systemUrdd`, or the traveller's `tenantUrddMap.global` |
 | 9.3 events replay | `GET` | system | `systemUrdd` |
@@ -82,7 +83,7 @@ Headers on **every** request:
 
 Responses are encrypted with the **same inner key** you used for the request. A renewed access token may arrive in the `x-new-accesstoken` response header at any time; replace your stored token with it immediately, because the previous one stops working.
 
-Reference client (Node.js, `crypto-js`):
+Reference client (Node.js, `crypto-js`). It reads your credentials from environment variables named `MY_DESTINATION_*`; the names are only an example, so use whatever your own configuration calls them:
 
 ```js
 const CryptoJS = require("crypto-js");
@@ -94,21 +95,21 @@ const aes = (obj, key) => CryptoJS.AES.encrypt(JSON.stringify(obj), CryptoJS.enc
 const unaes = (text, key) => JSON.parse(CryptoJS.AES.decrypt(text, CryptoJS.enc.Utf8.parse(fit(key)),
   { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 }).toString(CryptoJS.enc.Utf8));
 
-async function hms(method, path, body = {}, { token = null, headers = {} } = {}) {
-  const inner = `${token || ""}${process.env.HMS_PLATFORM_KEY}`;
+async function my-destination(method, path, body = {}, { token = null, headers = {} } = {}) {
+  const inner = `${token || ""}${process.env.MY_DESTINATION_PLATFORM_KEY}`;
   const envelope = {
     reqData: aes(body, inner),
-    encryptionDetails: { PlatformName: process.env.HMS_PLATFORM_NAME, PlatformVersion: process.env.HMS_PLATFORM_VERSION, accessToken: token },
+    encryptionDetails: { PlatformName: process.env.MY_DESTINATION_PLATFORM_NAME, PlatformVersion: process.env.MY_DESTINATION_PLATFORM_VERSION, accessToken: token },
   };
-  const encryptedRequest = aes(envelope, process.env.HMS_OUTER_KEY);
+  const encryptedRequest = aes(envelope, process.env.MY_DESTINATION_OUTER_KEY);
   const res = await axios({
     method,
-    url: process.env.HMS_BASE_URL + path,
+    url: process.env.MY_DESTINATION_BASE_URL + path,
     validateStatus: () => true,
     headers: {
       "Content-Type": "application/json",
       "x-client-platform": "web",
-      "x-client-device-uuid": process.env.HMS_DEVICE_UUID,
+      "x-client-device-uuid": process.env.MY_DESTINATION_DEVICE_UUID,
       "x-app-version": "1.0.0",
       ...(token ? { accesstoken: token } : {}),
       ...(method === "GET" ? { encryptedrequest: encryptedRequest } : {}),
@@ -188,6 +189,7 @@ Errors are **not encrypted**:
 |---|---|---|
 | 403 | `not_a_partner_platform` | the platform in the envelope is not an active partner |
 | 403 | `ip_not_allowed` | the call came from an address outside your registered egress IPs |
+| 403 | `origin_not_allowed` | a browser call whose `Origin` is not on your registered domains. Server-to-server calls send no `Origin` and are not affected |
 | 403 | `wrong_token` | a system token was used where a traveller token is needed, or the reverse, or the token belongs to another platform |
 | 403 | `persona_mismatch` | `actionPerformerURDD` does not belong to the token's user, or is not the right kind of seat |
 | 409 | `concurrent_request` | another request for the same purchase is in progress; retry shortly |
@@ -200,14 +202,16 @@ Every partner visit API returns its text in **one language**: the one you ask fo
 GET /api/partner/visits/detail?language_code=ar
 ```
 
-You can also send `language_code` in the encrypted body. The query string wins when both are sent. The same parameter sets the language of `meta.message`.
+You can also send `language_code` in the encrypted body. The query string wins when both are sent. Wherever you send it, the same value sets the language of the data **and** of `meta.message`. The code is case-insensitive (`AR` = `ar`).
 
 | Rule | Behaviour |
 |---|---|
 | Default | `en` |
-| Supported codes | the languages HMS has active, currently `en`, `ar`, `ur` and `fr` |
+| Supported codes | the languages my-destination has active, currently `en`, `ar`, `ur` and `fr` |
 | Unsupported or unknown code | treated as `en`; no error |
 | A text with no translation in that language | that one field comes back in English; the rest of the response stays in the requested language |
+| `meta.message` | translated for every partner endpoint, on success and for every error code, in Arabic. Urdu and French messages are not translated yet and come back in English |
+| Errors | the HTTP status, `error.details.code` and `meta.scc` are the same in every language. `error.message` and `meta.detail` are English developer text. Data inside `error.details` (for example the fresh `pricing` of a `409 price_changed`) is localized like a success result |
 | Shape | every text field is a **single string**. No response contains `{ "en": …, "ar": … }` pairs |
 
 **Translated:**
@@ -218,7 +222,7 @@ You can also send `language_code` in the encrypted body. The query string wins w
 - service names and labels;
 - `formSchema` options and location names. The form field labels themselves (`formSchema[].label`) are English for now; render your own label from `formSchema[].key` when you need it in another language;
 - the booking labels inside `legs[].booking`;
-- the category and service labels in the slots call.
+- the service labels and location names in the slots call (`category` itself is a code and does not change).
 
 **Never translated:** ids, codes, slugs and enum values, for example:
 - `status`, `type`, `category`, `rule`, the `formSchema[].key` and option `value`;
@@ -226,15 +230,40 @@ You can also send `language_code` in the encrypted body. The query string wins w
 
 Branch your code only on these, never on a display text. `violations[].message` is an English developer sentence; show `meta.message` to users.
 
-**When to call again.** HMS doesn't push a language change to you: webhooks carry ids and statuses, no display text. Whenever your user's language changes, fetch again whatever you show:
+**When to call again.** my-destination doesn't push a language change to you: webhooks carry ids and statuses, no display text. Whenever your user's language changes, fetch again whatever you show:
 
 | Your user… | Call again, with the new `language_code` |
 |---|---|
-| switches language on a catalogue screen | `GET /api/partner/visits` and, for an open visit, `GET /api/partner/visits/detail` |
+| switches language on a catalogue screen | `GET /api/partner/visits` (or `GET /api/partner/visits/filter`) and, for an open visit, `GET /api/partner/visits/detail` |
 | switches language on a booking or trip screen | `GET /api/partner/visits/bookings` (or filter by `externalRef`) |
 | switches language while scheduling a service | `GET /api/partner/visits/legs/slots` |
-| books, cancels, settles or schedules | send their current `language_code` on the call itself: the response's purchase or leg comes back in that language |
+| books, cancels or schedules | send their current `language_code` on the call itself: the response's purchase or leg comes back in that language |
 | gets a webhook (any event type) | fetch the purchase with `GET /api/partner/visits/bookings` in the user's language, then render it |
+
+#### Language support by endpoint
+
+"Data" is what the decrypted `return` holds; "Message" is `meta.message`. Every endpoint accepts `language_code` the same way (query string or encrypted body).
+
+| Endpoint | Data in the requested language | Message | Worth knowing |
+|---|---|---|---|
+| `POST /api/partner/auth/login` | none: `otpauthUri` and tokens only | yes | |
+| `POST /api/partner/auth/totp/confirm` | none: tokens, `rotated` | yes | |
+| `POST /api/partner/auth/totp/rotate` | none: `otpauthUri` | yes | |
+| `POST /api/auth/refresh` | none: tokens, `tenantUrddMap` | yes | |
+| `GET /api/partner/visits` | `name`, `description`, text `configs` (`display_name`…), `legs[].name`, `legs[].hotelName`, `legs[].hotel.name` and the hotel's location chain | yes | the `etag` differs per language |
+| `GET /api/partner/visits/filter` | everything in the row above, plus `facets.cities[].name` | yes | `q` matches English and every translation, whatever `language_code` is. `appliedFilters.q` echoes your text as sent. Facet ids and counts are the same in every language |
+| `GET /api/partner/visits/detail` | the list fields, plus `legs[].services[].name`, the `locations[]` path names, `formSchema` options and `pricing.legs[].name`. `formSchema[].label` stays English | yes | the `etag` differs per language, so an `ifNoneMatch` from another language gets the full detail. Prices and `pricingFingerprint` are identical: a price checked in one language books in any other |
+| `GET /api/upload/serve` | not applicable: the image itself | | |
+| `POST /api/partner/users/token` | none: tokens, ids, `tenantUrddMap` | yes | |
+| `POST /api/partner/visits/book` | the purchase: `visitName`, leg, hotel, location and service names, booking labels. Also the fresh `pricing` in a `409 price_changed` | yes | a retry with the same `Idempotency-Key` returns the same purchase in the retry's language |
+| `POST /api/partner/visits/cancel` | the cancelled purchase, as in `book` | yes | |
+| `GET /api/partner/visits/bookings` | `items[].visitName`, `legs[].booking.label`, `legs[].booking.services[].label`, `legs[].hotel.name` and its location chain, `legs[].services[].name` | yes | |
+| `GET /api/partner/visits/legs/slots` | `categories[].locations[].services[].label`, location names, `formSchema` options | yes | `category`, dates, slot times and `slotId`s never change |
+| `POST /api/partner/visits/legs/schedule` | the returned `booking`, as in `bookings` | yes | |
+| `GET /api/partner/events` | none: ids, codes and statuses only; identical in every language | yes | |
+| Webhooks (9.2) | none: no display text, and no language. Fetch `bookings` in your user's language to render an event | | |
+
+In every row, switching the language changes **only** display text. Ids, prices, quantities, dates, statuses and other codes are byte-for-byte the same.
 
 **Caching:**
 - Key cached catalogue and purchase data by language as well as by id: (`visitId`, `language_code`), (`externalRef`, `language_code`).
@@ -250,9 +279,9 @@ Branch your code only on these, never on a display text. `violations[].message` 
 ```mermaid
 sequenceDiagram
   autonumber
-  participant HA as HMS admin
+  participant HA as my-destination admin
   participant P as Partner backend
-  participant H as HMS API
+  participant H as my-destination API
   HA->>H: create partner platform and system user
   HA-->>P: platform name, version, key, outer key, email, password, webhook secret
   P->>H: POST /partner/auth/login (email, password)
@@ -268,13 +297,13 @@ sequenceDiagram
 sequenceDiagram
   autonumber
   participant P as Partner backend
-  participant H as HMS API
+  participant H as my-destination API
   P->>H: POST /partner/auth/login (email, password, otp)
   H-->>P: accessToken, systemUrdd
   P->>H: any system call (accesstoken)
   H-->>P: result, sometimes x-new-accesstoken
   P->>P: replace the stored token when renewed
-  Note over P,H: when a call returns 401 unauthenticated, log in again with a fresh OTP
+  Note over P,H: on 401 unauthenticated, re-read the shared token store first (5.4), then let one worker log in with a fresh OTP
 ```
 
 ### 4.3 Browse, price and book
@@ -284,7 +313,7 @@ sequenceDiagram
   autonumber
   actor U as Traveller
   participant P as Partner backend
-  participant H as HMS API
+  participant H as my-destination API
   P->>H: GET /partner/visits (system token)
   H-->>P: visits on sale
   U->>P: picks a visit, start date and party
@@ -312,7 +341,7 @@ sequenceDiagram
 sequenceDiagram
   autonumber
   participant P as Partner backend
-  participant H as HMS API
+  participant H as my-destination API
   P->>H: POST /partner/visits/book, Idempotency-Key K
   H--xP: timeout or 5xx (the outcome is unknown)
   P->>H: POST /partner/visits/book, same body, same key K
@@ -329,7 +358,7 @@ sequenceDiagram
 sequenceDiagram
   autonumber
   participant P as Partner backend
-  participant H as HMS API
+  participant H as my-destination API
   participant W as Your webhook
   P->>H: POST /partner/visits/cancel (externalRef)
   H->>H: every leg still pending or confirmed: fee from the hotel policy, cancel, credit your account
@@ -343,11 +372,11 @@ sequenceDiagram
 sequenceDiagram
   autonumber
   participant HS as Hotel staff
-  participant H as HMS
+  participant H as my-destination
   participant W as Your webhook
   participant P as Partner backend
   HS->>H: approve, reject, check in, check out, no-show
-  H->>H: event recorded in the same database statement
+  H->>H: event recorded at the moment of the change
   H->>W: signed webhook (retried on failure)
   W-->>H: 2xx within 10 s
   alt hotel rejected a leg awaiting approval
@@ -361,7 +390,7 @@ Hotel staff can only move a visit leg through its statuses: approve or reject a 
 
 ### 4.7 After booking
 
-A booked visit cannot be changed: there is no edit, extension, reschedule or add-on for a leg, from your platform or from the hotel. To change a trip, cancel the whole visit (4.5) and book again. If a leg ever shows a `balanceDue` above 0, settle it with `POST /partner/visits/legs/settle` (8.4).
+A booked visit cannot be changed: there is no edit, extension, reschedule or add-on for a leg, from your platform or from the hotel. To change a trip, cancel the whole visit (4.5) and book again. Every leg is paid in full when the visit is booked, so a leg never has a balance due.
 
 ---
 
@@ -381,11 +410,12 @@ These three endpoints use the envelope **without** an access token: no `accessto
 | Access token | none, so send no `accesstoken` header and use `innerKey = platformKey` |
 | `actionPerformerURDD` | not sent |
 | Encrypted payload goes in | the JSON body `{ "encryptedRequest": "<base64>" }` |
+| Language | messages only: `meta.message` follows `language_code`; the result (`otpauthUri`, tokens) has no display text ([by endpoint](#language-support-by-endpoint)) |
 
 Payload (the JSON inside `reqData`, before encryption):
 
 ```json
-{ "email": "hms@travelco.example.com", "password": "S3cr3t…", "otp": "117604" }
+{ "email": "my-destination@travelco.example.com", "password": "S3cr3t…", "otp": "117604" }
 ```
 
 | Field | Type | Required | Notes |
@@ -397,23 +427,23 @@ Payload (the JSON inside `reqData`, before encryption):
 Before enrolment, call without `otp`:
 
 ```json
-{ "email": "hms@travelco.example.com", "password": "S3cr3t…" }
+{ "email": "my-destination@travelco.example.com", "password": "S3cr3t…" }
 ```
 
 ```json
 { "enrolmentRequired": true,
-  "otpauthUri": "otpauth://totp/HMS:hms%40travelco.example.com%20(TravelCo)?secret=JBSWY3DPEHPK3PXP&issuer=HMS&algorithm=SHA1&digits=6&period=30",
+  "otpauthUri": "otpauth://totp/my-destination:my-destination%40travelco.example.com%20(TravelCo)?secret=JBSWY3DPEHPK3PXP&issuer=my-destination&algorithm=SHA1&digits=6&period=30",
   "secret": "JBSWY3DPEHPK3PXP" }
 ```
 
 Calling again before confirming replaces the pending secret. After enrolment:
 
 ```json
-{ "email": "hms@travelco.example.com", "password": "S3cr3t…", "otp": "117604" }
+{ "email": "my-destination@travelco.example.com", "password": "S3cr3t…", "otp": "117604" }
 ```
 
 ```json
-{ "accessToken": "eyJhbGciOi…", "expiresIn": 86400, "tokenType": "partner_system",
+{ "accessToken": "eyJhbGciOi…", "expiresIn": 3600, "tokenType": "partner_system",
   "systemUrdd": 4410, "platform": { "id": 8, "name": "TravelCo" } }
 ```
 
@@ -432,7 +462,7 @@ After enrolment, with a valid `otp`:
 | Path | Type | Nullable | Values and notes |
 |---|---|---|---|
 | `accessToken` | string | no | the system token (JWT) |
-| `expiresIn` | number | no | lifetime in seconds |
+| `expiresIn` | number | no | lifetime in seconds: **1 hour (3600)** in production. Test environments may use a different lifetime. Read this field instead of hard-coding it |
 | `tokenType` | string | no | always `partner_system` |
 | `systemUrdd` | number | no | send as `actionPerformerURDD` on every system call |
 | `platform.id` | number | no | your platform id |
@@ -444,7 +474,7 @@ After enrolment, with a valid `otp`:
 | 400 | `otp_required` | enrolled but no `otp` |
 | 401 | `invalid_credentials` | wrong email or password |
 | 401 | `invalid_otp` | wrong OTP, or already used |
-| 403 | `totp_revoked` | HMS revoked your TOTP; contact HMS |
+| 403 | `totp_revoked` | my-destination revoked your TOTP; contact my-destination |
 | 409 | `totp_confirm_required` | `otp` sent while enrolment is still pending |
 | 423 | `locked` | five failures in a row; `error.details.lockedUntil` (15 minutes) |
 
@@ -458,11 +488,12 @@ After enrolment, with a valid `otp`:
 | Access token | none, so send no `accesstoken` header and use `innerKey = platformKey` |
 | `actionPerformerURDD` | not sent |
 | Encrypted payload goes in | the JSON body `{ "encryptedRequest": "<base64>" }` |
+| Language | messages only: `meta.message` follows `language_code`; the result has no display text |
 
 Payload (the JSON inside `reqData`, before encryption):
 
 ```json
-{ "email": "hms@travelco.example.com", "password": "S3cr3t…", "otp": "492039", "otpFlow": "login" }
+{ "email": "my-destination@travelco.example.com", "password": "S3cr3t…", "otp": "492039", "otpFlow": "login" }
 ```
 
 | Field | Type | Required | Notes |
@@ -498,11 +529,12 @@ Payload (the JSON inside `reqData`, before encryption):
 | Access token | none, so send no `accesstoken` header and use `innerKey = platformKey` |
 | `actionPerformerURDD` | not sent |
 | Encrypted payload goes in | the JSON body `{ "encryptedRequest": "<base64>" }` |
+| Language | messages only: `meta.message` follows `language_code`; the result has no display text |
 
 Payload (the JSON inside `reqData`, before encryption):
 
 ```json
-{ "email": "hms@travelco.example.com", "password": "S3cr3t…", "otp": "117604" }
+{ "email": "my-destination@travelco.example.com", "password": "S3cr3t…", "otp": "117604" }
 ```
 
 `{ email, password, otp }`, with `otp` from the **current** secret. Returns `{ "rotationPending": true, "otpauthUri": "…", "secret": "…" }`. The old secret keeps working until you confirm with `otpFlow: rotation`.
@@ -523,6 +555,26 @@ Payload (the JSON inside `reqData`, before encryption):
 
 ---
 
+### 5.4 Keeping tokens valid
+
+Both kinds of token are bound to your platform and only work on `/api/partner/*` (and `/api/auth/refresh` for travellers). my-destination keeps **one stored token per session**, and a request must carry exactly that token. The moment a token is replaced, the previous one stops working: there is no overlap.
+
+| Situation | What my-destination does | What you do |
+|---|---|---|
+| The token is in its last 20% of life | the response (success or error) carries a new token in `x-new-accesstoken`; the old one is dead from that moment | replace the stored token at once, before the next call. Calls made in the same second get the same new token |
+| A call is still using a token that was just replaced (another worker, a queued call, a retry) | `401 unauthenticated` | re-read the token from your shared store and retry. Do **not** log in again first |
+| The system token expired | `401 unauthenticated` | log in again (5.1) with a fresh OTP. System sessions have no refresh token; `POST /api/auth/refresh` with a system token is `401 refresh_not_allowed` |
+| You log the system user in again | the new session replaces the previous one: the earlier token is `401` from then on | there is **one system session per system user per platform version**. Run one login for all your servers, not one per server |
+| The traveller token expired | | call `POST /api/auth/refresh` with the expired `accesstoken` and the `refreshToken` (7.1). The new pair stays bound to your platform. Each refresh token works **once**: a reused one is `409 refresh_replayed` |
+| The traveller token expired more than the grace period ago (20% of the token lifetime), or the refresh token itself expired | refresh is refused: `401 access_expired_beyond_grace`, or `410 refresh_expired` | mint a new traveller token with the system token: `POST /api/partner/users/token` with the traveller's email (7.1). Same user, same `tenantUrddMap.global` |
+| You mint a new traveller token | the traveller's previous token is revoked | keep only the latest token per traveller |
+
+**With several servers or workers:**
+
+1. Keep **one shared token store** (for example Redis or your database) for the system token and for each traveller's token pair. Every worker reads from it before a call and writes to it whenever a response carries `x-new-accesstoken`.
+2. On `401 unauthenticated`, first re-read the store: if another worker already saved a newer token, retry with it.
+3. Only if the stored token is the one that failed, take a lock and let **one** worker log in (or refresh, for a traveller). The others wait for the store to update. Parallel logins replace each other's sessions, and each OTP is accepted only once.
+
 ## 6. Catalogue APIs
 
 System token; `actionPerformerURDD` = `systemUrdd`.
@@ -537,6 +589,7 @@ System token; `actionPerformerURDD` = `systemUrdd`.
 | Access token | **required**, the **system** token in the `accesstoken` header (and in `encryptionDetails.accessToken`) |
 | `actionPerformerURDD` | `systemUrdd` |
 | Encrypted payload goes in | the `encryptedrequest` header |
+| Language | **data and messages**: names, descriptions, text `configs`, leg, hotel and location names come back in `language_code`; the `etag` is per language ([by endpoint](#language-support-by-endpoint)) |
 
 Payload (the JSON inside `reqData`, before encryption):
 
@@ -545,7 +598,9 @@ Payload (the JSON inside `reqData`, before encryption):
 ```
 
 
-Fields: `page` (default 1, alias `page_no`), `pageSize` (default 20, max 100, alias `page_size`). Only visits currently on sale are returned (published, every hotel active and participating, priced).
+Fields: `page` (alias `page_no`), `pageSize` (max 100, alias `page_size`). Only visits currently on sale are returned (published, every hotel active and participating, priced).
+
+**No paging unless you ask for it.** Without `page` and `pageSize`, every visit on sale is returned in one response, and `pagination.page` and `pagination.pageSize` are `null`. Send either one to page: a missing `page` is `1` and a missing `pageSize` is `20`.
 
 ```json
 { "items": [
@@ -598,12 +653,12 @@ Fields: `page` (default 1, alias `page_no`), `pageSize` (default 20, max 100, al
 | `items[].configs` | object | no | the visit's display settings by config key; `{}` when none (see below) |
 | `items[].updatedAt` | ISO 8601 datetime | no | last change to the visit |
 | `items[].etag` | string | no | e.g. `W/"edfe4b465a207d255849"`; changes when the visit, its legs, price or configs change |
-| `pagination.page` | number | no | |
-| `pagination.pageSize` | number | no | |
+| `pagination.page` | number | yes | `null` when no `page` or `pageSize` was sent (every match returned) |
+| `pagination.pageSize` | number | yes | `null` when no `page` or `pageSize` was sent |
 | `pagination.totalItems` | number | no | visits on sale |
-| `pagination.totalPages` | number | no | `0` when there are none |
+| `pagination.totalPages` | number | no | `0` when there are none; `1` when unpaged |
 
-`configs` has one key per config the visit has; keys that are not set are absent, and HMS may add keys over time, so ignore ones you don't use. Each value follows these rules:
+`configs` has one key per config the visit has; keys that are not set are absent, and my-destination may add keys over time, so ignore ones you don't use. Each value follows these rules:
 
 | Config | Value |
 |---|---|
@@ -616,6 +671,465 @@ Fields: `page` (default 1, alias `page_no`), `pageSize` (default 20, max 100, al
 Keys you will commonly see: `display_name`, `media`, `is_featured`, `base_price`, `base_currency`, `duration`, `duration_unit`, `publish_start_datetime`, `publish_end_datetime`, `advance_booking_min_days`, `advance_booking_max_days`, `min_persons_per_booking`, `max_persons_per_booking`, `max_adults`, `max_children`, `allowed_regions` (an array with one object mapping a region id to its city ids).
 
 
+### 6.1.1 Search and filter visits — `GET /api/partner/visits/filter`
+
+The same visits as 6.1 (only visits on sale), narrowed by filters, sorted and paged. Use it for search screens; use 6.1 when you only need the full catalogue.
+
+**Request**
+
+| | |
+|---|---|
+| Method | `GET /api/partner/visits/filter` |
+| Access token | **required**, the **system** token |
+| `actionPerformerURDD` | `systemUrdd` |
+| Permission | `partner_list_visits` (the same as 6.1) |
+| Encrypted payload goes in | the `encryptedrequest` header |
+| Language | **data and messages**: as 6.1, plus `facets.cities[].name`. `q` matches every language whatever `language_code` says ([Search and filter languages](#search-and-filter-languages)) |
+
+```json
+{
+  "actionPerformerURDD": 4410,
+  "cityId": "1,2",
+  "cityMatch": "all",
+  "minPrice": 3000,
+  "maxPrice": 9000,
+  "stayDuration": "4-7",
+  "startDate": "2026-11-20",
+  "adults": 2,
+  "children": 1,
+  "filters": "[{\"key\":\"is_featured\",\"value\":\"true\"}]",
+  "sort": "priceAsc",
+  "page": 1,
+  "pageSize": 20
+}
+```
+
+Every field is optional. Filters combine with AND. With no filter at all the result is the same list as 6.1, plus `facets` and `appliedFilters`.
+
+The fields can also be sent in the query string (`/api/partner/visits/filter?cityId=1&sort=priceAsc`). When a field is in both, the encrypted payload wins.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `q` | string, at most 100 characters, **any language** | case-insensitive text match on the visit name and description, `visitCode`, `display_name`, `short_description`, the legs' package, room and hotel names, and the hotels' city names, **in English and in every stored translation**. See [Search and filter languages](#search-and-filter-languages) |
+| `cityId` | one id or a comma-separated list | visits with a leg at a hotel in one of these cities. City ids come from `facets.cities` in this response: see [Getting the city ids](#getting-the-city-ids) |
+| `cityMatch` | `any` (default) or `all` | `all`: the visit must have a leg in **every** listed city, e.g. `cityId=1,2&cityMatch=all` for trips that cover both Makkah and Madinah |
+| `hotelId` | one id or a comma-separated list | visits with a leg at one of these hotels |
+| `minPrice`, `maxPrice` | number, 0 or more | on `price.amount`, the visit's sell price for a party that fits the base units (6.2 explains how a bigger party's price scales) |
+| `minNights`, `maxNights` | whole number, 0 or more | on `durationDays` |
+| `stayDuration` | `4-7`, `8+` or `5` | a nights range, used only when `minNights` and `maxNights` are not sent |
+| `startDate` | `YYYY-MM-DD`, today or later | visits whose window holds a trip starting that day: `availableFrom` ≤ `startDate` and `startDate` + `durationDays` ≤ `availableTo`. Free rooms and notice rules are checked by 6.2 |
+| `adults`, `children` | `adults` at least 1, `children` 0 or more | visits where **every** leg can take the party in one purchase: enough adult and child places, rooms the hotel has, per-booking caps and minimums. The same rule as the units in 6.2. `children` alone is refused |
+| `filters` | JSON array of `{ "key", "value" }` | the visit's `configs` must hold the value, e.g. `[{"key":"is_featured","value":"true"}]`. `value` may be an array (any of them). Matching is case-insensitive, and `true`/`1`/`yes` are the same. For an option, send its **key** (`nights`), never its translated label. See [Search and filter languages](#search-and-filter-languages) |
+| `sort` | `recommended` (default), `priceAsc`, `priceDesc`, `newest`, `durationAsc`, `durationDesc` | `recommended`: featured visits first, then by id. Ties are broken by id |
+| `page`, `pageSize` | number | as in 6.1: **without both, every match is returned unpaged** (`pagination.page` and `pageSize` are `null`). Send either one to page (defaults 1 and 20), `pageSize` at most 100 |
+
+**Examples, one filter at a time,** against two sample published visits: `80` (`VIS-441DPG`, "Visit I", 999 SAR, 2 nights, 2026-10-06 to 2026-10-31, featured, one hotel in Makkah) and `526` (`VIS-C050A1`, "Family Umrah Package", 4,470 SAR, 14 nights, from 2026-10-11 with no end, featured, two hotels in Makkah). Each payload also carries `actionPerformerURDD`.
+
+| Payload | `appliedFilters` (changed keys) | Result |
+|---|---|---|
+| `{ "q": "umrah" }` | `"q": "umrah"` | both: `526` by its name, `80` because a leg's package name contains "Umrah" |
+| `{ "cityId": "1" }` | `"cityId": [1], "cityMatch": "any"` | both (Makkah) |
+| `{ "cityId": "1,2", "cityMatch": "all" }` | `"cityId": [1, 2], "cityMatch": "all"` | none: no visit has legs in both Makkah and Madinah |
+| `{ "hotelId": "88" }` | `"hotelId": [88]` | `526` (its first legs are at hotel 88) |
+| `{ "minPrice": 1000, "maxPrice": 5000 }` | `"minPrice": 1000, "maxPrice": 5000` | `526` (4,470) |
+| `{ "minNights": 2, "maxNights": 3 }` | `"minNights": 2, "maxNights": 3` | `80` (2 nights) |
+| `{ "stayDuration": "8+" }` | `"minNights": 8, "maxNights": null` | `526` (14 nights) |
+| `{ "startDate": "2026-10-20" }` | `"startDate": "2026-10-20"` | both: `80` ends 2026-10-22, inside its window. `526` has no end |
+| `{ "adults": 2, "children": 1 }` | `"adults": 2, "children": 1` | both: every leg can take the party |
+| `{ "adults": 20 }` | `"adults": 20, "children": 0` | none: a leg would need more units than its per-booking cap or the hotel's rooms |
+| `{ "filters": "[{\"key\":\"is_featured\",\"value\":\"true\"}]" }` | `"filters": [{ "key": "is_featured", "value": "true" }]` | both (stored as `1`, which matches `true`) |
+| `{ "filters": "[{\"key\":\"max_persons_per_booking\",\"value\":[\"2\",\"4\"]}]" }` | `"filters": [{ "key": "max_persons_per_booking", "value": ["2", "4"] }]` | `526` (its value is `2`, one of the list) |
+| `{ "sort": "priceDesc" }` | `"sort": "priceDesc"` | `526` (4,470) then `80` (999) |
+
+**Full example.** Every filter together:
+
+```json
+{
+  "actionPerformerURDD": 4410,
+  "q": "umrah",
+  "cityId": "1",
+  "minPrice": 1000,
+  "maxPrice": 9000,
+  "stayDuration": "8+",
+  "startDate": "2026-10-20",
+  "adults": 2,
+  "children": 0,
+  "filters": "[{\"key\":\"is_featured\",\"value\":\"true\"}]",
+  "sort": "priceAsc",
+  "page": 1,
+  "pageSize": 20
+}
+```
+
+`cityMatch` and `hotelId` are left out here. `filters` is a JSON **string** inside the payload, so its quotes are escaped. An array (`"filters": [{ "key": "is_featured", "value": "true" }]`) is accepted too.
+
+#### Search and filter languages
+
+| Part | Language rule |
+|---|---|
+| `q` | any language. It searches the English text **and** every stored translation, whatever `language_code` you send, so an Arabic search box works: `q=العمرة` finds "باقة العمرة العائلية" |
+| `cityId`, `hotelId`, prices, nights, `startDate`, `adults`, `children`, `sort` | ids, numbers, dates and fixed values: the same in every language |
+| `filters` | keys and stored values, never display labels. Send the option key (`nights`) or the stored value (`true`), not "Nights" or "ليالي". Labels are display text and can change, keys do not |
+| The response (names, `facets.cities[].name`) | in the requested `language_code` ([Language](#language)), whatever language `q` was written in |
+
+**How Arabic text is compared.** Both your text and HMS's text are normalised first, so spelling variants match:
+
+| Variant | Treated as |
+|---|---|
+| `أ` `إ` `آ` `ٱ` | `ا` (`أبراج` = `ابراج`) |
+| `ة` | `ه` (`مكة` = `مكه`) |
+| `ى` | `ي` (`مستشفى` = `مستشفي`) |
+| diacritics (fatha, damma, kasra, shadda, sukun, tanween) and tatweel `ـ` | removed (`مَكَّةُ` = `مكة`) |
+| upper and lower case, repeated spaces | ignored |
+
+The match is a substring match, without stemming: `عمرة` and `العمرة` match "باقة العمرة العائلية", but `عائلة` does not match `العائلية` (a different word form). A visit or name without a stored translation is found only by its English text.
+
+#### Getting the city ids
+
+:::tip Where city ids come from
+There is no separate cities endpoint. Every filter response lists the cities you can filter on, with their ids, in `facets.cities`. Call the filter once with no filters to build your city picker:
+
+```
+GET /api/partner/visits/filter?pageSize=1
+```
+
+```json
+"facets": { "cities": [ { "cityId": 1, "name": "Makkah", "visitCount": 9 } ] }
+```
+
+- **Only useful cities.** The list holds every city that has at least one visit on sale, so you never offer a city that returns nothing. A list of every city in HMS would include hundreds with no visits.
+- **Translated names.** `name` comes in the request's language: `language_code=ar` gives "مكة".
+- **Stays complete while filtering.** The counts ignore the city filter itself, so when the user picks Makkah, the other cities stay in the picker.
+- **Typical flow.** Load the facets once, cache them for a while, and send the chosen city as `cityId`. Send the id, not the name: names vary in spelling ("Makkah", "Mecca") and language, and the id does not.
+:::
+
+**How a hotel's city is found.** A hotel belongs to the city set on it in my-destination. When none is set, my-destination matches the city name in the hotel's address to a reference city, preferring one in the hotel's country. A hotel whose address city has no reference city has no city: it never matches `cityId`, and it is left out of `facets.cities`.
+
+**Response**
+
+The shape, shortened:
+
+```json
+{
+  "items": [ { "dto": "PartnerVisitV1", "id": 42, "visitCode": "VIS-441DPG", "name": "Makkah and Madinah, 5 nights", "...": "the same visit object as 6.1" } ],
+  "pagination": { "page": 1, "pageSize": 20, "totalItems": 1, "totalPages": 1 },
+  "facets": { "cities": [ { "cityId": 1, "name": "Makkah", "visitCount": 6 }, { "cityId": 2, "name": "Madinah", "visitCount": 2 } ] },
+  "appliedFilters": {
+    "q": null, "cityId": [1, 2], "cityMatch": "all", "hotelId": null, "minPrice": 3000, "maxPrice": 9000,
+    "minNights": 4, "maxNights": 7, "startDate": "2026-11-20", "adults": 2, "children": 1,
+    "filters": [ { "key": "is_featured", "value": "true" } ], "sort": "priceAsc"
+  }
+}
+```
+
+<details>
+<summary>The full response to the full example above, unshortened (sample data, 2026-10-12)</summary>
+
+```json
+{
+  "items": [
+    {
+      "dto": "PartnerVisitV1",
+      "id": 526,
+      "visitCode": "VIS-C050A1",
+      "name": "Family Umrah Package",
+      "description": "Get family umrah package",
+      "availableFrom": "2026-10-11",
+      "availableTo": null,
+      "durationDays": 14,
+      "price": {"amount": 4470, "listAmount": 4470, "currency": "SAR"},
+      "legs": [
+        {
+          "legNo": 1,
+          "type": "package",
+          "recordId": 385,
+          "name": "Test Pkg",
+          "hotelId": 88,
+          "hotelName": "Le Meridien Towers",
+          "category": null,
+          "dayOffset": 0,
+          "nights": 2,
+          "quantity": 3,
+          "hotel": {
+            "id": 88,
+            "name": "Le Meridien Towers",
+            "slug": "le-meridien",
+            "logo": null,
+            "timezone": "UTC",
+            "contact": {"email": "admin@le-meridien.test", "phone": null},
+            "location": {
+              "id": null,
+              "name": "Saudi Arabia",
+              "type": "country",
+              "child": {
+                "id": null,
+                "name": "Makkah",
+                "type": "city",
+                "child": {"id": null, "name": "King Abdulaziz Road, Ajyad District, Makkah 24231", "type": "address"}
+              }
+            },
+            "postalCode": null,
+            "coordinates": {"lat": 21.42025, "lng": 39.82918}
+          }
+        },
+        {
+          "legNo": 2,
+          "type": "stay",
+          "recordId": 461,
+          "name": "Diplomatic Room (Blind & Deaf + Handicapped)",
+          "hotelId": 88,
+          "hotelName": "Le Meridien Towers",
+          "category": "stay",
+          "dayOffset": 2,
+          "nights": 8,
+          "quantity": 1,
+          "hotel": {
+            "id": 88,
+            "name": "Le Meridien Towers",
+            "slug": "le-meridien",
+            "logo": null,
+            "timezone": "UTC",
+            "contact": {"email": "admin@le-meridien.test", "phone": null},
+            "location": {
+              "id": null,
+              "name": "Saudi Arabia",
+              "type": "country",
+              "child": {
+                "id": null,
+                "name": "Makkah",
+                "type": "city",
+                "child": {"id": null, "name": "King Abdulaziz Road, Ajyad District, Makkah 24231", "type": "address"}
+              }
+            },
+            "postalCode": null,
+            "coordinates": {"lat": 21.42025, "lng": 39.82918}
+          }
+        },
+        {
+          "legNo": 3,
+          "type": "package",
+          "recordId": 366,
+          "name": "Family Umrah Package",
+          "hotelId": 86,
+          "hotelName": "Le Meridien Makkah",
+          "category": null,
+          "dayOffset": 10,
+          "nights": 1,
+          "quantity": 1,
+          "hotel": {
+            "id": 86,
+            "name": "Le Meridien Makkah",
+            "slug": "le-meridien-makkah",
+            "logo": null,
+            "timezone": "Asia/Riyadh",
+            "contact": {"email": "admin@lemeridien-makkah.test", "phone": null},
+            "location": {
+              "id": null,
+              "name": "Saudi Arabia",
+              "type": "country",
+              "child": {
+                "id": null,
+                "name": "Makkah",
+                "type": "city",
+                "child": {"id": null, "name": "King Abdulaziz Road, Ajyad District, Makkah 24231", "type": "address"}
+              }
+            },
+            "postalCode": null,
+            "coordinates": {"lat": 21.42025, "lng": 39.82918}
+          }
+        },
+        {
+          "legNo": 4,
+          "type": "stay",
+          "recordId": 383,
+          "name": "Classic Guest Room, City View, 1 Queen Bed, Low Floor, Sitting Area",
+          "hotelId": 86,
+          "hotelName": "Le Meridien Makkah",
+          "category": "stay",
+          "dayOffset": 11,
+          "nights": 1,
+          "quantity": 2,
+          "hotel": {
+            "id": 86,
+            "name": "Le Meridien Makkah",
+            "slug": "le-meridien-makkah",
+            "logo": null,
+            "timezone": "Asia/Riyadh",
+            "contact": {"email": "admin@lemeridien-makkah.test", "phone": null},
+            "location": {
+              "id": null,
+              "name": "Saudi Arabia",
+              "type": "country",
+              "child": {
+                "id": null,
+                "name": "Makkah",
+                "type": "city",
+                "child": {"id": null, "name": "King Abdulaziz Road, Ajyad District, Makkah 24231", "type": "address"}
+              }
+            },
+            "postalCode": null,
+            "coordinates": {"lat": 21.42025, "lng": 39.82918}
+          }
+        },
+        {
+          "legNo": 5,
+          "type": "package",
+          "recordId": 365,
+          "name": "Elite Umrah Package",
+          "hotelId": 86,
+          "hotelName": "Le Meridien Makkah",
+          "category": null,
+          "dayOffset": 12,
+          "nights": 2,
+          "quantity": 3,
+          "hotel": {
+            "id": 86,
+            "name": "Le Meridien Makkah",
+            "slug": "le-meridien-makkah",
+            "logo": null,
+            "timezone": "Asia/Riyadh",
+            "contact": {"email": "admin@lemeridien-makkah.test", "phone": null},
+            "location": {
+              "id": null,
+              "name": "Saudi Arabia",
+              "type": "country",
+              "child": {
+                "id": null,
+                "name": "Makkah",
+                "type": "city",
+                "child": {"id": null, "name": "King Abdulaziz Road, Ajyad District, Makkah 24231", "type": "address"}
+              }
+            },
+            "postalCode": null,
+            "coordinates": {"lat": 21.42025, "lng": 39.82918}
+          }
+        }
+      ],
+      "configs": {
+        "media": ["1525", "1526"],
+        "advance_booking_min_days": "0",
+        "advance_booking_max_days": "30",
+        "publish_start_datetime": "2026-10-11 17:28:00",
+        "min_persons_per_booking": "1",
+        "max_persons_per_booking": "2",
+        "allowed_regions": [
+          {
+            "1": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+            "2": [15, 16, 17, 18, 19, 20, 21, 22],
+            "3": [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
+            "4": [34, 35, 36, 37, 38, 39, 40, 41],
+            "5": [42, 43, 44, 45, 46],
+            "6": [47, 48, 49, 50, 51, 52, 53],
+            "7": [54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68],
+            "8": [69, 70, 71, 72, 73, 74, 75, 76, 77],
+            "9": [78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95],
+            "10": [96, 97, 98, 99, 100],
+            "11": [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147],
+            "12": [148, 149, 150],
+            "13": [151, 152, 153, 154, 155, 156, 157],
+            "14": [158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171],
+            "15": [172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183],
+            "16": [184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197]
+          }
+        ],
+        "base_price": "4470",
+        "is_featured": "1",
+        "base_currency": "SAR",
+        "duration_unit": {"value": "Nights", "key": "nights"},
+        "duration": "14",
+        "max_adults": "2",
+        "max_children": "0"
+      },
+      "updatedAt": "2026-10-12T06:52:00.000Z",
+      "etag": "W/\"8e10f4fe3b9c958e2459\""
+    }
+  ],
+  "pagination": {"page": 1, "pageSize": 20, "totalItems": 1, "totalPages": 1},
+  "facets": {
+    "cities": [
+      {"cityId": 1, "name": "Makkah", "visitCount": 8}
+    ]
+  },
+  "appliedFilters": {
+    "q": "umrah",
+    "cityId": [1],
+    "cityMatch": "any",
+    "hotelId": null,
+    "minPrice": 1000,
+    "maxPrice": 9000,
+    "minNights": 8,
+    "maxNights": null,
+    "startDate": "2026-10-20",
+    "adults": 2,
+    "children": 0,
+    "filters": [
+      {"key": "is_featured", "value": "true"}
+    ],
+    "sort": "priceAsc"
+  }
+}
+```
+
+`legs[].hotel.location` reports the city by name. Its `id` is `null` when the hotel's city comes from its address rather than a reference city, and `facets.cities[].cityId` is the id to filter on.
+
+</details>
+
+| Path | Type | Nullable | Values and notes |
+|---|---|---|---|
+| `items[]` | array | no | the visit object of 6.1, field for field, including `legs[].hotel` |
+| `pagination` | object | no | as in 6.1; `totalItems` counts the visits that match the filters |
+| `facets.cities[]` | array | no | every city with at least one matching visit, counted after `q` and `hotelId` but **before** every other filter. A city picker therefore keeps showing the other cities while one is selected. Ordered by `visitCount`, highest first |
+| `facets.cities[].cityId` | number | no | the value to send in `cityId` |
+| `facets.cities[].name` | string | no | in the requested language ([Language](#language)) |
+| `facets.cities[].visitCount` | number | no | visits on sale with a leg in that city |
+| `appliedFilters` | object | no | the filters as my-destination read them, after defaults: `cityId` and `hotelId` as arrays, `stayDuration` turned into `minNights`/`maxNights`, `cityMatch` `null` without `cityId`. Unset filters are `null`, `filters` is `[]` |
+
+**Errors** (besides those in [3](#3-responses-and-errors))
+
+| HTTP | SCC | When |
+|---|---|---|
+| 422 | `invalid_filter` | a malformed value: `cityId` or `hotelId` not whole ids above 0, `cityMatch` or `sort` not one of the listed values, a negative price or nights, `minPrice` above `maxPrice`, `minNights` above `maxNights`, a malformed `stayDuration`, `filters` not a JSON array of `{ key, value }`, `q` over 100 characters. `error.details.field` names the field |
+| 422 | `invalid_start_date` | `startDate` not `YYYY-MM-DD`, or before today |
+| 422 | `invalid_party` | `adults` below 1 or not a whole number, `children` below 0, or `children` without `adults` |
+
+An error, for example `cityMatch=both` (real response):
+
+```json
+{
+  "success": false,
+  "data": null,
+  "meta": {
+    "message": "<this endpoint's error sentence>",
+    "status": 422,
+    "detail": "cityMatch must be any or all",
+    "source": "Visits",
+    "scc": "invalid_filter"
+  },
+  "error": {
+    "message": "cityMatch must be any or all",
+    "detail": "<this endpoint's error sentence>",
+    "code": "invalid_filter",
+    "source": "Visits",
+    "details": {"code": "invalid_filter", "field": "cityMatch"}
+  }
+}
+```
+
+Every error message returned on dev:
+
+| Payload | SCC | `error.message` | `error.details.field` |
+|---|---|---|---|
+| `{ "cityId": "1", "cityMatch": "both" }` | `invalid_filter` | cityMatch must be any or all | `cityMatch` |
+| `{ "hotelId": "abc" }` | `invalid_filter` | hotelId must be one id or a comma-separated list of ids | `hotelId` |
+| `{ "minPrice": 5000, "maxPrice": 1000 }` | `invalid_filter` | minPrice must not be above maxPrice | `minPrice` |
+| `{ "stayDuration": "a week" }` | `invalid_filter` | stayDuration must look like 4-7, 8+ or 5 | `stayDuration` |
+| `{ "filters": "is_featured=true" }` | `invalid_filter` | filters must be a JSON array of `{ key, value }` | `filters` |
+| `{ "sort": "cheapest" }` | `invalid_filter` | sort must be one of recommended, priceAsc, priceDesc, newest, durationAsc, durationDesc | `sort` |
+| `{ "q": "<101 characters>" }` | `invalid_filter` | q must be at most 100 characters | `q` |
+| `{ "startDate": "2020-01-01" }` | `invalid_start_date` | startDate must be today or later | — |
+| `{ "startDate": "20/11/2026" }` | `invalid_start_date` | startDate must be YYYY-MM-DD | — |
+| `{ "children": 2 }` | `invalid_party` | adults must be at least 1 | — |
+
 ### 6.2 Visit detail and live pricing — `GET /api/partner/visits/detail`
 
 **Request**
@@ -626,6 +1140,7 @@ Keys you will commonly see: `display_name`, `media`, `is_featured`, `base_price`
 | Access token | **required**, the **system** token in the `accesstoken` header (and in `encryptionDetails.accessToken`) |
 | `actionPerformerURDD` | `systemUrdd` |
 | Encrypted payload goes in | the `encryptedrequest` header |
+| Language | **data and messages**: as 6.1, plus service names, `locations[]` names, `formSchema` options and `pricing.legs[].name`. Prices and `pricingFingerprint` are the same in every language |
 | Catalogue mode | send only `actionPerformerURDD` and `visitId` (optionally `ifNoneMatch`) |
 
 Payload (the JSON inside `reqData`, before encryption):
@@ -656,7 +1171,7 @@ For example, visit 42 has leg 1 with `dayOffset` 0 and 3 nights, then leg 2 with
 | 1 | 2026-11-02 | 2026-11-05 |
 | 2 | 2026-11-05 | 2026-11-07 |
 
-The trip ends on 2026-11-07. Any other end date would describe a different trip, so HMS doesn't accept one, and an `endDate` field is ignored. To offer a longer or shorter trip, HMS sells it as a separate visit.
+The trip ends on 2026-11-07. Any other end date would describe a different trip, so my-destination doesn't accept one, and an `endDate` field is ignored. To offer a longer or shorter trip, my-destination sells it as a separate visit.
 
 **Recommended flow**
 
@@ -664,7 +1179,13 @@ The trip ends on 2026-11-07. Any other end date would describe a different trip,
 2. Offer start dates from `availableFrom` up to `availableTo` − `durationDays`, so the whole trip fits the window.
 3. When the traveller picks a date and party, call this endpoint with `startDate`, `adults` and `children`.
 4. If `available` is `false`, show the `violations`. Where a leg has `nextAvailable`, offer it as a hint for another start date, then repeat step 3.
-5. If `available` is `true`, show `sellAmount`, keep `pricingFingerprint`, and book with the same `startDate`, `adults` and `children` (8.1). A change to the date or party needs a new call here first.
+5. If `available` is `true`, show `sellAmount` (this party's price; see *Price for a bigger party* below), keep `pricingFingerprint`, and book with the same `startDate`, `adults` and `children` (8.1). A change to the date or party needs a new call here first.
+
+**Price for a bigger party.** A visit's price (`price.amount` in 6.1, `baseSellAmount` here) is set for a party that fits each leg's base units: one room or package unit, unless the visit sets more. A bigger party needs more rooms or package units, and each hotel charges for them at its normal price, the same way it charges a guest who books an extra room. The visit price grows in the same proportion:
+
+`sellAmount = baseSellAmount × (componentSum for this party ÷ componentSum at the base units)`
+
+So the bundle discount stays the same percentage of the legs' prices for every party size. For example, with a visit price of 6,000, legs worth 6,300 at one room each and 12,600 with two rooms each, a party needing two rooms pays 12,000. A party that fits the base units pays exactly the visit price, with `partyScale: 1`. Every formula, with worked examples, is in [Visit price calculation](./visit-price-calculation.md).
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -680,7 +1201,7 @@ Without `startDate` the result is the visit DTO above. With it, `pricing` is add
 { "dto": "PartnerVisitV1", "id": 42, "…": "…",
   "pricing": {
     "startDate": "2026-11-02", "adults": 2, "children": 1, "available": true, "violations": [],
-    "currency": "SAR", "sellAmount": 6000, "componentSum": 6300, "bundleDiscount": 300,
+    "currency": "SAR", "sellAmount": 6000, "baseSellAmount": 6000, "partyScale": 1, "componentSum": 6300, "bundleDiscount": 300,
     "pricingFingerprint": "sha256:9b1c4e…",
     "legs": [
       { "legNo": 1, "type": "package", "recordId": 367, "hotelId": 86, "name": "Generosity Umrah Package",
@@ -737,7 +1258,9 @@ Fields only the detail call returns (6.1 does not, to keep the list light):
 | `pricing.violations[].nextAvailable.availableFrom` | `YYYY-MM-DD` | no | leg check-in that would be free |
 | `pricing.violations[].nextAvailable.availableTo` | `YYYY-MM-DD` | no | its check-out |
 | `pricing.currency` | string | no | ISO currency code of every amount below |
-| `pricing.sellAmount` | number | no | what the traveller pays for the whole visit |
+| `pricing.sellAmount` | number | no | what the traveller pays for the whole visit, for this party: `baseSellAmount` × `partyScale` |
+| `pricing.baseSellAmount` | number | no | the visit's price as set by my-destination (the same as `price.amount` in 6.1), for a party that fits each leg's base units |
+| `pricing.partyScale` | number | no | how much more the party's rooms or package units cost than the base units (4 decimals). `1` when the party fits the base units; above 1 when it needs more |
 | `pricing.componentSum` | number | no | the legs' own prices added up |
 | `pricing.bundleDiscount` | number | no | `componentSum` − `sellAmount`; negative when the visit sells above its parts |
 | `pricing.pricingFingerprint` | string | no | `sha256:` and 64 hex characters; send it to 8.1 |
@@ -801,6 +1324,7 @@ Keep `pricingFingerprint` for the book call. It never expires: it stays valid ex
 | Access token | none, so send no `accesstoken` header and use `innerKey = platformKey` |
 | `actionPerformerURDD` | not sent |
 | Encrypted payload goes in | the `encryptedrequest` header |
+| Language | not language-dependent: the result is the image |
 | Alternative | the same envelope URL-encoded as `?encryptedRequest=<base64>` |
 
 Payload (the JSON inside `reqData`, before encryption):
@@ -809,7 +1333,7 @@ Payload (the JSON inside `reqData`, before encryption):
 { "attachmentId": 201 }
 ```
 
-`media` holds attachment ids. To get an image's bytes, call the HMS file endpoint with your platform key and **no access token**:
+`media` holds attachment ids. To get an image's bytes, call the my-destination file endpoint with your platform key and **no access token**:
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -819,19 +1343,19 @@ Use the same envelope as any other call, with `innerKey = platformKey`. Send it 
 
 Catalogue imagery and hotel logos are public. Private attachments, such as guest documents, return `403`.
 
-Fetch images from your backend, then store or proxy them for your own users. Don't give HMS URLs or your platform key to a browser.
+Fetch images from your backend, then store or proxy them for your own users. Don't give my-destination URLs or your platform key to a browser.
 
 ### 6.4 Booking forms (`formSchema`)
 
-Hotels ask for different details per kind of service: a guest name and phone for most, a meal type for dining, a direction and two stops for a transfer. HMS describes each form as a `formSchema`, the same one the HMS guest app renders. You get it per service in the visit detail (`legs[].services[].formSchema`, 6.2) and in the slots call (`formSchema`, 8.5). Render your booking and scheduling screens from it rather than hard-coding fields.
+Hotels ask for different details per kind of service: a guest name and phone for most, a meal type for dining, a direction and two stops for a transfer. my-destination describes each form as a `formSchema`, the same one the my-destination guest app renders. You get it per service in the visit detail (`legs[].services[].formSchema`, 6.2) and in the slots call (`formSchema`, 8.5). Render your booking and scheduling screens from it rather than hard-coding fields.
 
 ```json
 [ { "key": "destination_type", "label": "Destination Type", "type": "dropdown", "isRequired": true, "autoDerivable": false,
     "options": [ { "value": "pickup", "label": "pickup" }, { "value": "dropoff", "label": "dropoff" } ] },
   { "key": "guest_pickup_location", "label": "Guest Pickup Location", "type": "dropdown", "isRequired": true, "autoDerivable": false,
     "options": [
-      { "value": "59961", "label": "Granjur Technologies", "is_default": 0,
-        "form": { "hms_config_id": 59961, "is_default": 0, "order": 1, "location_name": "Granjur Technologies",
+      { "value": "59961", "label": "Airport Terminal 1", "is_default": 0,
+        "form": { "hms_config_id": 59961, "is_default": 0, "order": 1, "location_name": "Airport Terminal 1",
                   "location_latitude": "31.472244", "location_longitude": "74.336978" } },
       { "value": "59962", "label": "Le Meridien Makkah", "is_default": 1,
         "form": { "hms_config_id": 59962, "is_default": 1, "order": null, "location_name": "Le Meridien Makkah",
@@ -848,7 +1372,7 @@ Hotels ask for different details per kind of service: a guest name and phone for
 | `label` | string | no | English label |
 | `type` | string | no | input kind: `text`, `email`, `tel`, `number`, `date`, `time`, `dropdown`, … |
 | `isRequired` | boolean | no | the booking is refused (`400`, "Missing required booking fields: …") when a required field is missing |
-| `autoDerivable` | boolean | no | `true`: HMS fills it from the booking itself (dates, party), so you may leave it out |
+| `autoDerivable` | boolean | no | `true`: my-destination fills it from the booking itself (dates, party), so you may leave it out |
 | `options[]` | array | | `dropdown` fields only: the allowed values |
 | `options[].value` | string | no | **send this value**, never the label |
 | `options[].label.en`, `options[].label.ar` | string | no | what to display; `ar` may be empty |
@@ -880,7 +1404,7 @@ For a package leg, `legs[].services[]` lists every service in the package, inclu
 | `pickup` (bring the traveller to the hotel) | a stop **other than** the hotel | **the hotel stop** (`is_default: 1`) |
 | `dropoff` (take the traveller from the hotel) | **the hotel stop** (`is_default: 1`) | a stop other than the hotel |
 
-So show only the non-hotel stops for the free end, and fill the hotel end yourself (or leave it out: HMS fills it in). HMS checks this on book and on schedule, and refuses a wrong combination before anything is created:
+So show only the non-hotel stops for the free end, and fill the hotel end yourself (or leave it out: my-destination fills it in). my-destination checks this on book and on schedule, and refuses a wrong combination before anything is created:
 
 | HTTP | SCC | When |
 |---|---|---|
@@ -939,13 +1463,13 @@ Each leg names its hotel twice: `hotelId` and `hotelName` as before, plus a `hot
 | `logo` | string | yes | |
 | `timezone` | string | no | IANA name, e.g. `Asia/Riyadh`; `UTC` when the hotel has none. Notice rules count days in this zone (6.2) |
 | `contact.email`, `contact.phone` | string | yes | |
-| `location` | node | yes | geography, levels in this order when present: `region` › `country` › `state` › `city` › `address`. A level that comes from HMS reference data has an `id` (and `code` for region and country); one taken from the hotel's address text has `id: null` |
+| `location` | node | yes | geography, levels in this order when present: `region` › `country` › `state` › `city` › `address`. A level that comes from my-destination reference data has an `id` (and `code` for region and country); one taken from the hotel's address text has `id: null` |
 | `postalCode` | string | yes | |
 | `coordinates` | object | yes | `{ lat, lng }` |
 
 | Path (each `locations[]` entry) | Type | Nullable | Values and notes |
 |---|---|---|---|
-| node `id` | number | no | the HMS location id |
+| node `id` | number | no | the my-destination location id |
 | node `name` | string | no | |
 | node `type` | string | yes | the hotel's own level names, typically `building` › `floor` › `zone`; read `type` rather than assuming the depth |
 | node `child` | node | missing on the last level | |
@@ -964,6 +1488,7 @@ A service can have several locations (a gym in two towers): each is its own path
 | Access token | **required**, the **system** token in the `accesstoken` header (and in `encryptionDetails.accessToken`) |
 | `actionPerformerURDD` | `systemUrdd` |
 | Encrypted payload goes in | the JSON body `{ "encryptedRequest": "<base64>" }` |
+| Language | messages only: `meta.message` follows `language_code`; the result (tokens, ids, `tenantUrddMap`) has no display text |
 
 Payload (the JSON inside `reqData`, before encryption):
 
@@ -998,20 +1523,20 @@ Payload (the JSON inside `reqData`, before encryption):
 
 | Path | Type | Nullable | Values and notes |
 |---|---|---|---|
-| `userId` | number | no | the traveller's HMS user id |
+| `userId` | number | no | the traveller's my-destination user id |
 | `created` | boolean | no | `true` when this call created the account, `false` when the email already had one |
 | `externalUserRef` | string | yes | as sent |
 | `accessToken` | string | no | the traveller token (JWT) |
 | `refreshToken` | string | no | starts with `rfh_` |
-| `expiresIn` | number | no | access token lifetime in seconds |
+| `expiresIn` | number | no | access token lifetime in seconds. Traveller tokens have the same lifetime as my-destination guest app tokens: **7 days (604800)** in production. Test environments may use a different lifetime. Read this field instead of hard-coding it |
 | `tenantUrddMap` | object | no | the traveller's partner guest URDDs: `global` plus one per hotel |
 | `tenantUrddMap.global` | number | no | the traveller's **global** partner guest URDD, not tied to a hotel. **Send this as `actionPerformerURDD` on every traveller call** (8.1 to 8.6) |
-| `tenantUrddMap.<hotelId>` | number | no | the URDD at one hotel (hotel id as a string key), created for the hotels of `visitId` and of earlier purchases. HMS uses these for the legs themselves; you don't need them, though a call made with one still works |
+| `tenantUrddMap.<hotelId>` | number | no | the URDD at one hotel (hotel id as a string key), created for the hotels of `visitId` and of earlier purchases. my-destination uses these for the legs themselves; you don't need them, though a call made with one still works |
 
 - Use `accessToken` for the traveller's calls, and `tenantUrddMap.global` as `actionPerformerURDD`. The same `global` value is returned every time for the same traveller.
 - A new token for the same traveller and platform revokes the previous one; keep only the latest.
-- `refreshToken` works with `POST /api/auth/refresh`; the refreshed token stays bound to your platform.
-- A traveller can later claim the account in the HMS app by signing in with a one-time code sent to the same email.
+- `refreshToken` works with `POST /api/auth/refresh` (payload `{ accesstoken, refreshToken }`, platform envelope without an access token); the refreshed token stays bound to your platform and the refresh token rotates. When refresh is refused (`access_expired_beyond_grace`, `refresh_expired`), call this endpoint again to mint a new token. See 5.4.
+- A traveller can later claim the account in the my-destination app by signing in with a one-time code sent to the same email.
 
 | HTTP | SCC | When |
 |---|---|---|
@@ -1019,10 +1544,10 @@ Payload (the JSON inside `reqData`, before encryption):
 | 422 | `first_name_required` | |
 | 422 | `invalid_passport` | |
 | 409 | `account_inactive` | the account for this email is disabled |
-| 409 | `account_not_eligible` | the email belongs to an HMS staff account |
+| 409 | `account_not_eligible` | the email belongs to an my-destination staff account |
 | 409 | `passport_in_use` | the passport number belongs to another account |
 | 404 | `visit_not_found` | unknown `visitId` |
-| 409 | `hotel_not_provisioned` | a hotel of the visit is not set up yet; contact HMS |
+| 409 | `hotel_not_provisioned` | a hotel of the visit is not set up yet; contact my-destination |
 
 ---
 
@@ -1040,6 +1565,7 @@ Traveller token and a traveller `actionPerformerURDD`, except where noted.
 | Access token | **required**, the **traveller** token in the `accesstoken` header (and in `encryptionDetails.accessToken`) |
 | `actionPerformerURDD` | the traveller's `tenantUrddMap.global` (from 7.1) |
 | Encrypted payload goes in | the JSON body `{ "encryptedRequest": "<base64>" }` |
+| Language | **data and messages**: the purchase comes back in `language_code`, and so does the fresh `pricing` of a `409 price_changed`. A retry with the same `Idempotency-Key` answers in the retry's language |
 | Extra header | **`Idempotency-Key`** (plain, not encrypted) |
 
 Payload (the JSON inside `reqData`, before encryption):
@@ -1085,7 +1611,7 @@ Header **`Idempotency-Key`**: 8 to 180 characters of letters, digits, `.`, `_`, 
     { "legNo": 2, "bookingId": 5013, "hotelId": 106, "status": "confirmed", "legNet": 2285.71, "booking": { } } ] }
 ```
 
-Every leg is paid in full through your partner account at booking time; HMS does not charge your user.
+Every leg is paid in full through your partner account at booking time; my-destination does not charge your user.
 
 **Response fields.** `replayed` plus one purchase. The same purchase object is used by 8.2 (`purchases[]`) and 8.3 (`items[]`).
 
@@ -1112,7 +1638,7 @@ Every leg is paid in full through your partner account at booking time; HMS does
 | `legs[].hotelId` | number | no | |
 | `legs[].status` | string | no | `pending` (awaiting hotel approval), `confirmed`, `checked_in`, `checked_out`, `cancelled`, `no_show` |
 | `legs[].legNet` | number | no | the amount paid for this leg |
-| `legs[].booking` | object | yes | the full hotel booking, in the same shape as the HMS guest booking reads. Every field is listed in the [guest booking field reference](../guest-apis/guest-bookings-upcoming/guest-bookings-upcoming.md#response-field-reference): `id`, `bookingId`, `hotelId`, `bookingType`, `status`, `paymentStatus`, `amount`, `paidAmount`, `currency`, `checkIn`, `checkOut`, `adults`, `children`, `package`, `services[]` (each with its `sessions`, `meals` or `transport` slots), `schedulingStatus`, `formValues`, `pricing`, `cancellation`, `checkInFlag`, and more |
+| `legs[].booking` | object | yes | the full hotel booking, in the same shape as the my-destination guest booking reads. Every field is listed in the [guest booking field reference](../guest-apis/guest-bookings-upcoming/guest-bookings-upcoming.md#response-field-reference): `id`, `bookingId`, `hotelId`, `bookingType`, `status`, `paymentStatus`, `amount`, `paidAmount`, `currency`, `checkIn`, `checkOut`, `adults`, `children`, `package`, `services[]` (each with its `sessions`, `meals` or `transport` slots), `schedulingStatus`, `formValues`, `pricing`, `cancellation`, `checkInFlag`, and more |
 | `legs[].hotel` | object | yes | the leg's hotel and its location hierarchy, see [6.5](#65-hotel-and-location-objects) |
 | `legs[].services[]` | array | no | every service booked in the leg: the service itself, or the package's services and extras |
 | `legs[].services[].serviceId`, `.name`, `.category` | number, string, string | `name` and `category` yes | as in `legs[].booking.services[]` |
@@ -1147,6 +1673,7 @@ Every leg is paid in full through your partner account at booking time; HMS does
 | Access token | **required**, the **traveller** token in the `accesstoken` header (and in `encryptionDetails.accessToken`) |
 | `actionPerformerURDD` | the traveller's `tenantUrddMap.global` |
 | Encrypted payload goes in | the JSON body `{ "encryptedRequest": "<base64>" }` |
+| Language | **data and messages**: the cancelled purchase comes back in `language_code` |
 
 Payload (the JSON inside `reqData`, before encryption):
 
@@ -1207,6 +1734,7 @@ Every leg of the purchase that is still `pending` or `confirmed` is cancelled, e
 | Access token | **required**, the system token (all purchases on your platform) or a traveller token (that traveller's) in the `accesstoken` header (and in `encryptionDetails.accessToken`) |
 | `actionPerformerURDD` | `systemUrdd` with the system token, or the traveller's `tenantUrddMap.global` with a traveller token |
 | Encrypted payload goes in | the `encryptedrequest` header |
+| Language | **data and messages**: `visitName`, booking labels, hotel, location and service names come back in `language_code` |
 
 Payload (the JSON inside `reqData`, before encryption):
 
@@ -1226,49 +1754,11 @@ Filters: `visitId`, `externalRef`, `page` (default 1, alias `page_no`), `pageSiz
 | `pagination.totalItems` | number | no | purchases matching the filters |
 | `pagination.totalPages` | number | no | `0` when there are none |
 
-### 8.4 Settle — `POST /api/partner/visits/legs/settle`
+### 8.4 Settle (removed)
 
-**Request**
+`POST /api/partner/visits/legs/settle` was removed on 2026-10-12 and now returns `404`. Every leg is paid in full, through your partner account, in the same transaction that books the visit (8.1), and a booked leg's amounts cannot change afterwards. A leg therefore never has a balance to settle. If you built a call to this endpoint, remove it.
 
-| | |
-|---|---|
-| Method | `POST /api/partner/visits/legs/settle` |
-| Access token | **required**, the **traveller** token in the `accesstoken` header (and in `encryptionDetails.accessToken`) |
-| `actionPerformerURDD` | the traveller's `tenantUrddMap.global` |
-| Encrypted payload goes in | the JSON body `{ "encryptedRequest": "<base64>" }` |
-
-Payload (the JSON inside `reqData`, before encryption):
-
-```json
-{ "actionPerformerURDD": 5119, "bookingId": 5013, "amount": 1100, "paymentMeta": { "reference": "PAY-91" } }
-```
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `bookingId` | number | yes | a leg of this traveller's purchase on your platform |
-| `amount` | number | yes | positive, at most the leg's balance |
-| `paymentMeta` | object | no | your payment reference, e.g. `{ "reference": "PAY-91" }` |
-
-```json
-{ "action": "settle", "balanceDue": 0, "booking": { } }
-```
-
-**Response fields**
-
-| Path | Type | Nullable | Values and notes |
-|---|---|---|---|
-| `action` | string | no | always `settle` |
-| `balanceDue` | number | no | what is still unpaid on the leg after this payment |
-| `booking` | object | yes | the leg's hotel booking, as `legs[].booking` in 8.1 |
-
-| HTTP | SCC | When |
-|---|---|---|
-| 400 | `booking_id_required` | |
-| 404 | `booking_not_found` | not a leg of this traveller on your platform |
-| 409 | `overpayment` | `amount` exceeds the balance; `error.details.balanceDue` |
-| 422 | `invalid_amount` | not a positive amount |
-
-Settle and service scheduling (8.5, 8.6) are the only calls that act on a single leg. A leg's dates, party, price and services cannot change: `/partner/visits/legs/edit`, `/legs/extend` and `/legs/reschedule` (a change of the leg's dates) return 404.
+Service slots and service scheduling (8.5, 8.6) are the only calls that act on a single leg. A leg's dates, party, price and services cannot change: `/partner/visits/legs/edit`, `/legs/extend`, `/legs/reschedule` (a change of the leg's dates) and `/legs/settle` return 404.
 
 ### 8.5 Service slots — `GET /api/partner/visits/legs/slots`
 
@@ -1282,6 +1772,7 @@ The services inside a leg, such as a spa or gym session, a dining reservation or
 | Access token | **required**, the **traveller** token in the `accesstoken` header (and in `encryptionDetails.accessToken`) |
 | `actionPerformerURDD` | the traveller's `tenantUrddMap.global` |
 | Encrypted payload goes in | the `encryptedrequest` header |
+| Language | **data and messages**: service labels, location names and `formSchema` options come back in `language_code`; `category`, dates and slot times do not change |
 
 Payload (the JSON inside `reqData`, before encryption):
 
@@ -1324,7 +1815,7 @@ Payload (the JSON inside `reqData`, before encryption):
 | `slots[].status` | string | no | `unscheduled`, `scheduled`, `completed`, `missed` or `cancelled` |
 | `slots[].scheduledStart` | ISO 8601 datetime | yes | `null` while unscheduled |
 | `slots[].scheduledEnd` | ISO 8601 datetime | yes | `null` while unscheduled, and for a date-only meal |
-| `categories[]` | array | no | the hotel's bookable times for this service, grouped like the HMS guest app |
+| `categories[]` | array | no | the hotel's bookable times for this service, grouped like the my-destination guest app |
 | `categories[].categoryId` | number | no | |
 | `categories[].label.en`, `categories[].label.ar` | string | no | |
 | `categories[].icon` | string | yes | |
@@ -1368,6 +1859,7 @@ Sets the time of one or more slots of a service in a leg. The same call moves a 
 | Access token | **required**, the **traveller** token in the `accesstoken` header (and in `encryptionDetails.accessToken`) |
 | `actionPerformerURDD` | the traveller's `tenantUrddMap.global` |
 | Encrypted payload goes in | the JSON body `{ "encryptedRequest": "<base64>" }` |
+| Language | **data and messages**: the returned `booking` comes back in `language_code`, as in 8.3 |
 
 Payload (the JSON inside `reqData`, before encryption). Send the block that matches the service's `category` from 8.5, with values taken from its `formSchema` (6.4):
 
@@ -1416,9 +1908,9 @@ At least one of `sessions`, `meals` or `transport` is required. Every `slotId` m
 
 Hotel staff see the new times at once. No event is sent, since the change came from you.
 
-### 8.7 Travellers in the HMS guest app
+### 8.7 Travellers in the my-destination guest app
 
-A traveller can also sign in to the HMS guest app with the same email. Their visit legs belong to a separate **partner guest** role, one URDD per hotel plus a global one, returned at login as `partnerTenantUrddMap` (with a `global` key, like `tenantUrddMap`) beside the normal `tenantUrddMap`. Under that role the traveller sees the legs hotel by hotel, and can:
+A traveller can also sign in to the my-destination guest app with the same email. Their visit legs belong to a separate **partner guest** role, one URDD per hotel plus a global one, returned at login as `partnerTenantUrddMap` (with a `global` key, like `tenantUrddMap`) beside the normal `tenantUrddMap`. Under that role the traveller sees the legs hotel by hotel, and can:
 
 - favourite rooms and packages, review a package or service after a checked-out stay that included it, raise support tickets, and edit their profile (not the email).
 
@@ -1435,16 +1927,16 @@ Every event has the same envelope: `id`, `event`, `createdAt` and `data` (fields
 | Event | Sent when | `oldStatus` → `newStatus` | `initiatedBy` | What to do |
 |---|---|---|---|---|
 | `leg.approved` | the hotel approves a leg that was waiting for approval | `pending` → `confirmed` | `hotel` | mark the leg confirmed |
-| `leg.rejected` | the hotel rejects a leg that was waiting for approval | `pending` → `cancelled` | `hotel` | the purchase fails: HMS cancels its other legs (each sends `booking.cancelled_by_system`) and credits you |
+| `leg.rejected` | the hotel rejects a leg that was waiting for approval | `pending` → `cancelled` | `hotel` | the purchase fails: my-destination cancels its other legs (each sends `booking.cancelled_by_system`) and credits you |
 | `booking.cancelled` | you cancelled the purchase (8.2); one event per leg | `pending` or `confirmed` → `cancelled` | `partner` | confirmation of your own call |
 | `booking.cancelled_by_hotel` | the hotel cancelled a leg that was already confirmed or later | any → `cancelled` | `hotel` | tell the traveller; contact the hotel with `externalRef` |
-| `booking.cancelled_by_system` | HMS cancelled a leg, for example the other legs of a purchase after `leg.rejected` | `pending` or `confirmed` → `cancelled` | `system` | mark the leg cancelled |
+| `booking.cancelled_by_system` | my-destination cancelled a leg, for example the other legs of a purchase after `leg.rejected` | `pending` or `confirmed` → `cancelled` | `system` | mark the leg cancelled |
 | `booking.checked_in` | the hotel checked the traveller in | usually `confirmed` → `checked_in` | `hotel` | stay started |
 | `booking.checked_out` | the hotel checked the traveller out | `checked_in` → `checked_out` | `hotel` | stay finished |
 | `booking.no_show` | the traveller did not arrive | `confirmed` → `no_show` | `hotel` | stay did not happen |
 | `booking.modified` | anything else that changes a leg's status, its `checkIn` or `checkOut`, or makes the leg active or inactive | as stored (can be equal) | `hotel`, `system` or `partner` | re-read the purchase (8.3) |
-| `visit.invalidated` | a published visit stopped being on sale: a component was withdrawn, or the visit was unpublished | — | — | stop selling it |
-| `visit.restored` | it is on sale again | — | — | you may sell it again; re-read it (6.2) |
+| `visit.invalidated` | a published visit stopped being on sale: the curator unpublished or deleted it, or my-destination unpublished it because a leg's package or room was deactivated or deleted, a hotel was deactivated or deleted, or a hotel withdrew from bundling. Sent within seconds of the change | — | — | stop selling it |
+| `visit.restored` | it is on sale again: the curator published it, or my-destination re-published a visit it had unpublished because the package, room, hotel or bundling consent is back. Sent within seconds of the change | — | — | you may sell it again; re-read it (6.2) |
 | `visit.updated` | a published visit's components or price changed | — | — | re-read (6.2) and re-price before selling |
 
 **Not sent:** creating a purchase (8.1), settling (8.4) and scheduling or moving a leg's services (8.6), since you made those changes yourself and get the result in the response. Room changes at the desk and hotel-side notes are not sent either.
@@ -1453,12 +1945,12 @@ Every event has the same envelope: `id`, `event`, `createdAt` and `data` (fields
 - `checkIn` and `checkOut` are the hotel's calendar dates, sent as midnight UTC (`2026-11-02T00:00:00Z` means the stay starts on 2 November at the hotel). Use the date part only, and don't convert it to a local time zone.
 - Visit events go to every active partner platform, whether or not you have sold that visit. Ignore visits you don't use.
 - Treat an `event` you don't recognise as "re-read the purchase": new types may be added.
-- HMS checks for due events every 10 seconds, so a webhook normally arrives within a few seconds of the change.
+- my-destination checks for due events every 10 seconds, so a webhook normally arrives within a few seconds of the change.
 - A platform with no webhook URL or secret still gets every event through replay (9.3). Its deliveries fail and end as `dead`.
 
 ### 9.1.1 Complete payloads
 
-The exact bodies HMS sends. All leg events share one `data` shape, and all visit events share another.
+The exact bodies my-destination sends. All leg events share one `data` shape, and all visit events share another.
 
 **`leg.approved`**
 
@@ -1469,6 +1961,7 @@ The exact bodies HMS sends. All leg events share one `data` shape, and all visit
   "createdAt": "2026-11-01T09:14:02Z",
   "data": {
     "visitId": 42,
+    "visitCode": "MKK-MDN-5N",
     "bookingId": 5012,
     "bookingNumber": "BK08571620",
     "externalRef": "TRAVELCO-ORD-8812",
@@ -1491,6 +1984,7 @@ The exact bodies HMS sends. All leg events share one `data` shape, and all visit
   "createdAt": "2026-11-01T09:14:02Z",
   "data": {
     "visitId": 42,
+    "visitCode": "MKK-MDN-5N",
     "bookingId": 5012,
     "bookingNumber": "BK08571620",
     "externalRef": "TRAVELCO-ORD-8812",
@@ -1513,6 +2007,7 @@ The exact bodies HMS sends. All leg events share one `data` shape, and all visit
   "createdAt": "2026-11-01T09:14:02Z",
   "data": {
     "visitId": 42,
+    "visitCode": "MKK-MDN-5N",
     "bookingId": 5012,
     "bookingNumber": "BK08571620",
     "externalRef": "TRAVELCO-ORD-8812",
@@ -1535,6 +2030,7 @@ The exact bodies HMS sends. All leg events share one `data` shape, and all visit
   "createdAt": "2026-11-01T09:14:02Z",
   "data": {
     "visitId": 42,
+    "visitCode": "MKK-MDN-5N",
     "bookingId": 5012,
     "bookingNumber": "BK08571620",
     "externalRef": "TRAVELCO-ORD-8812",
@@ -1557,6 +2053,7 @@ The exact bodies HMS sends. All leg events share one `data` shape, and all visit
   "createdAt": "2026-11-01T09:14:02Z",
   "data": {
     "visitId": 42,
+    "visitCode": "MKK-MDN-5N",
     "bookingId": 5013,
     "bookingNumber": "BK08571621",
     "externalRef": "TRAVELCO-ORD-8812",
@@ -1579,6 +2076,7 @@ The exact bodies HMS sends. All leg events share one `data` shape, and all visit
   "createdAt": "2026-11-01T09:14:02Z",
   "data": {
     "visitId": 42,
+    "visitCode": "MKK-MDN-5N",
     "bookingId": 5012,
     "bookingNumber": "BK08571620",
     "externalRef": "TRAVELCO-ORD-8812",
@@ -1601,6 +2099,7 @@ The exact bodies HMS sends. All leg events share one `data` shape, and all visit
   "createdAt": "2026-11-01T09:14:02Z",
   "data": {
     "visitId": 42,
+    "visitCode": "MKK-MDN-5N",
     "bookingId": 5012,
     "bookingNumber": "BK08571620",
     "externalRef": "TRAVELCO-ORD-8812",
@@ -1623,6 +2122,7 @@ The exact bodies HMS sends. All leg events share one `data` shape, and all visit
   "createdAt": "2026-11-01T09:14:02Z",
   "data": {
     "visitId": 42,
+    "visitCode": "MKK-MDN-5N",
     "bookingId": 5012,
     "bookingNumber": "BK08571620",
     "externalRef": "TRAVELCO-ORD-8812",
@@ -1645,6 +2145,7 @@ The exact bodies HMS sends. All leg events share one `data` shape, and all visit
   "createdAt": "2026-11-01T09:14:02Z",
   "data": {
     "visitId": 42,
+    "visitCode": "MKK-MDN-5N",
     "bookingId": 5012,
     "bookingNumber": "BK08571620",
     "externalRef": "TRAVELCO-ORD-8812",
@@ -1672,7 +2173,7 @@ The exact bodies HMS sends. All leg events share one `data` shape, and all visit
 }
 ```
 
-Visit events carry only `visitId` and `visitCode`. They have no `bookingId` and no `initiatedBy`.
+Visit events carry only `visitId` and `visitCode`. They have no `bookingId`, `bookingNumber` or `initiatedBy`. Leg events carry both the visit (`visitId`, `visitCode`) and the booking (`bookingId`, `bookingNumber`).
 
 ### 9.2 Webhooks
 
@@ -1694,7 +2195,7 @@ The body is one of the payloads in 9.1.1.
 | `event` | string | no | an event type from 9.1 |
 | `createdAt` | ISO 8601 datetime | no | when the change happened |
 | `data.visitId` | number | yes | |
-| `data.visitCode` | string | | `visit.*` events only |
+| `data.visitCode` | string | yes | the visit's code, on every event (leg and visit events) |
 | `data.bookingId` | number | | `leg.*` and `booking.*` events only, as are the fields below |
 | `data.bookingNumber` | string | yes | e.g. `BK08571620` |
 | `data.externalRef` | string | yes | your order id |
@@ -1723,7 +2224,7 @@ function verify(req, rawBody, secret) {
 }
 ```
 
-A non-2xx answer, a redirect or a timeout is a failure. HMS retries after **1 min, 5 min, 30 min, 2 h, 6 h and 15 h** with a fresh timestamp and signature; the id and body never change. After the seventh failure the event is marked dead (it stays available through replay). Events for one booking are always delivered in order.
+A non-2xx answer, a redirect or a timeout is a failure. my-destination retries after **1 min, 5 min, 30 min, 2 h, 6 h and 15 h** with a fresh timestamp and signature; the id and body never change. After the seventh failure the event is marked dead (it stays available through replay). Events for one booking are always delivered in order.
 
 ### 9.3 Replay — `GET /api/partner/events`
 
@@ -1735,11 +2236,12 @@ A non-2xx answer, a redirect or a timeout is a failure. HMS retries after **1 mi
 | Access token | **required**, the **system** token in the `accesstoken` header (and in `encryptionDetails.accessToken`) |
 | `actionPerformerURDD` | `systemUrdd` |
 | Encrypted payload goes in | the `encryptedrequest` header |
+| Language | messages only: events carry ids, codes and statuses, so the result is identical in every language |
 
 Payload (the JSON inside `reqData`, before encryption):
 
 ```json
-{ "actionPerformerURDD": 4410, "after": "WyIyMDI2LTExLTAxVDA5OjE0OjAyWiIsIjlmM2MyZTFhLi4uIl0", "limit": 100 }
+{ "actionPerformerURDD": 4410, "after": "WyIyMDI2LTExLTAxVDA5OjE0OjAyWiIsIjlmM2MyZTFhLi4uIl0", "limit": 100, "bookingNumber": "BK08571620" }
 ```
 
 
@@ -1749,11 +2251,15 @@ Webhooks are a hint; replay is the source of truth.
 |---|---|---|---|
 | `after` | string | no | the `nextCursor` of your previous call; omit to start from the oldest retained event |
 | `limit` | number | no | default 100, max 500 |
+| `bookingNumber` | string | no | only the events of this leg (`data.bookingNumber`), at most 64 characters |
+| `visitCode` | string | no | only the events of this visit (`data.visitCode`): its leg events and its `visit.*` events, at most 64 characters |
+
+Filters combine with `after` and `limit`, and the cursor works the same way. Keep using the unfiltered stream as your main feed: a filtered cursor only moves through the matching events. An empty value is ignored. A value of only spaces, or one longer than 64 characters, returns `422`, `meta.scc = invalid_filter`.
 
 ```json
 { "items": [
     { "id": "9f3c2e1a-5d7b-4c1e-9a0f-2b6d8e4c7a11", "event": "booking.cancelled", "createdAt": "2026-11-01T09:14:02Z",
-      "data": { "visitId": 42, "bookingId": 5012, "bookingNumber": "BK08571620", "externalRef": "TRAVELCO-ORD-8812", "legNo": 1,
+      "data": { "visitId": 42, "visitCode": "MKK-MDN-5N", "bookingId": 5012, "bookingNumber": "BK08571620", "externalRef": "TRAVELCO-ORD-8812", "legNo": 1,
                 "oldStatus": "confirmed", "newStatus": "cancelled", "checkIn": "2026-11-02T00:00:00Z", "checkOut": "2026-11-05T00:00:00Z",
                 "initiatedBy": "partner" },
       "deliveryStatus": "delivered", "attempts": 1 } ],
@@ -1778,7 +2284,9 @@ Keep the last `nextCursor` and poll, for example every few minutes; an empty `it
 
 - [ ] Keys, outer key, password and TOTP secret live in a secret manager, never in code.
 - [ ] TOTP enrolment completed; your clock is NTP-synchronised.
-- [ ] Every response's `x-new-accesstoken` replaces the stored token; a `401 unauthenticated` triggers a fresh login.
+- [ ] Every response's `x-new-accesstoken` replaces the stored token in **one store shared by all workers**.
+- [ ] On `401 unauthenticated`, re-read the shared store before anything else; only then let **one** worker log in (system) or refresh / re-mint (traveller), as in 5.4.
+- [ ] One system login for all servers: a second login ends the first session.
 - [ ] One `Idempotency-Key` per purchase attempt, reused on every retry of that attempt.
 - [ ] `externalRef` is your order id and unique per order.
 - [ ] Trips are changed by cancelling the whole visit and booking again; no leg-level change call is used.
@@ -1786,4 +2294,4 @@ Keep the last `nextCursor` and poll, for example every few minutes; an empty `it
 - [ ] Branching uses `meta.scc`; user-facing text uses `meta.message`.
 - [ ] The webhook endpoint verifies signatures, rejects stale timestamps, deduplicates on the event id, and answers within 10 seconds.
 - [ ] A replay job reads `GET /api/partner/events` and processes anything not already seen.
-- [ ] Your egress IPs are registered with HMS before going live (recommended).
+- [ ] Your egress IPs are registered with my-destination before going live (recommended).

@@ -4,14 +4,14 @@
 
 | Method | Step | Action | Permission | Returns |
 |---|---|---|---|---|
-| **POST** | 1 | Create a permission group | none (static) | `{ permissionGroups_permissionGroupId, … }` |
-| **PUT** | 1 | Edit a permission group (`?id=<group_id>`) | none | updated group summary |
-| **GET** | 1 | List groups / View one (`?id=`) | none | group rows (View also returns active permission ids) |
-| **DELETE** | 1 | Soft-delete a group (`?id=`) | none | standard delete result |
-| **POST** | 2 | Assign permissions to a group (replace-all) | none | sync report (`inserted/reactivated/removed`) |
-| **PUT** | 2 | Re-sync permissions (replace-all) | none | sync report |
-| **GET** | 2 | List a group's mappings (`?group_id=`) / View one (`?id=`) | none | mapping rows |
-| **DELETE** | 2 | Soft-revoke one mapping (`?id=`) | none | standard delete result |
+| **POST** | 1 | Create a permission group | `add_permission_groups` | `{ permissionGroups_permissionGroupId, … }` |
+| **PUT** | 1 | Edit a permission group (`?id=<group_id>`) | `update_permission_groups` | updated group summary |
+| **GET** | 1 | List groups / View one (`?id=`) | `list_permission_groups` / `view_permission_groups` | group rows (View also returns active permission ids) |
+| **DELETE** | 1 | Soft-delete a group (`?id=`) | `delete_permission_groups` | standard delete result |
+| **POST** | 2 | Assign permissions to a group (replace-all) | `add_permission_groups` | sync report (`inserted/reactivated/removed`) |
+| **PUT** | 2 | Re-sync permissions (replace-all) | `update_permission_groups` | sync report |
+| **GET** | 2 | List a group's mappings (`?group_id=`) / View one (`?id=`) | `list_permission_groups` / `view_permission_groups` | mapping rows |
+| **DELETE** | 2 | Soft-revoke one mapping (`?id=`) | `delete_permission_groups` | standard delete result |
 
 A two-step grouped CRUD used by a **Tenant Admin** (or SaaS Admin) to define a **permission group** and attach a set of **permissions** to it. Step 1 owns the `permission_groups` row; step 2 owns the group's `permission_groups_permissions` join set, applied with **replace-all** semantics. The client drives the sequence: step 1 (POST) returns the new `permissionGroups_permissionGroupId`, which the client forwards into the step-2 request. Each step runs in its own transaction — there is **no cross-step atomicity** (if the client stops after step 1 the group exists with no permissions; just re-run step 2).
 
@@ -21,7 +21,11 @@ A two-step grouped CRUD used by a **Tenant Admin** (or SaaS Admin) to define a *
 
 Runs on the standard **encrypted AUTH platform** (platform encryption + access token), like every authenticated dashboard call. `actionPerformerURDD` is the actor identity — it travels in the encrypted request header on every request (including GETs) and may also be sent in the body. It is used to **derive `tenant_id`** (a payload `tenant_id` is ignored) and to stamp `created_by` / `updated_by`.
 
-Both steps declare `requestMetaData.permission: null`, so this object does **not** gate on a static RBAC permission at the object level. Tenant scoping is derived from the actor's URDD: a group created with `permissionGroups_isGlobal = false` is scoped to the actor's tenant; a global group (`isGlobal = true`) is tenant-less.
+Every verb is gated by the permission in the table above (`403`, SCC `E41`). Hotel Tenant Managers and Tenant Admins hold all five. The general Tenant Manager (`PG-TENANT-MGMT`) holds list, view and add only, so it cannot edit or delete a group or re-sync its permissions. The SaaS Admin holds none.
+
+> **Changed 2026-10-11.** These permissions were declared but never checked (the object's `requestMetaData` sat beside `data`, so the middleware never saw it). Any signed-in admin seat could read and change permission groups. They are now enforced.
+
+Tenant scoping is derived from the actor's URDD: a group created with `permissionGroups_isGlobal = false` is scoped to the actor's tenant; a global group (`isGlobal = true`) is tenant-less.
 
 > **Method → operation:** `POST → Add`, `PUT → Update`, `GET → List`, `GET ?id=<n> → View`, `DELETE → Delete`.
 

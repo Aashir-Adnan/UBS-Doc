@@ -7,7 +7,8 @@ When a partner books a visit, HMS creates one ordinary booking per component (a 
 | Page | Audience | Contents |
 |---|---|---|
 | [Visits admin APIs](./visits-admin-apis.md) | General Tenant Manager or visits curator (visits); SaaS admin (partners, outbox) | Visits CRUD, component picker, partner onboarding, event outbox |
-| [Visit Components API](./visits-components-api.md) | Visit builder (frontend) | The component picker in full: rules, party matching, full payload, and how results become legs |
+| [Visit price calculation](./visit-price-calculation.md) | Visit builder (frontend), curators, partner engineers | Every price formula with worked examples: units per leg, package and extra-night cost, stay blocks, hotel rules, bundle discount, party scaling, per-leg split, the admin estimate |
+| [Visit Components API](../admin-apis/visits-components-api.md) | Visit builder (frontend) | The component picker in full: rules, party matching, full payload, and how results become legs |
 | [Partner integration guide](./partner-integration-guide.md) | Partner engineering teams (hand this over) | Credentials, transport, auth, every endpoint with requests, responses and errors, events, sequence diagrams |
 
 ---
@@ -17,11 +18,11 @@ When a partner books a visit, HMS creates one ordinary booking per component (a 
 | Term | Meaning |
 |---|---|
 | Visit | A `visits` row (code, name, visibility) plus its ordered components in `visit_items`. Its availability window and length are configs (`publish_start_datetime`, `publish_end_datetime`, server-computed `duration`) |
-| Component | What a leg is built from: a hotel's **package** or **stay service** (room type), chosen with the [Visit Components API](./visits-components-api.md). Legs run back to back with no gaps; the server derives each leg's start day from the leg order |
+| Component | What a leg is built from: a hotel's **package** or **stay service** (room type), chosen with the [Visit Components API](../admin-apis/visits-components-api.md). Legs run back to back with no gaps; the server derives each leg's start day from the leg order |
 | Leg | One booking created for one component. It carries `visit_id`, the partner's `externalRef` in `booking_metadata`, and `channel_platform_id` |
 | Purchase | All legs of one partner order: the same `visit_id` and `externalRef` on the same platform |
-| Sell price | The visit's own `catalog_pricing` row (`base_table = 'visits'`) |
-| Allocation | `componentSum − sellPrice` is spread pro-rata across legs; the last leg absorbs rounding, so the leg totals add up to the sell price exactly |
+| Sell price | The visit's own `catalog_pricing` row (`base_table = 'visits'`), set for a party that fits each leg's `quantity` units. A bigger party pays it scaled by how much more its extra rooms or package units cost: `sell × (componentSum for the party ÷ componentSum at quantity units)`, so the bundle discount stays the same percentage |
+| Allocation | `componentSum − sellPrice` (the party's scaled sell price) is spread pro-rata across legs; the last leg absorbs rounding, so the leg totals add up to the sell price exactly |
 | Channel | Every new booking (guest, admin or partner) records the platform it was made through in `bookings.channel_platform_id` |
 | Consent | A hotel's components can be bundled only while its `allow_visit_bundling` tenant config is on |
 
@@ -29,7 +30,7 @@ When a partner books a visit, HMS creates one ordinary booking per component (a 
 
 | Persona | Designation · role | Permission group | Seat |
 |---|---|---|---|
-| Visits curator | `VISITS` · Manager | `PG-VISITS` | System tenant, never cloned into hotels. Optional, assigned by hand to a dedicated visits operator |
+| Visits curator | `VISITS` · Manager | `PG-VISITS`: the five visits verbs plus `list_hms_config_keys` (the visits form's config keys) | System tenant, never cloned into hotels. Optional: a general Tenant Manager (its senior) assigns it by hand through the users grouped CRUD. It signs in even while the system tenant is inactive. It cannot reach services, packages, bookings, tenants, users, permission groups or partner platforms |
 | Partner system user | `PARTNER` · System | `PG-PARTNER-SYSTEM` | Tenant NULL; one per partner platform |
 | Partner guest (traveller) | `PARTNER` · Guest | `PG-PARTNER-GUEST` | One global URDD (tenant NULL, `tenantUrddMap.global`, the actor the partner sends) plus one URDD per hotel that holds the legs, created on demand |
 
@@ -43,7 +44,7 @@ A traveller created by a partner also gets the standard global guest URDD. **On 
 
 | Who | What they can do with a visit leg |
 |---|---|
-| Partner platform | View the purchase, settle a balance, and cancel the **whole visit** (`externalRef`). Every leg still pending or confirmed is cancelled; legs already checked in, checked out or cancelled are reported and left. Schedule or reschedule the services inside a leg (spa, gym, dining, transport) through `GET /api/partner/visits/legs/slots` and `POST /api/partner/visits/legs/schedule`. No change to a leg's dates, party or price, no extension, add-on or single-leg cancel |
+| Partner platform | View the purchase and cancel the **whole visit** (`externalRef`). Every leg still pending or confirmed is cancelled; legs already checked in, checked out or cancelled are reported and left. Schedule or reschedule the services inside a leg (spa, gym, dining, transport) through `GET /api/partner/visits/legs/slots` and `POST /api/partner/visits/legs/schedule`. No change to a leg's dates, party or price, no extension, add-on or single-leg cancel |
 | Traveller in our guest app | Two roles. The normal guest role (`tenantUrddMap`) never shows visit legs. The partner guest role (`partnerTenantUrddMap`, one URDD per hotel plus `global`) shows that hotel's legs, or every hotel's with `global`: list, view and folio. It can also favourite, review after a checked-out stay, raise support tickets and edit the profile except the email. Scheduling and rescheduling the services inside a leg are done by the partner platform only. Booking, scheduling or rescheduling, add or remove services, edit, extend, stage, cancel, check-in, check-out, payments, QR and loyalty redeem return `403 partner_guest_read_only`; check-in eligibility is blocked |
 | Hotel staff (bookings CRUD, grouped bookings, booking-rooms edit) | Status only: pending → confirmed or cancelled (a rejection, which cancels the other legs of the purchase), confirmed → checked_in or no_show, checked_in → checked_out. Dates, party, amounts, package, guest and currency are locked (`409 visit_leg_locked`), other status moves return `409 visit_leg_status`, and a delete returns `409 visit_leg_locked` |
 | Curator or general Tenant Manager | The visit itself (catalogue); a booked purchase is not changed |
@@ -80,7 +81,7 @@ encryptedRequest = AES({ reqData, encryptionDetails: { PlatformName, PlatformVer
 
 Every request needs the device headers `x-client-platform: web`, `x-client-device-uuid` and `x-app-version`.
 
-Partner endpoints refuse any platform that is not an active partner (`403 not_a_partner_platform`), enforce the platform's optional egress-IP allowlist (`403 ip_not_allowed`) and its per-minute rate limit (`429 rate_limited`).
+Partner endpoints refuse any platform that is not an active partner (`403 not_a_partner_platform`). Every platform's `domains` (`403 origin_not_allowed`), egress-IP list (`403 ip_not_allowed`) and per-minute rate limit (`429 rate_limited`) are checked for every request, partners and our own apps alike. `NULL`, empty or `*` means allow all. See [Per-platform rules](../major-implementations/edge-access-control/edge-access-control.md#per-platform-rules-from-the-platforms-table).
 
 ## Errors
 
@@ -90,9 +91,9 @@ Visit and partner errors carry their reason as the SCC (`meta.scc`, also `error.
 |---|---|
 | 400 | `credentials_required`, `otp_required`, `invalid_otp_flow`, `idempotency_key_required`, `visit_id_required`, `target_required`, `booking_id_required` |
 | 401 | `invalid_credentials`, `invalid_otp` |
-| 403 | `not_a_partner_platform`, `ip_not_allowed`, `wrong_token`, `persona_mismatch`, `totp_revoked` |
+| 403 | `not_a_partner_platform`, `ip_not_allowed`, `origin_not_allowed`, `wrong_token`, `persona_mismatch`, `totp_revoked` |
 | 404 | `visit_not_found`, `booking_not_found`, `nothing_to_cancel`, `platform_not_found`, `event_not_found` |
-| 409 | `price_changed`, `leg_unavailable`, `leg_failed`, `external_ref_reused`, `idempotency_key_reused`, `totp_confirm_required`, `otp_flow_mismatch`, `visit_unavailable`, `visit_not_priced`, `overpayment` |
+| 409 | `price_changed`, `leg_unavailable`, `leg_failed`, `external_ref_reused`, `idempotency_key_reused`, `totp_confirm_required`, `otp_flow_mismatch`, `visit_unavailable`, `visit_not_priced` |
 | 422 | `invalid_party`, `invalid_start_date`, `external_ref_required`, `fingerprint_required`, `outside_sellable_window`, `invalid_items`, `invalid_price` |
 | 423 | `locked` |
 | 429 | `rate_limited` |

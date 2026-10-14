@@ -24,6 +24,8 @@ This is the canonical tenant-seeding path. It replaces `POST /api/dev/seed/tenan
 | **Authorization** | valid access token, permission `add_tenants`, and the `requireSystemTenantImportActor` guard (see below). |
 | **API object** | `global.CustomTenantImport_object` (aliased `global.TenantImport_object`). |
 
+> **Enforced since 2026-10-11.** This permission was declared but never checked before that date: the object's `requestMetaData` sat beside `data` instead of inside it, so the middleware skipped it. It is now checked, and a seat without it gets `403` (SCC `E41`).
+
 ### Transport
 
 The request is the standard two-layer envelope:

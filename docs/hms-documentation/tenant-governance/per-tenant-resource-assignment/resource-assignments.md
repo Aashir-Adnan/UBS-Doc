@@ -273,7 +273,16 @@ It accepts a `source_id` **array** to batch several originals (one transaction p
 
 ## 9. Permissions — two layers
 
-1. A **static broad envelope** declared on the API object (`requestMetaData.permission`, e.g. `assign_hms_config_keys_to_tenant`) — a coarse gate.
+1. A **static broad envelope** declared on the API object (`requestMetaData.permission`), per verb:
+
+   | Verb | Permission |
+   |---|---|
+   | `POST` (assign) | `assign_hms_config_keys_to_tenant` |
+   | `PUT` (propagate, re-parent, restore) | `assign_hms_config_keys_to_tenant` |
+   | `DELETE` (revoke) | `revoke_hms_config_keys_from_tenant` |
+   | `GET` (list, view) | none: Service Managers read their tenant's categories through it at login |
+
+   Only the general Tenant Managers hold these. **Changed 2026-10-11:** the envelope was declared but never checked (the object's `requestMetaData` sat beside `data`), so before this date any signed-in admin seat could propagate or restore assignments.
 2. The **real per-resource check** — `enforceAssignmentPermission('assign'|'revoke')` runs before assign/revoke and looks up the actor's exact `assign_<type>_to_tenant` / `revoke_<type>_from_tenant` permission in URDP.
 
 > **Singular vs plural — a real footgun.** `resource_type` strings are **singular**, but most permission names are **plural**: `service_category` → `assign_service_categories_to_tenant`, yet `location_type` → `assign_location_type_to_tenant` (singular!). The exact mapping lives in `enforceAssignmentPermission.js` — consult it rather than guessing.
