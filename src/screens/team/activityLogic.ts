@@ -11,6 +11,14 @@ const COUNT_LABEL: Record<string, string> = {
   passedAcceptanceCriteria: 'acceptance criteria passed',
 }
 
+// "1h 30m", "45m", "2h" — the bot's own way of writing a duration.
+const duration = (m: number | undefined) => {
+  const n = Math.max(0, Math.round(Number(m) || 0))
+  const h = Math.floor(n / 60)
+  const r = n % 60
+  return h ? (r ? `${h}h ${r}m` : `${h}h`) : `${r}m`
+}
+
 // "moved it to Done (was Open)", "set the scope to QA", "assigned Ana, removed Ben" …
 // Every sentence is phrased to follow the actor's name: "<Ana> moved it to Done".
 export function describeChange(c: ActivityChange): string {
@@ -43,6 +51,17 @@ export function describeChange(c: ActivityChange): string {
       return c.action === 'added' ? `made it blocked by "${c.title}"` : `unblocked it from "${c.title}"`
     case 'subtask':
       return `added a subtask "${c.title}"`
+    case 'startDate':
+    case 'dueDate': {
+      const what = c.field === 'startDate' ? 'start date' : 'due date'
+      return c.to ? `set the ${what} to ${c.to}` : `cleared the ${what}`
+    }
+    case 'comment':
+      return c.text ? `commented: "${c.text}"` : 'commented'
+    case 'time':
+      if (c.action === 'edited') return `changed logged time from ${duration(c.from)} to ${duration(c.to)}`
+      if (c.action === 'deleted') return `removed ${duration(c.minutes)} of logged time`
+      return `logged ${duration(c.minutes)}`
     default:
       return 'changed this task'
   }

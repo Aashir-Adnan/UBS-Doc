@@ -10,6 +10,9 @@ export type ActivityChange =
   | { field: 'project'; from: string | null; to: string | null }
   | { field: 'blocked_by'; action: 'added' | 'removed'; title: string }
   | { field: 'subtask'; action: 'added'; title: string }
+  | { field: 'startDate' | 'dueDate'; from: string | null; to: string | null }
+  | { field: 'comment'; text?: string }
+  | { field: 'time'; action: 'logged' | 'edited' | 'deleted'; minutes?: number; from?: number; to?: number; personId?: string }
 // Where a change came from: the site, the task MCP (`viaToken` = the token's
 // name) or Discord (null). `via` is optional: an older backend sends only viaSite.
 export type ActivityVia = 'site' | 'mcp' | null

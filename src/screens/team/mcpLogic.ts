@@ -40,7 +40,7 @@ export function cursorConfig(url: string, token: string): string {
   return JSON.stringify({ mcpServers: { ubs: { url, headers: { Authorization: `Bearer ${token}` } } } }, null, 2)
 }
 
-// The guide's tool list: the server's twelve tools (CSAAS Src/Mcp/server.js),
+// The guide's tool list: the server's sixteen tools (CSAAS Src/Mcp/server.js),
 // what each does and something to ask Claude that uses it. `write` tools need
 // a Full token.
 export const MCP_TOOLS: { name: string; write: boolean; what: string; ask: string }[] = [
@@ -51,11 +51,15 @@ export const MCP_TOOLS: { name: string; write: boolean; what: string; ask: strin
   { name: 'list_time_entries', write: false, what: 'Time entries for you or someone else, for a week or a date range.', ask: 'What did I log this week?' },
   { name: 'time_report', write: false, what: 'Time totals per person and per project.', ask: 'How many hours went into Framework since Monday?' },
   { name: 'clock_status', write: false, what: 'Whether your timer is running, and on what.', ask: 'Am I clocked in?' },
-  { name: 'create_task', write: true, what: 'A new task, with its Discord post, GitHub issue and notifications as from the site.', ask: 'Create a bug in CSAAS: login fails on Safari, assign it to me.' },
-  { name: 'update_task', write: true, what: 'Change title, description, status, assignees, project, estimate or blockers.', ask: 'Set that task to in progress and add Ali as an assignee.' },
+  { name: 'create_task', write: true, what: 'A new task, with start and due dates, its Discord post, GitHub issue and notifications as from the site.', ask: 'Create a bug in CSAAS: login fails on Safari, assign it to me.' },
+  { name: 'update_task', write: true, what: 'Change title, description, status, assignees, project, dates, estimate or blockers.', ask: 'Set that task to in progress and add Ali as an assignee.' },
   { name: 'create_subtask', write: true, what: 'A subtask under a task (one level deep).', ask: 'Break this task into subtasks for the API, the UI and the tests.' },
   { name: 'clock_in', write: true, what: 'Start your timer, optionally on a task. A running timer is stopped first.', ask: 'Clock me in on this task.' },
   { name: 'clock_out', write: true, what: 'Stop your timer, with a note of what was done.', ask: 'Clock me out: finished the Safari login fix.' },
+  { name: 'log_time', write: true, what: 'Time you already spent, in minutes or from a start to an end, optionally on a task.', ask: 'I forgot the timer — log 2 hours on the login bug for this morning.' },
+  { name: 'edit_time_entry', write: true, what: 'Fix one of your own entries: its length, times, task or note.', ask: 'That last entry should be 45 minutes, not an hour.' },
+  { name: 'delete_time_entry', write: true, what: 'Delete one of your own entries.', ask: 'Delete the entry I logged by mistake today.' },
+  { name: 'add_comment', write: true, what: "A note in the task's Discord post, with your name. Nobody is pinged.", ask: 'Comment on the task: API is done, UI next.' },
 ]
 
 // Pasted into ~/.claude/CLAUDE.md by a developer who wants the routine to run

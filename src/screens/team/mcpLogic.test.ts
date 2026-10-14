@@ -43,12 +43,14 @@ describe('mcpLogic', () => {
     expect(CLAUDE_REMOVE_LOCAL).toBe('claude mcp remove ubs --scope local')
   })
 
-  it('lists the twelve tools the server has, read tools before write tools', () => {
+  it('lists the sixteen tools the server has, read tools before write tools', () => {
     expect(MCP_TOOLS.map((t) => t.name)).toEqual([
       'list_projects', 'list_members', 'list_tasks', 'get_task', 'list_time_entries', 'time_report', 'clock_status',
-      'create_task', 'update_task', 'create_subtask', 'clock_in', 'clock_out',
+      'create_task', 'update_task', 'create_subtask', 'clock_in', 'clock_out', 'log_time', 'edit_time_entry', 'delete_time_entry', 'add_comment',
     ])
-    expect(MCP_TOOLS.filter((t) => t.write).map((t) => t.name)).toEqual(['create_task', 'update_task', 'create_subtask', 'clock_in', 'clock_out'])
+    expect(MCP_TOOLS.filter((t) => t.write).map((t) => t.name)).toEqual([
+      'create_task', 'update_task', 'create_subtask', 'clock_in', 'clock_out', 'log_time', 'edit_time_entry', 'delete_time_entry', 'add_comment',
+    ])
     for (const t of MCP_TOOLS) { expect(t.what).not.toBe(''); expect(t.ask).not.toBe('') }
   })
 

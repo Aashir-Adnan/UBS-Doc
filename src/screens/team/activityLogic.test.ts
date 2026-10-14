@@ -35,6 +35,19 @@ describe('describeChange', () => {
   it('falls back to a generic sentence for a field it does not know', () => {
     expect(describeChange({ field: 'something_new' } as never)).toBe('changed this task')
   })
+  it('describes start and due dates', () => {
+    expect(describeChange({ field: 'dueDate', from: null, to: '2026-10-31' })).toBe('set the due date to 2026-10-31')
+    expect(describeChange({ field: 'startDate', from: '2026-10-01', to: null })).toBe('cleared the start date')
+  })
+  it('quotes a comment, or just says one was left', () => {
+    expect(describeChange({ field: 'comment', text: 'API done' })).toBe('commented: "API done"')
+    expect(describeChange({ field: 'comment' })).toBe('commented')
+  })
+  it('describes logged time in hours and minutes', () => {
+    expect(describeChange({ field: 'time', action: 'logged', minutes: 90 })).toBe('logged 1h 30m')
+    expect(describeChange({ field: 'time', action: 'edited', from: 60, to: 45 })).toBe('changed logged time from 1h to 45m')
+    expect(describeChange({ field: 'time', action: 'deleted', minutes: 120 })).toBe('removed 2h of logged time')
+  })
 })
 
 describe('relativeTime', () => {

@@ -268,6 +268,7 @@ function Guide({ theme }: { theme: Theme }) {
         <li className={li}><span className={strong}>Start:</span> tell Claude which task you are on (&ldquo;let&rsquo;s work on the Safari login bug&rdquo;). It finds the task, and offers to set it <em>In progress</em> and clock you in on it.</li>
         <li className={li}><span className={strong}>While working:</span> ask it to update the description as the plan changes, and to split big work into subtasks.</li>
         <li className={li}><span className={strong}>Switching:</span> clock out of the old task with a note, then clock in on the new one, so the time lands on the right task.</li>
+        <li className={li}><span className={strong}>Forgot the timer?</span> ask it to log the time instead (&ldquo;log 2 hours on this task for this morning&rdquo;), and to fix or delete an entry that is wrong.</li>
         <li className={li}><span className={strong}>Finish:</span> say you are done; it offers to clock you out with a one-line note of what was done and to set the task to <em>Done</em>.</li>
         <li className={li}><span className={strong}>End of day:</span> ask &ldquo;am I clocked in?&rdquo; before you close the laptop.</li>
       </ol>
