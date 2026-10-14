@@ -5,8 +5,9 @@ import type { Theme } from '../../types'
 import { API_BASE_URL } from '../../components/portal/config'
 import { createMcpToken, listMcpTokens, revokeMcpToken } from '../../components/discordTasks/api'
 import {
-  EXPIRY_CHOICES, NAME_MAX, claudeCommand, cursorConfig, mcpUrl, tokenState, validateTokenName,
-  type CreatedMcpToken, type McpToken,
+  CLAUDE_MD_SNIPPET, CLAUDE_REMOVE_LOCAL, CURSOR_CONFIG_PATH, EXPIRY_CHOICES, INSTALL_SCOPES, MCP_TOOLS, NAME_MAX,
+  claudeCommand, cursorConfig, mcpUrl, tokenState, validateTokenName,
+  type CreatedMcpToken, type InstallScope, type McpToken,
 } from './mcpLogic'
 
 // Team → MCP: the caller's personal access tokens for the task MCP. The plain
@@ -185,25 +186,135 @@ export default function McpTab() {
           </div>
         )}
       </section>
+
+      <Guide theme={theme} />
     </>
   )
 }
 
 function CreatedBox({ created, url, theme, onDismiss }: { created: CreatedMcpToken; url: string; theme: Theme; onDismiss: () => void }) {
   const d = theme === 'dark'
+  const [where, setWhere] = useState<InstallScope>('user')
   return (
     <section aria-label="New token" className={c('rounded-2xl p-5 sm:p-7 mb-5 border', d ? 'bg-indigo-500/8 border-indigo-400/25' : 'bg-indigo-50 border-indigo-200')}>
       <h2 className={c('font-extrabold text-sm m-0 mb-1', txt(theme))}>Token &ldquo;{created.name}&rdquo; created</h2>
       <p className={c('text-xs font-semibold m-0 mb-3', d ? 'text-amber-300' : 'text-amber-700')}>Copy it now — you will not see it again.</p>
 
       <CodeBlock label="Token" text={created.token} theme={theme} inline />
-      <CodeBlock label="Claude Code" text={claudeCommand(url, created.token)} theme={theme} />
-      <CodeBlock label="Cursor (mcp.json)" text={cursorConfig(url, created.token)} theme={theme} />
+
+      <div className="mb-3">
+        <p id="mcp-install-label" className={c('text-[11px] font-bold uppercase tracking-wide mb-1.5', muted(theme))}>Add it for</p>
+        <div role="radiogroup" aria-labelledby="mcp-install-label" className="flex flex-wrap gap-2">
+          {INSTALL_SCOPES.map((o) => (
+            <button key={o.value} type="button" role="radio" aria-checked={where === o.value} title={o.hint}
+              onClick={() => setWhere(o.value)}
+              className={c('px-4 py-2 text-sm font-semibold rounded-xl border tr',
+                where === o.value ? 'bg-indigo-500 border-indigo-500 text-white' : d ? 'border-white/15 text-white/70' : 'border-slate-300 text-slate-600')}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <p className={c('text-xs font-medium m-0 mt-1.5', muted(theme))}>{INSTALL_SCOPES.find((o) => o.value === where)?.hint}</p>
+      </div>
+
+      <CodeBlock label="Claude Code (run in a terminal)" text={claudeCommand(url, created.token, where)} theme={theme} />
+      {where === 'user' && (
+        <p className={c('text-xs font-medium m-0 -mt-1 mb-3', muted(theme))}>
+          Added it for one project before? Run <code className="font-mono">{CLAUDE_REMOVE_LOCAL}</code> in that folder first — the project-only entry would win there.
+        </p>
+      )}
+      <CodeBlock label={`Cursor (${CURSOR_CONFIG_PATH[where]})`} text={cursorConfig(url, created.token)} theme={theme} />
+      {where === 'local' && (
+        <p className={c('text-xs font-semibold m-0 -mt-1 mb-3', d ? 'text-amber-300' : 'text-amber-700')}>
+          This file holds your token: add <code className="font-mono">.cursor/mcp.json</code> to .gitignore and never commit it.
+        </p>
+      )}
 
       <button type="button" onClick={onDismiss}
         className={c('mt-1 px-3 py-1.5 text-xs font-semibold rounded-lg border tr', d ? 'border-white/15 text-white/70 hover:bg-white/6' : 'border-slate-300 text-slate-600 hover:bg-white')}>
         I have copied it
       </button>
+    </section>
+  )
+}
+
+// How to use it: always on the page, token or not. The server itself tells
+// Claude the same routine (offer, never unasked); the CLAUDE.md snippet is the
+// developer's opt-in to make it automatic.
+function Guide({ theme }: { theme: Theme }) {
+  const d = theme === 'dark'
+  const h3 = c('font-extrabold text-sm m-0 mb-2 mt-6', txt(theme))
+  const p = c('text-sm font-medium m-0 mb-2', muted(theme))
+  const li = c('text-sm font-medium', muted(theme))
+  const strong = c('font-bold', txt(theme))
+  return (
+    <section aria-labelledby="mcp-guide" className={c(card(theme), 'rounded-2xl p-5 sm:p-7 mt-5')}>
+      <h2 id="mcp-guide" className={c('font-extrabold text-xl m-0 mb-1', txt(theme))}>How to use it</h2>
+      <p className={p}>
+        The MCP lets Claude Code or Cursor read and change the same tasks you see here and in Discord, as you. Everything it changes is
+        visible to the team and marked &ldquo;via MCP&rdquo; with the token&rsquo;s name.
+      </p>
+
+      <h3 className={h3}>1. Connect</h3>
+      <ol className="list-decimal pl-5 m-0 mb-2 space-y-1">
+        <li className={li}>Create a token above. <span className={strong}>Full</span> if Claude should update tasks and clock you in and out; <span className={strong}>Read only</span> to just look things up.</li>
+        <li className={li}>Pick <span className={strong}>All projects</span> and run the Claude Code command in any terminal, or paste the Cursor config into <code className="font-mono text-xs">{CURSOR_CONFIG_PATH.user}</code>.</li>
+        <li className={li}>Restart Claude Code (or Cursor) and check: <code className="font-mono text-xs">claude mcp list</code> shows <code className="font-mono text-xs">ubs</code> as connected.</li>
+        <li className={li}>Ask &ldquo;which projects do I have access to?&rdquo; to try it.</li>
+      </ol>
+
+      <h3 className={h3}>2. Daily routine</h3>
+      <ol className="list-decimal pl-5 m-0 mb-2 space-y-1">
+        <li className={li}><span className={strong}>Start:</span> tell Claude which task you are on (&ldquo;let&rsquo;s work on the Safari login bug&rdquo;). It finds the task, and offers to set it <em>In progress</em> and clock you in on it.</li>
+        <li className={li}><span className={strong}>While working:</span> ask it to update the description as the plan changes, and to split big work into subtasks.</li>
+        <li className={li}><span className={strong}>Switching:</span> clock out of the old task with a note, then clock in on the new one, so the time lands on the right task.</li>
+        <li className={li}><span className={strong}>Finish:</span> say you are done; it offers to clock you out with a one-line note of what was done and to set the task to <em>Done</em>.</li>
+        <li className={li}><span className={strong}>End of day:</span> ask &ldquo;am I clocked in?&rdquo; before you close the laptop.</li>
+      </ol>
+
+      <h3 className={h3}>3. Make it automatic (optional)</h3>
+      <p className={p}>
+        By default Claude asks before it clocks you in or out. To have it do the routine without asking, paste this into
+        your <code className="font-mono text-xs">~/.claude/CLAUDE.md</code> (Windows: <code className="font-mono text-xs">%USERPROFILE%\.claude\CLAUDE.md</code>; create
+        the file if it is not there). In Cursor, add it under Settings → Rules → User Rules.
+      </p>
+      <CodeBlock label="CLAUDE.md" text={CLAUDE_MD_SNIPPET} theme={theme} />
+
+      <h3 className={h3}>4. What you can ask</h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm border-collapse">
+          <thead>
+            <tr className={c('text-[11px] font-bold uppercase tracking-wide', muted(theme))}>
+              <th scope="col" className="py-2 pr-4 font-bold">Tool</th>
+              <th scope="col" className="py-2 pr-4 font-bold">What it does</th>
+              <th scope="col" className="py-2 font-bold">Try asking</th>
+            </tr>
+          </thead>
+          <tbody className={c('divide-y', d ? 'divide-white/6' : 'divide-slate-100')}>
+            {MCP_TOOLS.map((t) => (
+              <tr key={t.name}>
+                <td className={c('py-2.5 pr-4 align-top whitespace-nowrap', txt(theme))}>
+                  <code className="font-mono text-xs font-semibold">{t.name}</code>
+                  {t.write && <span className={c('ml-2 text-[10px] font-bold uppercase tracking-wide', d ? 'text-indigo-300' : 'text-indigo-600')}>Full</span>}
+                </td>
+                <td className={c('py-2.5 pr-4 align-top', muted(theme))}>{t.what}</td>
+                <td className={c('py-2.5 align-top italic', muted(theme))}>&ldquo;{t.ask}&rdquo;</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className={c('text-xs font-medium m-0 mt-2', muted(theme))}>
+        Projects and people can be named (&ldquo;me&rdquo; is you); task ids can be shortened to their first 8 characters.
+      </p>
+
+      <h3 className={h3}>5. Keep it safe</h3>
+      <ul className="list-disc pl-5 m-0 space-y-1">
+        <li className={li}>A token is a password for your account: never paste it into a chat, a ticket or a repository, and never commit an <code className="font-mono text-xs">mcp.json</code> that holds one.</li>
+        <li className={li}>Lost a laptop or leaked a token? Revoke it above; anything using it stops at once.</li>
+        <li className={li}>Use a Read only token on shared or demo machines.</li>
+        <li className={li}>Read what Claude is about to change before you agree — the team sees every change.</li>
+      </ul>
     </section>
   )
 }
