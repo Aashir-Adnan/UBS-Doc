@@ -40,7 +40,7 @@ export function cursorConfig(url: string, token: string): string {
   return JSON.stringify({ mcpServers: { ubs: { url, headers: { Authorization: `Bearer ${token}` } } } }, null, 2)
 }
 
-// The guide's tool list: the server's sixteen tools (CSAAS Src/Mcp/server.js),
+// The guide's tool list: the server's seventeen tools (CSAAS Src/Mcp/server.js),
 // what each does and something to ask Claude that uses it. `write` tools need
 // a Full token.
 export const MCP_TOOLS: { name: string; write: boolean; what: string; ask: string }[] = [
@@ -60,6 +60,7 @@ export const MCP_TOOLS: { name: string; write: boolean; what: string; ask: strin
   { name: 'edit_time_entry', write: true, what: 'Fix one of your own entries: its length, times, task or note.', ask: 'That last entry should be 45 minutes, not an hour.' },
   { name: 'delete_time_entry', write: true, what: 'Delete one of your own entries.', ask: 'Delete the entry I logged by mistake today.' },
   { name: 'add_comment', write: true, what: "A note in the task's Discord post, with your name. Nobody is pinged.", ask: 'Comment on the task: API is done, UI next.' },
+  { name: 'delete_task', write: true, what: 'Delete a task you created (leads: any). It first shows what would go, and deletes only after you confirm. An admin can restore it.', ask: 'Delete the duplicate login task I made yesterday.' },
 ]
 
 // Pasted into ~/.claude/CLAUDE.md by a developer who wants the routine to run

@@ -315,6 +315,7 @@ function Guide({ theme }: { theme: Theme }) {
         <li className={li}>Lost a laptop or leaked a token? Revoke it above; anything using it stops at once.</li>
         <li className={li}>Use a Read only token on shared or demo machines.</li>
         <li className={li}>Read what Claude is about to change before you agree — the team sees every change.</li>
+        <li className={li}>Deleting asks first: Claude shows what would go and deletes only after you say yes. Only a task&rsquo;s creator or a lead can delete it.</li>
       </ul>
     </section>
   )
